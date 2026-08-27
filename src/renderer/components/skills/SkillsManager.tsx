@@ -388,7 +388,7 @@ export function SkillsManager(props: {
       </p>
       <p className="text-xs text-muted">
         <Trans>
-          Disabling a skill moves it out of active skill folders and removes Poracode-managed
+          Disabling a skill moves it out of active skill folders and removes Y Space-managed
           provider copies. Its files are preserved so you can enable it again.
         </Trans>
       </p>
@@ -579,7 +579,7 @@ function SkillRow(props: {
           ) : null}
           {skill.availability === "poracode" ? (
             <span className="shrink-0 rounded bg-surface-secondary px-1.5 py-0.5 text-[10px] text-muted">
-              <Trans>Poracode only</Trans>
+              <Trans>Y Space only</Trans>
             </span>
           ) : null}
           {skill.linked ? (

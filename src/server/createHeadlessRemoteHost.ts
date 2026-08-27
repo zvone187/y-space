@@ -224,6 +224,10 @@ export async function createHeadlessRemoteHost(
       // WebSocket reconnect (the replay window covers transient drops).
     },
   });
+  const resolveProviderSessionIdentity =
+    (serverId: "browser" | "app-controls") => async (providerSessionId: string) =>
+      (await supervisorClient.call("resolveMcpCallerIdentity", { providerSessionId, serverId })) ??
+      undefined;
   const scheduleCoordinator = new ScheduleRunCoordinator({
     startThread: (payload) => supervisorClient.call("startThread", payload),
     getAgentStatuses: (wslDistros) => supervisorClient.call("getAgentStatuses", { wslDistros }),
@@ -311,6 +315,7 @@ export async function createHeadlessRemoteHost(
     getProjects: () => dbGetProjects(),
     getProject: dbGetProject,
     getProjectNotes: dbGetProjectNotes,
+    resolveProviderSessionIdentity: resolveProviderSessionIdentity("app-controls"),
     ...sharedAppControlsDeps,
     settings: {
       read: () => readSharedSettingsFile(paths.settingsPath),
@@ -338,7 +343,7 @@ export async function createHeadlessRemoteHost(
     // honest not-available result instead of silently succeeding.
     notifyUser: () => ({
       delivered: false,
-      note: "No Poracode desktop app is connected, so no OS notification could be shown.",
+      note: "No Y Space desktop app is connected, so no OS notification could be shown.",
     }),
     checkForUpdate: async () => ({
       supported: false,

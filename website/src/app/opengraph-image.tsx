@@ -41,7 +41,7 @@ export default function OpengraphImage() {
           color: "transparent",
         }}
       >
-        Poracode
+        Y Space
       </div>
 
       <div

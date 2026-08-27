@@ -1,4 +1,4 @@
-// Renders the Poracode SVG masters into the committed Capacitor native
+// Renders the Y Space SVG masters into the committed Capacitor native
 // projects (ios/, android/): app icons, adaptive-icon layers, and splash
 // screens. Companion to build-icons.mjs (desktop/website/PWA assets).
 // Idempotent — overwrites in place; skips a platform whose native project is
@@ -17,7 +17,7 @@ const ROOT = resolve(HERE, "../..");
 const TILE_BG = "#0E0E14";
 // App/window background (matches capacitor.config.ts backgroundColor).
 const SPLASH_BG = "#070709";
-// Glyph fill used by poracode-icon.svg for the "P".
+// Glyph fill used by poracode-icon.svg for the "Y".
 const GLYPH_COLOR = "#EAF0FB";
 
 const iconSvg = await readFile(`${HERE}poracode-icon.svg`);
@@ -29,10 +29,9 @@ const glyphSvg = Buffer.from(
 const roundIconSvg = Buffer.from(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <circle cx="512" cy="512" r="512" fill="${TILE_BG}"/>
-  <path fill-rule="evenodd" fill="${GLYPH_COLOR}"
-    d="M352,300 H556 A152,152 0 0 1 556,604 H472 V730 H352 Z
-       M472,392 H548 A60,60 0 0 1 548,512 H472 Z"/>
-  <circle cx="636" cy="694" r="46" fill="#8B7BFF"/>
+  <path fill="${GLYPH_COLOR}"
+    d="M302 286H442L512 410L582 286H722L576 536V738H448V536L302 286Z"/>
+  <circle cx="690" cy="690" r="42" fill="#8B7BFF"/>
 </svg>`,
 );
 

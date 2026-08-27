@@ -3,10 +3,13 @@ import { createLocalIpcHandlers } from "./localHandlers";
 
 type FetchMock = (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
-function makeHandlers() {
+function makeHandlers(
+  browserPanelManager: { openLink(url: string): Promise<boolean> } | null = null,
+  openSystemUrl?: (url: string) => Promise<void>,
+) {
   return createLocalIpcHandlers({
     getMainWindow: () => null,
-    getBrowserPanelManager: () => null,
+    getBrowserPanelManager: () => browserPanelManager as never,
     getRemoteAccessServer: () => null,
     setRemoteAccessEnabled: vi.fn<(enabled: boolean) => Promise<{ status: "disabled" }>>(
       async () => ({ status: "disabled" }),
@@ -50,6 +53,11 @@ function makeHandlers() {
     requestRelaunch: vi.fn<() => void>(),
     scheduleService: {} as never,
     prWatchService: {} as never,
+    pipedreamMainService: {} as never,
+    browserCookieImportService: {} as never,
+    cookieImportBridge: {} as never,
+    browserCookieImportExtensionDir: "/tmp/y-space-cookie-import",
+    ...(openSystemUrl ? { openSystemUrl } : {}),
   });
 }
 
@@ -152,4 +160,42 @@ describe("local remoteHttpRequest handler", () => {
       message: "Remote request timed out after 60000ms.",
     });
   });
+});
+
+describe("local external-link handlers", () => {
+  it.each(["openExternal", "openExternalNative"] as const)(
+    "routes %s HTTP(S) links into the embedded browser",
+    async (handlerName) => {
+      const openLink = vi.fn<(url: string) => Promise<boolean>>(async () => true);
+      const handlers = makeHandlers({ openLink });
+
+      await handlers[handlerName]("https://example.test/settings?source=y-space");
+
+      expect(openLink).toHaveBeenCalledWith("https://example.test/settings?source=y-space");
+    },
+  );
+
+  it.each(["openExternal", "openExternalNative"] as const)(
+    "fails closed for %s HTTP(S) links before the embedded browser is initialized",
+    async (handlerName) => {
+      const openSystemUrl = vi.fn<(url: string) => Promise<void>>(async () => undefined);
+
+      await expect(
+        makeHandlers(null, openSystemUrl)[handlerName]("https://example.test/early"),
+      ).rejects.toThrow("Embedded browser is not initialized");
+
+      expect(openSystemUrl).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["openExternal", "openExternalNative"] as const)(
+    "allows %s mail links to use the operating-system mail handler",
+    async (handlerName) => {
+      const openSystemUrl = vi.fn<(url: string) => Promise<void>>(async () => undefined);
+
+      await makeHandlers(null, openSystemUrl)[handlerName]("mailto:hello@example.test");
+
+      expect(openSystemUrl).toHaveBeenCalledWith("mailto:hello@example.test");
+    },
+  );
 });

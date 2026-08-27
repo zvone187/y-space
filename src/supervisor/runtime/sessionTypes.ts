@@ -13,6 +13,7 @@ import type {
   McpLaunchSnapshot,
 } from "@/shared/contracts";
 import type { TranscriptBuffer } from "@/shared/transcriptBuffer";
+import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import type {
   AgentAdapter,
   AgentNativePlugin,
@@ -57,6 +58,8 @@ export interface SessionRuntime {
   launchConfig?: ThreadConfig;
   /** MCP launch snapshot reused by restart and recovery paths. */
   mcpLaunchSnapshot: McpLaunchSnapshot;
+  /** Trusted app-thread identity used to scope built-in MCP calls. */
+  mcpIdentity?: McpThreadIdentity;
   /** Provider-native plugin packages that replace matching Poracode contributions. */
   nativePlugins?: readonly AgentNativePlugin[];
   sessionRef?: SessionRef;

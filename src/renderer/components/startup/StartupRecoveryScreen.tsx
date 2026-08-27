@@ -46,7 +46,7 @@ export function StartupRecoveryScreen(props: StartupRecoveryScreenProps) {
             </h1>
             <p className="mt-2 text-sm leading-6 text-muted">
               <Trans>
-                Poracode may be waiting on saved data or a background service. You can keep waiting,
+                Y Space may be waiting on saved data or a background service. You can keep waiting,
                 restart, or install an available update.
               </Trans>
             </p>
@@ -90,7 +90,7 @@ export function StartupRecoveryScreen(props: StartupRecoveryScreenProps) {
           </Button>
           <Button size="sm" variant="secondary" onPress={restart}>
             <RotateCcw className="size-3.5" />
-            <Trans>Restart Poracode</Trans>
+            <Trans>Restart Y Space</Trans>
           </Button>
           {phase === "downloaded" ? (
             <Button size="sm" variant="primary" onPress={() => void readBridge().installUpdate()}>

@@ -1,7 +1,7 @@
 {
   "name": "poracode-status",
   "version": "1.0.0",
-  "description": "Forward Qoder CLI lifecycle events to Poracode for sidebar status detection.",
-  "author": "Poracode",
+  "description": "Forward Qoder CLI lifecycle events to Y Space for sidebar status detection.",
+  "author": "Y Space",
   "license": "Apache-2.0"
 }

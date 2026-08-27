@@ -62,8 +62,8 @@ import { LanguageSelector } from "@/components/LanguageSelector";
 import {
   BrandLockup,
   BrandWordmark,
-  PoraGlyph,
-  PoraIconTile,
+  YSpaceGlyph,
+  YSpaceIconTile,
   MonoLockup,
   DotPeriod,
 } from "@/components/BrandMark";
@@ -164,7 +164,7 @@ const DETAILS = [
   { icon: Keyboard, title: "detail.shortcuts.title", desc: "detail.shortcuts.desc" },
 ] as const;
 
-// The built-in MCP servers Poracode exposes to any agent that speaks MCP.
+// The built-in MCP servers Y Space exposes to any agent that speaks MCP.
 // `server` is the literal server name an agent addresses, so it stays untranslated.
 const MCP_POWERS = [
   {
@@ -187,7 +187,7 @@ const MCP_POWERS = [
     desc: "mcp.surfaces.desc",
   },
   // The user's side of the same story, given a full-width card: the servers
-  // above are Poracode's, this one is everyone else's.
+  // above are Y Space's, this one is everyone else's.
   {
     icon: Server,
     server: "stdio · http · sse",
@@ -477,10 +477,10 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
       title: t(g.title),
     })),
   ];
-  // Lead with the `Pora.code` wordmark, so the headline copy is the value-prop
-  // only: drop the "Poracode —" brand prefix from title1 and the trailing
-  // full-stop from title2 (the Pora dot stands in for it). Locale-safe.
-  const descriptor = `${t("hero.title1").replace(/^Poracode\s*[—–-]\s*/u, "")} ${t(
+  // Lead with the `Y Space` wordmark, so the headline copy is the value-prop
+  // only: drop the "Y Space —" brand prefix from title1 and the trailing
+  // full-stop from title2 (the Y Space dot stands in for it). Locale-safe.
+  const descriptor = `${t("hero.title1").replace(/^Y Space\s*[—–-]\s*/u, "")} ${t(
     "hero.title2",
   ).replace(/[.。]\s*$/u, "")}`;
 
@@ -514,7 +514,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
           <Link
             href={homeHref}
             prefetch={false}
-            aria-label="Poracode"
+            aria-label="Y Space"
             className="transition-opacity hover:opacity-90"
           >
             <BrandLockup />
@@ -542,7 +542,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
               {t("nav.changelog")}
             </Link>
             <a
-              href="https://github.com/SDSLeon/lightcode"
+              href="https://github.com/zvone187/y-space"
               target="_blank"
               rel="noreferrer"
               aria-label="GitHub"
@@ -600,7 +600,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
               <ArrowUpRight className="h-4 w-4 text-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </a>
             <a
-              href="https://github.com/SDSLeon/lightcode"
+              href="https://github.com/zvone187/y-space"
               target="_blank"
               rel="noreferrer"
               className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 font-semibold text-moon transition will-change-transform hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]"
@@ -672,7 +672,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
           <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_28%,rgba(139,123,255,0.22),transparent)] blur-[90px]" />
           <AppWindow
             src="/hero-screenshot.png"
-            alt="Poracode desktop app running Claude and Codex coding agents side by side"
+            alt="Y Space desktop app running Claude and Codex coding agents side by side"
             width={2920}
             height={1840}
             chrome
@@ -887,7 +887,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
           <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/[0.08] bg-tile px-6 py-20 text-center sm:px-12">
             <div className="pointer-events-none absolute -top-24 left-1/2 h-[360px] w-[760px] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,123,255,0.22),transparent)] blur-2xl" />
             <div className="relative">
-              <PoraIconTile className="mx-auto mb-7 h-14 w-14" />
+              <YSpaceIconTile className="mx-auto mb-7 h-14 w-14" />
               <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
                 {descriptor}
                 <DotPeriod />
@@ -906,7 +906,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
                   {t("hero.downloadFor", { platform: platform.label })}
                 </a>
                 <a
-                  href="https://github.com/SDSLeon/lightcode"
+                  href="https://github.com/zvone187/y-space"
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-6 font-medium text-moon transition hover:border-white/20 hover:bg-white/[0.06]"
@@ -926,7 +926,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
       <footer className="relative z-10 border-t border-white/[0.06] px-5 py-12 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 md:flex-row">
           <div className="flex items-center gap-2.5">
-            <PoraIconTile className="h-7 w-7" />
+            <YSpaceIconTile className="h-7 w-7" />
             <BrandWordmark className="text-base" />
           </div>
           <p className="font-mono text-[12px] text-dim">{t("footer.copyright", { year: 2026 })}</p>
@@ -944,7 +944,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
               {t("nav.changelog")}
             </Link>
             <a
-              href="https://github.com/SDSLeon/lightcode"
+              href="https://github.com/zvone187/y-space"
               className="font-mono text-[13px] text-dim transition-colors hover:text-moon"
             >
               GitHub
@@ -959,7 +959,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
 
 /**
  * The web-app pitch rendered as a real browser window — the address bar is the
- * message. Chrome bar (traffic lights, nav, `app.poracode.com` address pill with
+ * message. Chrome bar (traffic lights, nav, Y Space Remote address pill with
  * a live pora-dot), a living pairing link (desktop ⇄ browser), and the localized
  * description. The whole window links to the web app.
  */
@@ -983,7 +983,7 @@ function WebAppCard({ className, description }: { className?: string; descriptio
         </span>
         <span className="mx-auto flex min-w-0 items-center gap-2 rounded-md border border-white/[0.06] bg-night/70 px-3 py-1">
           <Lock className="h-3 w-3 shrink-0 text-ice" />
-          <span className="truncate font-mono text-[12px] text-dim">app.poracode.com</span>
+          <span className="truncate font-mono text-[12px] text-dim">Y Space Remote</span>
           <span className="pora-dot pora-pulse h-1 w-1 shrink-0" />
         </span>
         <ArrowUpRight className="h-4 w-4 shrink-0 text-dim transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-moon" />
@@ -993,7 +993,7 @@ function WebAppCard({ className, description }: { className?: string; descriptio
         <span className="brand-grid absolute inset-0 opacity-50" />
         <span className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.14),transparent)] blur-2xl" />
         <span className="relative flex items-center justify-center">
-          <PoraIconTile className="h-11 w-11 sm:h-14 sm:w-14" />
+          <YSpaceIconTile className="h-11 w-11 sm:h-14 sm:w-14" />
           <span className="relative mx-2 h-px w-20 bg-white/15 sm:mx-3 sm:w-28">
             <span className="pora-pair-dot absolute -top-[3px] h-[7px] w-[7px] rounded-full bg-accent [box-shadow:0_0_8px_rgba(139,123,255,0.8)]" />
           </span>
@@ -1013,7 +1013,7 @@ function WebAppCard({ className, description }: { className?: string; descriptio
 /**
  * The web app on a phone — the paired state. Where the browser card pitches the
  * pairing (traveling dot), the phone shows its outcome: the app glyph breathing,
- * a confirmed `paired` status, and the `app.poracode.com` address pill. Pure
+ * a confirmed `paired` status, and the Y Space Remote address pill. Pure
  * CSS/SVG; no capture asset. The whole device links to the web app.
  */
 function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; className?: string }) {
@@ -1038,7 +1038,7 @@ function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; classNam
         {/* address pill */}
         <span className="mx-3 mt-3 flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-tile-2 px-3 py-1.5">
           <Lock className="h-2.5 w-2.5 shrink-0 text-ice" />
-          <span className="truncate font-mono text-[10px] text-dim">app.poracode.com</span>
+          <span className="truncate font-mono text-[10px] text-dim">Y Space Remote</span>
           <span className="pora-dot pora-pulse ml-auto h-1 w-1 shrink-0" />
         </span>
         {/* paired state */}
@@ -1047,7 +1047,7 @@ function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; classNam
           <span className="pointer-events-none absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.16),transparent)] blur-2xl" />
           <span className="relative">
             <span className="pora-pulse absolute -inset-3 rounded-[32%] bg-accent/15 blur-xl" />
-            <PoraIconTile className="relative h-16 w-16" />
+            <YSpaceIconTile className="relative h-16 w-16" />
           </span>
           <span className="relative flex items-center gap-2 font-mono text-[11px] text-dim">
             <span className="pora-dot h-1.5 w-1.5" />
@@ -1063,7 +1063,7 @@ function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; classNam
 }
 
 /**
- * Framed app-capture window. The hero passes `chrome` (macOS title bar + `pora.code`
+ * Framed app-capture window. The hero passes `chrome` (macOS title bar + `y.space`
  * mono URL), `badge` (floating glyph), and `parallax` (mouse tilt); the zig-zag
  * captures use the bare frame. The shared shell (border, top hairline, inset ring)
  * lives here once so it can't drift between callers.
@@ -1139,7 +1139,7 @@ function AppWindow({
       <LightboxTrigger onOpen={onOpen} />
       {badge ? (
         <div className="absolute -bottom-5 -left-4 hidden h-12 w-12 rotate-3 items-center justify-center rounded-2xl border border-white/10 bg-tile brand-glow sm:flex">
-          <PoraGlyph className="h-6 w-6 text-moon" />
+          <YSpaceGlyph className="h-6 w-6 text-moon" />
         </div>
       ) : null}
     </div>

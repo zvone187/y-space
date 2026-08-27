@@ -1,5 +1,5 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readFile, stat } from "node:fs/promises";
+import { basename, dirname } from "node:path";
 import { app, clipboard, dialog, nativeImage, shell, type BrowserWindow } from "electron";
 import type { BrowserPanelManager } from "../browser";
 import { openMicrophoneSettings } from "../browser/permissions";
@@ -94,6 +94,8 @@ import {
   requestLegacyDataMigration,
   resolveLegacyElectronUserDataDir,
 } from "../legacyDataMigration";
+import type { PipedreamMainService } from "../pipedream/PipedreamMainService";
+import type { BrowserCookieImportService, CookieImportBridgeServer } from "../browser/cookieImport";
 
 interface CreateLocalIpcHandlersOptions {
   getMainWindow(): BrowserWindow | null;
@@ -122,6 +124,12 @@ interface CreateLocalIpcHandlersOptions {
   requestRelaunch(): void;
   scheduleService: ScheduleService;
   prWatchService: PrWatchService;
+  pipedreamMainService: PipedreamMainService;
+  browserCookieImportService: BrowserCookieImportService;
+  cookieImportBridge: CookieImportBridgeServer;
+  browserCookieImportExtensionDir: string;
+  /** Test seam for protocols that intentionally leave the embedded browser (currently mailto). */
+  openSystemUrl?(url: string): Promise<void>;
 }
 
 function requireBrowserPanel(getter: () => BrowserPanelManager | null): BrowserPanelManager {
@@ -215,6 +223,22 @@ export function createLocalIpcHandlers(
     options.onSharedSettingsChanged?.(applied.settings);
     return applied.result;
   };
+  const openAllowedExternalUrl = async (rawUrl: string): Promise<void> => {
+    const safeUrl = assertSafeExternalUrl(rawUrl);
+    const protocol = new URL(safeUrl).protocol;
+    if (protocol === "http:" || protocol === "https:") {
+      const browserPanel = options.getBrowserPanelManager();
+      if (!browserPanel || !(await browserPanel.openLink(safeUrl))) {
+        throw new Error("Embedded browser is not initialized.");
+      }
+      return;
+    }
+    if (options.openSystemUrl) {
+      await options.openSystemUrl(safeUrl);
+      return;
+    }
+    await shell.openExternal(safeUrl);
+  };
   return defineMainLocalIpcHandlers({
     pickFolder: async (defaultPath) => {
       const result = await dialog.showOpenDialog(options.getMainWindow()!, {
@@ -249,6 +273,45 @@ export function createLocalIpcHandlers(
       writeImageFile(result.filePath, data);
       return result.filePath;
     },
+    pipedreamBeginConnect: (payload) => options.pipedreamMainService.beginConnect(payload),
+    browserCookieImportOpenExtensionFolder: async () => {
+      const error = await shell.openPath(options.browserCookieImportExtensionDir);
+      if (error) throw new Error("Unable to open the Y Space Cookie Import extension folder.");
+    },
+    browserCookieImportGetState: () => options.browserCookieImportService.getState(),
+    browserCookieImportChooseFile: async ({ targetUrls }) => {
+      const result = await dialog.showOpenDialog(options.getMainWindow()!, {
+        title: "Choose a cookie export",
+        properties: ["openFile"],
+        filters: [
+          { name: "Cookie exports", extensions: ["json", "txt", "cookies"] },
+          { name: "All files", extensions: ["*"] },
+        ],
+      });
+      const filePath = result.filePaths[0];
+      if (result.canceled || !filePath) return null;
+      const metadata = await stat(filePath);
+      if (!metadata.isFile() || metadata.size > 4 * 1024 * 1024) {
+        throw new Error("Cookie file must be no larger than 4 MiB.");
+      }
+      const serialized = await readFile(filePath, "utf8");
+      return options.browserCookieImportService.previewFile({
+        fileName: basename(filePath),
+        serialized,
+        targetUrls,
+      });
+    },
+    browserCookieImportBeginPairing: () => options.cookieImportBridge.beginPairing(),
+    browserCookieImportCancelPairing: ({ pairingId }) => {
+      options.cookieImportBridge.cancelPairing(pairingId);
+    },
+    browserCookieImportForgetSource: ({ sourceId }) => {
+      options.cookieImportBridge.forgetSource(sourceId);
+    },
+    browserCookieImportPreview: (payload) => options.browserCookieImportService.preview(payload),
+    browserCookieImportCommit: (payload) => options.browserCookieImportService.commit(payload),
+    browserCookieImportCancel: ({ requestId }) =>
+      options.browserCookieImportService.cancel(requestId),
     copyImageToClipboard: ({ data }) => {
       // `nativeImage.createFromBuffer` only decodes PNG/JPEG; the renderer
       // converts other formats to PNG first. Report whether anything landed on
@@ -301,17 +364,8 @@ export function createLocalIpcHandlers(
         clearTimeout(timeout);
       }
     },
-    openExternal: async (url) => {
-      const safeUrl = assertSafeExternalUrl(url);
-      const browserPanel = options.getBrowserPanelManager();
-      if (browserPanel && (await browserPanel.openLink(safeUrl))) {
-        return;
-      }
-      await shell.openExternal(safeUrl);
-    },
-    openExternalNative: async (url) => {
-      await shell.openExternal(assertSafeExternalUrl(url));
-    },
+    openExternal: openAllowedExternalUrl,
+    openExternalNative: openAllowedExternalUrl,
     openMicrophoneSettings: () => openMicrophoneSettings(),
     focusWindow: () => {
       const win = options.getMainWindow();

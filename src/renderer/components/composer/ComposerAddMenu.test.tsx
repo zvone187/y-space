@@ -2,12 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { ComposerAddMenu } from "./ComposerAddMenu";
-import {
-  browserMcpServer,
-  chromeMcpServer,
-  mcpTogglePatch,
-  crossagentMcpServer,
-} from "./composerMcpServers";
+import { browserMcpServer, crossagentMcpServer } from "./composerMcpServers";
 
 const bridgeMock = vi.hoisted(() => ({
   isRemoteSession: vi.fn<() => boolean>(() => false),
@@ -32,18 +27,6 @@ function openMcpSubmenu() {
 describe("ComposerAddMenu", () => {
   beforeEach(() => {
     bridgeMock.isRemoteSession.mockReturnValue(false);
-  });
-
-  it("keeps Chrome unavailable for WSL projects", () => {
-    expect(
-      chromeMcpServer.isAvailable({
-        kind: "wsl",
-        distro: "Ubuntu",
-        linuxPath: "/home/demo/repo",
-        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\repo",
-      }),
-    ).toBe(false);
-    expect(chromeMcpServer.isAvailable({ kind: "windows", path: "C:\\repo" })).toBe(true);
   });
 
   it("keeps the desktop dropdown trigger free of nested buttons", () => {
@@ -154,12 +137,6 @@ describe("ComposerAddMenu", () => {
             visible: true,
             onToggle: vi.fn<(next: boolean) => void>(),
           },
-          {
-            descriptor: chromeMcpServer,
-            enabled: false,
-            visible: true,
-            onToggle: vi.fn<(next: boolean) => void>(),
-          },
         ]}
         computerUse={{ enabled: true, visible: true, onToggle: vi.fn<(next: boolean) => void>() }}
         showFileOption={false}
@@ -206,28 +183,6 @@ describe("ComposerAddMenu", () => {
 
     // The submenu stays open so multiple toggles are possible.
     expect(screen.getByText("Crossagents")).toBeInTheDocument();
-  });
-
-  it("registers Chrome for native projects and hides it for WSL", () => {
-    const capabilities = {
-      mcpScope: { terminal: "launch", gui: "launch" },
-    } as Parameters<typeof chromeMcpServer.getScope>[0];
-
-    expect(
-      chromeMcpServer.getScope(capabilities, "terminal", {
-        kind: "windows",
-        path: "C:\\repo",
-      }),
-    ).toBe("launch");
-    expect(
-      chromeMcpServer.getScope(capabilities, "terminal", {
-        kind: "wsl",
-        distro: "Ubuntu",
-        linuxPath: "/repo",
-        uncPath: "\\\\wsl.localhost\\Ubuntu\\repo",
-      }),
-    ).toBe("none");
-    expect(mcpTogglePatch("chromeMcp", true)).toEqual({ chromeMcp: true });
   });
 
   it("captions the submenu with the persistence note", () => {

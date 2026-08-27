@@ -163,7 +163,7 @@ function defaultClientMetadata(): RemoteClientMetadata {
   const userAgent = globalThis.navigator?.userAgent;
   const isMobile = userAgent ? /\bMobile\b/i.test(userAgent) : false;
   return {
-    label: isMobile ? "Poracode mobile web" : "Poracode web app",
+    label: isMobile ? "Y Space mobile web" : "Y Space web app",
     deviceType: isMobile ? "mobile" : "browser",
     ...(userAgent ? { os: userAgent } : {}),
   };

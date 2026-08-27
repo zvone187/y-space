@@ -4,10 +4,10 @@
   "version": "1.1.0",
   "description": "Control desktop apps and complete visual workflows.",
   "author": {
-    "name": "Poracode",
-    "url": "https://poracode.com"
+    "name": "Y Space",
+    "url": "https://github.com/zvone187/y-space"
   },
-  "homepage": "https://poracode.com",
+  "homepage": "https://github.com/zvone187/y-space",
   "license": "Apache-2.0",
   "keywords": ["desktop", "automation", "computer-use"],
   "extensions": {
@@ -25,7 +25,7 @@
       "skills": {
         "computer-use": {
           "name": "Computer Use",
-          "description": "Operate desktop apps through Poracode's desktop-control tools.",
+          "description": "Operate desktop apps through Y Space's desktop-control tools.",
           "nativePluginName": "computer-use",
           "nativeSkill": "computer-use"
         }

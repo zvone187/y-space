@@ -36,6 +36,7 @@ import { DevSettings } from "./parts/DevSettings";
 import { McpServersSettings } from "./parts/McpServersSettings";
 import { SkillsSettings } from "./parts/SkillsSettings";
 import { PluginsSettings } from "./parts/PluginsSettings";
+import { ConnectionsSettings } from "./parts/ConnectionsSettings";
 import { SettingsSidebar } from "./parts/SettingsSidebar";
 import { WorkspacesSettings } from "./parts/WorkspacesSettings";
 import { AgentSettingsEmpty, SingleAgentSettings } from "./parts/SingleAgentSettings";
@@ -62,6 +63,7 @@ const SECTION_VIEWS: Partial<Record<SettingsSection, () => ReactNode>> = {
   skills: () => <SkillsSettings />,
   mcpServers: () => <McpServersSettings />,
   plugins: () => <PluginsSettings />,
+  connections: () => <ConnectionsSettings />,
   browser: () => <BrowserSettings />,
   usage: () => <UsageSettings />,
   archived: () => <ArchivedThreadsSettings />,

@@ -140,7 +140,6 @@ export function agentConfigProductProperties(input: {
 
   return {
     ...(config.browserMcp === true ? { browser_mcp: true } : {}),
-    ...(config.chromeMcp === true ? { chrome_mcp: true } : {}),
     ...(config.computerUse === true ? { computer_use: true } : {}),
     ...(config.crossagentMcp === true ? { crossagent_mcp: true } : {}),
     ...(effortAvailable ? { effort: normalizeComposerEffort(config.effort) } : {}),

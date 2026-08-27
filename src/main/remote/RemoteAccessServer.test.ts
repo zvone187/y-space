@@ -850,21 +850,21 @@ describe("RemoteAccessServer", () => {
     const pairingPageResponse = await fetch(info.pairingUrl);
     expect(pairingPageResponse.status).toBe(200);
     const pairingHtml = await pairingPageResponse.text();
-    expect(pairingHtml).toContain("Poracode");
+    expect(pairingHtml).toContain("Y Space");
     expect(pairingHtml).toContain('rel="manifest"');
 
     const appResponse = await fetch(new URL("/app", info.httpBaseUrl));
     expect(appResponse.status).toBe(200);
-    await expect(appResponse.text()).resolves.toContain("Poracode");
+    await expect(appResponse.text()).resolves.toContain("Y Space");
 
     const appRouteResponse = await fetch(new URL("/app/settings/appearance", info.httpBaseUrl));
     expect(appRouteResponse.status).toBe(200);
-    await expect(appRouteResponse.text()).resolves.toContain("Poracode");
+    await expect(appRouteResponse.text()).resolves.toContain("Y Space");
 
     const manifestResponse = await fetch(new URL("/manifest.webmanifest", info.httpBaseUrl));
     expect(manifestResponse.status).toBe(200);
     await expect(manifestResponse.json()).resolves.toMatchObject({
-      name: "Poracode",
+      name: "Y Space",
       start_url: "/app",
       display: "standalone",
     });
@@ -3043,7 +3043,7 @@ describe("RemoteAccessServer", () => {
             transport: { type: "stdio", command: "untrusted-command" },
           },
         ],
-        disabledBuiltInMcpServerIds: ["chrome"],
+        disabledBuiltInMcpServerIds: ["browser"],
       }),
     });
 
@@ -3055,6 +3055,7 @@ describe("RemoteAccessServer", () => {
       disabledBuiltInMcpServerIds: [],
       disabledBuiltInMcpTools: {},
       mcpServers: [],
+      projectMcpServers: [],
       threadId: "thread-1",
     });
   });
@@ -4345,7 +4346,7 @@ describe("RemoteAccessServer", () => {
     let stored: RemoteSettings = pickRemoteSettings({
       ...defaultSharedSettings,
       enabledMcpServers: { browser: true, crossagents: false },
-      disabledBuiltInMcpServers: { chrome: true },
+      disabledBuiltInMcpServers: { "computer-use": true },
     });
     const update = vi.fn<(patch: Partial<RemoteSettings>) => RemoteSettings>((patch) => {
       stored = { ...stored, ...patch };
@@ -4380,7 +4381,7 @@ describe("RemoteAccessServer", () => {
       settings: {
         titleGenProvider: defaultSharedSettings.titleGenProvider,
         enabledMcpServers: { browser: true, crossagents: false },
-        disabledBuiltInMcpServers: { chrome: true },
+        disabledBuiltInMcpServers: { "computer-use": true },
       },
     });
 

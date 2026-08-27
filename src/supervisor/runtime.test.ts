@@ -1718,9 +1718,14 @@ describe("SupervisorRuntime thread input", () => {
     expect(adapter.buildLaunchArgv).not.toHaveBeenCalled();
     expect(ptySpawnMock).not.toHaveBeenCalled();
     expect(setListener).toHaveBeenCalledTimes(1);
-    expect(startTurn).toHaveBeenCalledWith("hi", { model: "gpt-5.4" }, undefined, {
-      userMessageItemId: expect.stringMatching(/^user-/),
-    });
+    expect(startTurn).toHaveBeenCalledWith(
+      "hi",
+      { model: "gpt-5.4", browserMcp: true },
+      undefined,
+      {
+        userMessageItemId: expect.stringMatching(/^user-/),
+      },
+    );
     expect(
       (runtime as unknown as { sessions: Map<string, { pty?: unknown }> }).sessions.get(
         "thread-gui-start",

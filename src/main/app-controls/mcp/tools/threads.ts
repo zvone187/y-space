@@ -110,7 +110,7 @@ export const threadTools: ToolDomain = {
     {
       name: "get_current_thread",
       description:
-        "Identify the Poracode thread making this MCP call. Returns its threadId, project, presentation mode, status, and worktreePath/branch when it uses a separate worktree; an absent worktreePath means the project's main checkout. Call this before work that depends on 'this thread' or 'this worktree'; do not ask the user to provide an id. Takes no arguments.",
+        "Identify the Y Space thread making this MCP call. Returns its threadId, project, presentation mode, status, and worktreePath/branch when it uses a separate worktree; an absent worktreePath means the project's main checkout. Call this before work that depends on 'this thread' or 'this worktree'; do not ask the user to provide an id. Takes no arguments.",
       inputSchema: {
         type: "object",
         additionalProperties: false,
@@ -241,7 +241,7 @@ export const threadTools: ToolDomain = {
     },
     {
       name: "open_thread",
-      description: "Open and focus a thread in the Poracode UI for the user.",
+      description: "Open and focus a thread in the Y Space UI for the user.",
       inputSchema: threadIdJsonSchema(),
     },
     {
@@ -315,7 +315,7 @@ export const threadTools: ToolDomain = {
       if (!threadId) {
         return {
           threadId: null,
-          note: "This MCP request is not associated with a Poracode thread.",
+          note: "This MCP request is not associated with a Y Space thread.",
         };
       }
       const thread = requireThread(ctx, threadId);
@@ -539,7 +539,7 @@ export const threadTools: ToolDomain = {
       return {
         threadId: parsed.threadId,
         applied,
-        note: "No Poracode UI is connected; the update was applied directly to the stored thread row.",
+        note: "No Y Space UI is connected; the update was applied directly to the stored thread row.",
       };
     },
     open_thread: (args, ctx) => {
@@ -549,7 +549,7 @@ export const threadTools: ToolDomain = {
       return {
         threadId,
         opened: false,
-        note: "No Poracode UI is connected, so the thread could not be opened.",
+        note: "No Y Space UI is connected, so the thread could not be opened.",
       };
     },
     list_terminals: async (_args, ctx) => {
@@ -804,7 +804,7 @@ function sameProjectLocation(left: ProjectLocation, right: ProjectLocation): boo
 function currentThread(ctx: AppControlsToolContext): Thread {
   const threadId = ctx.identity.threadId;
   if (!threadId) {
-    throw new Error("This MCP request is not associated with a Poracode thread.");
+    throw new Error("This MCP request is not associated with a Y Space thread.");
   }
   return requireThread(ctx, threadId);
 }

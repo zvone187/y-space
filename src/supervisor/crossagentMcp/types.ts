@@ -67,8 +67,8 @@ export function resolveSubagentExecution(adapter: {
  * Build an unrestricted child config using the target provider's strongest
  * advertised policy, falling back to its declared bypass posture when the
  * probe exposes no choices. Subagents must not inherit a potentially
- * incompatible or supervised parent policy. Browser, Computer Use, and Chrome
- * MCP choices are inherited; Crossagents MCP is deliberately excluded so a child
+ * incompatible or supervised parent policy. Browser and Computer Use MCP choices
+ * are inherited; Crossagents MCP is deliberately excluded so a child
  * cannot spawn grandchildren. One-shot-only providers already enforce the
  * permission rule in `buildSubagentOneShotCommand`.
  */
@@ -87,7 +87,6 @@ export function buildUnrestrictedChildConfig(
     ...resolveUnrestrictedPermissionConfig(targetCapabilities),
     ...(parentConfig?.browserMcp === true ? { browserMcp: true } : {}),
     ...(parentConfig?.computerUse === true ? { computerUse: true } : {}),
-    ...(parentConfig?.chromeMcp === true ? { chromeMcp: true } : {}),
   };
 }
 

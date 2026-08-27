@@ -230,7 +230,7 @@ export class GitWorktreeService {
   ): Promise<void> {
     const stashCommit = await this.pushTransferStash(
       location,
-      `Poracode: before pull from ${remote}`,
+      `Y Space: before pull from ${remote}`,
     );
 
     try {
@@ -582,7 +582,7 @@ export class GitWorktreeService {
     const stashSha = carryChanges
       ? await this.pushTransferStash(
           location,
-          `Poracode: ${keepChangesInSource ? "copy" : "move"} changes to ${branch ?? resolvedPath}`,
+          `Y Space: ${keepChangesInSource ? "copy" : "move"} changes to ${branch ?? resolvedPath}`,
         )
       : undefined;
 

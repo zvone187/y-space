@@ -1,5 +1,6 @@
 import type { ProjectLocation } from "@/shared/contracts";
 import { encodeThreadQuery, type McpThreadIdentity } from "@/shared/browserMcpThread";
+import { readPrivilegedMcpEnvironment } from "@/supervisor/privilegedMcpEnvironment";
 
 export type ComputerUseMcpLocation =
   | ProjectLocation
@@ -16,10 +17,7 @@ export const COMPUTER_USE_MCP_URL_ENV = "PORACODE_COMPUTER_USE_MCP_URL";
 export const COMPUTER_USE_MCP_TOKEN_ENV = "PORACODE_COMPUTER_USE_MCP_TOKEN";
 
 export function readComputerUseMcpEnv(): ComputerUseMcpEnv | null {
-  const url = process.env[COMPUTER_USE_MCP_URL_ENV];
-  const token = process.env[COMPUTER_USE_MCP_TOKEN_ENV];
-  if (!url || !token) return null;
-  return { url, token };
+  return readPrivilegedMcpEnvironment("computer-use");
 }
 
 export interface ComputerUseMcpHttpConfig {

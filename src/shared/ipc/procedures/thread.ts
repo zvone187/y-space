@@ -1,3 +1,5 @@
+import { z } from "zod";
+import type { McpThreadIdentity } from "../../browserMcpThread";
 import {
   authenticateAcpAgentPayloadSchema,
   clearPendingSteerPayloadSchema,
@@ -83,6 +85,13 @@ import {
   type WorkflowGetRunPayload,
   type WorkflowGetRunResult,
 } from "../schemas";
+
+export const resolveMcpCallerIdentityPayloadSchema = z.object({
+  providerSessionId: z.string().trim().min(1).max(1024),
+  serverId: z.enum(["browser", "app-controls"]),
+});
+
+export type ResolveMcpCallerIdentityPayload = z.infer<typeof resolveMcpCallerIdentityPayloadSchema>;
 
 export const threadProcedures = {
   getCrossagentRouting: defineNoArgProcedure<CrossagentRoutingState, "supervisor">(
@@ -180,6 +189,11 @@ export const threadProcedures = {
     "getTerminalShellSnapshots",
     "supervisor",
   ),
+  resolveMcpCallerIdentity: definePayloadProcedure<
+    ResolveMcpCallerIdentityPayload,
+    McpThreadIdentity | null,
+    "supervisor"
+  >("resolveMcpCallerIdentity", "supervisor", resolveMcpCallerIdentityPayloadSchema),
   getAvailableWindowsShells: defineNoArgProcedure<AvailableWindowsShell[], "supervisor">(
     "getAvailableWindowsShells",
     "supervisor",

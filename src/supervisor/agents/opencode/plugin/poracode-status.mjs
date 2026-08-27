@@ -76,17 +76,22 @@ function readPluginVersionFromManifest() {
 
 const PLUGIN_VERSION = readPluginVersionFromManifest();
 const PROTOCOL_VERSION = 1;
-const CROSSAGENT_SESSION_ID_ARG = "__poracode_provider_session_id";
+const PROVIDER_SESSION_ID_ARG = "__poracode_provider_session_id";
 
-function injectCrossagentSessionId(input, output) {
+function injectProviderSessionId(input, output) {
   if (process.env.PORACODE_OPENCODE_SESSION_ROUTING !== "1") return;
-  if (typeof input?.tool !== "string" || !input.tool.startsWith("crossagents_")) return;
+  if (
+    typeof input?.tool !== "string" ||
+    !["browser_", "poracode_", "crossagents_"].some((prefix) => input.tool.startsWith(prefix))
+  ) {
+    return;
+  }
   if (typeof input.sessionID !== "string" || input.sessionID.length === 0) return;
   if (!output?.args || typeof output.args !== "object" || Array.isArray(output.args)) return;
 
   // Always overwrite the private field after model-argument validation. The
   // value comes from OpenCode's trusted tool context, never from model input.
-  output.args[CROSSAGENT_SESSION_ID_ARG] = input.sessionID;
+  output.args[PROVIDER_SESSION_ID_ARG] = input.sessionID;
 }
 
 function hookDebugEnabled() {
@@ -256,7 +261,7 @@ export default {
     // (paired with chat.message) are idempotent in the state machine.
     "tool.execute.before": async (input, output) => {
       try {
-        injectCrossagentSessionId(input, output);
+        injectProviderSessionId(input, output);
         const sessionId =
           typeof input?.sessionID === "string" && input.sessionID.length > 0
             ? input.sessionID

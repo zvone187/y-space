@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import type { AnchorHTMLAttributes } from "react";
+import { openExternalWithFeedback } from "@/renderer/utils/openExternal";
 
 const components = {
   a: ({ children, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -10,7 +11,7 @@ const components = {
       {...rest}
       onClick={(e) => {
         e.preventDefault();
-        if (rest.href) window.open(rest.href, "_blank");
+        if (rest.href) openExternalWithFeedback(rest.href);
       }}
     >
       {children}

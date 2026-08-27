@@ -2,7 +2,6 @@ import type { LoadedPlugin } from "@/shared/contracts";
 import { parsePluginManifest, parsePoracodeExtension } from "@/shared/plugins/spec";
 import { usePlugins } from "@/renderer/state/pluginsStore";
 import browserTools from "../../../resources/plugins/browser-tools/plugin.json";
-import chromeTools from "../../../resources/plugins/chrome-tools/plugin.json";
 import computerUse from "../../../resources/plugins/computer-use/plugin.json";
 import subagentDelegation from "../../../resources/plugins/subagent-delegation/plugin.json";
 
@@ -17,7 +16,7 @@ import subagentDelegation from "../../../resources/plugins/subagent-delegation/p
  * `src/supervisor/plugins/conformance.test.ts`.
  */
 
-const SHIPPED_MANIFESTS = [browserTools, chromeTools, computerUse, subagentDelegation];
+const SHIPPED_MANIFESTS = [browserTools, computerUse, subagentDelegation];
 
 function toLoadedPlugin(raw: unknown): LoadedPlugin {
   const parsed = parsePluginManifest(raw);

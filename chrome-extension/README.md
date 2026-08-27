@@ -1,55 +1,22 @@
-# Poracode Chrome Control
+# Y Space Cookie Import
 
-Companion browser extension that lets Poracode agents drive your **real**
-Chrome / Brave / Edge — your actual tabs, cookies, and logged-in sessions. It is
-the external-browser counterpart to Poracode's built-in **Browser** panel; the
-two run side by side.
+This Manifest V3 extension imports cookies from a Chromium browser profile into the Y Space embedded browser.
 
-## How it works
+## Security boundary
 
-```
-Agent → chrome MCP server (Poracode) → localhost WebSocket → this extension → chrome.debugger (CDP) → your tabs
-```
+- Pairing uses an eight-digit, five-minute code to derive a proof key. Neither that code nor the long-lived token is sent in plaintext; both sides prove the pairing, and Y Space persists only the token's SHA-256 hash.
+- The extension declares HTTP(S) access as optional. Chrome prompts for the exact origins requested by Y Space from a real popup click. Only origins newly granted for that request are removed after commit, cancellation, timeout, disconnect, or worker restart; permissions that existed before the request are preserved.
+- Preview responses contain domain/count metadata only. Raw values are read again and transmitted only after the user commits an import.
+- Raw commit payloads use an ephemeral P-256 session key and authenticated AES-GCM encryption, so another loopback process cannot read or alter cookie values.
+- The extension has no browsing, navigation, page-inspection, tab-management, or debugging APIs.
+- Messages are protocol-versioned, schema-restricted by the desktop app, capped at 750 cookies and 4 MiB, and accepted only after the loopback WebSocket is authenticated.
 
-The extension holds no logic of its own: it relays Chrome DevTools Protocol
-(CDP) commands from Poracode to `chrome.debugger` and forwards CDP events back.
-Attaching shows Chrome's own **"Poracode started debugging this browser"** banner
-on the driven tab — that banner is your consent + kill switch.
+## Local installation
 
-## Load it (unpacked)
-
-1. Open `chrome://extensions` (or `brave://extensions`, `edge://extensions`).
+1. Open `chrome://extensions` in Chrome 120 or newer, Brave, Edge, Arc, or another current Chromium browser.
 2. Enable **Developer mode**.
-3. **Load unpacked** → select this `chrome-extension/` folder.
+3. Choose **Load unpacked** and select this `chrome-extension` directory.
+4. In Y Space, start browser-cookie pairing.
+5. Open the extension, optionally name this browser profile, enter the eight-digit code shown by Y Space, and approve only the requested site origins.
 
-That's it — no pairing, no buttons. The extension pairs with the Poracode
-**app**: whenever the app is running it connects automatically and the popup
-shows a green **Connected**; when the app is closed it quietly retries and
-reconnects the moment the app launches again. It scans Poracode's default local
-port range, so there is nothing to enter.
-
-## Use it
-
-In a Claude thread, the agent has a `chrome` MCP server alongside `browser`. Try:
-_"Use the chrome tools: check status, list my tabs, then screenshot the active
-one."_ Good first calls: `chrome_status` → `chrome_list_tabs` → `chrome_attach`
-→ `chrome_snapshot` / `chrome_screenshot`.
-
-## Security notes
-
-- The WebSocket is bound to `127.0.0.1` and only accepts browser-extension
-  origins (a web page's `http(s)` origin is rejected), so random sites can't
-  reach it. A per-launch bearer token is also available for hardened setups.
-- Actual control always surfaces Chrome's "started debugging this browser"
-  banner — stop a session any time from there.
-- `chrome_eval` and `chrome_cookies` are gated behind the same
-  eval / data-access switches as the embedded browser (Poracode → Settings →
-  Browser). They stay off unless you enable them.
-- This drives your authenticated browser. Treat agent actions as your own.
-
-## Current limitations
-
-- Trusts any browser-extension-origin connection on loopback. The extension ID
-  should be pinned before wider distribution.
-- Wired for the Claude provider and always-on. A per-thread toggle and support
-  for the other providers plus WSL are still pending.
+The desktop app and extension scan the same loopback port ranges, so no manual port configuration is required.

@@ -1,14 +1,12 @@
-// Renders the Poracode SVG masters into production icon assets.
-// Uses the repo's `sharp` for SVG->PNG, macOS `iconutil` for .icns, and a tiny
-// PNG-in-ICO packer for .ico. Outputs to branding/assets/out/. Run from repo root:
+// Renders the Y Space SVG masters into production icon assets. Legacy master
+// filenames remain stable so downstream packaging scripts do not need migration.
+// Uses the repo's `sharp` for SVG->PNG plus small PNG-in-ICNS/ICO packers.
+// Outputs to branding/assets/out/. Run from repo root:
 //   node branding/assets/build-icons.mjs
 import sharp from "sharp";
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
-import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 import { padToMacSafeArea } from "./macSafeAreaIcon.mjs";
-const sh = promisify(execFile);
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
 const OUT = `${HERE}out`;
@@ -26,8 +24,8 @@ async function macPng(svg, size) {
     .toBuffer();
 }
 
-// Tray glyph colors follow the brand tokens (BRAND.md §6): moon P on dark
-// shells, ink P on light shells. Ice is too faint against a light taskbar, so
+// Tray glyph colors follow the brand tokens (BRAND.md §6): moon Y on dark
+// shells, ink Y on light shells. Ice is too faint against a light taskbar, so
 // the nightly accent deepens for the ink variant.
 const TRAY_VARIANTS = [
   { name: "tray-icon", glyph: "#EAF0FB", accent: "#8B7BFF" },
@@ -52,7 +50,7 @@ async function trayPng(svg, size, { glyph, accent }) {
 
 // macOS template image: a solid-black glyph on a transparent background. macOS
 // reads only the alpha channel and tints it per menu-bar appearance, so both the
-// P and the accent dot are forced to black. Monochrome ⇒ channel-neutral (one set).
+// Y and the accent dot are forced to black. Monochrome ⇒ channel-neutral (one set).
 async function trayMacTemplatePng(svg, size) {
   const source = (await readFile(svg, "utf8"))
     .replace(
@@ -102,27 +100,41 @@ function buildIco(frames /* [{size, buf}] */) {
   return Buffer.concat([head, dir, ...parts]);
 }
 
+function buildIcns(frames /* [{type, buf}] */) {
+  const chunks = frames.map(({ type, buf }) => {
+    const chunk = Buffer.alloc(8 + buf.length);
+    chunk.write(type, 0, 4, "ascii");
+    chunk.writeUInt32BE(chunk.length, 4);
+    buf.copy(chunk, 8);
+    return chunk;
+  });
+  const totalLength = 8 + chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const header = Buffer.alloc(8);
+  header.write("icns", 0, 4, "ascii");
+  header.writeUInt32BE(totalLength, 4);
+  return Buffer.concat([header, ...chunks], totalLength);
+}
+
 async function icns(svg, outBase) {
-  const set = `${outBase}.iconset`;
-  await mkdir(set, { recursive: true });
+  // Modern ICNS accepts PNG payloads. Include both canonical and Retina chunk
+  // identifiers so Finder and older packaging tools select the right density.
   const specs = [
-    [16, ""],
-    [16, "@2x"],
-    [32, ""],
-    [32, "@2x"],
-    [128, ""],
-    [128, "@2x"],
-    [256, ""],
-    [256, "@2x"],
-    [512, ""],
-    [512, "@2x"],
+    ["icp4", 16],
+    ["icp5", 32],
+    ["icp6", 64],
+    ["ic07", 128],
+    ["ic08", 256],
+    ["ic09", 512],
+    ["ic10", 1024],
+    ["ic11", 32],
+    ["ic12", 64],
+    ["ic13", 256],
+    ["ic14", 512],
   ];
-  for (const [base, hi] of specs) {
-    const px = hi ? base * 2 : base;
-    await writeFile(`${set}/icon_${base}x${base}${hi}.png`, await png(svg, px));
-  }
-  await sh("iconutil", ["-c", "icns", set, "-o", `${outBase}.icns`]);
-  await rm(set, { recursive: true, force: true });
+  const frames = await Promise.all(
+    specs.map(async ([type, size]) => ({ type, buf: await png(svg, size) })),
+  );
+  await writeFile(`${outBase}.icns`, buildIcns(frames));
 }
 
 async function buildVariant(name, svg, dir) {
@@ -159,10 +171,8 @@ async function buildTrayIcons(dir) {
   await buildTrayMacTemplate(svg, dir);
 }
 
-// One PWA icon set per release channel. Stable and nightly are installed side
-// by side from separate origins (app.poracode.com / app-nightly.poracode.com),
-// so nightly needs its own art or the two are indistinguishable on a home
-// screen.
+// One PWA icon set per release channel. Nightly needs distinct art so side-by-side
+// installs remain distinguishable on a home screen.
 const PWA_VARIANTS = [
   { suffix: "", svg: "poracode-icon.svg" },
   { suffix: "-nightly", svg: "poracode-icon-nightly.svg" },
@@ -204,10 +214,8 @@ async function buildTrayMacTemplate(svg, dir) {
   console.log("  ✓ tray-icon-mac: 22px + @2x template PNG");
 }
 
-// Optional section filter (`node build-icons.mjs pwa`). The `build` section
-// shells out to macOS `iconutil` for .icns, so contributors on other hosts can
-// still regenerate the `tray`, `website`, and `pwa` sections on their own.
-// `tray` writes into out/build/ additively (no iconutil needed).
+// Optional section filter (`node build-icons.mjs pwa`). `tray` writes into
+// out/build/ additively.
 const SECTIONS = ["build", "tray", "website", "pwa"];
 const only = process.argv[2];
 if (only && !SECTIONS.includes(only)) {

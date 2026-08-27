@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
 import type {
   AgentStatusesResponse,
   CloseThreadPayload,
@@ -259,10 +260,21 @@ function deps(overrides: Partial<AppControlsMcpIngressDeps> = {}): AppControlsMc
   };
 }
 
-async function callTool(url: string, token: string, name: string, args: Record<string, unknown>) {
-  const response = await fetch(`${url}/mcp?thread=thread-1`, {
+async function callTool(
+  url: string,
+  token: string,
+  name: string,
+  args: Record<string, unknown>,
+  query = "?thread=thread-1",
+) {
+  const launchToken = createMcpLaunchContextToken(
+    token,
+    "app-controls",
+    query === "" ? undefined : { threadId: "thread-1" },
+  );
+  const response = await fetch(`${url}/mcp${query}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${launchToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
@@ -282,6 +294,36 @@ async function callTool(url: string, token: string, name: string, args: Record<s
 }
 
 describe("AppControlsMcpIngress", () => {
+  it("resolves the exact caller from a trusted OpenCode provider session", async () => {
+    const resolveProviderSessionIdentity = vi.fn<
+      (providerSessionId: string) => Promise<{ threadId?: string; title?: string } | undefined>
+    >(async (providerSessionId) =>
+      providerSessionId === "session-controls"
+        ? { threadId: "thread-1", title: "Caller" }
+        : undefined,
+    );
+    const d = deps() as AppControlsMcpIngressDeps & {
+      resolveProviderSessionIdentity(
+        providerSessionId: string,
+      ): Promise<{ threadId?: string; title?: string } | undefined>;
+    };
+    d.resolveProviderSessionIdentity = resolveProviderSessionIdentity;
+    ingress = new AppControlsMcpIngress(d);
+    const info = await ingress.start();
+
+    const { isError, payload } = await callTool(
+      info.url,
+      info.token,
+      "get_current_thread",
+      { __poracode_provider_session_id: "session-controls" },
+      "",
+    );
+
+    expect(isError).toBe(false);
+    expect(payload?.threadId).toBe("thread-1");
+    expect(resolveProviderSessionIdentity).toHaveBeenCalledWith("session-controls");
+  });
+
   it("serves schedule tools and applies calling-thread defaults over Streamable HTTP", async () => {
     const d = deps();
     ingress = new AppControlsMcpIngress(d);

@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="build/icon.png" width="128" height="128" alt="Poracode" />
+  <img src="build/icon.png" width="128" height="128" alt="Y Space" />
 </p>
 
-<h1 align="center">Poracode</h1>
+<h1 align="center">Y Space</h1>
 
 <p align="center">
   <strong>One window for all your AI coding agents.</strong><br />
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://poracode.com">Website</a> · <a href="https://github.com/SDSLeon/lightcode/releases">Download</a> · <a href="https://github.com/SDSLeon/lightcode/issues">Report a Bug</a> · <a href="https://github.com/SDSLeon/lightcode/issues">Request Feature</a>
+  <a href="https://github.com/zvone187/y-space">Repository</a> · <a href="https://github.com/zvone187/y-space/releases">Download</a> · <a href="https://github.com/zvone187/y-space/issues">Report a Bug</a> · <a href="https://github.com/zvone187/y-space/issues">Request Feature</a>
 </p>
 
 <p align="center">
@@ -20,16 +20,16 @@
 ---
 
 <p align="center">
-  <img src="website/public/hero-screenshot.png" alt="Poracode — AI agents running side-by-side" width="960" />
+  <img src="website/public/hero-screenshot.png" alt="Y Space — AI agents running side-by-side" width="960" />
 </p>
 
 ## Supported Agents
 
 **Claude** · **Codex** · **OpenCode** · **Gemini** · **Grok** · **Kimi Code** · **Qwen Code** · **Pi** · **Qoder** · **Factory Droid** · **Antigravity** · **Cursor** · **Command Code** · **Copilot** and any agent from the [ACP registry](https://agentclientprotocol.com).
 
-## Why Poracode?
+## Why Y Space?
 
-If you use more than one AI coding agent, you know the pain: separate terminals, separate apps, no shared context. Poracode puts them all in one place.
+If you use more than one AI coding agent, you know the pain: separate terminals, separate apps, no shared context. Y Space puts them all in one place.
 
 ### Infinite Threads & Layouts
 
@@ -45,7 +45,7 @@ Let one agent delegate work to another across providers. Subagent output streams
 
 ### Built-in MCP & App Controls
 
-Poracode ships its own MCP servers. Point any agent at them to create and steer threads, organize projects, list and merge Git worktrees, commit and sync, open and merge pull requests, schedule runs, manage skills, and change settings — or add your own MCP servers over stdio, HTTP, or SSE.
+Y Space ships its own MCP servers. Point any agent at them to create and steer threads, organize projects, list and merge Git worktrees, commit and sync, open and merge pull requests, schedule runs, manage skills, and change settings — or add your own MCP servers over stdio, HTTP, or SSE.
 
 ### Agent Experiments
 
@@ -53,7 +53,7 @@ Run one prompt across several agents in parallel worktrees, then let an AI judge
 
 ### Scheduled Runs
 
-Put recurring work on a schedule — nightly reviews, dependency sweeps, changelog drafts — and let Poracode start the thread for you.
+Put recurring work on a schedule — nightly reviews, dependency sweeps, changelog drafts — and let Y Space start the thread for you.
 
 ### Skills & Marketplace
 
@@ -89,19 +89,27 @@ Optimized to stay fast and responsive, even when you have lots of agent sessions
 
 ### Session Persistence
 
-Sessions are saved automatically, so you can close Poracode and pick up right where you left off.
+Sessions are saved automatically, so you can close Y Space and pick up right where you left off.
 
 ### Built-in Browser
 
-Open web pages, attach browser context to agents, and keep research in the same workspace.
+Use a full embedded browser with independent tabs, history, tab groups, screenshots, console and network inspection, and agent automation. Every supported agent receives the same tab inventory and can find, activate, reuse, open, test, and close tabs without controlling an external browser.
+
+### Secure Cookie Import
+
+Pair the import-only companion extension with Chrome, Brave, Edge, or another Chromium browser. Preview domain and cookie counts, choose exactly what to import, and copy authenticated sessions into Y Space's isolated browser partition without exposing cookie values to the renderer or an agent.
+
+### Connections with Pipedream
+
+Use Personal Pipedream MCP or connect selected app accounts through Pipedream Connect. Y Space keeps developer credentials and upstream tokens outside agent processes and exposes enabled integrations through a session-bound local MCP relay.
 
 ### Remote Access
 
-Pair the Poracode web app with your desktop to follow live threads, read terminal output, send messages, and receive notifications from your phone or browser.
+Pair the Y Space web app with your desktop to follow live threads, read terminal output, send messages, and receive notifications from your phone or browser.
 
 ### Remote Machines over SSH
 
-Connect a server from your SSH config and Poracode installs its runtime there, then runs agents on that machine — clone repos, open threads, and drive projects that never leave the box.
+Connect a server from your SSH config and Y Space installs its runtime there, then runs agents on that machine — clone repos, open threads, and drive projects that never leave the box.
 
 ### In-App PRs
 
@@ -113,7 +121,7 @@ Monaco-based editor with LSP support for quick edits without switching to your I
 
 ### Cross-Platform Desktop
 
-Run Poracode on macOS, Windows, and Linux, with a polished interface that feels at home on both Mac and Windows.
+Run Y Space on macOS, Windows, and Linux, with a polished interface that feels at home on both Mac and Windows.
 
 ### WSL Support
 
@@ -125,7 +133,7 @@ Install and run any agent from the [Agent Client Protocol](https://agentclientpr
 
 ## Install
 
-Download the latest release for your platform from the [releases page](https://github.com/SDSLeon/lightcode/releases) or visit [poracode.com](https://poracode.com).
+Download the latest release for your platform from the [releases page](https://github.com/zvone187/y-space/releases).
 
 | Platform | Format                        |
 | -------- | ----------------------------- |
@@ -135,13 +143,40 @@ Download the latest release for your platform from the [releases page](https://g
 
 ### Getting Started
 
-1. Install Poracode for your platform.
+1. Install Y Space for your platform.
 2. Install the AI agent CLIs you want to use (e.g., [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex](https://github.com/openai/codex)).
-3. Open Poracode, add your project, and start orchestrating.
+3. Open Y Space, add your project, and start orchestrating.
+
+### Cookie import
+
+Open **Settings → Browser → Import browser cookies**. The included **Y Space Cookie Import**
+extension pairs individual Chrome, Brave, Edge, or Chromium profiles and requests temporary access
+only to the exact HTTP(S) origins you approve. Y Space shows a metadata-only preview before the
+second confirmation. If an extension cannot be installed, choose a Cookie-Editor JSON or Netscape
+cookie file instead; file values stay in the main process and are cleared as soon as the import
+finishes or expires.
+
+### Pipedream connections
+
+Personal Pipedream MCP can be added and signed in directly from **Settings → Connections** without
+developer credentials. For BYO Pipedream Connect, provide these four variables to the Y Space
+process or place them in an ignored `.env.pipedream` file during development:
+
+```text
+PIPEDREAM_CLIENT_ID=
+PIPEDREAM_CLIENT_SECRET=
+PIPEDREAM_PROJECT_ID=
+PIPEDREAM_ENVIRONMENT=development
+```
+
+For a packaged app launched from a terminal, set `PIPEDREAM_ENV_FILE` to the absolute path of that
+file. Y Space captures the credentials before agents start and removes all five variables from their
+environment. Connected accounts are exposed to agents only through authenticated loopback MCP
+relays.
 
 ## Contributing
 
-Contributions are welcome! Please open an [issue](https://github.com/SDSLeon/lightcode/issues) first to discuss what you'd like to change.
+Contributions are welcome! Please open an [issue](https://github.com/zvone187/y-space/issues) first to discuss what you'd like to change.
 
 ## License
 

@@ -199,7 +199,7 @@ export function PluginDetail(props: {
           title={t`MCP servers`}
           {...(plugin.mcpServers.length > 0
             ? {
-                description: t`Servers this plugin declares in mcp.json. Poracode passes them to every supported agent.`,
+                description: t`Servers this plugin declares in mcp.json. Y Space passes them to every supported agent.`,
               }
             : {})}
         >

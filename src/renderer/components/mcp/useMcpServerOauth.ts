@@ -36,7 +36,7 @@ async function refreshAuthenticatedUrls(
 /**
  * OAuth sign-in state for user-configured HTTP/SSE MCP servers. Tokens live in
  * the supervisor; the renderer only tracks which URLs are authenticated and
- * hands the authorization URL to the system browser.
+ * hands the authorization URL to Y Space's embedded browser.
  */
 export function useMcpServerOauth(
   projectLocation?: ProjectLocation,
@@ -80,9 +80,10 @@ export function useMcpServerOauth(
         return false;
       }
       if (begin.status === "redirect") {
-        // OAuth consent always goes to the system browser (matching agent
-        // login): that's where the user's sessions and password manager live.
-        await readBridge().openExternalNative(begin.authorizationUrl);
+        // HTTP(S) authorization stays in Y Space's embedded browser so agents
+        // and users share one browser workspace. BrowserPanelManager also
+        // redacts OAuth query credentials until the safe landing URL arrives.
+        await readBridge().openExternal(begin.authorizationUrl);
         const result = await readBridge().waitMcpServerOauth({
           flowId: begin.flowId,
           ...ownerPayload,

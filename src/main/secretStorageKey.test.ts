@@ -101,7 +101,7 @@ describe("readOrCreateSafeStorageSecretKey", () => {
     });
 
     expect(() => readOrCreateSafeStorageSecretKey(dir, "linux")).toThrow(
-      "Unable to encrypt the Poracode secret storage key.",
+      "Unable to encrypt the Y Space secret storage key.",
     );
     expect(() => readFileSync(join(dir, "secret-key.safe"))).toThrow(/ENOENT|no such file/i);
   });

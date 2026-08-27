@@ -119,6 +119,7 @@ describe("bridge.mjs Browser MCP proxy", () => {
     | {
         url: string | undefined;
         authorization: string | undefined;
+        launchContext: string | undefined;
         sessionId: string | undefined;
         body: string;
       }
@@ -133,6 +134,10 @@ describe("bridge.mjs Browser MCP proxy", () => {
         received = {
           url: req.url,
           authorization: req.headers.authorization,
+          launchContext:
+            typeof req.headers["x-y-space-mcp-context"] === "string"
+              ? req.headers["x-y-space-mcp-context"]
+              : undefined,
           sessionId:
             typeof req.headers["mcp-session-id"] === "string"
               ? req.headers["mcp-session-id"]
@@ -148,7 +153,6 @@ describe("bridge.mjs Browser MCP proxy", () => {
     upstreamBaseUrl = await listenLocalServer(upstream, "0.0.0.0");
     bridge = await startBridge({
       PORACODE_BROWSER_MCP_URL: upstreamBaseUrl,
-      PORACODE_BROWSER_MCP_TOKEN: "upstream-token",
     });
   });
 
@@ -163,6 +167,7 @@ describe("bridge.mjs Browser MCP proxy", () => {
       headers: {
         authorization: `Bearer ${SECRET}`,
         "content-type": "application/json",
+        "x-y-space-mcp-context": "signed-launch-context",
         "mcp-session-id": "agent-session",
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
@@ -177,10 +182,22 @@ describe("bridge.mjs Browser MCP proxy", () => {
     });
     expect(received).toEqual({
       url: "/mcp",
-      authorization: "Bearer upstream-token",
+      authorization: "Bearer signed-launch-context",
+      launchContext: undefined,
       sessionId: "agent-session",
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
     });
+  });
+
+  it("refuses to proxy without a signed launch capability", async () => {
+    const response = await fetch(`${bridge.baseUrl}/mcp`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}`, "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(received).toBeUndefined();
   });
 
   it("reaches a loopback-only upstream even when a default gateway exists (mirrored networking)", async () => {
@@ -194,13 +211,16 @@ describe("bridge.mjs Browser MCP proxy", () => {
     const loopbackBaseUrl = await listenLocalServer(loopbackUpstream, "127.0.0.1");
     const loopbackBridge = await startBridge({
       PORACODE_BROWSER_MCP_URL: loopbackBaseUrl,
-      PORACODE_BROWSER_MCP_TOKEN: "upstream-token",
     });
 
     try {
       const response = await fetch(`${loopbackBridge.baseUrl}/mcp`, {
         method: "POST",
-        headers: { authorization: `Bearer ${SECRET}`, "content-type": "application/json" },
+        headers: {
+          authorization: `Bearer ${SECRET}`,
+          "content-type": "application/json",
+          "x-y-space-mcp-context": "signed-loopback-context",
+        },
         body: JSON.stringify({ jsonrpc: "2.0", id: 7, method: "initialize", params: {} }),
       });
 

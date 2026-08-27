@@ -3,6 +3,8 @@
 // asserts they don't drift.
 
 const CHANNELS = ["stable", "nightly"];
+const githubPublishOwner = "zvone187";
+const githubPublishRepo = "y-space";
 
 // Subdirectories under `dist/` that ship in the installer. A broad `dist/**/*`
 // glob would sweep up stale `dist/win-unpacked` trees from prior packaging
@@ -19,7 +21,7 @@ function normalizeChannel(value) {
 }
 
 function productNameFor(channel) {
-  return channel === "nightly" ? "Poracode Nightly" : "Poracode";
+  return channel === "nightly" ? "Y Space Nightly" : "Y Space";
 }
 
 function appIdFor(channel) {
@@ -35,15 +37,15 @@ function updaterChannelFor(channel) {
 }
 
 function artifactPrefixFor(channel) {
-  return channel === "nightly" ? "Poracode-Nightly" : "Poracode";
+  return channel === "nightly" ? "Y-Space-Nightly" : "Y-Space";
 }
 
 /**
  * Squirrel.Mac cannot relaunch when an update changes the outer bundle and
  * executable name: it moves the old bundle away, then tries to spawn its
  * relaunch helper from the path it just removed. Keep updater ZIPs on the
- * pre-rebrand executable name so both Lightcode and already-migrated Poracode
- * installs update in place. DMGs remain fully Poracode-branded.
+ * pre-rebrand executable name so Lightcode, Poracode, and Y Space installs can
+ * update in place. DMGs remain fully Y Space-branded.
  */
 function macExecutableNameFor(channel, artifactKind) {
   if (artifactKind === "updater") {
@@ -54,6 +56,8 @@ function macExecutableNameFor(channel, artifactKind) {
 
 module.exports = {
   CHANNELS,
+  githubPublishOwner,
+  githubPublishRepo,
   PACKAGED_DIST_DIRS,
   PACKAGED_DIST_FILES,
   normalizeChannel,

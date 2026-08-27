@@ -101,7 +101,7 @@ describe("SkillMarketplaceModal", () => {
     });
     expect(screen.queryByText("review-code")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Skill availability"));
-    fireEvent.click(await screen.findByRole("option", { name: "Poracode only" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Y Space only" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Install" }));
     await waitFor(() =>

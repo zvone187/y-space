@@ -148,14 +148,13 @@ function makeHarness(options?: {
               browserMcp: true,
               crossagentMcp: true,
               computerUse: true,
-              chromeMcp: true,
             },
           }
         : undefined,
     resolveParentMcpAccess: async (_threadId, _identity, targetAgentKind) => {
       mcpTargets.push(targetAgentKind);
       return {
-        mcpServers: ["browser", "computer_use", "chrome"].map((name) => ({
+        mcpServers: ["browser", "computer_use"].map((name) => ({
           id: name,
           name,
           timeoutMs: 30_000,
@@ -781,7 +780,6 @@ describe("SubagentRunManager", () => {
     expect(childInput.config).toMatchObject({
       browserMcp: true,
       computerUse: true,
-      chromeMcp: true,
     });
     expect(childInput.config.model).toBe("gpt-5.5");
     expect(childInput.config.effort).toBe("high");
@@ -795,8 +793,10 @@ describe("SubagentRunManager", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "browser" }),
         expect.objectContaining({ name: "computer_use" }),
-        expect.objectContaining({ name: "chrome" }),
       ]),
+    );
+    expect(childInput.mcpServers).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "chrome" })]),
     );
   });
 

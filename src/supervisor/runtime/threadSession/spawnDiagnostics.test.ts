@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const ENV_KEYS = [
   "PORACODE_COMPUTER_USE_MCP_URL",
   "PORACODE_COMPUTER_USE_MCP_TOKEN",
+  "PORACODE_BROWSER_MCP_URL",
+  "PORACODE_BROWSER_MCP_TOKEN",
+  "PORACODE_APP_CONTROLS_MCP_URL",
+  "PORACODE_APP_CONTROLS_MCP_TOKEN",
   "PORACODE_CHROME_MCP_URL",
   "PORACODE_CHROME_MCP_TOKEN",
 ] as const;
@@ -22,11 +26,18 @@ describe("sanitizedProcessEnv", () => {
   it("keeps launch-only MCP credentials out of ambient child environments", async () => {
     for (const key of ENV_KEYS) process.env[key] = `${key}-secret`;
 
-    const { sanitizedProcessEnv } = await import("./spawnDiagnostics");
+    const { sanitizeChildProcessEnv, sanitizedProcessEnv } = await import("./spawnDiagnostics");
 
     for (const key of ENV_KEYS) {
       expect(sanitizedProcessEnv).not.toHaveProperty(key);
       expect(process.env[key]).toBe(`${key}-secret`);
     }
+    expect(
+      sanitizeChildProcessEnv({
+        SAFE_VALUE: "kept",
+        PORACODE_BROWSER_MCP_TOKEN: "late-browser-root",
+        PORACODE_APP_CONTROLS_MCP_TOKEN: "late-controls-root",
+      }),
+    ).toEqual({ SAFE_VALUE: "kept" });
   });
 });

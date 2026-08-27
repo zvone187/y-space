@@ -194,13 +194,13 @@ describe("acquireOpenCodeServer", () => {
     };
   }
 
-  const chromeMcp = {
+  const remoteBrowserMcp = {
     url: "http://127.0.0.1:9401/mcp",
-    token: "chrome-token",
-    headers: { Authorization: "Bearer chrome-token" },
+    token: "remote-browser-token",
+    headers: { Authorization: "Bearer remote-browser-token" },
   };
 
-  it("registers the external Chrome MCP on an opted-in server", async () => {
+  it("registers a remote Browser MCP on an opted-in server", async () => {
     const handle = makeHandle("http://127.0.0.1:4199");
     mocks.spawnOpenCodeServer.mockReturnValue(handle);
     const client = makeSubagentClient();
@@ -208,17 +208,17 @@ describe("acquireOpenCodeServer", () => {
 
     const { acquireOpenCodeServer } = await import("./sdkClient");
     const acquired = await acquireOpenCodeServer({
-      projectLocation: { kind: "posix", path: "/repo-chrome" },
-      mcpServers: [remoteMcp("chrome", chromeMcp.url, chromeMcp.headers)],
+      projectLocation: { kind: "posix", path: "/repo-browser" },
+      mcpServers: [remoteMcp("remote-browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
     });
 
     expect(client.mcp.add).toHaveBeenCalledWith({
-      directory: "/repo-chrome",
-      name: "chrome",
+      directory: "/repo-browser",
+      name: "remote-browser",
       config: {
         type: "remote",
-        url: chromeMcp.url,
-        headers: chromeMcp.headers,
+        url: remoteBrowserMcp.url,
+        headers: remoteBrowserMcp.headers,
         enabled: true,
         timeout: 30_000,
       },
@@ -415,7 +415,7 @@ describe("acquireOpenCodeServer", () => {
     });
     const firstB = await acquireOpenCodeServer({
       projectLocation: { kind: "posix", path: "/repo-b" },
-      mcpServers: [remoteMcp("chrome", chromeMcp.url, chromeMcp.headers)],
+      mcpServers: [remoteMcp("remote-browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
     });
     await firstA.updateMcpServers([]);
 
@@ -467,7 +467,7 @@ describe("acquireOpenCodeServer", () => {
     const { acquireOpenCodeServer } = await import("./sdkClient");
     const settings = await acquireOpenCodeServer({
       projectLocation: { kind: "posix", path: "/repo" },
-      mcpServers: [remoteMcp("chrome", chromeMcp.url, chromeMcp.headers)],
+      mcpServers: [remoteMcp("remote-browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
     });
     const oneShot = await acquireOpenCodeServer({
       projectLocation: { kind: "posix", path: "/repo" },
@@ -507,7 +507,7 @@ describe("acquireOpenCodeServer", () => {
     const { acquireOpenCodeServer } = await import("./sdkClient");
     const firstPromise = acquireOpenCodeServer({
       projectLocation: { kind: "posix", path: "/repo" },
-      mcpServers: [remoteMcp("chrome", chromeMcp.url, chromeMcp.headers)],
+      mcpServers: [remoteMcp("remote-browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
     });
     await started;
     const secondPromise = acquireOpenCodeServer({

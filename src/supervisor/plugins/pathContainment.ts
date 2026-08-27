@@ -1,5 +1,5 @@
 import { realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 
 /**
  * Filesystem containment used to enforce the Agent Plugins package boundary.
@@ -31,6 +31,32 @@ export function relativePathInside(root: string, target: string): string | undef
 }
 
 /**
+ * Canonicalize the existing prefix of a path while retaining any missing tail.
+ *
+ * This matters on macOS where temporary paths are commonly authored through
+ * `/var` but `realpath` reports `/private/var`. A policy target may not exist
+ * yet, so resolving the complete target fails even though its existing parent
+ * is enough to reconcile the aliases. Resolving the nearest existing ancestor
+ * also preserves the security property for symlinks: an existing prefix that
+ * escapes the package is canonicalized to its outside location before the
+ * missing tail is appended.
+ */
+function resolveExistingPrefix(path: string): string | undefined {
+  const missingSegments: string[] = [];
+  let candidate = path;
+  while (true) {
+    try {
+      return resolve(realpathSync.native(candidate), ...missingSegments);
+    } catch {
+      const parent = dirname(candidate);
+      if (parent === candidate) return undefined;
+      missingSegments.unshift(basename(candidate));
+      candidate = parent;
+    }
+  }
+}
+
+/**
  * Real-path containment. Returns the relative path when `target` resolves inside
  * `root`, or `undefined` when it escapes.
  *
@@ -51,14 +77,11 @@ export function relativePolicyPath(root: string, target: string): string | undef
   }
   const direct = relativePathInside(normalizedRoot, normalizedTarget);
   if (direct) return direct;
-  try {
-    return relativePathInside(
-      resolve(realpathSync.native(normalizedRoot)),
-      resolve(realpathSync.native(normalizedTarget)),
-    );
-  } catch {
-    return undefined;
-  }
+  const resolvedRoot = resolveExistingPrefix(normalizedRoot);
+  const resolvedTarget = resolveExistingPrefix(normalizedTarget);
+  return resolvedRoot && resolvedTarget
+    ? relativePathInside(resolvedRoot, resolvedTarget)
+    : undefined;
 }
 
 /** True when `target` is the same path as `root` or resolves inside it. */

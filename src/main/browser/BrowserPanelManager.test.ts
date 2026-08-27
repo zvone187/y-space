@@ -1,16 +1,29 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrowserTabGroupInfo } from "@/shared/ipc";
 
 const resolveWebContentsById = vi.hoisted(() => vi.fn<(id: number) => unknown>());
+const shellOpenExternal = vi.hoisted(() => vi.fn<(url: string) => Promise<void>>());
+const dbGetState = vi.hoisted(() => vi.fn<(key: string) => string | null>());
+const dbSetState = vi.hoisted(() => vi.fn<(key: string, value: string) => void>());
+const browserTabs = vi.hoisted(
+  () =>
+    new Map<
+      string,
+      {
+        emitUrl(url: string, title?: string): void;
+        clearHistory: ReturnType<typeof vi.fn>;
+      }
+    >(),
+);
 
 vi.mock("electron", () => ({
   BrowserWindow: class BrowserWindow {},
-  shell: { openExternal: vi.fn<(url: string) => Promise<void>>() },
+  shell: { openExternal: shellOpenExternal },
 }));
 
 vi.mock("../db", () => ({
-  dbGetState: vi.fn<(key: string) => string | null>(),
-  dbSetState: vi.fn<(key: string, value: string) => void>(),
+  dbGetState,
+  dbSetState,
 }));
 
 vi.mock("../sharedSettingsFile", () => ({
@@ -41,7 +54,62 @@ vi.mock("./picker/pickerScript", () => ({
 }));
 
 vi.mock("./BrowserTab", () => ({
-  BrowserTab: class BrowserTab {},
+  BrowserTab: class BrowserTab {
+    readonly tabId: string;
+    readonly clearHistory = vi.fn<() => void>();
+    private snapshotValue: {
+      tabId: string;
+      url: string;
+      title: string;
+      loading: boolean;
+      canGoBack: boolean;
+      canGoForward: boolean;
+      devToolsOpen: boolean;
+    };
+
+    constructor(
+      private readonly options: {
+        tabId: string;
+        initialUrl?: string;
+        initialTitle?: string;
+        onUpdate(snapshot: unknown): void;
+      },
+    ) {
+      this.tabId = options.tabId;
+      this.snapshotValue = {
+        tabId: options.tabId,
+        url: options.initialUrl ?? "about:blank",
+        title: options.initialTitle ?? "",
+        loading: false,
+        canGoBack: false,
+        canGoForward: false,
+        devToolsOpen: false,
+      };
+      browserTabs.set(options.tabId, {
+        emitUrl: (url, title = "Connected") => {
+          this.snapshotValue = { ...this.snapshotValue, url, title, loading: false };
+          options.onUpdate(this.snapshotValue);
+        },
+        clearHistory: this.clearHistory,
+      });
+    }
+
+    snapshot() {
+      return { ...this.snapshotValue };
+    }
+
+    attach() {}
+    whenAttached() {
+      return Promise.resolve();
+    }
+    async loadURL(url: string) {
+      this.snapshotValue = { ...this.snapshotValue, url, loading: false };
+      this.options.onUpdate(this.snapshotValue);
+    }
+    async destroy() {
+      browserTabs.delete(this.tabId);
+    }
+  },
   resolveWebContentsById,
 }));
 
@@ -101,6 +169,13 @@ function seedGroupState(
 describe("BrowserPanelManager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserTabs.clear();
+    dbGetState.mockReturnValue(null);
+    shellOpenExternal.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("rejects the host window WebContents as a browser tab target", async () => {
@@ -155,6 +230,47 @@ describe("BrowserPanelManager", () => {
 
     expect(manager.setAutomationSession("thread-2", false)).toBe(true);
     expect(activity).toEqual([true, false]);
+  });
+
+  it("keeps an independent implicit active tab for each trusted agent thread", async () => {
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+    const threadA = {
+      id: "group-thread-thread-a",
+      title: "Thread A",
+      color: "blue",
+      collapsed: false,
+      threadId: "thread-a",
+    } satisfies BrowserTabGroupInfo;
+    const threadB = {
+      id: "group-thread-thread-b",
+      title: "Thread B",
+      color: "green",
+      collapsed: false,
+      threadId: "thread-b",
+    } satisfies BrowserTabGroupInfo;
+    seedGroupState(
+      manager,
+      [createFakeTab("tab-a"), createFakeTab("tab-b"), createFakeTab("tab-a-2")],
+      [threadA, threadB],
+      [
+        ["tab-a", threadA.id],
+        ["tab-b", threadB.id],
+        ["tab-a-2", threadA.id],
+      ],
+    );
+    (manager as unknown as { activeTabId: string }).activeTabId = "tab-b";
+
+    expect(manager.getActiveTabForThread("thread-a")?.tabId).toBe("tab-a-2");
+    expect(manager.getActiveTabForThread("thread-b")?.tabId).toBe("tab-b");
+
+    expect(manager.rememberTabForThread("thread-a", "tab-a")).toBe(true);
+    manager.setActiveTab("tab-b");
+    expect(manager.getActiveTabForThread("thread-a")?.tabId).toBe("tab-a");
+    expect(manager.getActiveTab()?.tabId).toBe("tab-b");
   });
 
   it("moves ungrouped tabs into the target tab's group", async () => {
@@ -213,5 +329,105 @@ describe("BrowserPanelManager", () => {
     expect(state.tabs.map((t) => t.tabId)).toEqual(["tab-free", "tab-a"]);
     expect(state.tabs.find((t) => t.tabId === "tab-a")?.groupId).toBeUndefined();
     expect(state.groups).toEqual([]);
+  });
+
+  it("keeps every HTTP(S) link inside Y Space even when legacy settings request the system browser", async () => {
+    const { readSharedSettingsFile } = await import("../sharedSettingsFile");
+    vi.mocked(readSharedSettingsFile).mockReturnValue({
+      browser: { linkOpenTarget: "system", linkPresentationMode: "panel" },
+    } as never);
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+
+    await expect(manager.openLink("https://example.test/path")).resolves.toBe(true);
+
+    expect(shellOpenExternal).not.toHaveBeenCalled();
+    expect(manager.snapshot().tabs).toHaveLength(1);
+    expect(manager.snapshot().tabs[0]?.url).toBe("https://example.test/path");
+  });
+
+  it("flushes the newest tab state when disposed before the persistence debounce", async () => {
+    vi.useFakeTimers();
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+
+    await manager.createTab(
+      { url: "https://persist.test/path", activate: true },
+      { awaitAttach: false },
+    );
+    expect(dbSetState).not.toHaveBeenCalled();
+
+    manager.dispose();
+
+    expect(dbSetState).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(dbSetState.mock.calls[0]?.[1] ?? "{}")).toMatchObject({
+      tabs: [{ url: "https://persist.test/path" }],
+      activeIndex: 0,
+    });
+  });
+
+  it("restores saved titles before dormant tabs remount", async () => {
+    dbGetState.mockReturnValue(
+      JSON.stringify({
+        tabs: [{ url: "https://persist.test/path", title: "Saved page title" }],
+        activeIndex: 0,
+      }),
+    );
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+    const { host } = createManagerWithTab();
+
+    manager.bindHost(host as never);
+    await vi.waitFor(() => {
+      expect(manager.snapshot().tabs).toHaveLength(1);
+    });
+
+    expect(manager.snapshot().tabs[0]).toMatchObject({
+      url: "https://persist.test/path",
+      title: "Saved page title",
+    });
+  });
+
+  it("never emits, records, or persists a one-use integration URL and reveals only the safe landing URL", async () => {
+    vi.useFakeTimers();
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+    const events: unknown[] = [];
+    manager.addEventListener((event) => events.push(event));
+    const privateUrl =
+      "https://pipedream.com/_static/connect.html?token=connect-token-private&connectLink=true&app=slack";
+
+    const created = await manager.createSensitiveIntegrationTab(
+      { url: privateUrl, activate: true, reveal: true },
+      { awaitAttach: false },
+    );
+    await vi.runAllTimersAsync();
+
+    expect(JSON.stringify(events)).not.toContain("connect-token-private");
+    expect(created.url).not.toContain("connect-token-private");
+    expect(JSON.stringify(dbSetState.mock.calls)).not.toContain("connect-token-private");
+    expect(manager.getTab(created.tabId)).toBeNull();
+    expect(manager.getActiveTab()).toBeNull();
+
+    browserTabs.get(created.tabId)?.emitUrl("https://pipedream.com/connected", "Connected");
+    await vi.runAllTimersAsync();
+
+    expect(manager.snapshot().tabs[0]?.url).toBe("https://pipedream.com/connected");
+    expect(manager.getTab(created.tabId)?.tabId).toBe(created.tabId);
+    expect(browserTabs.get(created.tabId)?.clearHistory).toHaveBeenCalled();
+    expect(JSON.stringify(events)).not.toContain("connect-token-private");
+    expect(JSON.stringify(dbSetState.mock.calls)).not.toContain("connect-token-private");
   });
 });

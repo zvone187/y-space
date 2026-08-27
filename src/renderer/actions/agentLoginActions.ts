@@ -92,7 +92,7 @@ export function runAgentLoginCommand(input: {
   });
   const command =
     project.location.kind === "windows" ? `Clear-Host; ${loginCommand}` : `clear; ${loginCommand}`;
-  const stopOpeningUrls = interceptWslUrls ? watchUrlsInNativeBrowser(shellId) : undefined;
+  const stopOpeningUrls = interceptWslUrls ? watchUrlsInEmbeddedBrowser(shellId) : undefined;
   const completionToken = createCompletionToken();
   const script = appendCompletionSignal(command, project, completionToken);
 
@@ -344,7 +344,7 @@ function isLoopbackUrl(text: string): boolean {
   }
 }
 
-function watchUrlsInNativeBrowser(shellId: string): (flushPending?: boolean) => void {
+function watchUrlsInEmbeddedBrowser(shellId: string): (flushPending?: boolean) => void {
   let buffer = "";
   let done = false;
   let flushTimer = 0;

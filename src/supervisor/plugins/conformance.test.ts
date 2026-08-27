@@ -647,14 +647,7 @@ describe("registry", () => {
 describe("shipped packages", () => {
   it("loads every package in resources/plugins", () => {
     const shippedDir = join(process.cwd(), "resources", "plugins");
-    const shipped = [
-      "browser-tools",
-      "chrome-tools",
-      "computer-use",
-      "github",
-      "outlook",
-      "subagent-delegation",
-    ];
+    const shipped = ["browser-tools", "computer-use", "github", "outlook", "subagent-delegation"];
     for (const name of shipped) {
       const result = loadPluginFromDirectory(join(shippedDir, name), "bundled");
       expect(result.diagnostics, `${name}: ${JSON.stringify(result.diagnostics)}`).toEqual([]);
@@ -686,13 +679,6 @@ describe("shipped packages", () => {
         "## Output",
         "browser.enable",
         "browser.disable",
-      ],
-      "chrome-tools": [
-        "## Workflow",
-        "## Boundaries",
-        "## Output",
-        "chrome.enable",
-        "chrome.disable",
       ],
       "computer-use": [
         "## Workflow",

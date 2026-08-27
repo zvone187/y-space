@@ -4,14 +4,14 @@
   --font-sans: var(--font-geist-sans), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* Poracode brand palette — moonlight + ink + one cool accent.
+  /* Y Space brand palette — moonlight + ink + one cool accent.
      See branding/BRAND.md §6. No orange, ever. */
   --color-night: #070709; /* page / canvas */
   --color-tile: #0e0e14; /* panels, raised surfaces */
   --color-tile-2: #14141c; /* slightly lifted panel */
-  --color-moon: #eaf0fb; /* primary text / the P on dark */
+  --color-moon: #eaf0fb; /* primary text / the Y on dark */
   --color-dim: #9ba6be; /* secondary text */
-  --color-accent: #8b7bff; /* indigo — the Pora dot, links, active states */
+  --color-accent: #8b7bff; /* indigo — the Y Space dot, links, active states */
   --color-accent-soft: #b6acff;
   --color-ice: #5ee6e0; /* secondary accent */
 }
@@ -62,7 +62,7 @@ body {
   background-clip: padding-box;
 }
 
-/* ---- The Pora dot (motif): one round indigo dot, baseline-aligned ---- */
+/* ---- The Y Space dot (motif): one round indigo dot, baseline-aligned ---- */
 .pora-dot {
   display: inline-block;
   border-radius: 9999px;
@@ -171,7 +171,7 @@ body {
   }
 }
 
-/* The brand forbids text gradients — the headline accent is the SVG Pora dot
+/* The brand forbids text gradients — the headline accent is the SVG Y Space dot
    (DotPeriod), never a clipped gradient. No `.brand-gradient-text` /
    `.brand-shimmer` helpers exist by design. */
 
@@ -273,7 +273,7 @@ summary:focus-visible,
     0 24px 70px -28px rgba(139, 123, 255, 0.5);
 }
 
-/* ---- Blinking block cursor for the `pora.code` CLI signature ---- */
+/* ---- Blinking block cursor for the `y.space` CLI signature ---- */
 .pora-cursor {
   animation: pora-blink 1.06s steps(1) infinite;
 }

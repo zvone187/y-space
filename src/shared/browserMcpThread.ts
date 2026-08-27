@@ -1,10 +1,4 @@
-/**
- * Per-thread identity carried on the browser/chrome MCP endpoint URL as a query
- * (`?thread=<id>&title=<task>`). The supervisor encodes it per launch (all
- * providers connect by URL, so this is provider-agnostic — no header forwarding
- * needed); the main-process ingress decodes it per request to give each thread
- * its own tab group named by its task.
- */
+/** Per-thread identity used by Y Space-owned MCP launch capabilities. */
 
 export interface McpThreadIdentity {
   threadId?: string;
@@ -14,7 +8,10 @@ export interface McpThreadIdentity {
 
 const MAX_TITLE = 80;
 
-/** Append `?thread=&title=` to an MCP endpoint URL (no-op without a threadId). */
+/**
+ * Legacy query encoder retained only for the computer-use ingress. Browser and
+ * App Controls use signed launch capabilities and must not trust URL identity.
+ */
 export function encodeThreadQuery(
   baseUrl: string,
   identity: McpThreadIdentity | undefined,
@@ -30,7 +27,7 @@ export function encodeThreadQuery(
   return baseUrl + query;
 }
 
-/** Read the thread identity back out of a request URL (path + query). */
+/** Legacy decoder paired with {@link encodeThreadQuery}. */
 export function decodeThreadIdentity(url: string | undefined): McpThreadIdentity {
   if (!url) return {};
   try {
@@ -48,11 +45,7 @@ export function decodeThreadIdentity(url: string | undefined): McpThreadIdentity
   }
 }
 
-/**
- * Tab-group colors valid in BOTH the internal browser's group palette and
- * Chrome's `tabGroups` API (Chrome also offers grey/pink; we stay on the shared
- * subset so a thread keeps the same color across internal + external tabs).
- */
+/** Tab-group colors supported by the embedded Browser UI. */
 export const THREAD_GROUP_COLORS = [
   "blue",
   "green",

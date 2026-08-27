@@ -44,7 +44,7 @@ describe("AboutSettings Lightcode data import", () => {
     render(<AboutSettings />);
 
     fireEvent.click(screen.getByRole("button", { name: "Import again" }));
-    expect(screen.getByRole("alertdialog", { name: "Import Lightcode data again?" })).toBeVisible();
+    expect(screen.getByRole("alertdialog", { name: "Import legacy data again?" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Import and restart" }));
 
     await waitFor(() => expect(bridgeMock.requestLegacyDataMigration).toHaveBeenCalledOnce());

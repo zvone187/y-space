@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { openExternalWithFeedback } from "@/renderer/utils/openExternal";
 import type { RequestOutcome } from "@/shared/contracts";
 
 type StructuredElicitationChoice = { const: string; title?: string };
@@ -237,6 +238,10 @@ export function StructuredElicitationForm(props: {
           href={params.url}
           rel="noreferrer"
           target="_blank"
+          onClick={(event) => {
+            event.preventDefault();
+            openExternalWithFeedback(params.url);
+          }}
         >
           <Trans>Open required URL</Trans>
         </a>

@@ -345,6 +345,7 @@ async function main() {
     copyPackagedDist(stageRoot);
     copyDir(resolve(repoRoot, "build"), join(stageRoot, "build"));
     copyDir(resolve(repoRoot, "resources"), join(stageRoot, "resources"));
+    copyDir(resolve(repoRoot, "chrome-extension"), join(stageRoot, "chrome-extension"));
 
     // 4. Generate stage package.json.
     const rootPkg = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
@@ -490,7 +491,7 @@ async function main() {
 }
 
 // macOS ZIP updates ship under the legacy executable name as a Squirrel.Mac
-// migration bridge; DMGs and every other platform stay fully Poracode-branded.
+// migration bridge; DMGs and every other platform stay fully Y Space-branded.
 function macArtifactKindFor(platform, target) {
   return platform === "mac" && target === "zip" ? "updater" : "branded";
 }
@@ -519,7 +520,7 @@ function buildElectronBuilderConfig(macArtifactKind = "branded") {
 
   return `appId: ${appId}
 productName: ${productName}
-copyright: Copyright (C) 2026 Poracode
+copyright: Copyright (C) 2026 Y Space contributors
 
 directories:
   output: release
@@ -534,6 +535,10 @@ ${packagedDistFilesYaml}
   - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**/*"
 
 extraResources:
+  - from: chrome-extension
+    to: chrome-extension
+    filter:
+      - "**/*"
   - from: resources/wsl-helpers
     to: wsl-helpers
     filter:
@@ -576,8 +581,8 @@ afterPack: build/after-pack.cjs
 
 publish:
   provider: github
-  owner: SDSLeon
-  repo: lightcode${publishChannelLine}
+  owner: ${channelTable.githubPublishOwner}
+  repo: ${channelTable.githubPublishRepo}${publishChannelLine}
 
 win:
   target:
@@ -624,7 +629,7 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
   extendInfo:
-    NSMicrophoneUsageDescription: Poracode uses the microphone for local voice input in the composer.
+    NSMicrophoneUsageDescription: Y Space uses the microphone for local voice input in the composer.
   entitlements: ${macEntitlements}
   entitlementsInherit: ${macEntitlementsInherit}
   notarize: true

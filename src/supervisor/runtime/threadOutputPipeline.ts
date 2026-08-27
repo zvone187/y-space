@@ -353,7 +353,7 @@ export class ThreadOutputPipeline {
           s.length <= max ? JSON.stringify(s) : `${JSON.stringify(s.slice(0, max))}…`;
         const hintText = oscHint
           ? `hint=${oscHint.status}/${oscHint.attention} corroborated=${String(oscHint.corroborated)}`
-          : "hint=(null — event not mapped to Poracode status)";
+          : "hint=(null — event not mapped to Y Space status)";
         console.log(
           `[poracode-osc] PTY thread=${session.threadId} kind=${session.agentKind} ` +
             `code=${notification.code} title=${j(notification.title, 64)} body=${j(notification.body, 200)} ` +

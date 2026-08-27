@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentKind } from "@/shared/contracts";
+import type { AgentKind, McpServer } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { WindowsShellPreference } from "../shellPreference";
@@ -210,6 +210,54 @@ describe("ThreadSessionManager provider-session routing", () => {
 
     delete adapter.capabilities.crossagentMcpRouting;
     expect(manager.getThreadIdByProviderSessionId("ses_existing")).toBeUndefined();
+  });
+
+  it("resolves root and child provider sessions to the owning MCP identity and expires it", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.ownsProviderSession = (sessionId) => sessionId === "ses_child";
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.crossagentMcpRouting = "provider-session";
+    const manager = createManager("opencode", adapter);
+    const runtime = createInactiveRuntime(
+      "opencode",
+      adapter,
+      structuredSession,
+    ) as SessionRuntime & {
+      mcpIdentity: { threadId: string; title: string };
+    };
+    runtime.mcpIdentity = { threadId: runtime.threadId, title: "OpenCode caller" };
+    runtime.mcpLaunchSnapshot.disabledBuiltInMcpTools = {
+      browser: ["close_tab"],
+      "app-controls": ["delete_thread"],
+    };
+    manager.sessions.set(runtime.threadId, runtime);
+    manager.sessionsBySessionId.set("ses_existing", runtime);
+    const identityManager = manager as unknown as {
+      getMcpIdentityByProviderSessionId(
+        providerSessionId: string,
+        serverId?: "browser" | "app-controls",
+      ): { threadId?: string; title?: string } | undefined;
+    };
+
+    expect(identityManager.getMcpIdentityByProviderSessionId("ses_existing")).toEqual(
+      runtime.mcpIdentity,
+    );
+    expect(identityManager.getMcpIdentityByProviderSessionId("ses_child")).toEqual(
+      runtime.mcpIdentity,
+    );
+    expect(identityManager.getMcpIdentityByProviderSessionId("ses_existing", "browser")).toEqual({
+      ...runtime.mcpIdentity,
+      disabledTools: ["close_tab"],
+    });
+    expect(identityManager.getMcpIdentityByProviderSessionId("ses_child", "app-controls")).toEqual({
+      ...runtime.mcpIdentity,
+      disabledTools: ["delete_thread"],
+    });
+    expect(identityManager.getMcpIdentityByProviderSessionId("ses_unknown")).toBeUndefined();
+
+    manager.sessions.delete(runtime.threadId);
+    manager.sessionsBySessionId.delete("ses_existing");
+    expect(identityManager.getMcpIdentityByProviderSessionId("ses_existing")).toBeUndefined();
   });
 });
 
@@ -656,6 +704,112 @@ describe("ThreadSessionManager start guards", () => {
     expect(
       events.slice(eventCountAfterClose).filter((event) => event.type === "thread-state"),
     ).toEqual([]);
+  });
+
+  it("preserves the trusted thread identity when live OpenCode MCP servers reload", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = vi.fn<
+      NonNullable<StructuredSessionHandle["updateMcpServers"]>
+    >(async () => undefined);
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    adapter.capabilities.crossagentMcpRouting = "provider-session";
+    const manager = createManager("opencode", adapter);
+
+    await manager.startThread({
+      threadId: "thread-reload-identity",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+    });
+
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        resolveMcpServersForLaunch: ReturnType<typeof vi.fn>;
+      };
+    };
+    const resolveSpy = vi.spyOn(internal.spawnPipeline, "resolveMcpServersForLaunch");
+    await manager.reloadAgentMcpServers({ agentKind: "opencode" });
+
+    expect(resolveSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ threadId: "thread-reload-identity" }),
+      }),
+    );
+  });
+
+  it("rebuilds live OpenCode MCPs from current settings while preserving launch policy", async () => {
+    const updateMcpServers = vi.fn<NonNullable<StructuredSessionHandle["updateMcpServers"]>>(
+      async () => undefined,
+    );
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = updateMcpServers;
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    adapter.capabilities.crossagentMcpRouting = "provider-session";
+    const manager = createManager("opencode", adapter);
+    const oldServer: McpServer = {
+      id: "old-server",
+      name: "old-server",
+      description: "",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: "https://old.example.test/mcp", headers: {} },
+    };
+    const newServer: McpServer = {
+      id: "new-server",
+      name: "new-server",
+      description: "",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: "https://new.example.test/mcp", headers: {} },
+    };
+    const projectServer: McpServer = {
+      id: "project-server",
+      name: "project-server",
+      description: "",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: "https://project.example.test/mcp", headers: {} },
+    };
+
+    await manager.startThread({
+      threadId: "thread-reload-current-settings",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [oldServer, projectServer],
+      projectMcpServers: [projectServer],
+      disabledBuiltInMcpTools: { browser: ["close_tab"] },
+    });
+    updateMcpServers.mockClear();
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(settingsPath, JSON.stringify({ mcpServers: [newServer] }), "utf8");
+
+    await manager.reloadAgentMcpServers({ agentKind: "opencode" });
+
+    expect(updateMcpServers).toHaveBeenCalledTimes(1);
+    const applied = updateMcpServers.mock.calls[0]?.[0] ?? [];
+    expect(applied.map((server) => server.id)).toContain("new-server");
+    expect(applied.map((server) => server.id)).toContain("project-server");
+    expect(applied.map((server) => server.id)).not.toContain("old-server");
+    expect(manager.sessions.get("thread-reload-current-settings")?.mcpLaunchSnapshot).toMatchObject(
+      {
+        mcpServers: expect.arrayContaining([
+          expect.objectContaining({ id: "new-server" }),
+          expect.objectContaining({ id: "project-server" }),
+        ]),
+        projectMcpServers: [expect.objectContaining({ id: "project-server" })],
+        disabledBuiltInMcpTools: { browser: ["close_tab"] },
+      },
+    );
   });
 
   it.each(guardedStructuredProviders)(

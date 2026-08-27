@@ -135,6 +135,8 @@ describe("GitExperimentService", () => {
     const result = await new GitExperimentService(statusService).getCandidateDiff(location, commit);
 
     expect(result.omittedFiles).toBe(2);
+    expect(result.diff).toContain("Y SPACE NOTICE:");
+    expect(result.diff).not.toContain("PORACODE NOTICE:");
     expect(result.diff).toContain('"assets/logo.svg" (non-code asset)');
     expect(result.diff).toContain('"assets/photo.png" (non-code asset)');
     expect(diffSpy).toHaveBeenCalledTimes(4);

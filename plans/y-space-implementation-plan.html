@@ -1,0 +1,972 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Y Space Implementation Plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f1f4f2;
+        --paper: #ffffff;
+        --ink: #172026;
+        --muted: #64727a;
+        --border: #d5dede;
+        --accent: #0f766e;
+        --accent-ink: #084f4a;
+        --accent-soft: #e3f3f0;
+        --blue: #e8efff;
+        --amber: #fff1d7;
+        --red: #ffe7e7;
+        --shadow: 0 18px 42px rgba(23, 32, 38, 0.08);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #e5efec 0, var(--page) 300px);
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        font-size: 16px;
+        line-height: 1.55;
+      }
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 36px 0 64px;
+      }
+      .shell {
+        background: rgba(255, 255, 255, 0.76);
+        border: 1px solid #b9c7c9;
+        border-radius: 18px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .hero {
+        background: var(--paper);
+        border-top: 6px solid var(--accent);
+        padding: 34px 36px 28px;
+      }
+      .eyebrow {
+        color: var(--accent-ink);
+        font-size: 0.78rem;
+        font-weight: 850;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(2.2rem, 5vw, 3.6rem);
+        line-height: 1.02;
+        margin-top: 10px;
+        max-width: 900px;
+      }
+      .hero-note {
+        color: var(--muted);
+        margin-top: 14px;
+        max-width: 850px;
+      }
+      .meta,
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .meta {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-top: 26px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .card,
+      details {
+        background: #fbfcfc;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      .card {
+        padding: 15px;
+      }
+      .label {
+        color: var(--muted);
+        display: block;
+        font-size: 0.74rem;
+        font-weight: 850;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .value {
+        display: block;
+        font-weight: 700;
+        margin-top: 6px;
+      }
+      nav {
+        background: #fafcfc;
+        border-block: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 14px 36px;
+      }
+      nav a {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--ink);
+        font-size: 0.86rem;
+        font-weight: 700;
+        padding: 6px 11px;
+        text-decoration: none;
+      }
+      .content {
+        background: var(--paper);
+        padding: 8px 36px 40px;
+      }
+      section {
+        border-top: 1px solid var(--border);
+        padding: 30px 0;
+      }
+      section:first-child {
+        border-top: 0;
+      }
+      h2 {
+        font-size: 1.5rem;
+      }
+      h3 {
+        font-size: 1rem;
+        margin-bottom: 7px;
+      }
+      .intro {
+        color: var(--muted);
+        margin: 6px 0 16px;
+      }
+      ul,
+      ol {
+        margin: 9px 0 0;
+        padding-left: 21px;
+      }
+      li + li {
+        margin-top: 6px;
+      }
+      code {
+        background: #edf3f2;
+        border: 1px solid #d2dfdd;
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+      .decision {
+        background: var(--accent-soft);
+        border-left: 4px solid var(--accent);
+      }
+      .warning {
+        background: var(--amber);
+        border-left: 4px solid #b45309;
+      }
+      .risk {
+        background: var(--red);
+        border-left: 4px solid #b42318;
+      }
+      .blue {
+        background: var(--blue);
+      }
+      details {
+        margin-top: 12px;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 800;
+        padding: 13px 15px;
+      }
+      .detail {
+        border-top: 1px solid var(--border);
+        padding: 14px 16px 16px;
+      }
+      table {
+        border-collapse: collapse;
+        margin-top: 12px;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 9px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: #f4f7f6;
+      }
+      .status {
+        border-radius: 999px;
+        display: inline-block;
+        font-size: 0.75rem;
+        font-weight: 850;
+        padding: 3px 8px;
+        text-transform: uppercase;
+      }
+      .approved {
+        background: #dff5df;
+      }
+      @media (max-width: 850px) {
+        main {
+          width: calc(100% - 18px);
+          padding: 14px 0 32px;
+        }
+        .hero,
+        .content,
+        nav {
+          padding-left: 18px;
+          padding-right: 18px;
+        }
+        .meta,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article class="shell">
+        <header class="hero">
+          <div class="eyebrow">Approved planning report</div>
+          <h1>Y Space: embedded-browser agent workspace and integrations</h1>
+          <p class="hero-note">
+            Fork Poracode as Y Space, preserve compatibility-sensitive internals, make the embedded
+            tabbed browser the single agent-controlled browser, add safe cookie import and Pipedream
+            Connect, and prove Codex, Claude Code, and OpenCode on the macOS desktop app.
+          </p>
+          <div class="meta">
+            <div class="card">
+              <span class="label">Repository</span><span class="value">zvone187/y-space</span>
+            </div>
+            <div class="card">
+              <span class="label">Prepared</span><span class="value">2026-08-27</span>
+            </div>
+            <div class="card">
+              <span class="label">Status</span
+              ><span class="value"><span class="status approved">Approved</span></span>
+            </div>
+            <div class="card">
+              <span class="label">Implementation branch</span
+              ><span class="value">y-space-browser-integrations</span>
+            </div>
+          </div>
+        </header>
+
+        <nav aria-label="Report contents">
+          <a href="#summary">Summary</a><a href="#existing">Existing system</a
+          ><a href="#implementation">Implementation</a><a href="#tests">Tests</a
+          ><a href="#order">Order</a><a href="#risks">Risks</a>
+        </nav>
+
+        <div class="content">
+          <section id="summary">
+            <h2>01 · Fast answer</h2>
+            <p class="intro">
+              The upstream already solves much of the original browser request. The implementation
+              should deepen and secure it, not replace it.
+            </p>
+            <div class="grid three">
+              <div class="card decision">
+                <h3>Reuse</h3>
+                <p>
+                  Keep the existing tab strip, persistent Electron partition, BrowserPanelManager,
+                  browser MCP, provider adapters, MCP OAuth service, encrypted storage, and
+                  plugin/skills projection.
+                </p>
+              </div>
+              <div class="card decision">
+                <h3>Change</h3>
+                <p>
+                  Add caller-owned tab selection/search, make embedded browser capabilities
+                  universal, convert the external-browser bridge to cookie-import-only, and add
+                  Pipedream connections.
+                </p>
+              </div>
+              <div class="card warning">
+                <h3>Compatibility boundary</h3>
+                <p>
+                  Brand the product as Y Space in user-facing surfaces while retaining
+                  Poracode/Lightcode internal identifiers, migrations, protocols, data paths, and
+                  persistent browser partition.
+                </p>
+              </div>
+            </div>
+
+            <h3 style="margin-top: 22px">Resolved decisions</h3>
+            <div class="grid two">
+              <div class="card">
+                <span class="label">1A · Fork</span>
+                <p>Public fork <code>zvone187/y-space</code>, master branch only.</p>
+              </div>
+              <div class="card">
+                <span class="label">2C · Rebrand</span>
+                <p>User-facing Y Space rebrand; preserve compatibility-sensitive internals.</p>
+              </div>
+              <div class="card">
+                <span class="label">3A · Cookies</span>
+                <p>
+                  Extension-assisted Chrome-family import with preview and JSON/Netscape fallback.
+                </p>
+              </div>
+              <div class="card">
+                <span class="label">4A · Capabilities</span>
+                <p>
+                  Embedded browser, app controls, and core skills default-on; no agent-facing
+                  external-browser controls.
+                </p>
+              </div>
+              <div class="card">
+                <span class="label">5A · Pipedream</span>
+                <p>
+                  End-user MCP preset plus local BYO Connect and secure relay using four supplied
+                  env variables.
+                </p>
+              </div>
+              <div class="card">
+                <span class="label">6A · Providers</span>
+                <p>
+                  Repair/update local CLIs and test Codex, Claude Code, and OpenCode with multiple
+                  available models.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="existing">
+            <h2>02 · Existing implementation</h2>
+            <p class="intro">Observed on fork base <code>8e8880a8</code>.</p>
+            <details open>
+              <summary>Reusable browser architecture</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    <code>BrowserPanelManager</code>, <code>BrowserTab</code>, and the browser
+                    renderer already implement multiple tabs, navigation, persistence, groups,
+                    history, bookmarks, panel/overlay/window placement, and headless automation
+                    lifetime.
+                  </li>
+                  <li>
+                    <code>BrowserTabStrip.tsx</code> already provides Chrome-like activation, close,
+                    reorder, and tab grouping.
+                  </li>
+                  <li>
+                    The browser MCP already exposes tab overview/create/activate/close, navigation,
+                    snapshots, DOM actions, screenshots, console/network, cookies/storage, frames,
+                    and injection tools.
+                  </li>
+                  <li>
+                    <code>persist:lightcode-browser</code> intentionally preserves browser sign-ins.
+                    It must remain unchanged under decision 2C.
+                  </li>
+                </ul>
+              </div>
+            </details>
+            <details>
+              <summary>Reusable provider and skills architecture</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    <code>spawnPipeline.ts</code> is the provider-neutral launch boundary for Codex,
+                    Claude Code, OpenCode, browser MCP, Crossagents, Computer Use, app controls, and
+                    user MCP servers.
+                  </li>
+                  <li>
+                    Codex app-server, Claude Agent SDK/CLI, and OpenCode SDK/TUI adapters already
+                    support models, modes, approvals, resume, and MCP translation.
+                  </li>
+                  <li>
+                    <code>SkillsService</code> already discovers and projects skills into
+                    provider-native roots; core Y Space skills can reuse this mechanism.
+                  </li>
+                  <li>
+                    App-controls MCP already exposes projects, tasks, settings, files, terminals,
+                    agents, git/GitHub, MCP servers, skills, notifications, and schedules.
+                  </li>
+                </ul>
+              </div>
+            </details>
+            <details>
+              <summary>Reusable Pipedream/MCP architecture</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    <code>McpOAuthService</code> already implements discovery, DCR, PKCE, refresh,
+                    encrypted token storage, system-browser authorization, and loopback callbacks.
+                  </li>
+                  <li>
+                    User MCP translation already covers Codex, Claude, OpenCode, ACP, Gemini, and
+                    Cursor.
+                  </li>
+                  <li>
+                    <code>secretStorage.ts</code>, authenticated localhost ingress patterns, and
+                    supervisor lifecycle wiring provide the primitives for a safe Pipedream relay.
+                  </li>
+                </ul>
+              </div>
+            </details>
+            <details>
+              <summary>Gaps to close</summary>
+              <div class="detail">
+                <ul>
+                  <li>Browser MCP is not enabled for every agent by default.</li>
+                  <li>
+                    Browser tools without an explicit tab use one global active tab, so concurrent
+                    agents can collide.
+                  </li>
+                  <li>
+                    Tab groups suggest ownership but tab metadata does not directly encode owner,
+                    creator, or last use.
+                  </li>
+                  <li>
+                    OpenCode provider-level MCP drops normal thread identity; its current trusted
+                    hook only repairs Crossagents routing.
+                  </li>
+                  <li>No browser-cookie import workflow exists.</li>
+                  <li>
+                    The existing Chrome MCP gives agents control over a real external browser,
+                    contrary to the resolved embedded-only product direction.
+                  </li>
+                  <li>
+                    No first-party Pipedream connections catalog/account manager/relay exists.
+                  </li>
+                </ul>
+              </div>
+            </details>
+          </section>
+
+          <section id="libraries">
+            <h2>03 · Libraries and services</h2>
+            <div class="card blue">
+              <strong>No new runtime packages are planned initially.</strong>
+              <p>
+                The current Electron, MCP SDK, Zod, HTTP/fetch, SQLite, and encrypted-storage
+                primitives are sufficient. Add a dependency only if implementation evidence shows
+                the existing stack cannot meet a specific requirement.
+              </p>
+            </div>
+            <details>
+              <summary>External APIs used</summary>
+              <div class="detail">
+                <ul>
+                  <li>Pipedream end-user MCP: <code>https://mcp.pipedream.net/v2</code>.</li>
+                  <li>
+                    Pipedream Connect OAuth, apps, accounts, Connect Link, and developer MCP
+                    <code>/v3</code>.
+                  </li>
+                  <li>
+                    Electron session cookies for controlled import into the embedded persistent
+                    partition.
+                  </li>
+                  <li>
+                    Chrome WebExtension cookies API solely for user-initiated cookie
+                    export/import—not agent control.
+                  </li>
+                </ul>
+              </div>
+            </details>
+          </section>
+
+          <section id="implementation">
+            <h2>04 · New implementation</h2>
+            <p class="intro">Work is divided into five independently testable vertical slices.</p>
+            <details open>
+              <summary>A. Y Space surface and Codex-like shell</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    Replace user-visible Poracode/Lightcode labels, descriptions, onboarding, menus,
+                    about screens, settings, website copy, browser tool text, extension copy, and
+                    bundled skill language with Y Space.
+                  </li>
+                  <li>
+                    Preserve internal app IDs, environment names, package scopes, filesystem paths,
+                    protocols, migration files, and <code>persist:lightcode-browser</code>.
+                  </li>
+                  <li>
+                    Refine spacing, sidebar hierarchy, thread header, composer, right-panel chrome,
+                    typography, neutral surfaces, and activity presentation against the current
+                    Codex desktop visual language.
+                  </li>
+                  <li>Use existing design tokens/components; avoid a parallel component system.</li>
+                </ul>
+              </div>
+            </details>
+            <details open>
+              <summary>B. Embedded browser as the sole agent browser</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    Add versioned tab metadata: <code>ownerThreadId?</code>, <code>createdBy</code>,
+                    and <code>lastUsedAt</code>.
+                  </li>
+                  <li>
+                    Add a caller workspace registry that tracks selected tab and automation leases
+                    by trusted thread/provider session and MCP session.
+                  </li>
+                  <li>
+                    Resolve implicit tab targets in this order: explicit tab ID → caller-selected
+                    tab → newest caller-owned tab → new caller-owned tab. UI-only calls may use the
+                    global active tab.
+                  </li>
+                  <li>
+                    Add <code>find_tabs</code> and <code>open_or_focus_tab</code>; enrich
+                    <code>list_tabs</code> with ownership and caller-selection metadata.
+                  </li>
+                  <li>
+                    Make background agent tab activation avoid stealing the user’s visible focus
+                    unless <code>reveal:true</code>.
+                  </li>
+                  <li>
+                    Pass trusted identity through every provider. For OpenCode, generalize
+                    provider-session metadata injection or issue a per-session authenticated local
+                    browser endpoint that maps directly to a Y Space thread and fails closed.
+                  </li>
+                  <li>
+                    Default the embedded browser core plugin and core browser skill on for new and
+                    existing settings, with a global kill switch. Keep cookie/storage and eval gates
+                    off by default.
+                  </li>
+                  <li>
+                    Remove the external Chrome MCP from agent launch configuration,
+                    composer/settings affordances, and core capability defaults. Retain only the
+                    import bridge described below.
+                  </li>
+                </ul>
+              </div>
+            </details>
+            <details open>
+              <summary>C. Cookie import into the embedded profile</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    Refactor the companion extension/localhost bridge into an import-only cookie
+                    source. It must not expose debugger, tab-control, CDP, DOM, or navigation
+                    commands to agents.
+                  </li>
+                  <li>
+                    Support Chrome, Brave, Edge, and Arc extension profiles; allow more than one
+                    paired source connection.
+                  </li>
+                  <li>
+                    Add a main-process <code>BrowserCookieImportService</code>. The renderer
+                    receives source/profile/domain/name/count/status metadata but never cookie
+                    values.
+                  </li>
+                  <li>
+                    Flow: connect source → preview domains/counts → select domains → confirm →
+                    import to the embedded session → flush cookie store → show
+                    imported/skipped/failed counts.
+                  </li>
+                  <li>
+                    Validate domain/path, expiry, secure, httpOnly, SameSite, host-only semantics,
+                    and source profile. Skip expired, malformed, partitioned/CHIPS, and unsupported
+                    container cookies with explicit reasons.
+                  </li>
+                  <li>
+                    Add Cookie-Editor JSON and Netscape <code>cookies.txt</code> file import as the
+                    Firefox/Safari fallback.
+                  </li>
+                  <li>
+                    Never log, render, separately persist, or expose raw cookie values to agents.
+                    Imported cookies become ordinary embedded-profile cookies governed by the
+                    existing data-access gate.
+                  </li>
+                </ul>
+              </div>
+            </details>
+            <details open>
+              <summary>D. Pipedream connections</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    Add a first-party “Connect Pipedream” preset using end-user MCP v2 and the
+                    existing MCP OAuth flow.
+                  </li>
+                  <li>
+                    Add a Connections settings page and supervisor-owned
+                    <code>PipedreamConnectService</code> for app search, Connect Link, account list,
+                    binding, and disconnect.
+                  </li>
+                  <li>
+                    Read <code>PIPEDREAM_PROJECT_ID</code>, <code>PIPEDREAM_ENVIRONMENT</code>,
+                    <code>PIPEDREAM_CLIENT_ID</code>, and <code>PIPEDREAM_CLIENT_SECRET</code> from
+                    the process environment for development; never expose values through renderer
+                    IPC or agent configuration.
+                  </li>
+                  <li>
+                    Generate one opaque install-scoped external-user ID. Never derive it from
+                    project, thread, email, or agent ID.
+                  </li>
+                  <li>
+                    Keep developer access tokens in supervisor memory with expiry slack and refresh
+                    deduplication.
+                  </li>
+                  <li>
+                    Expose one authenticated loopback MCP relay per bound app/account. Strip inbound
+                    Authorization and all agent-supplied <code>x-pd-*</code> headers, then pin
+                    project, environment, external user, app, and account server-side.
+                  </li>
+                  <li>
+                    Inject only the loopback URL and random local bearer into Codex, Claude, and
+                    OpenCode. Preserve tool annotations and existing approval behavior.
+                  </li>
+                </ul>
+              </div>
+            </details>
+            <details open>
+              <summary>E. Provider capabilities and skills</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    Create one provider-neutral Y Space core capability bundle: embedded browser,
+                    app controls, core skills, Crossagents, and enabled Pipedream bindings.
+                  </li>
+                  <li>
+                    Install canonical core skills under the shared skill root and project them into
+                    Codex, Claude, and OpenCode native roots during launch preparation.
+                  </li>
+                  <li>
+                    Add a concise browser baseline instruction: inspect existing tabs first, search
+                    by title/URL, reuse when appropriate, and create a caller-owned tab otherwise.
+                  </li>
+                  <li>
+                    Make OpenCode plugin installation/readiness observable. Do not advertise
+                    identity-dependent capabilities when the trusted hook/proxy is unavailable.
+                  </li>
+                  <li>
+                    Keep Computer Use available but permission-gated; it is not the browser path.
+                  </li>
+                </ul>
+              </div>
+            </details>
+          </section>
+
+          <section id="refactoring">
+            <h2>05 · Refactoring and cleanup</h2>
+            <div class="grid two">
+              <div class="card">
+                <h3>Split browser responsibilities</h3>
+                <p>
+                  Extract caller workspace/lease state and cookie import from the already-large
+                  BrowserPanelManager.
+                </p>
+              </div>
+              <div class="card">
+                <h3>Retire external control</h3>
+                <p>
+                  Delete agent-facing Chrome MCP translation, tools, toggles, and launch wiring
+                  while retaining a narrowly scoped import bridge.
+                </p>
+              </div>
+              <div class="card">
+                <h3>Generalize trusted identity</h3>
+                <p>
+                  Replace Crossagents-only OpenCode routing assumptions with a reusable
+                  provider-session capability boundary.
+                </p>
+              </div>
+              <div class="card">
+                <h3>Separate secrets from settings</h3>
+                <p>
+                  Never put Pipedream credentials/tokens into plaintext shared settings; keep
+                  renderer contracts status-only.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="tests">
+            <h2>06 · Tests and user stories</h2>
+            <details open>
+              <summary>User stories</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    As a user, I can create, reorder, activate, group, close, and restore several
+                    embedded browser tabs.
+                  </li>
+                  <li>
+                    As a user, I can tell any connected agent about an existing tab and it can find,
+                    focus, inspect, and operate that exact tab.
+                  </li>
+                  <li>
+                    As a user running concurrent agents, each agent keeps its own selected/owned
+                    browser workspace without controlling another agent’s implicit target.
+                  </li>
+                  <li>
+                    As a user, I can import selected logged-in domains from Chrome or Brave into Y
+                    Space without exposing cookie values to the UI, logs, or agents.
+                  </li>
+                  <li>
+                    As a user, I can connect Pipedream, add app accounts, use read-only tools from
+                    any provider, select the intended account, and disconnect cleanly.
+                  </li>
+                  <li>
+                    As a user, I can run Codex, Claude Code, and OpenCode with available models and
+                    receive the same Y Space browser/skills/integration capabilities.
+                  </li>
+                </ul>
+              </div>
+            </details>
+            <details open>
+              <summary>Automated tests to write before production code</summary>
+              <div class="detail">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Area</th>
+                      <th>Initial failing proof</th>
+                      <th>Primary suites</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Settings/default bundle</td>
+                      <td>
+                        Browser/core skill defaults are absent; Chrome control remains available.
+                      </td>
+                      <td>
+                        <code>settings.test.ts</code>, <code>spawnPipeline.test.ts</code>, provider
+                        adapter tests
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Tab ownership/search</td>
+                      <td>
+                        No owner metadata, caller selection, <code>find_tabs</code>, or
+                        <code>open_or_focus_tab</code>.
+                      </td>
+                      <td>
+                        <code>BrowserPanelManager.test.ts</code>, new workspace registry tests,
+                        <code>toolRegistry.test.ts</code>, ingress tests
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Concurrent leases</td>
+                      <td>Two clients collide on global selection/disable.</td>
+                      <td>Browser MCP transport/lease integration tests</td>
+                    </tr>
+                    <tr>
+                      <td>OpenCode identity</td>
+                      <td>
+                        Provider-level browser calls are unscoped or fail closed without generalized
+                        identity.
+                      </td>
+                      <td>
+                        OpenCode plugin tests, <code>spawnPipeline.test.ts</code>, runtime session
+                        tests
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Cookie import</td>
+                      <td>No source discovery/preview/import/redaction/flush behavior exists.</td>
+                      <td>New cookie service, bridge protocol, IPC, renderer component tests</td>
+                    </tr>
+                    <tr>
+                      <td>External-control retirement</td>
+                      <td>Chrome MCP still appears in settings/composer and launch configs.</td>
+                      <td>Settings/composer tests, provider translation tests, bridge tests</td>
+                    </tr>
+                    <tr>
+                      <td>Pipedream token broker</td>
+                      <td>No scoped token refresh/cache/redaction behavior exists.</td>
+                      <td>New Connect service/token broker/store tests</td>
+                    </tr>
+                    <tr>
+                      <td>Pipedream relay</td>
+                      <td>
+                        No local bearer, header stripping/pinning, streaming, or 401 retry exists.
+                      </td>
+                      <td>New relay protocol/security/integration tests</td>
+                    </tr>
+                    <tr>
+                      <td>Connections UI</td>
+                      <td>
+                        No preset, app search, account binding, disconnect, or safe status UI
+                        exists.
+                      </td>
+                      <td>Renderer component and IPC contract tests</td>
+                    </tr>
+                    <tr>
+                      <td>Y Space surface</td>
+                      <td>
+                        User-visible Poracode labels remain and visual baselines do not match agreed
+                        shell.
+                      </td>
+                      <td>Targeted component/i18n tests and screenshot assertions</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </details>
+            <details open>
+              <summary>Acceptance criteria</summary>
+              <div class="detail">
+                <ul>
+                  <li>
+                    All user-visible product surfaces say Y Space while compatibility-sensitive
+                    internal identifiers and stored sessions remain intact.
+                  </li>
+                  <li>
+                    Every supported desktop agent receives embedded browser and core skill
+                    capabilities by default; no agent receives an external-browser MCP.
+                  </li>
+                  <li>
+                    Agents can list/search/open-or-focus tabs, and concurrent agents maintain
+                    independent implicit targets.
+                  </li>
+                  <li>
+                    Cookie import requires user action and preview; raw values never cross renderer
+                    IPC or appear in logs; an imported login survives restart.
+                  </li>
+                  <li>
+                    Pipedream secrets never reach renderer/shared settings/provider configs; real
+                    account state and relay headers prove the intended user/app/account route.
+                  </li>
+                  <li>
+                    Codex, Claude Code, and OpenCode each complete browser and Pipedream read-only
+                    smoke tasks on at least two available model configurations where account access
+                    permits.
+                  </li>
+                  <li>
+                    Automated suites, type checks, lint, formatting, packaging smoke, and manual
+                    macOS UI workflows pass with captured evidence.
+                  </li>
+                </ul>
+              </div>
+            </details>
+          </section>
+
+          <section id="order">
+            <h2>07 · TDD implementation order</h2>
+            <ol>
+              <li>
+                Create failing default-capability and external-control-retirement tests; implement
+                the provider-neutral Y Space bundle.
+              </li>
+              <li>
+                Create failing tab metadata/workspace/search/lease tests; implement scoped
+                embedded-browser behavior.
+              </li>
+              <li>
+                Create failing OpenCode identity/readiness tests; generalize provider-session
+                routing.
+              </li>
+              <li>
+                Create failing cookie bridge/service/IPC/UI tests; implement previewed import and
+                fallback files.
+              </li>
+              <li>
+                Create failing Pipedream credential/token/account/relay tests; implement Connect
+                backend and local relay.
+              </li>
+              <li>
+                Create failing Connections UI/preset tests; implement UI and provider injection.
+              </li>
+              <li>
+                Create failing rebrand/i18n/visual tests; complete Y Space surface and Codex-like
+                refinements.
+              </li>
+              <li>
+                Run full verification, package the macOS app, and manually test
+                provider/browser/cookie/Pipedream workflows.
+              </li>
+            </ol>
+          </section>
+
+          <section id="risks">
+            <h2>08 · Risks and mitigations</h2>
+            <div class="grid two">
+              <div class="card risk">
+                <h3>Cookie secrecy</h3>
+                <p>
+                  Values could leak through IPC/logs. Keep values main-only, use metadata DTOs,
+                  redact errors, and add canary-secret tests.
+                </p>
+              </div>
+              <div class="card risk">
+                <h3>Agent tab races</h3>
+                <p>
+                  Global active-tab fallback can target the wrong page. Require trusted caller
+                  identity for agent calls and isolate selection/leases.
+                </p>
+              </div>
+              <div class="card warning">
+                <h3>OpenCode pooled server</h3>
+                <p>
+                  Provider-level MCP can lose thread identity. Fail closed unless a verified
+                  provider-session mapping or per-session local credential exists.
+                </p>
+              </div>
+              <div class="card warning">
+                <h3>Pipedream developer secret</h3>
+                <p>
+                  A desktop binary cannot safely embed a publisher secret. This plan implements
+                  local BYO credentials; a distributed product would require a Y Space backend.
+                </p>
+              </div>
+              <div class="card warning">
+                <h3>OAuth/live-account dependency</h3>
+                <p>
+                  Real E2E depends on Pipedream account permissions and Claude login. Separate
+                  implementation correctness from credential-dependent QA and capture both statuses.
+                </p>
+              </div>
+              <div class="card warning">
+                <h3>Compatibility naming</h3>
+                <p>
+                  Surface rebrand can accidentally rename internal identities. Maintain an explicit
+                  allowlist of compatibility identifiers and test persisted data/session paths.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="assumptions">
+            <h2>09 · Assumptions and deferred items</h2>
+            <ul>
+              <li>
+                The four supplied Pipedream variables are development credentials for the fork
+                owner’s local testing and will remain ignored/uncommitted.
+              </li>
+              <li>
+                Chrome and Brave provide the primary live extension-import QA; Firefox/Safari use
+                file fallback in this release.
+              </li>
+              <li>
+                Computer Use remains a separately permissioned capability, but it is not used as a
+                substitute for the embedded browser.
+              </li>
+              <li>
+                Publishing a shared production Pipedream backend, app-store signing/notarization,
+                and Safari Web Extension packaging are deferred.
+              </li>
+            </ul>
+          </section>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>

@@ -125,7 +125,7 @@ export const XTermSurface = forwardRef<
       onReset: () => void;
       onExited: (exitCode: number | null) => void;
     }) => () => void;
-    /** Override PTY input/resize for a terminal hosted on a remote Poracode server. */
+    /** Override PTY input/resize for a terminal hosted on a remote Y Space server. */
     writeInput?: (data: string) => Promise<void>;
     resizeBackingTerminal?: (size: TerminalSize) => Promise<void>;
     /**
@@ -271,7 +271,7 @@ export const XTermSurface = forwardRef<
     const RESIZE_DEBOUNCE_BUFFER_THRESHOLD = 200;
 
     // Resolve the PTY backend: a caller-provided override (a terminal hosted on
-    // a remote Poracode server) or the local supervisor bridge. Each reads its
+    // a remote Y Space server) or the local supervisor bridge. Each reads its
     // ref lazily so a later prop update is still honored.
     const writeInputToPty = (data: string): Promise<void> =>
       writeInputRef.current
@@ -396,7 +396,7 @@ export const XTermSurface = forwardRef<
       scrollback: 5_000,
       scrollSensitivity: useSharedSettings.getState().scrollSpeed,
       fastScrollSensitivity: 10,
-      // Keep xterm's internal scrollbar gutter effectively zero; Poracode
+      // Keep xterm's internal scrollbar gutter effectively zero; Y Space
       // renders the visible scrollbar outside the terminal content area.
       scrollbar: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },
       fontSize: baseFontSizeRef.current,

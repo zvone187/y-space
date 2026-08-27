@@ -388,8 +388,8 @@ describe("OpencodeSdkSession", () => {
 
     const newMcpServers = [
       {
-        id: "chrome",
-        name: "chrome",
+        id: "remote-browser",
+        name: "remote-browser",
         timeoutMs: 300_000,
         transport: { type: "http" as const, url: "http://127.0.0.1:9502/mcp", headers: {} },
       },
@@ -1013,7 +1013,7 @@ describe("OpencodeSdkSession", () => {
     await session.dispose();
   });
 
-  it("keeps disabled Crossagents tools denied in full access mode", async () => {
+  it("keeps disabled built-in MCP tools denied in full access mode", async () => {
     const update = vi
       .fn<(input: unknown) => Promise<{ data: unknown }>>()
       .mockResolvedValue({ data: {} });
@@ -1050,6 +1050,20 @@ describe("OpencodeSdkSession", () => {
           disabledTools: ["spawn_agent"],
           transport: { type: "http", url: "http://127.0.0.1:4321/mcp", headers: {} },
         },
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          disabledTools: ["close_tab"],
+          transport: { type: "http", url: "http://127.0.0.1:4322/mcp", headers: {} },
+        },
+        {
+          id: "app-controls",
+          name: "poracode",
+          timeoutMs: 30_000,
+          disabledTools: ["delete_thread"],
+          transport: { type: "http", url: "http://127.0.0.1:4323/mcp", headers: {} },
+        },
       ],
     });
 
@@ -1063,6 +1077,8 @@ describe("OpencodeSdkSession", () => {
       permission: [
         { permission: "*", pattern: "*", action: "allow" },
         { permission: "crossagents_spawn_agent", pattern: "*", action: "deny" },
+        { permission: "browser_close_tab", pattern: "*", action: "deny" },
+        { permission: "poracode_delete_thread", pattern: "*", action: "deny" },
       ],
     });
     expect(promptAsync).toHaveBeenCalledTimes(1);

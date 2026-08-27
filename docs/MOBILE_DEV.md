@@ -138,7 +138,7 @@ before the browser sees the redirect; browser users are redirected to
   curl -s -D - -o /dev/null -H "Origin: http://localhost:3100" \
     http://127.0.0.1:49152/.well-known/poracode/environment | grep -i access-control
   ```
-- **"data dir … is in use by another Poracode process (pid N)"** → a desktop
+- **"data dir … is in use by another Y Space process (pid N)"** → a desktop
   app or a prior server holds the lock. Kill it (`kill N`) or run with a separate
   `PORACODE_BASE_DIR`.
 - **Invalid pairing token** → tokens are single-use and expire in 10 min; mint a

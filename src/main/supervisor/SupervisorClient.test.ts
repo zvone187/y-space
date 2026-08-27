@@ -37,7 +37,12 @@ function makeFakeChild(): FakeChild {
   return child;
 }
 
-function makeClient(options: Pick<SupervisorClientOptions, "prepareStartThread"> = {}) {
+function makeClient(
+  options: Pick<
+    SupervisorClientOptions,
+    "prepareStartThread" | "resolvePipedreamPrivilegedBootstrap"
+  > = {},
+) {
   const child = makeFakeChild();
   forkMock.mockReturnValue(child);
   const client = new SupervisorClient({
@@ -201,5 +206,30 @@ describe("SupervisorClient lifecycle", () => {
 
     expect(terminateChildProcessTreeMock).toHaveBeenCalledExactlyOnceWith(child);
     expect(forkMock).toHaveBeenCalledOnce();
+  });
+
+  it("sends Pipedream credentials only in the privileged bootstrap message, never child env", () => {
+    const { child } = makeClient({
+      resolvePipedreamPrivilegedBootstrap: () => ({
+        bootstrap: {
+          state: "ready",
+          source: "environment",
+          credentials: {
+            clientId: "client-id-private",
+            clientSecret: "client-secret-private",
+            projectId: "proj_Test123",
+            environment: "development",
+          },
+        },
+        externalUserId: "y-space-install-private-id",
+      }),
+    });
+
+    const forkOptions = forkMock.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv };
+    expect(JSON.stringify(forkOptions.env)).not.toMatch(/PIPEDREAM|client-secret-private/);
+    expect(child.send).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "pipedream-privileged-bootstrap" }),
+      expect.any(Function),
+    );
   });
 });

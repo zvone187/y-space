@@ -84,8 +84,8 @@ if (isNightly) {
     process.exit(1);
   }
   html = html
-    .replaceAll("<title>Poracode</title>", "<title>Poracode Nightly</title>")
-    .replaceAll('web-app-title" content="Poracode"', 'web-app-title" content="Poracode Nightly"');
+    .replaceAll("<title>Y Space</title>", "<title>Y Space Nightly</title>")
+    .replaceAll('web-app-title" content="Y Space"', 'web-app-title" content="Y Space Nightly"');
   writeFileSync(source, html, "utf8");
 }
 writeFileSync(target, html, "utf8");

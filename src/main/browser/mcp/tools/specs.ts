@@ -1,7 +1,7 @@
 import type { ToolSpec } from "./types";
 
 export const BROWSER_MCP_INSTRUCTIONS =
-  "Use the browser MCP server for browsing, inspecting, clicking, typing, screenshots, network/console checks, and local web app verification inside Poracode. Before the first browsing action, call browser.enable once and keep it enabled across the whole uninterrupted browser session so agent presence stays consistent between calls. Always call browser.disable before pausing to ask for user input, waiting for an external event, or finishing, and enable again when you resume. Prefer browser.snapshot or browser.find before browser.click/fill/type, use @e refs from snapshots when possible, and call browser.api when you need the complete API map.";
+  "Use the browser MCP server for browsing, inspecting, clicking, typing, screenshots, network/console checks, and local web app verification inside Y Space. Before the first browsing action, call browser.enable once and keep it enabled across the whole uninterrupted browser session so agent presence stays consistent between calls. Always call browser.disable before pausing to ask for user input, waiting for an external event, or finishing, and enable again when you resume. Prefer browser.snapshot or browser.find before browser.click/fill/type, use @e refs from snapshots when possible, and call browser.api when you need the complete API map.";
 
 const RAW_TOOLS: ToolSpec[] = [
   {
@@ -24,12 +24,24 @@ const RAW_TOOLS: ToolSpec[] = [
   },
   {
     name: "list_tabs",
-    description: "List open tabs in the Poracode in-app browser panel.",
+    description: "List open tabs in the Y Space in-app browser panel.",
     inputSchema: { type: "object", properties: {} },
   },
   {
+    name: "find_tabs",
+    description: "Search all open Y Space browser tabs by tab id, URL, or title.",
+    inputSchema: {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: { type: "string" },
+        limit: { type: "number", description: "Maximum matches (default 20)." },
+      },
+    },
+  },
+  {
     name: "new_tab",
-    description: "Open a new tab in the Poracode browser panel.",
+    description: "Open a new tab in the Y Space browser panel.",
     inputSchema: {
       type: "object",
       properties: {
@@ -40,7 +52,7 @@ const RAW_TOOLS: ToolSpec[] = [
   },
   {
     name: "open",
-    description: "Open a URL in the active Poracode browser tab, creating a tab if needed.",
+    description: "Open a URL in the active Y Space browser tab, creating a tab if needed.",
     inputSchema: {
       type: "object",
       required: ["url"],
@@ -54,6 +66,20 @@ const RAW_TOOLS: ToolSpec[] = [
       type: "object",
       required: ["tabId"],
       properties: { tabId: { type: "string" } },
+    },
+  },
+  {
+    name: "open_or_focus_tab",
+    description:
+      "Focus an already-open tab matching a URL, or open it in this agent thread's tab group when absent.",
+    inputSchema: {
+      type: "object",
+      required: ["url"],
+      properties: {
+        url: { type: "string" },
+        match: { type: "string", enum: ["exact", "origin", "prefix"] },
+        activate: { type: "boolean", description: "Activate the matched/new tab (default true)." },
+      },
     },
   },
   {
@@ -265,7 +291,7 @@ const RAW_TOOLS: ToolSpec[] = [
   {
     name: "eval",
     description:
-      "Evaluate a JS expression in the page's main world. Disabled by default; enable in Poracode settings.",
+      "Evaluate a JS expression in the page's main world. Disabled by default; enable in Y Space settings.",
     inputSchema: {
       type: "object",
       required: ["js"],
@@ -495,7 +521,7 @@ const RAW_TOOLS: ToolSpec[] = [
   {
     name: "cookies",
     description:
-      'Cookies for the tab. `op:"get"` returns matching cookies; `op:"set"` upserts; `op:"clear"` deletes (filter optional). Requires allowDataAccess in Poracode settings.',
+      'Cookies for the tab. `op:"get"` returns matching cookies; `op:"set"` upserts; `op:"clear"` deletes (filter optional). Requires allowDataAccess in Y Space settings.',
     inputSchema: {
       type: "object",
       properties: {
@@ -530,7 +556,7 @@ const RAW_TOOLS: ToolSpec[] = [
   {
     name: "storage",
     description:
-      'Read/write localStorage or sessionStorage. `op:"getAll"|"get"|"set"|"remove"|"clear"`. Requires allowDataAccess in Poracode settings.',
+      'Read/write localStorage or sessionStorage. `op:"getAll"|"get"|"set"|"remove"|"clear"`. Requires allowDataAccess in Y Space settings.',
     inputSchema: {
       type: "object",
       required: ["op", "kind"],
@@ -600,6 +626,7 @@ const RAW_TOOLS: ToolSpec[] = [
 const READ_ONLY_TOOL_NAMES = new Set([
   "api",
   "list_tabs",
+  "find_tabs",
   "get_url",
   "get_title",
   "screenshot",

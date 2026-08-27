@@ -2062,7 +2062,7 @@ describe("GitService.pullFromSource", () => {
     const commands = execFileMock.mock.calls.map((c: unknown[]) =>
       gitSubcommandArgs(c[1] as string[]).join(" "),
     );
-    expect(commands).toContain("stash push -u -m Poracode: before pull from main");
+    expect(commands).toContain("stash push -u -m Y Space: before pull from main");
     expect(commands).toContain("merge --ff-only origin/main");
     expect(commands).toContain("stash pop");
   });

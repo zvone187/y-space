@@ -1,4 +1,4 @@
-// Service worker for the standalone (hosted) Poracode PWA. The desktop-served
+// Service worker for the standalone (hosted) Y Space PWA. The desktop-served
 // build ships an equivalent worker generated at runtime (see
 // src/main/remote/pairingPage.ts); keep the two in sync.
 //

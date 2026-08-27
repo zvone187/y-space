@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { asStructuredElicitationDetails, StructuredElicitationForm } from "./structuredElicitation";
 
@@ -59,6 +59,47 @@ function renderKimiForm(details: unknown = kimiFormDetails()) {
 }
 
 describe("StructuredElicitationForm", () => {
+  const openExternal = vi.fn<(url: string) => Promise<void>>(async () => undefined);
+
+  beforeEach(() => {
+    openExternal.mockClear();
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      value: {
+        openExternal,
+        setWindowChrome: vi.fn<() => Promise<{ nativeCapable: boolean }>>(async () => ({
+          nativeCapable: false,
+        })),
+      },
+    });
+  });
+
+  it("routes URL elicitation links through the app link handler", () => {
+    const params = asStructuredElicitationDetails({
+      mcpElicitation: {
+        mode: "url",
+        message: "Authorize access",
+        serverName: "Example MCP",
+        url: "https://example.test/oauth",
+        elicitationId: "elicitation-1",
+      },
+    });
+    expect(params).toBeDefined();
+    render(
+      <AppProvider>
+        <StructuredElicitationForm
+          isDisabled={false}
+          onSubmit={vi.fn<(response: unknown, outcome: string) => void>()}
+          params={params!}
+        />
+      </AppProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("link", { name: "Open required URL" }));
+
+    expect(openExternal).toHaveBeenCalledWith("https://example.test/oauth");
+  });
+
   it("renders a checkbox per anyOf choice of a multi-select array", () => {
     renderKimiForm();
 

@@ -1,6 +1,6 @@
 # @poracode/activity-bridge
 
-Local Capacitor 8 plugin bridging the Poracode mobile web layer to iOS
+Local Capacitor 8 plugin bridging the Y Space mobile web layer to iOS
 **ActivityKit** (Live Activities / Dynamic Island). No-op on Android and web.
 
 Linked from the repo root as a `file:` dependency:

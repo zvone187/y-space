@@ -213,7 +213,9 @@ describe("createHeadlessRemoteHost", () => {
 
     expect(resolver?.("project-1")).toEqual({
       mcpServers: [projectServer],
-      disabledBuiltInMcpServerIds: ["chrome"],
+      projectMcpServers: [projectServer],
+      disabledBuiltInMcpServerIds: [],
+      disabledBuiltInMcpTools: undefined,
     });
     await host.dispose();
   });

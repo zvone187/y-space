@@ -1,14 +1,14 @@
 {
-  "name": "poracode",
+  "name": "y-space",
   "version": "1.6.6",
   "private": true,
-  "description": "The universal desktop orchestrator for AI agents. Run terminal-native and structured chat agents side-by-side.",
-  "homepage": "https://poracode.com/",
+  "description": "A desktop workspace for AI coding agents with a shared embedded browser and integrations.",
+  "homepage": "https://github.com/zvone187/y-space",
   "license": "Apache-2.0",
   "author": "SDSLeon",
   "repository": {
     "type": "git",
-    "url": "https://github.com/SDSLeon/lightcode"
+    "url": "https://github.com/zvone187/y-space"
   },
   "type": "module",
   "main": "dist/main/main.cjs",

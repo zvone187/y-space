@@ -1,6 +1,6 @@
-# Poracode mobile beta release
+# Y Space mobile beta release
 
-Poracode ships one mobile client from `src/mobile` to a hosted PWA, Android via
+Y Space ships one mobile client from `src/mobile` to a hosted PWA, Android via
 Capacitor, and iOS via Capacitor. The native application identifier is locked to
 `com.lightcodeapp.mobile`; the iOS Live Activity extension uses
 `com.lightcodeapp.mobile.PoracodeActivities`.
@@ -32,7 +32,7 @@ reads the three-integer marketing version from `package.json` (or a
 
 ## Public URLs
 
-These URLs are Poracode's hosted-PWA, legal, and verified-link acceptance gates.
+These URLs are Y Space's hosted-PWA, legal, and verified-link acceptance gates.
 Internal TestFlight and Play installation can work without the association
 endpoints, but the links must be live before testing universal/app links or
 using them as store metadata:
@@ -144,13 +144,13 @@ backups.
 3. Create an Admin team App Store Connect API key and add the GitHub secrets
    above. Do not use an individual API key because Xcode automatic provisioning
    cannot use it.
-4. Create the App Store Connect app record: platform iOS, name `Poracode`, bundle
+4. Create the App Store Connect app record: platform iOS, name `Y Space`, bundle
    ID `com.lightcodeapp.mobile`, primary language English (U.S.), and a unique
    SKU such as `poracode-ios`.
 5. Set Privacy Policy URL to `https://poracode.com/privacy` and Support URL to
    `https://poracode.com/support`.
 6. Complete App Privacy, age rating, content-rights, and export-compliance
-   questions. Do not automatically answer “no encryption”: Poracode includes an
+   questions. Do not automatically answer “no encryption”: Y Space includes an
    SSH client and SwiftCrypto, so the encryption/export answer must be reviewed
    in App Store Connect.
 7. Add an internal tester group and enable automatic distribution if uploaded
@@ -162,13 +162,13 @@ backups.
 
 Beta description:
 
-> Poracode for iPhone and iPad is the mobile companion for the Poracode desktop
+> Y Space for iPhone and iPad is the mobile companion for the Y Space desktop
 > app. Pair with a desktop to monitor coding agents, reply when they need input,
 > review work, and receive optional status notifications away from your desk.
 
 What to Test:
 
-> Pair with a Poracode desktop by scanning its QR code or entering the endpoint
+> Pair with a Y Space desktop by scanning its QR code or entering the endpoint
 > and token. Verify project/thread navigation, terminal and native-chat updates,
 > sending a reply, camera and local-network permission prompts, background
 > notifications, universal links, and Live Activity status. Report the desktop
@@ -178,14 +178,14 @@ Feedback email: `support@poracode.com`
 
 Review note:
 
-> Poracode is a companion client and requires a reachable Poracode desktop.
+> Y Space is a companion client and requires a reachable Y Space desktop.
 > Provide Beta App Review with a dedicated reachable desktop endpoint and
 > pairing token; do not submit a short-lived QR code as static credentials.
 
 ## Google Play one-time setup
 
 1. Complete Play Console developer enrollment and create an app named
-   `Poracode`, default language English (United States), package
+   `Y Space`, default language English (United States), package
    `com.lightcodeapp.mobile`, app/game = App, free.
 2. Generate one upload key, back it up, and add its encoded
    keystore/password/alias values to the GitHub environment. Select Play App
@@ -208,7 +208,7 @@ Review note:
    JSON key as `PLAY_SERVICE_ACCOUNT_JSON`. Later workflow runs publish to the
    configured track automatically.
 
-Store listing name: `Poracode`
+Store listing name: `Y Space`
 
 Short description:
 
@@ -216,16 +216,16 @@ Short description:
 
 Full description:
 
-> Poracode is the mobile companion for the Poracode desktop app. Pair your phone
+> Y Space is the mobile companion for the Y Space desktop app. Pair your phone
 > with a desktop you control to follow active coding sessions, read terminal and
 > native chat output, respond when an agent needs input, inspect project work,
-> and receive optional status notifications. Poracode supports local-network and
-> HTTPS desktop connections. A running Poracode desktop is required; the mobile
+> and receive optional status notifications. Y Space supports local-network and
+> HTTPS desktop connections. A running Y Space desktop is required; the mobile
 > app does not provide a hosted coding-agent account.
 
 Initial release note:
 
-> First beta: pair with Poracode desktop, monitor and steer agent threads, scan
+> First beta: pair with Y Space desktop, monitor and steer agent threads, scan
 > pairing QR codes, and receive optional status notifications.
 
 Privacy policy: `https://poracode.com/privacy`
@@ -240,7 +240,7 @@ Support: `https://poracode.com/support`
    TestFlight upload is automatic. Leave `PLAY_SERVICE_ACCOUNT_JSON` unset for
    the first run so the workflow produces the signed AAB without attempting the
    unsupported first API upload.
-4. Download `poracode-android-<version>-<build>.zip` from the workflow and upload
+4. Download `y-space-android-<version>-<build>.zip` from the workflow and upload
    its AAB to the Play Internal testing release.
 5. Select the processed TestFlight build for the internal tester group and roll
    out the Play internal release.

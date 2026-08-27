@@ -11,6 +11,7 @@ import {
 } from "../wslDeploy";
 import { resolveNodeForDistro, type ResolvedNode } from "../runtime";
 import { attachLineSplitter, spawnWslLineChild, type WslLineChildOpts } from "../wslChild";
+import { readPrivilegedMcpEnvironment } from "@/supervisor/privilegedMcpEnvironment";
 
 export type HookEventReceiver = (event: AgentEventEnvelope) => void;
 
@@ -381,18 +382,14 @@ export class WslBridgeServer {
     // `/bin/sh: node: not found` failure mode when the user has nvm-only
     // node and Claude (or wsl.exe under a sanitized env) doesn't source
     // their shell init files.
+    const browserMcpUrl = readPrivilegedMcpEnvironment("browser")?.url;
     const childOpts: WslLineChildOpts = {
       distro,
       argv: [resolved.nodePath, linuxScriptPath],
       env: {
         PORACODE_HOOK_SECRET: this.options.secret,
         PORACODE_HOOK_PROTOCOL_VERSION: String(this.options.protocolVersion),
-        ...(process.env.PORACODE_BROWSER_MCP_URL
-          ? { PORACODE_BROWSER_MCP_URL: process.env.PORACODE_BROWSER_MCP_URL }
-          : {}),
-        ...(process.env.PORACODE_BROWSER_MCP_TOKEN
-          ? { PORACODE_BROWSER_MCP_TOKEN: process.env.PORACODE_BROWSER_MCP_TOKEN }
-          : {}),
+        ...(browserMcpUrl ? { PORACODE_BROWSER_MCP_URL: browserMcpUrl } : {}),
       },
       stderr: "ignore",
       onLine,

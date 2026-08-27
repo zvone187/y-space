@@ -87,7 +87,7 @@ describe("remote settings", () => {
     const settings = pickRemoteSettings({
       ...defaultSharedSettings,
       enabledMcpServers: { browser: true, crossagents: false, "computer-use": true },
-      disabledBuiltInMcpServers: { chrome: true },
+      disabledBuiltInMcpServers: { "computer-use": true },
       mcpServers: [
         {
           id: "secret-server",
@@ -109,7 +109,7 @@ describe("remote settings", () => {
       crossagents: false,
       "computer-use": true,
     });
-    expect(settings.disabledBuiltInMcpServers).toEqual({ chrome: true });
+    expect(settings.disabledBuiltInMcpServers).toEqual({ "computer-use": true });
     expect(settings).not.toHaveProperty("mcpServers");
     expect(JSON.stringify(settings)).not.toContain("Bearer secret");
   });

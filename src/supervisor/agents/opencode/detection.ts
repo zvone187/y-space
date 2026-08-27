@@ -66,7 +66,7 @@ export const opencodeDefaultCapabilities: AgentCapability = {
   // per-thread MCP credentials.
   mcpScope: { terminal: "none", gui: "none" },
   mcpConfigSource: "agentSettings",
-  agentSettingsDefaults: { crossagentMcp: true },
+  agentSettingsDefaults: { browserMcp: true, crossagentMcp: true },
   // The installed OpenCode plugin injects the trusted provider session id
   // into Crossagents calls, allowing every directory/session in the pooled
   // server to share one MCP credential without losing parent-thread routing.

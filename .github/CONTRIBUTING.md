@@ -1,4 +1,4 @@
-# Contributing to Poracode
+# Contributing to Y Space
 
 Thanks for thinking about contributing! Bug reports, docs fixes, new providers, and features are all welcome.
 
@@ -6,16 +6,16 @@ By contributing, you agree your work is licensed under the [Apache License 2.0](
 
 ## Before you start
 
-- For anything non-trivial, [open an issue](https://github.com/SDSLeon/lightcode/issues/new/choose) first so we can align on scope.
-- Search [existing issues](https://github.com/SDSLeon/lightcode/issues) and [PRs](https://github.com/SDSLeon/lightcode/pulls) to avoid duplicates.
+- For anything non-trivial, [open an issue](https://github.com/zvone187/y-space/issues/new/choose) first so we can align on scope.
+- Search [existing issues](https://github.com/zvone187/y-space/issues) and [PRs](https://github.com/zvone187/y-space/pulls) to avoid duplicates.
 
 ## Local setup
 
 You'll need Node `>= 24.10.0` (see `.nvmrc`) and pnpm `11.x` (pinned in `package.json`).
 
 ```bash
-git clone https://github.com/<your-username>/poracode.git
-cd poracode
+git clone https://github.com/<your-username>/y-space.git
+cd y-space
 pnpm install
 pnpm run dev
 ```
@@ -47,7 +47,7 @@ Rebase on the latest `master` before requesting review. Husky runs `lint-staged`
 
 ## Reporting issues
 
-Use the [issue templates](https://github.com/SDSLeon/lightcode/issues/new/choose). Include OS, Poracode version, the agent(s) involved, and reproduction steps.
+Use the [issue templates](https://github.com/zvone187/y-space/issues/new/choose). Include OS, Y Space version, the agent(s) involved, and reproduction steps.
 
 For security issues, don't open a public issue. See [SECURITY.md](SECURITY.md).
 

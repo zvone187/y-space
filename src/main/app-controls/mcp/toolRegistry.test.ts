@@ -695,7 +695,7 @@ describe("Poracode app control tools — threads", () => {
     )) as { applied: string[]; note?: string };
 
     expect(result.applied).toEqual(["rename", "done", "acknowledge"]);
-    expect(result.note).toMatch(/No Poracode UI is connected/);
+    expect(result.note).toMatch(/No Y Space UI is connected/);
     // Commands are still emitted (attempted), but no renderer received them.
     expect(emitRemoteThreadCommand).toHaveBeenCalled();
     expect(updateThreadRow).toHaveBeenCalledWith("a", expect.any(Function));
@@ -730,7 +730,7 @@ describe("Poracode app control tools — threads", () => {
       note?: string;
     };
     expect(result.opened).toBe(false);
-    expect(result.note).toMatch(/No Poracode UI is connected/);
+    expect(result.note).toMatch(/No Y Space UI is connected/);
   });
 
   it("rejects unknown thread ids with a clear error", async () => {

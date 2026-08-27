@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { ExpectedStructuredRuntimeError, type CommandSpec } from "../base";
 import { classifyOpenCodeError } from "./opencodeErrors";
+import { sanitizeChildProcessEnv } from "@/supervisor/runtime/threadSession/spawnDiagnostics";
 
 const URL_LINE_PREFIX = "opencode server listening";
 const URL_REGEX = /on\s+(https?:\/\/[^\s]+)/;
@@ -68,10 +69,7 @@ export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHan
   const isWin = process.platform === "win32";
   const child = spawn(commandSpec.command, commandSpec.args, {
     cwd: commandSpec.cwd,
-    env: {
-      ...process.env,
-      ...commandSpec.env,
-    },
+    env: sanitizeChildProcessEnv({ ...process.env, ...commandSpec.env }),
     stdio: ["pipe", "pipe", "pipe"],
     shell: false,
     windowsHide: true,

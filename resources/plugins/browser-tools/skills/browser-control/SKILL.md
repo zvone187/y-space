@@ -1,16 +1,16 @@
 ---
 name: browser-control
-description: Open, inspect, interact with, and verify websites or local web apps in Poracode's isolated browser. Use for visible page state, navigation, screenshots, console or network evidence, and end-to-end UI testing; do not use it for semantic service operations when a purpose-built connector is available.
+description: Open, find, inspect, interact with, and verify websites or local web apps in Y Space's embedded multi-tab browser. Use for visible page state, navigation, screenshots, console or network evidence, and end-to-end UI testing; do not use it for semantic service operations when a purpose-built connector is available.
 ---
 
 # Browser Control
 
-Use Poracode's `browser` MCP when the task depends on a rendered page, visible interaction, or local web app. If the request is really about structured data or a service operation and a purpose-built connector is available, use that connector instead. An explicit request for Poracode's browser wins.
+Use Y Space's `browser` MCP when the task depends on a rendered page, visible interaction, or local web app. If the request is really about structured data or a service operation and a purpose-built connector is available, use that connector instead. An explicit request for the Y Space browser wins.
 
 ## Workflow
 
 1. Call `browser.api` when you need the current API map, then call `browser.enable` once before the first browser action.
-2. Reuse a relevant tab from `browser.list_tabs`; otherwise open the exact URL the user supplied or the known local target. Do not guess a remote site or substitute web search when authentication blocks the requested page.
+2. Inventory tabs with `browser.list_tabs`, search their titles and URLs, and activate a relevant match. Only create another tab when no existing tab fits. Open the exact URL the user supplied or the known local target; do not guess a remote site or substitute web search when authentication blocks the requested page.
 3. Establish the baseline with the current URL plus `browser.snapshot` or `browser.find`. Prefer accessible roles, names, and returned element refs over brittle selectors or coordinates.
 4. Perform the smallest meaningful action. Use `fill` when replacing a field and `type` only when appending is intended.
 5. After every navigation or state-changing action, wait for the expected URL, text, or element and inspect the resulting state. For web-app verification, also check relevant console errors and failed network requests.
@@ -19,7 +19,7 @@ Use Poracode's `browser` MCP when the task depends on a rendered page, visible i
 
 ## Boundaries
 
-- The in-app browser is isolated from the user's personal Chrome profile. Do not assume it contains existing logins, cookies, or extensions.
+- Do not open or control an external browser. External browser profiles are cookie sources only; selected cookies can be imported into the embedded browser through Y Space settings.
 - Never inspect cookies or storage unless the task requires it and the user authorized that data access.
 - A successful click is not proof of success. Verify the user-visible or application state it was meant to produce.
 - Pause before purchases, submissions, messages, deletions, or other irreversible external actions unless the user explicitly authorized that exact action.

@@ -78,6 +78,14 @@ export interface ThreadSessionManagerOptions {
    * config builders. Tokens are refreshed by the supervisor's OAuth service.
    */
   applyMcpServerAuthorization?(servers: McpServer[]): Promise<McpServer[]>;
+  /** Ephemeral local Pipedream MCP relays scoped to one trusted thread launch. */
+  resolvePipedreamMcpServers?(input: {
+    threadId: string;
+    providerBindingId?: string;
+    projectLocation: ProjectLocation;
+  }): Promise<ResolvedMcpServer[]>;
+  /** Revokes every relay bearer minted for a thread when it closes. */
+  releasePipedreamMcpBindings?(threadId: string): void;
   /** Skills and MCPs contributed by enabled Agent Plugins for one provider launch. */
   resolvePluginLaunchContributions?(
     projectLocation: ProjectLocation,

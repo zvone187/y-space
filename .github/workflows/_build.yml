@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       channel:
-        description: "Poracode release channel (stable | nightly)"
+        description: "Y Space release channel (stable | nightly)"
         required: true
         type: string
       sentry_environment:
@@ -185,7 +185,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          apps=(release/mac*/Poracode*.app)
+          apps=(release/mac*/Y\ Space*.app)
           if [ "${#apps[@]}" -eq 0 ]; then
             echo "::error::No packaged macOS app bundles found under release/mac*."
             exit 1
@@ -211,11 +211,11 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: |
-            release/Poracode-*.exe
-            release/Poracode-*.dmg
-            release/Poracode-*.zip
-            release/Poracode-*.AppImage
-            release/Poracode-*.deb
+            release/Y-Space-*.exe
+            release/Y-Space-*.dmg
+            release/Y-Space-*.zip
+            release/Y-Space-*.AppImage
+            release/Y-Space-*.deb
             release/latest*.yml
             release/nightly*.yml
             release/*.blockmap

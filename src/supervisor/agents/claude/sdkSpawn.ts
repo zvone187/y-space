@@ -9,6 +9,7 @@ import {
   quotePosixShellArg,
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
+import { sanitizeChildProcessEnv } from "@/supervisor/runtime/threadSession/spawnDiagnostics";
 
 type WindowsProjectLocation = Extract<ProjectLocation, { kind: "windows" }>;
 
@@ -88,7 +89,7 @@ export function spawnClaudeInWsl(location: ProjectLocation, options: SpawnOption
     ...buildDirectWslEnvCommandArgs(command, options.args, env),
   ];
   return spawn(getWslCommand(), args, {
-    env: process.env,
+    env: sanitizeChildProcessEnv(process.env),
     signal: options.signal,
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,

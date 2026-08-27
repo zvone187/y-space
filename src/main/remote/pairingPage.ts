@@ -110,7 +110,7 @@ export function buildLocalPairingPageHtml(input: { readonly httpBaseUrl: string 
     body: `  <div class="app">
     <main>
       <h1>${productNameFor(resolvePoracodeChannel())}</h1>
-      <p>The mobile web app bundle is not available from this desktop build. Rebuild Poracode so <span class="inline-code">mobile.html</span> is included in the renderer output, then open the pairing link again.</p>
+      <p>The mobile web app bundle is not available from this desktop build. Rebuild Y Space so <span class="inline-code">mobile.html</span> is included in the renderer output, then open the pairing link again.</p>
       <p>Desktop endpoint</p>
       <code class="endpoint" id="endpoint"></code>
     </main>

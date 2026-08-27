@@ -153,7 +153,7 @@ jobs:
       - name: Upload AAB artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: poracode-android-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+          name: y-space-android-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
       - name: Check Play publishing credentials
@@ -274,7 +274,7 @@ jobs:
       - name: Upload IPA artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: poracode-ios-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+          name: y-space-ios-${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
           path: ${{ runner.temp }}/export/*.ipa
           if-no-files-found: error
       - name: Upload to TestFlight

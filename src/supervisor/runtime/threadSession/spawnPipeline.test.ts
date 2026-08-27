@@ -1,9 +1,17 @@
-import { describe, expect, it } from "vitest";
-import type { ThreadConfig } from "@/shared/contracts";
+import { describe, expect, it, vi } from "vitest";
+import type {
+  McpLaunchSnapshot,
+  ProjectLocation,
+  ResolvedMcpServer,
+  ThreadConfig,
+} from "@/shared/contracts";
+import { verifyMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
+import type { AgentAdapter } from "@/supervisor/agents/base";
 import {
   applyAgentSettingsMcpFlags,
   composeResolvedMcpServers,
   effectiveLaunchConfig,
+  SpawnPipeline,
   usesProviderSessionCrossagentRouting,
   workspaceLaunchConfig,
 } from "./spawnPipeline";
@@ -13,10 +21,27 @@ const baseConfig: ThreadConfig = {
   browserMcp: true,
   crossagentMcp: true,
   computerUse: true,
-  chromeMcp: true,
 };
 
 describe("effectiveLaunchConfig — single gate for built-in MCP disables", () => {
+  it("defaults the embedded Browser on when a launch omits browserMcp", () => {
+    expect(effectiveLaunchConfig({ model: "test-model" }, [])).toMatchObject({
+      browserMcp: true,
+    });
+  });
+
+  it("preserves an explicit Browser opt-out", () => {
+    expect(effectiveLaunchConfig({ model: "test-model", browserMcp: false }, [])).toMatchObject({
+      browserMcp: false,
+    });
+  });
+
+  it("lets the global Browser hard-disable override the default", () => {
+    expect(effectiveLaunchConfig({ model: "test-model" }, ["browser"])).toMatchObject({
+      browserMcp: false,
+    });
+  });
+
   it("returns the config unchanged when nothing is disabled", () => {
     expect(effectiveLaunchConfig(baseConfig, [])).toBe(baseConfig);
   });
@@ -35,7 +60,6 @@ describe("effectiveLaunchConfig — single gate for built-in MCP disables", () =
       "browser",
       "crossagents",
       "computer-use",
-      "chrome",
       "app-controls",
     ]);
     expect(result).toEqual({
@@ -43,7 +67,6 @@ describe("effectiveLaunchConfig — single gate for built-in MCP disables", () =
       browserMcp: false,
       crossagentMcp: false,
       computerUse: false,
-      chromeMcp: false,
     });
   });
 
@@ -58,21 +81,15 @@ describe("effectiveLaunchConfig — single gate for built-in MCP disables", () =
       browserMcp: false,
       crossagentMcp: false,
       computerUse: false,
-      chromeMcp: false,
     };
 
     expect(
-      effectiveLaunchConfig(
-        config,
-        ["chrome"],
-        ["browser", "crossagents", "computer-use", "chrome"],
-      ),
+      effectiveLaunchConfig(config, ["computer-use"], ["browser", "crossagents", "computer-use"]),
     ).toEqual({
       ...config,
       browserMcp: true,
       crossagentMcp: true,
-      computerUse: true,
-      chromeMcp: false,
+      computerUse: false,
     });
   });
 });
@@ -117,7 +134,6 @@ describe("applyAgentSettingsMcpFlags", () => {
     expect(result).toEqual({
       ...baseConfig,
       browserMcp: true,
-      chromeMcp: false,
       computerUse: false,
       crossagentMcp: false,
     });
@@ -131,14 +147,13 @@ describe("applyAgentSettingsMcpFlags", () => {
   it("keeps globally disabled servers off when provider settings enable them", () => {
     const result = applyAgentSettingsMcpFlags(
       baseConfig,
-      { browserMcp: true, crossagentMcp: true, chromeMcp: true, computerUse: true },
-      ["browser", "crossagents", "chrome", "computer-use"],
+      { browserMcp: true, crossagentMcp: true, computerUse: true },
+      ["browser", "crossagents", "computer-use"],
       true,
     );
     expect(result).toEqual({
       ...baseConfig,
       browserMcp: false,
-      chromeMcp: false,
       computerUse: false,
       crossagentMcp: false,
     });
@@ -174,6 +189,115 @@ describe("usesProviderSessionCrossagentRouting", () => {
   });
 });
 
+describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
+  it("uses provider-session routing for OpenCode terminal Browser calls", async () => {
+    const previousUrl = process.env.PORACODE_BROWSER_MCP_URL;
+    const previousToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
+    process.env.PORACODE_BROWSER_MCP_URL = "http://127.0.0.1:43210";
+    process.env.PORACODE_BROWSER_MCP_TOKEN = "browser-token";
+
+    try {
+      const pipeline = new SpawnPipeline({
+        options: {},
+        resolveAgentSettings: () => ({ browserMcp: true }),
+      } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+      const adapter = {
+        kind: "opencode",
+        capabilities: {
+          presentationMode: "terminal",
+          mcpConfigSource: "agentSettings",
+          crossagentMcpRouting: "provider-session",
+        },
+      } as unknown as AgentAdapter;
+
+      const servers = await pipeline.resolveMcpServersForLaunch({
+        location: { kind: "posix", path: "/repo" },
+        config: { model: "opencode/big-pickle" },
+        mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: [] },
+        identity: { threadId: "thread-terminal", title: "Terminal caller" },
+        crossagentThreadId: "thread-terminal",
+        adapter,
+        presentationMode: "terminal",
+      });
+
+      const browser = servers.find((server) => server.id === "browser");
+      expect(browser?.transport.type).toBe("http");
+      if (browser?.transport.type !== "http") throw new Error("Browser MCP was not resolved.");
+      const url = new URL(browser.transport.url);
+      expect(url.searchParams.get("thread")).toBeNull();
+      expect(url.searchParams.get("title")).toBeNull();
+      const authorization = browser.transport.headers.Authorization;
+      expect(authorization).toMatch(/^Bearer /u);
+      expect(
+        verifyMcpLaunchContextToken(
+          "browser-token",
+          "browser",
+          authorization?.replace(/^Bearer /u, "") ?? "",
+        ),
+      ).toEqual({
+        routing: "provider-session",
+        identity: {},
+      });
+    } finally {
+      if (previousUrl === undefined) delete process.env.PORACODE_BROWSER_MCP_URL;
+      else process.env.PORACODE_BROWSER_MCP_URL = previousUrl;
+      if (previousToken === undefined) delete process.env.PORACODE_BROWSER_MCP_TOKEN;
+      else process.env.PORACODE_BROWSER_MCP_TOKEN = previousToken;
+    }
+  });
+
+  it("uses a stable same-directory Pipedream binding for OpenCode GUI reloads", async () => {
+    const resolvePipedreamMcpServers = vi.fn<
+      (input: {
+        threadId: string;
+        providerBindingId?: string;
+        projectLocation: ProjectLocation;
+      }) => Promise<ResolvedMcpServer[]>
+    >(async () => []);
+    const pipeline = new SpawnPipeline({
+      options: { resolvePipedreamMcpServers },
+      resolveAgentSettings: () => ({}),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+    const adapter = {
+      kind: "opencode",
+      capabilities: {
+        presentationMode: "gui",
+        mcpConfigSource: "agentSettings",
+        crossagentMcpRouting: "provider-session",
+      },
+    } as unknown as AgentAdapter;
+    const location = { kind: "posix" as const, path: "/repo" };
+    const input = {
+      location,
+      config: { model: "opencode/model" },
+      mcpLaunchSnapshot: {
+        mcpServers: [],
+        disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+      } satisfies McpLaunchSnapshot,
+      crossagentThreadId: "thread-a",
+      adapter,
+      presentationMode: "gui" as const,
+    };
+
+    await pipeline.resolveMcpServersForLaunch({
+      ...input,
+      identity: { threadId: "thread-a" },
+    });
+    await pipeline.resolveMcpServersForLaunch({
+      ...input,
+      crossagentThreadId: "thread-b",
+      identity: { threadId: "thread-b" },
+    });
+
+    const first = resolvePipedreamMcpServers.mock.calls[0]?.[0];
+    const second = resolvePipedreamMcpServers.mock.calls[1]?.[0];
+    expect(first).toMatchObject({ threadId: "thread-a", projectLocation: location });
+    expect(second).toMatchObject({ threadId: "thread-b", projectLocation: location });
+    expect(first?.providerBindingId).toMatch(/^opencode-gui:/u);
+    expect(second?.providerBindingId).toBe(first?.providerBindingId);
+  });
+});
+
 describe("composeResolvedMcpServers", () => {
   it("combines custom and built-in servers before the provider boundary", () => {
     const servers = composeResolvedMcpServers(
@@ -192,7 +316,6 @@ describe("composeResolvedMcpServers", () => {
       },
       { url: "http://browser/mcp", token: "b", headers: { Authorization: "Bearer b" } },
       { url: "http://agents/mcp", token: "a", headers: { Authorization: "Bearer a" } },
-      undefined,
       undefined,
       undefined,
     );

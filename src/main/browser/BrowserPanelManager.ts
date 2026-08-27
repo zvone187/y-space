@@ -10,12 +10,12 @@ import {
 } from "@/shared/ipc";
 import type { UsageLoginConfirmationAction, UsageLoginDeviceCode } from "@/shared/contracts";
 import type { PoracodePaths } from "@/shared/poracodePaths";
-import type { BrowserLinkOpenTarget, BrowserLinkPresentationMode } from "@/shared/settings";
+import type { BrowserLinkPresentationMode } from "@/shared/settings";
 import { dbGetState, dbSetState } from "../db";
 import { readSharedSettingsFile } from "../sharedSettingsFile";
 import { saveClipboardImageFile } from "../attachments/localFiles";
 import { BrowserLoginCaptureCoordinator } from "./BrowserLoginCaptureCoordinator";
-import { BrowserTab, resolveWebContentsById } from "./BrowserTab";
+import { BrowserTab, type BrowserTabSnapshot, resolveWebContentsById } from "./BrowserTab";
 import { BrowserTabGroups } from "./BrowserTabGroups";
 import { BrowserHistoryStore, fetchSearchSuggestions } from "./browserHistory";
 import { BrowserBookmarkStore, type BrowserBookmark } from "./browserBookmarks";
@@ -29,7 +29,22 @@ const ATTACH_TIMEOUT_MS = 8000;
 // after the last agent tool call, before the renderer unmounts them.
 const AUTOMATION_GRACE_MS = 45_000;
 const INTERNAL_BROWSER_PROTOCOLS = new Set(["http:", "https:"]);
-const SYSTEM_BROWSER_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+const SYSTEM_BROWSER_PROTOCOLS = new Set(["mailto:"]);
+const REDACTED_INTEGRATION_URL = "about:blank";
+const REDACTED_INTEGRATION_TITLE = "Connecting\u2026";
+const SENSITIVE_INTEGRATION_QUERY_KEYS = new Set([
+  "access_token",
+  "client_secret",
+  "code",
+  "code_challenge",
+  "code_verifier",
+  "connectlink",
+  "oauth_token",
+  "refresh_token",
+  "session_token",
+  "state",
+  "token",
+]);
 
 interface PersistedTabsState {
   tabs: Array<{ url: string; title: string; groupId?: string }>;
@@ -59,6 +74,20 @@ interface BrowserPanelManagerOptions {
   focusExtractedWindow?: () => void;
 }
 
+interface CreateTabOptions {
+  markActivity?: boolean;
+  awaitAttach?: boolean;
+  agent?: boolean;
+  threadId?: string;
+  threadTitle?: string;
+  restoredTitle?: string;
+}
+
+interface SensitiveIntegrationTabState {
+  privateUrl: string;
+  navigationStarted: boolean;
+}
+
 export class BrowserPanelManager {
   private tabs: BrowserTab[] = [];
   private readonly tabGroups = new BrowserTabGroups();
@@ -72,9 +101,16 @@ export class BrowserPanelManager {
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly history = new BrowserHistoryStore();
   private readonly bookmarks = new BrowserBookmarkStore();
+  /**
+   * One-use OAuth / Connect URLs live only in the main process. The renderer
+   * receives an about:blank tab and main navigates the attached guest directly.
+   */
+  private readonly sensitiveIntegrationTabs = new Map<string, SensitiveIntegrationTabState>();
   private restored = false;
   private automationActive = false;
   private readonly automationSessions = new Set<string>();
+  /** Per-agent implicit tab target; intentionally independent of the visible UI tab. */
+  private readonly activeAgentTabByThread = new Map<string, string>();
   private automationTimer: ReturnType<typeof setTimeout> | null = null;
   private pickerKeyCleanup: (() => void) | null = null;
   private readonly loginCoordinator = new BrowserLoginCaptureCoordinator({
@@ -95,25 +131,33 @@ export class BrowserPanelManager {
     });
   }
 
+  private persistTabsState(): void {
+    try {
+      const groups = this.tabGroups.serialize();
+      const persistedTabs = this.tabs.filter(
+        (tab) => !this.sensitiveIntegrationTabs.has(tab.tabId),
+      );
+      const activeIndex = this.activeTabId
+        ? persistedTabs.findIndex((t) => t.tabId === this.activeTabId)
+        : -1;
+      const state: PersistedTabsState = {
+        tabs: persistedTabs.map((t) => {
+          const s = t.snapshot();
+          const groupId = this.tabGroups.groupIdForTab(t.tabId);
+          return { url: s.url, title: s.title, ...(groupId ? { groupId } : {}) };
+        }),
+        activeIndex: activeIndex >= 0 ? activeIndex : null,
+        ...(groups ? { groups } : {}),
+      };
+      dbSetState(PERSIST_KEY, JSON.stringify(state));
+    } catch {}
+  }
+
   private schedulePersist(): void {
     if (this.persistTimer) clearTimeout(this.persistTimer);
     this.persistTimer = setTimeout(() => {
       this.persistTimer = null;
-      try {
-        const groups = this.tabGroups.serialize();
-        const state: PersistedTabsState = {
-          tabs: this.tabs.map((t) => {
-            const s = t.snapshot();
-            const groupId = this.tabGroups.groupIdForTab(t.tabId);
-            return { url: s.url, title: s.title, ...(groupId ? { groupId } : {}) };
-          }),
-          activeIndex: this.activeTabId
-            ? this.tabs.findIndex((t) => t.tabId === this.activeTabId)
-            : null,
-          ...(groups ? { groups } : {}),
-        };
-        dbSetState(PERSIST_KEY, JSON.stringify(state));
-      } catch {}
+      this.persistTabsState();
     }, PERSIST_DEBOUNCE_MS);
   }
 
@@ -140,7 +184,11 @@ export class BrowserPanelManager {
       // they mount lazily when the user opens the panel or the agent uses them.
       const info = await this.createTab(
         { url: entry.url, activate: isActive },
-        { markActivity: false, awaitAttach: false },
+        {
+          markActivity: false,
+          awaitAttach: false,
+          ...(typeof entry.title === "string" ? { restoredTitle: entry.title } : {}),
+        },
       ).catch(() => null);
       // Persisted order is already contiguous, so just re-map (no reorder).
       if (info && entry.groupId) this.tabGroups.assignRestoredTab(info.tabId, entry.groupId);
@@ -173,6 +221,7 @@ export class BrowserPanelManager {
     if (this.persistTimer) {
       clearTimeout(this.persistTimer);
       this.persistTimer = null;
+      this.persistTabsState();
     }
     if (this.automationTimer) {
       clearTimeout(this.automationTimer);
@@ -186,6 +235,7 @@ export class BrowserPanelManager {
       void t.destroy();
     }
     this.tabs = [];
+    this.sensitiveIntegrationTabs.clear();
     this.activeTabId = null;
     this.hosts.clear();
   }
@@ -331,18 +381,14 @@ export class BrowserPanelManager {
     return false;
   }
 
-  private readLinkSettings(): {
-    linkOpenTarget: BrowserLinkOpenTarget;
-    linkPresentationMode: BrowserLinkPresentationMode;
-  } {
+  private readLinkSettings(): { linkPresentationMode: BrowserLinkPresentationMode } {
     try {
       const browser = readSharedSettingsFile(this.paths.settingsPath).browser;
       return {
-        linkOpenTarget: browser.linkOpenTarget,
         linkPresentationMode: browser.linkPresentationMode,
       };
     } catch {
-      return { linkOpenTarget: "internal", linkPresentationMode: "panel" };
+      return { linkPresentationMode: "panel" };
     }
   }
 
@@ -366,17 +412,20 @@ export class BrowserPanelManager {
       return false;
     }
 
-    const settings = this.readLinkSettings();
-    if (settings.linkOpenTarget === "system" || !INTERNAL_BROWSER_PROTOCOLS.has(url.protocol)) {
+    if (!INTERNAL_BROWSER_PROTOCOLS.has(url.protocol)) {
       return this.openSystemBrowser(url.toString());
     }
 
-    void this.createTab({ url: url.toString(), activate: true, reveal: true }).catch(() => {});
+    const payload = { url: url.toString(), activate: true, reveal: true };
+    const create = isSensitiveIntegrationUrl(url)
+      ? this.createSensitiveIntegrationTab(payload)
+      : this.createTab(payload);
+    void create.catch(() => {});
     return true;
   }
 
   private toInfo(t: BrowserTab): BrowserTabInfo {
-    const s = t.snapshot();
+    const s = this.publicSnapshot(t, t.snapshot());
     const groupId = this.tabGroups.groupIdForTab(s.tabId);
     return {
       tabId: s.tabId,
@@ -478,17 +527,43 @@ export class BrowserPanelManager {
       if (host.webContents === wc) return;
     }
     tab.attach(wc);
+    const sensitive = this.sensitiveIntegrationTabs.get(tabId);
+    if (sensitive && !sensitive.navigationStarted) {
+      sensitive.navigationStarted = true;
+      void tab.loadURL(sensitive.privateUrl).catch(() => {
+        // Keep the one-use URL redacted even when navigation fails. The user
+        // can safely close the blank integration tab and try again.
+      });
+    }
+  }
+
+  async createSensitiveIntegrationTab(
+    payload: { url: string; activate?: boolean; reveal?: boolean },
+    opts: CreateTabOptions = {},
+  ): Promise<BrowserTabInfo> {
+    const privateUrl = parseInternalBrowserUrl(payload.url);
+    if (!privateUrl) throw new Error("Sensitive integration URL must use HTTP(S)");
+    return this.createTabInternal(
+      {
+        ...(payload.activate !== undefined ? { activate: payload.activate } : {}),
+        ...(payload.reveal !== undefined ? { reveal: payload.reveal } : {}),
+      },
+      opts,
+      privateUrl.toString(),
+    );
   }
 
   async createTab(
     payload: { url?: string; activate?: boolean; reveal?: boolean },
-    opts: {
-      markActivity?: boolean;
-      awaitAttach?: boolean;
-      agent?: boolean;
-      threadId?: string;
-      threadTitle?: string;
-    } = {},
+    opts: CreateTabOptions = {},
+  ): Promise<BrowserTabInfo> {
+    return this.createTabInternal(payload, opts);
+  }
+
+  private async createTabInternal(
+    payload: { url?: string; activate?: boolean; reveal?: boolean },
+    opts: CreateTabOptions,
+    sensitiveInitialUrl?: string,
   ): Promise<BrowserTabInfo> {
     // Creating a tab is agent activity (mounts the headless host). Restore
     // passes markActivity:false so reopening the app doesn't wake dormant tabs.
@@ -500,29 +575,38 @@ export class BrowserPanelManager {
       this.revealForUserOpen();
     }
     const tabId = `tab-${randomUUID()}`;
+    if (sensitiveInitialUrl) {
+      this.sensitiveIntegrationTabs.set(tabId, {
+        privateUrl: sensitiveInitialUrl,
+        navigationStarted: false,
+      });
+    }
     const tab = new BrowserTab({
       tabId,
       ...(payload.url ? { initialUrl: payload.url } : {}),
+      ...(opts.restoredTitle ? { initialTitle: opts.restoredTitle } : {}),
       userAgent: this.browserUserAgent,
       onUpdate: (snap) => {
-        this.emit({ type: "tab-updated", tab: { ...snap } });
-        if (!snap.loading) this.history.record(snap.url, snap.title, Date.now());
-        this.schedulePersist();
+        this.onTabUpdate(tab, snap);
       },
       onAttention: (id) => {
         this.emit({ type: "tab-attention", tabId: id });
       },
-      onPopup: (_sourceTabId, popupUrl) => {
-        void this.openLink(popupUrl).catch(() => {});
+      onPopup: (sourceTabId, popupUrl) => {
+        const popup = this.sensitiveIntegrationTabs.has(sourceTabId)
+          ? this.createSensitiveIntegrationTab({ url: popupUrl, activate: true, reveal: true })
+          : this.openLink(popupUrl);
+        void popup.catch(() => {});
       },
     });
     this.tabs.push(tab);
     // Agent-created tabs auto-join a group (parity with the external extension)
     // so they're visually distinct from the user's tabs. Tabs carrying a thread
     // get that thread's own group (named after its task); the rest fall back to
-    // the shared "Poracode" group.
+    // the shared "Y Space" group.
     if (opts.agent) {
       this.tabGroups.assignAgentTab(this.tabs, tabId, opts.threadId, opts.threadTitle);
+      if (opts.threadId) this.activeAgentTabByThread.set(opts.threadId, tabId);
     }
     const shouldActivate = payload.activate !== false;
     if (shouldActivate || this.activeTabId === null) {
@@ -536,6 +620,44 @@ export class BrowserPanelManager {
       await this.awaitAttach(tab);
     }
     return this.toInfo(tab);
+  }
+
+  private publicSnapshot(tab: BrowserTab, snapshot: BrowserTabSnapshot): BrowserTabSnapshot {
+    if (!this.sensitiveIntegrationTabs.has(tab.tabId)) return snapshot;
+    return {
+      tabId: tab.tabId,
+      url: REDACTED_INTEGRATION_URL,
+      title: REDACTED_INTEGRATION_TITLE,
+      loading: true,
+      canGoBack: false,
+      canGoForward: false,
+      devToolsOpen: false,
+    };
+  }
+
+  private onTabUpdate(tab: BrowserTab, snapshot: BrowserTabSnapshot): void {
+    const sensitive = this.sensitiveIntegrationTabs.get(tab.tabId);
+    if (sensitive) {
+      if (isSafeIntegrationLandingUrl(snapshot.url, sensitive.privateUrl)) {
+        // Drop the private state before clearing history. BrowserTab may emit a
+        // synchronous update from clearHistory(); that update is now safe.
+        this.sensitiveIntegrationTabs.delete(tab.tabId);
+        tab.clearHistory();
+        const landing = tab.snapshot();
+        this.emit({ type: "tab-updated", tab: { ...landing } });
+        if (!landing.loading) this.history.record(landing.url, landing.title, Date.now());
+        this.schedulePersist();
+        return;
+      }
+
+      this.emit({ type: "tab-updated", tab: { ...this.publicSnapshot(tab, snapshot) } });
+      this.schedulePersist();
+      return;
+    }
+
+    this.emit({ type: "tab-updated", tab: { ...snapshot } });
+    if (!snapshot.loading) this.history.record(snapshot.url, snapshot.title, Date.now());
+    this.schedulePersist();
   }
 
   setActiveTab(tabId: string): void {
@@ -570,6 +692,10 @@ export class BrowserPanelManager {
     if (idx < 0) return;
     const [tab] = this.tabs.splice(idx, 1);
     if (!tab) return;
+    this.sensitiveIntegrationTabs.delete(tabId);
+    for (const [threadId, activeTabId] of this.activeAgentTabByThread) {
+      if (activeTabId === tabId) this.activeAgentTabByThread.delete(threadId);
+    }
     await tab.destroy();
     this.tabGroups.removeTab(tabId);
     if (this.activeTabId === tabId) {
@@ -716,10 +842,36 @@ export class BrowserPanelManager {
   }
 
   getActiveTab(): BrowserTab | null {
-    return this.activeTabId ? (this.findTab(this.activeTabId) ?? null) : null;
+    if (!this.activeTabId || this.sensitiveIntegrationTabs.has(this.activeTabId)) return null;
+    return this.findTab(this.activeTabId) ?? null;
+  }
+
+  /** Resolve a thread's implicit target without consulting another agent's visible tab. */
+  getActiveTabForThread(threadId: string): BrowserTab | null {
+    const remembered = this.activeAgentTabByThread.get(threadId);
+    if (remembered) {
+      const tab = this.findTab(remembered);
+      if (tab && !this.sensitiveIntegrationTabs.has(remembered)) return tab;
+      this.activeAgentTabByThread.delete(threadId);
+    }
+    const ownedIds = this.tabGroups.tabIdsForThread(threadId);
+    const fallbackId = ownedIds[ownedIds.length - 1];
+    if (!fallbackId) return null;
+    const fallback = this.findTab(fallbackId);
+    if (!fallback || this.sensitiveIntegrationTabs.has(fallbackId)) return null;
+    this.activeAgentTabByThread.set(threadId, fallbackId);
+    return fallback;
+  }
+
+  /** Remember an explicit agent selection for later tabId-omitted calls. */
+  rememberTabForThread(threadId: string, tabId: string): boolean {
+    if (!this.findTab(tabId) || this.sensitiveIntegrationTabs.has(tabId)) return false;
+    this.activeAgentTabByThread.set(threadId, tabId);
+    return true;
   }
 
   getTab(tabId: string): BrowserTab | null {
+    if (this.sensitiveIntegrationTabs.has(tabId)) return null;
     return this.findTab(tabId) ?? null;
   }
 
@@ -848,6 +1000,35 @@ export class BrowserPanelManager {
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
     };
   }
+}
+
+function parseInternalBrowserUrl(rawUrl: string): URL | null {
+  try {
+    const url = new URL(rawUrl);
+    return INTERNAL_BROWSER_PROTOCOLS.has(url.protocol) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function isSensitiveIntegrationUrl(url: URL): boolean {
+  for (const key of url.searchParams.keys()) {
+    if (SENSITIVE_INTEGRATION_QUERY_KEYS.has(key.toLowerCase())) return true;
+  }
+  const fragment = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
+  if (fragment.includes("=")) {
+    const fragmentParams = new URLSearchParams(fragment);
+    for (const key of fragmentParams.keys()) {
+      if (SENSITIVE_INTEGRATION_QUERY_KEYS.has(key.toLowerCase())) return true;
+    }
+  }
+  return false;
+}
+
+function isSafeIntegrationLandingUrl(rawUrl: string, privateUrl: string): boolean {
+  if (!rawUrl || rawUrl === REDACTED_INTEGRATION_URL || rawUrl === privateUrl) return false;
+  const url = parseInternalBrowserUrl(rawUrl);
+  return url !== null && !isSensitiveIntegrationUrl(url);
 }
 
 function isEscapeKeyDown(input: Electron.Input): boolean {

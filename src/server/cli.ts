@@ -93,7 +93,7 @@ export function acquireDataDirLock(
       const holderPid = readPidFile(path);
       if (holderPid !== null && isAlive(holderPid)) {
         throw new Error(
-          `Poracode data dir ${baseDir} is in use by another Poracode process (pid ${holderPid}); ` +
+          `Y Space data dir ${baseDir} is in use by another Y Space process (pid ${holderPid}); ` +
             "set PORACODE_BASE_DIR to run a separate instance.",
           { cause: error },
         );
@@ -102,7 +102,7 @@ export function acquireDataDirLock(
       // avoid an unbounded loop if two starts race to reclaim simultaneously.
       if (reclaimed) {
         throw new Error(
-          `Poracode data dir ${baseDir} lock at ${path} could not be reclaimed; ` +
+          `Y Space data dir ${baseDir} lock at ${path} could not be reclaimed; ` +
             "another process may be racing to start. Retry, or set PORACODE_BASE_DIR.",
           { cause: error },
         );

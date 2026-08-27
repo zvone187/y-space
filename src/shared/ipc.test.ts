@@ -104,6 +104,12 @@ describe("ipcProcedureMap", () => {
       requestRelaunch: vi.fn<() => void>(),
       scheduleService: {} as never,
       prWatchService: {} as never,
+      pipedreamMainService: {
+        beginConnect: vi.fn<() => Promise<never>>(),
+      } as never,
+      browserCookieImportService: {} as never,
+      cookieImportBridge: {} as never,
+      browserCookieImportExtensionDir: "C:\\tmp\\y-space-cookie-import",
     });
 
     expect(Object.keys(handlers).sort()).toEqual([...MAIN_LOCAL_PROCEDURE_NAMES].sort());

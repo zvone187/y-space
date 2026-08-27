@@ -14,7 +14,6 @@ import { HOME_PROJECT_NAME, isHomeProjectId } from "@/shared/homeScope";
 import { readBridge } from "@/renderer/bridge";
 import { getComputerUseScope } from "@/renderer/components/composer/computerUseScope";
 import {
-  chromeMcpServer,
   COMPUTER_USE_MCP_ID,
   resolveMcpScope,
 } from "@/renderer/components/composer/composerMcpServers";
@@ -256,7 +255,6 @@ export function ThreadDraftView(props: {
   // flag is `mention || (persistent && scope available)`, computed below.
   const [browserMcpMention, setBrowserMcpMention] = useState(false);
   const [crossagentMcpMention, setCrossagentMcpMention] = useState(false);
-  const [chromeMcpMention, setChromeMcpMention] = useState(false);
   const [computerUseMention, setComputerUseMention] = useState(false);
   const [worktreeMode, setWorktreeMode] = useState(
     isHomeScope ? false : (lastDraftConfig?.worktreeMode ?? false),
@@ -813,11 +811,6 @@ export function ThreadDraftView(props: {
       setCrossagentMcpMention(patch.crossagentMcp === true);
       return;
     }
-    if ("chromeMcp" in patch) {
-      // Per-draft mention flag — same bypass as browserMcp above.
-      setChromeMcpMention(patch.chromeMcp === true);
-      return;
-    }
     if ("computerUse" in patch) {
       // Per-draft mention flag — same bypass as browserMcp above.
       setComputerUseMention(patch.computerUse === true);
@@ -1171,11 +1164,6 @@ export function ThreadDraftView(props: {
     crossagentMcpMention,
     selectedMcpScope,
   );
-  const effectiveChromeMcp = effectiveMcp(
-    "chrome",
-    chromeMcpMention,
-    chromeMcpServer.getScope(selectedAgent.capabilities, presentationMode, project.location),
-  );
   const effectiveComputerUse = effectiveMcp(
     COMPUTER_USE_MCP_ID,
     computerUseMention,
@@ -1266,7 +1254,6 @@ export function ThreadDraftView(props: {
               ...(sandboxMode ? { sandboxMode } : {}),
               ...(effectiveBrowserMcp ? { browserMcp: true } : {}),
               ...(effectiveCrossagentMcp ? { crossagentMcp: true } : {}),
-              ...(effectiveChromeMcp ? { chromeMcp: true } : {}),
               ...(effectiveComputerUse ? { computerUse: true } : {}),
             }}
             compact={compactComposer}

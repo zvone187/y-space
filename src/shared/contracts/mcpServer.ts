@@ -11,11 +11,10 @@ export interface McpToolAnnotations {
   openWorldHint?: boolean;
 }
 
-/** Stable ids for the MCP servers provided by Poracode itself. */
+/** Stable ids for the MCP servers provided by Y Space itself. */
 export const BUILT_IN_MCP_SERVER_IDS = [
   "browser",
   "crossagents",
-  "chrome",
   "computer-use",
   "app-controls",
 ] as const;
@@ -25,21 +24,22 @@ export type BuiltInMcpServerId = (typeof BUILT_IN_MCP_SERVER_IDS)[number];
 export const BUILT_IN_MCP_SERVER_NAMES: Record<BuiltInMcpServerId, string> = {
   browser: "browser",
   crossagents: "crossagents",
-  chrome: "chrome",
   "computer-use": "computer_use",
   "app-controls": "poracode",
 };
 
-/** Tool catalogs advertised by each Poracode-owned MCP server. */
+/** Tool catalogs advertised by each Y Space-owned MCP server. */
 export const BUILT_IN_MCP_SERVER_TOOL_NAMES = {
   browser: [
     "api",
     "enable",
     "disable",
     "list_tabs",
+    "find_tabs",
     "new_tab",
     "open",
     "activate_tab",
+    "open_or_focus_tab",
     "close_tab",
     "navigate",
     "back",
@@ -91,30 +91,6 @@ export const BUILT_IN_MCP_SERVER_TOOL_NAMES = {
     "get_status",
     "list_runs",
     "cancel",
-  ],
-  chrome: [
-    "chrome_status",
-    "enable",
-    "disable",
-    "chrome_list_tabs",
-    "chrome_open",
-    "chrome_attach",
-    "chrome_navigate",
-    "chrome_reload",
-    "chrome_get_url",
-    "chrome_get_title",
-    "chrome_snapshot",
-    "chrome_find",
-    "chrome_get",
-    "chrome_is",
-    "chrome_click",
-    "chrome_fill",
-    "chrome_type",
-    "chrome_press",
-    "chrome_wait",
-    "chrome_screenshot",
-    "chrome_eval",
-    "chrome_cookies",
   ],
   "computer-use": [
     "api",
@@ -198,7 +174,6 @@ export const BUILT_IN_MCP_SERVER_TOOL_NAMES = {
 export const BUILT_IN_MCP_SERVER_TOOL_COUNTS: Record<BuiltInMcpServerId, number> = {
   browser: BUILT_IN_MCP_SERVER_TOOL_NAMES.browser.length,
   crossagents: BUILT_IN_MCP_SERVER_TOOL_NAMES.crossagents.length,
-  chrome: BUILT_IN_MCP_SERVER_TOOL_NAMES.chrome.length,
   "computer-use": BUILT_IN_MCP_SERVER_TOOL_NAMES["computer-use"].length,
   "app-controls": BUILT_IN_MCP_SERVER_TOOL_NAMES["app-controls"].length,
 };
@@ -494,6 +469,8 @@ export function disabledBuiltInMcpServerIds(
 /** Custom servers plus built-in disables resolved for a thread launch. */
 export interface McpLaunchSnapshot {
   mcpServers: McpServer[];
+  /** Raw project layer retained so provider live reloads can reapply overrides. */
+  projectMcpServers?: McpServer[];
   disabledBuiltInMcpServerIds: BuiltInMcpServerId[];
   disabledBuiltInMcpTools?: BuiltInMcpDisabledTools;
   /** Built-in MCPs contributed by enabled Agent Plugins for this launch. */
@@ -518,6 +495,7 @@ export function resolveMcpLaunchSnapshot(
 ): McpLaunchSnapshot {
   return {
     mcpServers: resolveEnabledMcpServers(mergeMcpServers(settings.mcpServers, projectMcpServers)),
+    ...(projectMcpServers.length > 0 ? { projectMcpServers: [...projectMcpServers] } : {}),
     disabledBuiltInMcpServerIds: disabledBuiltInMcpServerIds(settings.disabledBuiltInMcpServers),
     disabledBuiltInMcpTools: settings.disabledBuiltInMcpTools,
   };

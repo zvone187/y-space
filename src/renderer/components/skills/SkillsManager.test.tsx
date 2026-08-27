@@ -123,9 +123,9 @@ describe("SkillsManager", () => {
           absolutePath: "C:\\Users\\me\\.poracode\\skills\\private-review",
           rootPath: "C:\\Users\\me\\.poracode\\skills",
           providerId: "poracode",
-          providerLabel: "Poracode only",
+          providerLabel: "Y Space only",
           providerGroupId: "poracode",
-          providerGroupLabel: "Poracode",
+          providerGroupLabel: "Y Space",
           providerGroupOrder: -1,
           availability: "poracode",
         }),
@@ -163,9 +163,9 @@ describe("SkillsManager", () => {
           id: "global:poracode-built-in:create-skill:on",
           name: "create-skill",
           providerId: "poracode-built-in",
-          providerLabel: "Poracode built-ins",
+          providerLabel: "Y Space built-ins",
           providerGroupId: "poracode",
-          providerGroupLabel: "Poracode",
+          providerGroupLabel: "Y Space",
           providerGroupOrder: -1,
           origin: "built-in",
           mutable: false,
@@ -204,19 +204,19 @@ describe("SkillsManager", () => {
 
     expect(screen.getByRole("button", { name: "Marketplace" })).toHaveClass("button--tertiary");
     expect(screen.getByRole("button", { name: "Add skill" })).toHaveClass("button--tertiary");
-    expect(screen.getByText("Poracode only")).toBeInTheDocument();
+    expect(screen.getByText("Y Space only")).toBeInTheDocument();
     expect(screen.queryByText("Global")).not.toBeInTheDocument();
     expect(screen.queryByText("Managed")).not.toBeInTheDocument();
     expect(screen.getByText("Claude Code")).toBeInTheDocument();
     const headings = screen.getAllByRole("heading", { level: 3 });
     expect(headings.map((heading) => heading.textContent)).toEqual([
-      "Poracode",
+      "Y Space",
       "Shared",
       "Claude Code",
       "Codex",
       "OpenCode",
     ]);
-    const poracodeSection = screen.getByRole("heading", { name: "Poracode" }).closest("section")!;
+    const poracodeSection = screen.getByRole("heading", { name: "Y Space" }).closest("section")!;
     expect(within(poracodeSection).getByText("private-review")).toBeInTheDocument();
     expect(within(poracodeSection).getByText("create-skill")).toBeInTheDocument();
     const codexSection = screen.getByRole("heading", { name: "Codex" }).closest("section")!;
@@ -226,7 +226,7 @@ describe("SkillsManager", () => {
     expect(within(opencodeSection).getByText("opencode-review")).toBeInTheDocument();
     expect(within(opencodeSection).getByText("legacy-review")).toBeInTheDocument();
     expect(screen.queryByText("Codex built-ins")).not.toBeInTheDocument();
-    expect(screen.queryByText("Poracode built-ins")).not.toBeInTheDocument();
+    expect(screen.queryByText("Y Space built-ins")).not.toBeInTheDocument();
     expect(screen.queryByText("Built-in and plugin skills")).not.toBeInTheDocument();
     expect(screen.getByText("skill-creator")).toBeInTheDocument();
     expect(screen.getAllByText("Built-in")).toHaveLength(2);

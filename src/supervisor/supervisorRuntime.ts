@@ -93,6 +93,11 @@ import { SkillsService } from "./skills/SkillsService";
 import { dropSkillSegmentsOnPolicyFailure } from "./skills/pluginSkillPolicy";
 import { PluginRegistry, resolvePluginMcpServers } from "./plugins";
 import { captureExperimentResponseSnapshot } from "./experimentResponseSnapshot";
+import type { PipedreamPrivilegedBootstrapPayload } from "@/shared/pipedreamPrivilegedIpc";
+import {
+  PIPEDREAM_PERSONAL_MCP_URL,
+  PipedreamSupervisorService,
+} from "./pipedream/PipedreamSupervisorService";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
 
@@ -137,6 +142,7 @@ export class SupervisorRuntime {
   readonly mcpProbeService: McpProbeService;
   readonly skillsService: SkillsService;
   readonly pluginRegistry: PluginRegistry;
+  readonly pipedreamService: PipedreamSupervisorService;
   private readonly pluginDataDir: string;
   private readonly crossagentMcpIngress: CrossagentMcpIngress;
   private readonly subagentRunManager: SubagentRunManager;
@@ -187,6 +193,13 @@ export class SupervisorRuntime {
     this.settingsPath = paths.settingsPath;
     this.acpIconsDir = paths.acpIconsDir;
     this.sharedSettingsCache = new SupervisorSharedSettingsCache(this.settingsPath);
+    this.pipedreamService = new PipedreamSupervisorService({
+      baseDir,
+      readPersonalMcpStatus: () => this.readPipedreamPersonalMcpStatus(),
+      wslHostAccess: {
+        resolveHostAccess: (distro) => resolveWslHostAccess(distro),
+      },
+    });
     this.disposeWindowsPowerShellPreference = setWindowsPowerShellPreferenceResolver(() => {
       const preference = this.resolveWindowsPowerShell();
       return preference.kind === "cmd"
@@ -442,6 +455,9 @@ export class SupervisorRuntime {
         resolveHostAccess: (distro) => resolveWslHostAccess(distro),
       },
       applyMcpServerAuthorization: (servers) => this.mcpOAuthService.applyAuthorization(servers),
+      resolvePipedreamMcpServers: (input) =>
+        this.pipedreamService.resolveMcpServersForLaunch(input),
+      releasePipedreamMcpBindings: (threadId) => this.pipedreamService.releaseMcpBindings(threadId),
       prepareMcpToolFilters,
       resolvePluginLaunchContributions: async (projectLocation, agentKind) => {
         const adapter = this.adapters.get(agentKind);
@@ -642,6 +658,24 @@ export class SupervisorRuntime {
 
   confirmCrossagentRoutingOverride(payload: ConfirmCrossagentRoutingOverridePayload): void {
     this.routingOverridePersistence.confirm(payload);
+  }
+
+  configurePipedream(payload: PipedreamPrivilegedBootstrapPayload): void {
+    this.pipedreamService.configure(payload);
+  }
+
+  private readPipedreamPersonalMcpStatus(): { enabled: boolean; authenticated: boolean } {
+    const settings = this.sharedSettingsCache.readFresh();
+    const enabled = settings.mcpServers.some((server) => {
+      if (!server.enabled) return false;
+      const transport = server.transport;
+      if (transport.type !== "http" && transport.type !== "sse") return false;
+      return normalizeUrl(transport.url) === PIPEDREAM_PERSONAL_MCP_URL;
+    });
+    const authenticated = this.mcpOAuthService
+      .status()
+      .authenticatedUrls.some((url) => normalizeUrl(url) === PIPEDREAM_PERSONAL_MCP_URL);
+    return { enabled, authenticated };
   }
 
   /** Distinct WSL distros hosting a live `antigravity` session (the only
@@ -981,6 +1015,7 @@ export class SupervisorRuntime {
     this.usageService.stop();
     this.mcpProbeService.dispose();
     this.mcpOAuthService.dispose();
+    await this.pipedreamService.dispose();
     this.lspManager.dispose();
     await this._projectWatcher?.dispose();
     await this.threadSessionManager.dispose();
@@ -1003,5 +1038,16 @@ export class SupervisorRuntime {
     return this.threadSessionManager.spawnThreadForTests(
       input as Parameters<typeof this.threadSessionManager.spawnThreadForTests>[0],
     );
+  }
+}
+
+function normalizeUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    url.search = "";
+    return url.toString().replace(/\/$/u, "");
+  } catch {
+    return "";
   }
 }

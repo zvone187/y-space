@@ -263,9 +263,7 @@ describe("SSH runtime bundle", () => {
     const { mainBundleDir } = options;
     writeFileSync(join(mainBundleDir, "server.cjs"), 'require("electron");', "utf8");
 
-    expect(() => ensureSshRuntimeBundle(options)).toThrow(
-      "Poracode Helper cannot include Electron",
-    );
+    expect(() => ensureSshRuntimeBundle(options)).toThrow("Y Space Helper cannot include Electron");
   });
 });
 
@@ -404,6 +402,6 @@ describe("SSH helper readiness", () => {
   it("does not mistake a desktop-hosted server for the SSH helper", async () => {
     await expect(
       waitForRemoteEndpoint(endpoint("desktop"), "http://127.0.0.1:49152/", 1),
-    ).rejects.toThrow("Timed out waiting for Poracode Helper");
+    ).rejects.toThrow("Timed out waiting for Y Space Helper");
   });
 });

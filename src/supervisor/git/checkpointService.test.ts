@@ -139,7 +139,7 @@ describe.skipIf(!hasGit())("GitCheckpointService", () => {
       });
 
       expect(git(dir, "log", "-1", "--format=%an <%ae>", checkpoint.ref).trim()).toBe(
-        "Poracode <checkpoints@poracode.local>",
+        "Y Space <checkpoints@poracode.local>",
       );
       await expect(
         service.list({ threadId: "thread-1", projectLocation: location }),

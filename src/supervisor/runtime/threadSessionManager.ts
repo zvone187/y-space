@@ -29,11 +29,14 @@ import {
   type RuntimeEvent,
   type McpLaunchSnapshot,
   type ResolvedMcpServer,
+  mergeMcpServers,
+  resolveEnabledMcpServers,
 } from "@/shared/contracts";
 import { applyHomeScopePermissions } from "@/shared/agents/unrestrictedPermissions";
 import { TranscriptBuffer } from "@/shared/transcriptBuffer";
 import {
   type AgentAdapter,
+  type AgentNativePlugin,
   createKnownSessionRef,
   defaultFormatPromptSegments,
   getRefreshedWindowsPath,
@@ -201,22 +204,54 @@ export class ThreadSessionManager {
    * opt into the fallback through `ownsProviderSession`.
    */
   getThreadIdByProviderSessionId(providerSessionId: string): string | undefined {
+    return this.getMcpIdentityByProviderSessionId(providerSessionId)?.threadId;
+  }
+
+  /**
+   * Resolve a trusted provider-native session id to the identity of its live
+   * Poracode thread. Stale reverse-index entries fail closed rather than
+   * preserving access after their runtime has been replaced or removed.
+   */
+  getMcpIdentityByProviderSessionId(
+    providerSessionId: string,
+    serverId?: "browser" | "app-controls",
+  ): McpThreadIdentity | undefined {
     const indexed = this.sessionsBySessionId.get(providerSessionId);
-    if (indexed?.adapter.capabilities.crossagentMcpRouting === "provider-session") {
-      return indexed.threadId;
+    if (indexed) {
+      if (
+        this.isCurrentSession(indexed) &&
+        indexed.adapter.capabilities.crossagentMcpRouting === "provider-session"
+      ) {
+        return this.identityForBuiltInServer(indexed, serverId);
+      }
+      this.sessionsBySessionId.delete(providerSessionId);
     }
 
     for (const session of this.sessions.values()) {
       if (session.adapter.capabilities.crossagentMcpRouting !== "provider-session") continue;
       if (session.sessionRef?.providerSessionId === providerSessionId) {
         this.sessionsBySessionId.set(providerSessionId, session);
-        return session.threadId;
+        return this.identityForBuiltInServer(session, serverId);
       }
       if (session.structuredSession?.ownsProviderSession?.(providerSessionId)) {
-        return session.threadId;
+        return this.identityForBuiltInServer(session, serverId);
       }
     }
     return undefined;
+  }
+
+  private identityForBuiltInServer(
+    session: SessionRuntime,
+    serverId: "browser" | "app-controls" | undefined,
+  ): McpThreadIdentity {
+    const identity = session.mcpIdentity ?? { threadId: session.threadId };
+    if (!serverId) return identity;
+    const disabledTools = session.mcpLaunchSnapshot.disabledBuiltInMcpTools?.[serverId] ?? [];
+    if (disabledTools.length === 0) return identity;
+    return {
+      ...identity,
+      disabledTools: [...new Set([...(identity.disabledTools ?? []), ...disabledTools])],
+    };
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
@@ -375,22 +410,25 @@ export class ThreadSessionManager {
       reloads.push(
         (async () => {
           try {
+            const refreshed = await this.resolveCurrentMcpLaunchSnapshot(session);
+            if (!this.isCurrentSession(session)) return;
             const launchConfig = this.spawnPipeline.resolveMcpLaunchConfig(
               workspaceLaunchConfig(
                 session.projectLocation,
                 session.config,
                 session.adapter,
-                session.mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
-                session.mcpLaunchSnapshot.pluginBuiltInMcpServerIds,
+                refreshed.snapshot.disabledBuiltInMcpServerIds,
+                refreshed.snapshot.pluginBuiltInMcpServerIds,
               ),
-              session.mcpLaunchSnapshot,
+              refreshed.snapshot,
               session.adapter,
               session.threadId,
             );
             const mcpServers = await this.spawnPipeline.resolveMcpServersForLaunch({
               location: session.projectLocation,
               config: launchConfig,
-              mcpLaunchSnapshot: session.mcpLaunchSnapshot,
+              mcpLaunchSnapshot: refreshed.snapshot,
+              identity: session.mcpIdentity ?? { threadId: session.threadId },
               crossagentThreadId: session.threadId,
               adapter: session.adapter,
               ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
@@ -398,6 +436,8 @@ export class ThreadSessionManager {
             if (!this.isCurrentSession(session)) return;
             await update(mcpServers);
             if (!this.isCurrentSession(session)) return;
+            session.mcpLaunchSnapshot = refreshed.snapshot;
+            session.nativePlugins = refreshed.nativePlugins;
             session.launchConfig = launchConfig;
             this.outputPipeline.emitState(session);
           } catch (error) {
@@ -410,6 +450,43 @@ export class ThreadSessionManager {
       );
     }
     await Promise.all(reloads);
+  }
+
+  /** Re-read provider-level custom MCPs instead of replaying launch-time settings. */
+  private async resolveCurrentMcpLaunchSnapshot(session: SessionRuntime): Promise<{
+    snapshot: McpLaunchSnapshot;
+    nativePlugins: readonly AgentNativePlugin[];
+  }> {
+    const settings = readSupervisorSharedSettings(this.options.settingsPath);
+    const pluginContributions = (await this.options.resolvePluginLaunchContributions?.(
+      session.projectLocation,
+      session.agentKind,
+    )) ?? { mcpServers: [], builtInMcpServerIds: [], nativePlugins: [] };
+
+    const userMcpServers = mergeMcpServers(
+      settings.mcpServers,
+      session.mcpLaunchSnapshot.projectMcpServers ?? [],
+    );
+    const userMcpServerNames = new Set(userMcpServers.map((server) => server.name));
+    const pluginMcpServers = pluginContributions.mcpServers.filter(
+      (server) => !userMcpServerNames.has(server.name),
+    );
+    let mcpServers = resolveEnabledMcpServers([...userMcpServers, ...pluginMcpServers]);
+    if (this.options.applyMcpServerAuthorization) {
+      mcpServers = await this.options.applyMcpServerAuthorization(mcpServers);
+    }
+    if (this.options.prepareMcpToolFilters) {
+      mcpServers = await this.options.prepareMcpToolFilters(mcpServers, session.projectLocation);
+    }
+
+    return {
+      snapshot: {
+        ...session.mcpLaunchSnapshot,
+        mcpServers,
+        pluginBuiltInMcpServerIds: pluginContributions.builtInMcpServerIds,
+      },
+      nativePlugins: pluginContributions.nativePlugins,
+    };
   }
 
   /**
@@ -919,6 +996,7 @@ export class ThreadSessionManager {
   }
 
   async closeThread(payload: CloseThreadPayload): Promise<void> {
+    this.options.releasePipedreamMcpBindings?.(payload.threadId);
     const shell = this.shellSessions.get(payload.threadId);
     if (shell) {
       shell.ignoreExit = true;

@@ -1,123 +1,214 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Poracode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Y Space Cookie Import</title>
     <style>
       :root {
-        --bg: #100e17;
-        --card: rgba(255, 255, 255, 0.04);
-        --border: rgba(255, 255, 255, 0.08);
-        --text: #eceaf3;
-        --muted: rgba(236, 234, 243, 0.5);
-        --accent: #7d6cf6;
-        --on: #46d17f;
-        --on-bg: rgba(70, 209, 127, 0.12);
-        --idle: #e6b34a;
-        --idle-bg: rgba(230, 179, 74, 0.12);
-        --err: #ff6a5a;
-        --err-bg: rgba(255, 106, 90, 0.12);
+        color-scheme: dark;
+        --bg: #111113;
+        --card: #1c1c1f;
+        --border: #34343a;
+        --text: #f5f5f7;
+        --muted: #aaaab3;
+        --accent: #8b7bff;
+        --on: #4bd987;
+        --idle: #f4bc57;
+        --danger: #ff746c;
       }
       * {
         box-sizing: border-box;
       }
-      html {
-        /* Let the browser composite rounded body corners without a bg fill. */
-        background: transparent;
-      }
       body {
-        width: 340px;
+        width: 360px;
         margin: 0;
-        padding: 22px 22px 20px;
-        border-radius: 16px;
-        overflow: hidden;
+        padding: 20px;
         background: var(--bg);
         color: var(--text);
         font-family:
           system-ui,
           -apple-system,
-          Segoe UI,
+          "Segoe UI",
           sans-serif;
         font-size: 13px;
-        text-align: center;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
       }
       .logo {
-        width: 46px;
-        height: 46px;
-        border-radius: 12px;
-        display: block;
-        margin: 0 auto;
+        width: 42px;
+        height: 42px;
+        border-radius: 11px;
       }
-      .wordmark {
+      h1 {
+        margin: 0;
         font-size: 17px;
-        font-weight: 650;
         letter-spacing: -0.02em;
-        margin: 9px 0 16px;
       }
-      .wordmark .dot {
-        color: var(--accent);
+      .subtitle,
+      #description,
+      #version {
+        color: var(--muted);
+      }
+      .subtitle {
+        margin-top: 2px;
+        font-size: 11px;
       }
       .card {
+        padding: 14px;
         border: 1px solid var(--border);
-        background: var(--card);
         border-radius: 12px;
-        padding: 13px 14px;
-        text-align: left;
+        background: var(--card);
       }
       .pill {
         display: inline-flex;
         align-items: center;
         gap: 7px;
-        padding: 5px 11px;
-        border-radius: 999px;
-        font-size: 12.5px;
-        font-weight: 600;
-        background: rgba(127, 127, 127, 0.14);
-        color: var(--muted);
+        font-weight: 650;
       }
-      .pill .pdot {
+      .dot {
         width: 8px;
         height: 8px;
         border-radius: 50%;
         background: currentColor;
-        flex: none;
       }
       .pill.on {
-        background: var(--on-bg);
         color: var(--on);
       }
       .pill.idle {
-        background: var(--idle-bg);
         color: var(--idle);
       }
-      .pill.err {
-        background: var(--err-bg);
-        color: var(--err);
-      }
-      .desc {
+      .pill.off {
         color: var(--muted);
-        font-size: 11.5px;
+      }
+      #description {
+        margin: 9px 0 0;
         line-height: 1.45;
-        margin-top: 10px;
       }
-      .version {
+      form,
+      #grantPanel {
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+      }
+      label {
+        display: block;
+        margin-bottom: 7px;
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      input {
+        min-width: 0;
+        flex: 1;
+        padding: 9px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #121214;
+        color: var(--text);
+        font: inherit;
+        letter-spacing: 0.12em;
+      }
+      #profileLabel {
+        letter-spacing: normal;
+      }
+      button {
+        padding: 9px 12px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #16100d;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button.secondary {
+        width: 100%;
+        margin-top: 12px;
+        border: 1px solid var(--border);
+        background: transparent;
         color: var(--muted);
+      }
+      #origins {
+        margin: 7px 0 10px;
+        padding: 8px;
+        border-radius: 7px;
+        background: #121214;
+        color: var(--muted);
+        font-family: ui-monospace, "SFMono-Regular", monospace;
         font-size: 11px;
-        margin-top: 7px;
-        opacity: 0.75;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #error {
+        margin-top: 10px;
+        color: var(--danger);
+        line-height: 1.4;
+      }
+      #version {
+        margin-top: 10px;
+        text-align: center;
+        font-size: 10px;
+      }
+      [hidden] {
+        display: none !important;
       }
     </style>
   </head>
   <body>
-    <img class="logo" src="icons/icon-128.png" alt="Poracode" />
-    <div class="wordmark">Pora<span class="dot">.</span>code</div>
-    <div class="card">
-      <span class="pill" id="pill"
-        ><span class="pdot"></span><span id="statusText">Checking…</span></span
-      >
-      <div class="desc" id="desc"></div>
-      <div class="version" id="version"></div>
-    </div>
+    <header>
+      <img class="logo" src="icons/icon-128.png" alt="" />
+      <div>
+        <h1>Y Space Cookie Import</h1>
+        <div class="subtitle">Import cookies into the embedded browser</div>
+      </div>
+    </header>
+    <main class="card">
+      <div class="pill" id="pill">
+        <span class="dot"></span><span id="statusText">Checking…</span>
+      </div>
+      <p id="description">Checking Y Space connection.</p>
+
+      <form id="profileForm">
+        <label for="profileLabel">Browser profile name</label>
+        <div class="row">
+          <input id="profileLabel" maxlength="120" autocomplete="off" />
+          <button type="submit">Save</button>
+        </div>
+      </form>
+
+      <form id="pairingForm" hidden>
+        <label for="pairingCode">Pairing code</label>
+        <div class="row">
+          <input
+            id="pairingCode"
+            inputmode="numeric"
+            pattern="[0-9]{8}"
+            maxlength="8"
+            autocomplete="one-time-code"
+            aria-describedby="description"
+          />
+          <button type="submit">Pair</button>
+        </div>
+      </form>
+
+      <section id="grantPanel" hidden>
+        <strong>Approve cookie access</strong>
+        <p id="origins"></p>
+        <button id="grantButton" type="button">Allow these sites once</button>
+      </section>
+
+      <p id="error" role="alert" hidden></p>
+      <button id="forgetButton" class="secondary" type="button" hidden>Forget this pairing</button>
+    </main>
+    <div id="version"></div>
     <script src="popup.js"></script>
   </body>
 </html>

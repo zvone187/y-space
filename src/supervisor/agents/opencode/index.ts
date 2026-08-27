@@ -55,7 +55,10 @@ function buildOpenCodeMcpEnv(
   return {
     ...launch.env,
     OPENCODE_CONFIG_CONTENT: launch.configContent,
-    ...(mcpServers.some((server) => server.id === "crossagents")
+    ...(mcpServers.some(
+      (server) =>
+        server.id === "browser" || server.id === "app-controls" || server.id === "crossagents",
+    )
       ? { PORACODE_OPENCODE_SESSION_ROUTING: "1" }
       : {}),
   };

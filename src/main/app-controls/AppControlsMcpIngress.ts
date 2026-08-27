@@ -3,6 +3,7 @@ import type { SupervisorEvent } from "@/shared/ipc";
 import type { RemoteProjectCommand, RemoteProjectCommandResult } from "@/shared/remote";
 import {
   StreamableHttpMcpIngress,
+  type ProviderSessionIdentityResolver,
   type StreamableHttpMcpIngressInfo,
 } from "../mcp/StreamableHttpMcpIngress";
 import type { ScheduleService } from "../schedules/ScheduleService";
@@ -45,6 +46,7 @@ export interface AppControlsMcpIngressDeps {
   openThreadInUi(threadId: string): boolean;
   notifyUser(input: { title: string; body: string; threadId: string }): AppControlsNotifyResult;
   checkForUpdate(): Promise<AppControlsUpdateCheck>;
+  resolveProviderSessionIdentity?: ProviderSessionIdentityResolver;
 }
 
 export class AppControlsMcpIngress {
@@ -54,6 +56,7 @@ export class AppControlsMcpIngress {
 
   constructor(deps: AppControlsMcpIngressDeps) {
     this.ingress = new StreamableHttpMcpIngress<AppControlsToolContext>({
+      launchContextAudience: "app-controls",
       serverInfo: { ...APP_CONTROLS_MCP_SERVER_INFO },
       instructions: APP_CONTROLS_MCP_INSTRUCTIONS,
       tools: TOOLS,
@@ -61,6 +64,9 @@ export class AppControlsMcpIngress {
       buildContext: (identity) => ({ ...deps, identity, threadStates: this.threadStates }),
       dispatchTool,
       formatToolResult,
+      ...(deps.resolveProviderSessionIdentity
+        ? { resolveProviderSessionIdentity: deps.resolveProviderSessionIdentity }
+        : {}),
     });
   }
 

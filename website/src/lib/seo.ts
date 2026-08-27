@@ -25,22 +25,22 @@ const OG_LOCALE: Record<Locale, string> = {
   "zh-CN": "zh_CN",
 };
 
-export const SITE_NAME = "Poracode";
+export const SITE_NAME = "Y Space";
 export const SITE_URL = "https://poracode.com";
-export const GITHUB_URL = "https://github.com/SDSLeon/lightcode";
+export const GITHUB_URL = "https://github.com/zvone187/y-space";
 export const SOCIAL_IMAGE_PATH = "/hero-screenshot.png";
-export const SOCIAL_IMAGE_ALT = "Poracode AI coding agent orchestrator social card";
+export const SOCIAL_IMAGE_ALT = "Y Space AI coding agent orchestrator social card";
 const SOCIAL_IMAGE_WIDTH = 1200;
 const SOCIAL_IMAGE_HEIGHT = 630;
 
-export const SITE_TITLE = "Poracode - AI Coding Agent Desktop for Claude Code, Codex & Gemini";
+export const SITE_TITLE = "Y Space - AI Coding Agent Desktop for Claude Code, Codex & Gemini";
 export const SITE_DESCRIPTION =
-  "Poracode is an open-source desktop app for running Claude Code, Codex, Gemini, Cursor, OpenCode, and ACP agents side by side with terminals, diffs, browser previews, worktrees, and PRs.";
+  "Y Space is an open-source desktop app for running Claude Code, Codex, Gemini, Cursor, OpenCode, and ACP agents side by side with terminals, diffs, browser previews, worktrees, and PRs.";
 
 export const SEO_KEYWORDS = [
-  "Poracode",
-  "Poracode app",
-  "Poracode desktop app",
+  "Y Space",
+  "Y Space app",
+  "Y Space desktop app",
   "AI coding agents",
   "Claude Code desktop app",
   "Codex desktop app",
@@ -181,13 +181,13 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     "@id": `${SITE_URL}/#software`,
     name: SITE_NAME,
     // Brand aliases help Google disambiguate the app from the unrelated
-    // "Poracode" music project and other software firms ranking for the term,
+    // "Y Space" music project and other software firms ranking for the term,
     // and tie the entity to the poracode.com domain-match query.
     alternateName: [
-      "Poracode App",
-      "Poracode Desktop",
-      "Poracode Desktop App",
-      "Poracode AI Agent Orchestrator",
+      "Y Space App",
+      "Y Space Desktop",
+      "Y Space Desktop App",
+      "Y Space AI Agent Orchestrator",
       "poracode.com",
     ],
     applicationCategory: "DeveloperApplication",
@@ -239,7 +239,7 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
     name: SITE_NAME,
-    alternateName: ["Pora.code", "poracode.com"],
+    alternateName: ["YSpace", "y.space", "poracode.com"],
     url: SITE_URL,
     description: SITE_DESCRIPTION,
     publisher: {

@@ -1,4 +1,4 @@
-# Poracode
+# Y Space
 
 Universal AI agent orchestrator — Electron desktop app managing Claude, Codex, and Gemini via real PTY sessions (terminal-native) and structured runtimes (native chat).
 
@@ -17,6 +17,9 @@ Universal AI agent orchestrator — Electron desktop app managing Claude, Codex,
 
 - Terminal-presentation threads must be backed by a real PTY process; GUI-presentation threads must be backed by the provider structured runtime process. The active presentation surface is the source of truth.
 - The renderer must never spawn agent processes — the supervisor runtime owns all agent processes.
+- Route every desktop HTTP(S) navigation through `BrowserPanelManager`; OS URL handling is reserved for non-web protocols such as `mailto:`. Do not add external-browser automation. Chromium profiles are cookie-import sources only.
+- Browser and app-control MCP access must use signed, audience-bound launch context or a supervisor-resolved provider session. Never trust a model-supplied thread ID, unsigned URL identity, or ambient privileged token.
+- Cookie values and Pipedream credentials/tokens must remain in main/supervisor memory boundaries. Never expose them to renderer IPC, provider environments/configuration, logs, telemetry, crash context, or persisted metadata.
 - React Compiler is the default memoization strategy. Do not add `useMemo`, `useCallback`, or `React.memo` unless escaping the compiler. Keep `babel-plugin-react-compiler` pinned to an exact version.
 - Use HeroUI v3 for all non-terminal UI. When working with HeroUI components, always load the `heroui-react` skill first (`/skill heroui-react`).
 - **Every user-facing string you add or change in `src/renderer` must be localized.** Wrap it in a Lingui macro, run `pnpm i18n:extract`, then fill the new `msgstr` in all 12 non-English catalogs — never ship empty translations (that leaves a half-English UI). See [Internationalization (i18n)](#internationalization-i18n).
@@ -98,7 +101,7 @@ toast.warning(i18n._(msg`Unable to install ${label}.`));
 ### Step 2 — Extract, then translate every locale
 
 1. Run `pnpm i18n:extract`. This registers the new msgids across all 13 catalogs. Forgetting this is the most common mistake — the new IDs never reach the catalogs and the strings silently stay English.
-2. **The catalogs are fully translated, not English-fallback.** Open each of the 12 non-English `messages.po` files and fill the new `msgstr ""` entries with a real translation. Leaving them empty ships a half-English UI. (`en` is the source locale and needs no `msgstr`.) Match the per-language terminology already used in the catalog — grep an existing entry first; keep product nouns like `Poracode`, `WSL`, `.poracode/worktrees` literal. The terminology cheat-sheet is in [i18n.md](.agents/docs/i18n.md).
+2. **The catalogs are fully translated, not English-fallback.** Open each of the 12 non-English `messages.po` files and fill the new `msgstr ""` entries with a real translation. Leaving them empty ships a half-English UI. (`en` is the source locale and needs no `msgstr`.) Match the per-language terminology already used in the catalog — grep an existing entry first; keep product nouns like `Y Space` and `WSL`, plus compatibility identifiers such as `.poracode/worktrees`, literal. The terminology cheat-sheet is in [i18n.md](.agents/docs/i18n.md).
 3. Re-run `pnpm i18n:extract` to normalize `.po` formatting, and confirm the printed stats table shows **0 missing** for every locale.
 
 ### Checklist before you finish

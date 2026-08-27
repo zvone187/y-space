@@ -10,6 +10,12 @@ import { handleSupervisorIpcFailure } from "./ipcFailure";
 import { createSupervisorIpcHandlers } from "./ipcHandlers";
 import { SupervisorRuntime } from "./supervisorRuntime";
 import { configureSecretStorageKey } from "./secretStorage";
+import {
+  isPipedreamPrivilegedBootstrapMessage,
+  isPipedreamPrivilegedConnectLinkRequest,
+  type PipedreamPrivilegedReply,
+} from "@/shared/pipedreamPrivilegedIpc";
+import { capturePrivilegedMcpEnvironment } from "./privilegedMcpEnvironment";
 
 const isDev = process.env.PORACODE_IS_DEV === "1" || Boolean(process.env.VITE_DEV_SERVER_URL);
 
@@ -19,6 +25,7 @@ initializeSupervisorSentry({
 });
 configureSecretStorageKey(process.env.PORACODE_SECRET_STORAGE_KEY);
 delete process.env.PORACODE_SECRET_STORAGE_KEY;
+capturePrivilegedMcpEnvironment();
 
 const runtime = new SupervisorRuntime((event) => {
   process.send?.(event);
@@ -56,7 +63,34 @@ async function handleRequest(request: SupervisorRequest): Promise<unknown> {
   return handler(request.payload as never);
 }
 
-process.on("message", (message: SupervisorRequest) => {
+process.on("message", (message: unknown) => {
+  if (isPipedreamPrivilegedBootstrapMessage(message)) {
+    runtime.configurePipedream(message.payload);
+    return;
+  }
+  if (isPipedreamPrivilegedConnectLinkRequest(message)) {
+    void runtime.pipedreamService
+      .createConnectLink({ appSlug: message.request.appSlug })
+      .then(
+        (data): PipedreamPrivilegedReply => ({
+          kind: "pipedream-privileged-reply",
+          replyTo: message.id,
+          ok: true,
+          data,
+        }),
+      )
+      .catch(
+        (): PipedreamPrivilegedReply => ({
+          kind: "pipedream-privileged-reply",
+          replyTo: message.id,
+          ok: false,
+          error: "Pipedream request failed.",
+        }),
+      )
+      .then((reply) => process.send?.(reply));
+    return;
+  }
+  if (!isSupervisorRequest(message)) return;
   void handleRequest(message)
     .then(
       (data): SupervisorReply => ({
@@ -70,6 +104,18 @@ process.on("message", (message: SupervisorRequest) => {
     })
     .then((reply) => process.send?.(reply));
 });
+
+function isSupervisorRequest(value: unknown): value is SupervisorRequest {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    "type" in value &&
+    typeof value.type === "string" &&
+    "payload" in value
+  );
+}
 
 process.on("disconnect", () => {
   void shutdownSupervisor(0);

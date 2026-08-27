@@ -3,6 +3,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { isIP } from "node:net";
 import { decodeThreadIdentity, type McpThreadIdentity } from "@/shared/browserMcpThread";
 import { isLocalhostOrigin, readBoundedNodeRequestBody, writeJsonResponse } from "@/shared/http";
+import {
+  type McpLaunchContextAudience,
+  type McpLaunchContextRouting,
+  verifyMcpLaunchContextToken,
+} from "@/shared/mcpLaunchContext";
 
 export interface StreamableHttpMcpIngressInfo {
   url: string;
@@ -28,6 +33,11 @@ export interface StreamableHttpMcpToolResult {
   isError?: boolean;
 }
 
+/** Resolves a provider-owned session id through the supervisor trust boundary. */
+export type ProviderSessionIdentityResolver = (
+  providerSessionId: string,
+) => Promise<McpThreadIdentity | undefined>;
+
 export interface StreamableHttpMcpIngressOptions<TContext> {
   /**
    * Network interface to bind. Defaults to `0.0.0.0` so WSL agents can reach the
@@ -47,13 +57,26 @@ export interface StreamableHttpMcpIngressOptions<TContext> {
   buildContext(identity: McpThreadIdentity): TContext | null;
   instructions: string;
   isKnownToolName(name: string): boolean;
+  /**
+   * Require a signed launch capability bound to this server. When configured,
+   * unsigned URL query identity is ignored and the process-wide root token is
+   * never accepted directly from an agent.
+   */
+  launchContextAudience?: McpLaunchContextAudience;
   onBeforeToolCall?(name: string, ctx: TContext): void;
+  /**
+   * Optional trusted fallback for pooled provider runtimes whose MCP URL cannot
+   * carry a per-thread identity. The private caller id is stripped before tool
+   * validation and dispatch.
+   */
+  resolveProviderSessionIdentity?: ProviderSessionIdentityResolver;
   serverInfo: { name: string; version: string };
   tools: readonly StreamableHttpMcpToolSpec[];
 }
 
 const MAX_BODY = 1024 * 1024;
 const MCP_PROTOCOL_VERSION = "2025-03-26";
+const PROVIDER_SESSION_ID_ARG = "__poracode_provider_session_id";
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -75,6 +98,11 @@ interface JsonRpcResponseErr {
 }
 
 type JsonRpcResponse = JsonRpcResponseOk | JsonRpcResponseErr;
+
+interface McpRequestTrust {
+  identity: McpThreadIdentity;
+  routing?: McpLaunchContextRouting;
+}
 
 export class StreamableHttpMcpIngress<TContext> {
   private server: Server | null = null;
@@ -126,13 +154,20 @@ export class StreamableHttpMcpIngress<TContext> {
     writeJsonResponse(res, status, body, { cacheControl: "no-store" });
   }
 
-  private checkAuth(req: IncomingMessage): boolean {
+  private resolveRequestTrust(req: IncomingMessage): McpRequestTrust | undefined {
     const auth = req.headers.authorization;
-    if (auth && auth.startsWith("Bearer ") && this.tokenMatches(auth.slice(7).trim())) {
-      return true;
-    }
+    const bearer = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : undefined;
     const xToken = req.headers["x-poracode-token"];
-    return typeof xToken === "string" && this.tokenMatches(xToken);
+    const candidate = bearer ?? (typeof xToken === "string" ? xToken : undefined);
+    const audience = this.options.launchContextAudience;
+
+    if (!audience) {
+      return candidate && this.tokenMatches(candidate)
+        ? { identity: decodeThreadIdentity(req.url) }
+        : undefined;
+    }
+
+    return candidate ? verifyMcpLaunchContextToken(this.token, audience, candidate) : undefined;
   }
 
   /**
@@ -206,7 +241,7 @@ export class StreamableHttpMcpIngress<TContext> {
           res.setHeader("Access-Control-Allow-Origin", origin);
           res.setHeader(
             "Access-Control-Allow-Headers",
-            "Authorization, X-Poracode-Token, Content-Type, Mcp-Session-Id",
+            "Authorization, X-Poracode-Token, X-Y-Space-Mcp-Context, Content-Type, Mcp-Session-Id",
           );
           res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
         }
@@ -215,7 +250,8 @@ export class StreamableHttpMcpIngress<TContext> {
         return;
       }
 
-      if (!this.checkAuth(req)) {
+      const trust = this.resolveRequestTrust(req);
+      if (!trust) {
         this.sendJson(res, 401, { error: "unauthorized" });
         return;
       }
@@ -233,7 +269,7 @@ export class StreamableHttpMcpIngress<TContext> {
           this.sendJson(res, 405, { error: "method not allowed" });
           return;
         }
-        await this.handleMcp(req, res);
+        await this.handleMcp(req, res, trust);
         return;
       }
 
@@ -243,8 +279,12 @@ export class StreamableHttpMcpIngress<TContext> {
     }
   }
 
-  private async handleMcp(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const identity = decodeThreadIdentity(req.url);
+  private async handleMcp(
+    req: IncomingMessage,
+    res: ServerResponse,
+    trust: McpRequestTrust,
+  ): Promise<void> {
+    const { identity, routing } = trust;
     const raw = await this.readBody(req);
     let body: unknown;
     try {
@@ -271,13 +311,13 @@ export class StreamableHttpMcpIngress<TContext> {
     if (Array.isArray(body)) {
       const out: JsonRpcResponse[] = [];
       for (const message of body) {
-        const reply = await this.handleSingle(message, identity);
+        const reply = await this.handleSingle(message, identity, routing);
         if (reply) out.push(reply);
       }
       this.sendJson(res, 200, out);
       return;
     }
-    const reply = await this.handleSingle(body, identity);
+    const reply = await this.handleSingle(body, identity, routing);
     if (!reply) {
       // notification — no response
       res.statusCode = 202;
@@ -290,6 +330,7 @@ export class StreamableHttpMcpIngress<TContext> {
   private async handleSingle(
     message: unknown,
     identity: McpThreadIdentity,
+    routing?: McpLaunchContextRouting,
   ): Promise<JsonRpcResponse | null> {
     if (!isJsonRpcRequest(message)) return null;
     const { id = null, method, params } = message;
@@ -323,14 +364,47 @@ export class StreamableHttpMcpIngress<TContext> {
       if (method === "tools/call") {
         const p = (params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
         const name = String(p.name ?? "");
-        const args = (p.arguments ?? {}) as Record<string, unknown>;
-        if (identity.disabledTools?.includes(name)) {
+        const rawArgs = (p.arguments ?? {}) as Record<string, unknown>;
+        const args = { ...rawArgs };
+        const hasProviderSessionId = Object.prototype.hasOwnProperty.call(
+          args,
+          PROVIDER_SESSION_ID_ARG,
+        );
+        const providerSessionId = args[PROVIDER_SESSION_ID_ARG];
+        delete args[PROVIDER_SESSION_ID_ARG];
+
+        let callIdentity = identity;
+        if (routing === "provider-session" && !hasProviderSessionId) {
+          return this.toolError(id, "Provider session identity is unavailable");
+        }
+        if ((!identity.threadId && hasProviderSessionId) || routing === "provider-session") {
+          const resolver = this.options.resolveProviderSessionIdentity;
+          if (
+            typeof providerSessionId !== "string" ||
+            providerSessionId.length === 0 ||
+            !resolver
+          ) {
+            return this.toolError(id, "Provider session identity is unavailable");
+          }
+          let resolvedIdentity: McpThreadIdentity | undefined;
+          try {
+            resolvedIdentity = await resolver(providerSessionId);
+          } catch {
+            return this.toolError(id, "Provider session identity is unavailable");
+          }
+          if (!resolvedIdentity?.threadId) {
+            return this.toolError(id, "Provider session is stale or unknown");
+          }
+          callIdentity = mergeMcpIdentities(identity, resolvedIdentity);
+        }
+
+        if (callIdentity.disabledTools?.includes(name)) {
           return {
             jsonrpc: "2.0",
             id,
             result: {
               isError: true,
-              content: [{ type: "text", text: `Tool disabled by Poracode: ${name}` }],
+              content: [{ type: "text", text: `Tool disabled by Y Space: ${name}` }],
             },
           };
         }
@@ -344,7 +418,7 @@ export class StreamableHttpMcpIngress<TContext> {
             },
           };
         }
-        const ctx = this.options.buildContext(identity);
+        const ctx = this.options.buildContext(callIdentity);
         if (!ctx) {
           return {
             jsonrpc: "2.0",
@@ -387,6 +461,17 @@ export class StreamableHttpMcpIngress<TContext> {
       };
     }
   }
+
+  private toolError(id: number | string | null, message: string): JsonRpcResponseOk {
+    return {
+      jsonrpc: "2.0",
+      id,
+      result: {
+        isError: true,
+        content: [{ type: "text", text: message }],
+      },
+    };
+  }
 }
 
 function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
@@ -396,4 +481,21 @@ function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
     (value as { jsonrpc?: unknown }).jsonrpc === "2.0" &&
     typeof (value as { method?: unknown }).method === "string"
   );
+}
+
+function mergeMcpIdentities(
+  launchIdentity: McpThreadIdentity,
+  providerIdentity: McpThreadIdentity,
+): McpThreadIdentity {
+  const disabledTools = [
+    ...new Set([
+      ...(launchIdentity.disabledTools ?? []),
+      ...(providerIdentity.disabledTools ?? []),
+    ]),
+  ];
+  return {
+    ...launchIdentity,
+    ...providerIdentity,
+    ...(disabledTools.length > 0 ? { disabledTools } : {}),
+  };
 }

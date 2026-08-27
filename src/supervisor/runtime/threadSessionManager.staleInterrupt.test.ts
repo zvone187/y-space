@@ -304,7 +304,7 @@ describe("ThreadSessionManager structured stale-interrupt watchdog", () => {
     expect(startTurn).toHaveBeenCalledTimes(1);
     expect(startTurn).toHaveBeenCalledWith(
       "after force stop\n\n@/tmp/reference.png ",
-      { model: `${AGENT_KIND}/model` },
+      { model: `${AGENT_KIND}/model`, browserMcp: true },
       segments,
       { userMessageItemId: "user-after-force-stop" },
     );
@@ -378,7 +378,7 @@ describe("ThreadSessionManager structured stale-interrupt watchdog", () => {
     expect(startTurn).toHaveBeenCalledTimes(1);
     expect(startTurn).toHaveBeenCalledWith(
       "redirect with this image\n\n@/tmp/reference.png",
-      { model: `${AGENT_KIND}/model` },
+      { model: `${AGENT_KIND}/model`, browserMcp: true },
       segments,
       { userMessageItemId: optimisticItemId },
     );

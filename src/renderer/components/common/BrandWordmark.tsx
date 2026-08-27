@@ -1,26 +1,12 @@
-/**
- * The Pora·code brand wordmark — "Pora" + the indigo baseline dot + "code".
- *
- * The dot is a real round SVG circle, not a typed period: Geist (like most
- * geometric sans) renders the "." glyph as a square. It's tuned to sit on the
- * baseline and inherits the theme accent, mirroring
- * `branding/brand-showcase.html`. Reads as "Poracode" to assistive tech.
- */
+/** The compact Y Space wordmark used across desktop and first-run surfaces. */
 export function BrandWordmark({ className }: { className?: string | undefined }) {
   return (
-    <span className={className} aria-label="Poracode">
-      <span className="font-bold" aria-hidden="true">
-        Pora
+    <span className={className} aria-label="Y Space">
+      <span className="font-semibold tracking-[-0.055em]" aria-hidden="true">
+        Y
       </span>
-      <svg
-        viewBox="0 0 24 100"
-        aria-hidden="true"
-        className="ml-[0.1em] mr-[0.03em] inline-block h-[1em] w-[0.24em] overflow-visible align-baseline [fill:var(--accent)]"
-      >
-        <circle cx="12" cy="96" r="9" />
-      </svg>
-      <span className="font-semibold" aria-hidden="true">
-        code
+      <span className="ml-[0.22em] font-medium tracking-[-0.035em]" aria-hidden="true">
+        Space
       </span>
     </span>
   );

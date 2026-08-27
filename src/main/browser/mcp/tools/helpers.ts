@@ -28,9 +28,12 @@ export async function resolveTabId(
   if (requested) {
     // Marks agent activity + revives the tab if it was unmounted while idle.
     await ctx.manager.ensureTabReady(requested);
+    if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, requested);
     return requested;
   }
-  const active = ctx.manager.getActiveTab();
+  const active = ctx.threadId
+    ? ctx.manager.getActiveTabForThread(ctx.threadId)
+    : ctx.manager.getActiveTab();
   if (active) {
     await ctx.manager.ensureTabReady(active.tabId);
     return active.tabId;

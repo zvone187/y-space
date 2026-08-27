@@ -1,4 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { resolve as resolvePosixPath } from "node:path/posix";
+import { resolve as resolveWindowsPath } from "node:path/win32";
 import { setTimeout as sleep } from "node:timers/promises";
 import { spawn } from "node-pty";
 import {
@@ -39,10 +41,6 @@ import {
   resolveComputerUseMcpHttpConfigForLaunch,
   type ComputerUseMcpHttpConfig,
 } from "@/supervisor/agents/computerUseMcp";
-import {
-  resolveChromeMcpHttpConfigForLaunch,
-  type ChromeMcpHttpConfig,
-} from "@/supervisor/agents/chromeMcp";
 import {
   resolveAppControlsMcpHttpConfigForLaunch,
   type AppControlsMcpHttpConfig,
@@ -106,6 +104,8 @@ export interface SpawnThreadInput {
   mcpLaunchSnapshot: McpLaunchSnapshot;
   launchConfig?: ThreadConfig;
   nativePlugins?: readonly AgentNativePlugin[];
+  /** Trusted app-thread identity used to scope built-in MCP calls. */
+  mcpIdentity?: McpThreadIdentity;
 }
 
 /**
@@ -120,18 +120,17 @@ export function effectiveLaunchConfig(
   disabledBuiltInMcpServerIds: readonly BuiltInMcpServerId[],
   pluginBuiltInMcpServerIds: readonly BuiltInMcpServerId[] = [],
 ): ThreadConfig {
+  const withDefaults = config.browserMcp === undefined ? { ...config, browserMcp: true } : config;
   if (disabledBuiltInMcpServerIds.length === 0 && pluginBuiltInMcpServerIds.length === 0) {
-    return config;
+    return withDefaults;
   }
-  const next = { ...config };
+  const next = { ...withDefaults };
   if (pluginBuiltInMcpServerIds.includes("browser")) next.browserMcp = true;
   if (pluginBuiltInMcpServerIds.includes("crossagents")) next.crossagentMcp = true;
   if (pluginBuiltInMcpServerIds.includes("computer-use")) next.computerUse = true;
-  if (pluginBuiltInMcpServerIds.includes("chrome")) next.chromeMcp = true;
   if (disabledBuiltInMcpServerIds.includes("browser")) next.browserMcp = false;
   if (disabledBuiltInMcpServerIds.includes("crossagents")) next.crossagentMcp = false;
   if (disabledBuiltInMcpServerIds.includes("computer-use")) next.computerUse = false;
-  if (disabledBuiltInMcpServerIds.includes("chrome")) next.chromeMcp = false;
   return next;
 }
 
@@ -172,7 +171,6 @@ export function applyAgentSettingsMcpFlags(
     {
       ...config,
       browserMcp: agentSettings.browserMcp === true,
-      chromeMcp: agentSettings.chromeMcp === true,
       computerUse: agentSettings.computerUse === true,
       crossagentMcp: crossagentRoutingAvailable && agentSettings.crossagentMcp === true,
     },
@@ -204,7 +202,6 @@ export function composeResolvedMcpServers(
   browserMcp: BrowserMcpHttpConfig | undefined,
   crossagentMcp: CrossagentMcpHttpConfig | undefined,
   computerUseMcp: ComputerUseMcpHttpConfig | undefined,
-  chromeMcp: ChromeMcpHttpConfig | undefined,
   appControlsMcp: AppControlsMcpHttpConfig | undefined,
 ): ResolvedMcpServer[] {
   const http = (
@@ -236,7 +233,6 @@ export function composeResolvedMcpServers(
     http("browser", browserMcp),
     http("crossagents", crossagentMcp, 300_000, "approve"),
     http("computer-use", computerUseMcp),
-    http("chrome", chromeMcp),
     http("app-controls", appControlsMcp),
   ].filter((server): server is ResolvedMcpServer => server !== undefined);
 }
@@ -368,6 +364,9 @@ export class SpawnPipeline {
           )
         : undefined;
     const mcpLaunchSnapshotBase = {
+      ...(payload.projectMcpServers?.length
+        ? { projectMcpServers: [...payload.projectMcpServers] }
+        : {}),
       disabledBuiltInMcpServerIds: payload.disabledBuiltInMcpServerIds ?? [],
       disabledBuiltInMcpTools: payload.disabledBuiltInMcpTools ?? {},
       pluginBuiltInMcpServerIds: pluginContributions.builtInMcpServerIds,
@@ -528,6 +527,7 @@ export class SpawnPipeline {
         mcpLaunchSnapshot,
         launchConfig,
         nativePlugins,
+        mcpIdentity,
       });
       if (
         !startInterrupted &&
@@ -673,6 +673,7 @@ export class SpawnPipeline {
       ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
       mcpLaunchSnapshot,
       launchConfig,
+      mcpIdentity,
       nativePlugins,
       ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
       presentationMode: requestedPresentation,
@@ -730,7 +731,7 @@ export class SpawnPipeline {
       return;
     }
 
-    const mcpIdentity = { threadId: session.threadId };
+    const mcpIdentity = session.mcpIdentity ?? { threadId: session.threadId };
     const launchConfig = this.resolveMcpLaunchConfig(
       workspaceLaunchConfig(
         session.projectLocation,
@@ -810,6 +811,7 @@ export class SpawnPipeline {
         sessionRef: session.sessionRef,
         mcpLaunchSnapshot,
         launchConfig,
+        mcpIdentity,
         ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
         ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
       });
@@ -910,6 +912,7 @@ export class SpawnPipeline {
       sessionRef: session.sessionRef,
       mcpLaunchSnapshot,
       launchConfig,
+      mcpIdentity,
       ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
       ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
     });
@@ -1009,6 +1012,7 @@ export class SpawnPipeline {
       config: input.config,
       mcpLaunchSnapshot,
       ...(input.nativePlugins ? { nativePlugins: input.nativePlugins } : {}),
+      ...(input.mcpIdentity ? { mcpIdentity: input.mcpIdentity } : {}),
       launchConfig:
         input.launchConfig ??
         workspaceLaunchConfig(
@@ -1073,17 +1077,29 @@ export class SpawnPipeline {
     adapter?: AgentAdapter;
     presentationMode?: ThreadPresentationMode;
   }): Promise<ResolvedMcpServer[]> {
+    // Pipedream relays bind to the concrete app thread even when a provider-owned
+    // GUI runtime clears the general MCP identity in favor of its shared session.
+    const pipedreamIdentity = identity;
     const providerSessionCrossagents = usesProviderSessionCrossagentRouting(
       adapter,
       presentationMode,
       crossagentThreadId,
     );
+    let browserAppControlsIdentity = identity;
     if (adapter?.capabilities.mcpConfigSource === "agentSettings") {
-      // Provider-level MCP: flags come from the provider's settings page. Drop
-      // the general MCP identity; GUI provider-session routing uses its own
-      // shared credential, while terminal routing keeps the thread token.
+      // Provider-level MCP flags come from the provider's settings page. The
+      // provider-specific routing decision below keeps shared config stable.
       config = this.resolveMcpLaunchConfig(config, mcpLaunchSnapshot, adapter, crossagentThreadId);
-      identity = undefined;
+      if (
+        adapter.kind === "opencode" &&
+        adapter.capabilities.crossagentMcpRouting === "provider-session"
+      ) {
+        // OpenCode MCP configuration is directory-scoped even for terminal
+        // sessions. A per-thread credential would be overwritten by the next
+        // same-directory session, so Browser/App Controls route every call via
+        // the provider-owned session id injected by Y Space's trusted plugin.
+        browserAppControlsIdentity = undefined;
+      }
       if (adapter.capabilities.crossagentMcpRouting !== "provider-session") {
         crossagentThreadId = undefined;
       }
@@ -1092,7 +1108,7 @@ export class SpawnPipeline {
       location,
       config,
       mcpLaunchSnapshot,
-      identity,
+      browserAppControlsIdentity,
     );
     const crossagentMcp = crossagentThreadId
       ? await this.resolveCrossagentMcpForLaunch(
@@ -1109,20 +1125,31 @@ export class SpawnPipeline {
       mcpLaunchSnapshot,
       identity,
     );
-    const chromeMcp = this.resolveChromeMcpForLaunch(location, config, mcpLaunchSnapshot, identity);
     const appControlsMcp = await this.resolveAppControlsMcpForLaunch(
       location,
       mcpLaunchSnapshot,
-      identity,
+      browserAppControlsIdentity,
     );
-    return composeResolvedMcpServers(
+    const baseServers = composeResolvedMcpServers(
       mcpLaunchSnapshot,
       browserMcp,
       crossagentMcp,
       computerUseMcp,
-      chromeMcp,
       appControlsMcp,
     );
+    const pipedreamServers = pipedreamIdentity?.threadId
+      ? await this.ctx.options.resolvePipedreamMcpServers?.({
+          threadId: pipedreamIdentity.threadId,
+          providerBindingId: resolvePipedreamProviderBindingId(
+            adapter,
+            presentationMode,
+            location,
+            pipedreamIdentity.threadId,
+          ),
+          projectLocation: location,
+        })
+      : undefined;
+    return pipedreamServers?.length ? [...baseServers, ...pipedreamServers] : baseServers;
   }
 
   resolveMcpLaunchConfig(
@@ -1185,26 +1212,6 @@ export class SpawnPipeline {
     return resolveComputerUseMcpHttpConfigForLaunch(location, enabled, {
       ...identity,
       disabledTools: mcpLaunchSnapshot.disabledBuiltInMcpTools?.["computer-use"] ?? [],
-    });
-  }
-
-  /**
-   * Resolve the external-Chrome MCP http config for a launch when the thread
-   * opted in (`config.chromeMcp === true`). Mirrors
-   * {@link resolveComputerUseMcpForLaunch}: the per-thread config flag is
-   * authoritative (scope gating lives in the renderer) and the resolver declines
-   * for WSL projects by design.
-   */
-  resolveChromeMcpForLaunch(
-    location: ProjectLocation,
-    config: ThreadConfig,
-    mcpLaunchSnapshot: McpLaunchSnapshot,
-    identity?: McpThreadIdentity,
-  ): ChromeMcpHttpConfig | undefined {
-    const enabled = config.chromeMcp === true;
-    return resolveChromeMcpHttpConfigForLaunch(location, enabled, {
-      ...identity,
-      disabledTools: mcpLaunchSnapshot.disabledBuiltInMcpTools?.chrome ?? [],
     });
   }
 
@@ -1361,4 +1368,26 @@ export class SpawnPipeline {
       threadStatusSource: "server",
     });
   }
+}
+
+function resolvePipedreamProviderBindingId(
+  adapter: AgentAdapter | undefined,
+  presentationMode: ThreadPresentationMode | undefined,
+  location: ProjectLocation,
+  threadId: string,
+): string {
+  const usesDirectoryScopedOpenCodeMcp =
+    adapter?.kind === "opencode" &&
+    adapter.capabilities.mcpConfigSource === "agentSettings" &&
+    (presentationMode ?? adapter.capabilities.presentationMode) !== "terminal";
+  if (!usesDirectoryScopedOpenCodeMcp) return `thread:${threadId}`;
+
+  const directory =
+    location.kind === "windows"
+      ? resolveWindowsPath(location.path).toLowerCase()
+      : resolvePosixPath(location.kind === "wsl" ? location.linuxPath : location.path);
+  const runtime = location.kind === "wsl" ? `wsl:${location.distro.toLowerCase()}` : location.kind;
+  const canonical = `${runtime}:${location.remoteServerId ?? "local"}:${directory}`;
+  const digest = createHash("sha256").update(canonical).digest("hex").slice(0, 32);
+  return `opencode-gui:${digest}`;
 }

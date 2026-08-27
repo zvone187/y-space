@@ -23,6 +23,7 @@ export interface BrowserTabSnapshot {
 export interface BrowserTabOptions {
   tabId: string;
   initialUrl?: string;
+  initialTitle?: string;
   userAgent: string;
   onUpdate(snapshot: BrowserTabSnapshot): void;
   onAttention(tabId: string): void;
@@ -66,7 +67,7 @@ export class BrowserTab {
     this.network = new NetworkCapture();
     this.dialogs = new DialogController();
     this.currentUrl = opts.initialUrl ?? "about:blank";
-    this.currentTitle = "";
+    this.currentTitle = opts.initialTitle ?? "";
     if (opts.initialUrl) {
       this.clearInitialHistoryOnLoad = true;
       this.initialHistoryUrl = opts.initialUrl;

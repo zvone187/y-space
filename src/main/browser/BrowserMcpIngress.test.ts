@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
 import { BrowserMcpIngress } from "./BrowserMcpIngress";
 import type { BrowserPanelManager } from "./BrowserPanelManager";
 
@@ -13,11 +14,12 @@ describe("BrowserMcpIngress", () => {
   it("advertises browser instructions and API discovery on initialize", async () => {
     ingress = new BrowserMcpIngress();
     const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser");
 
     const response = await fetch(`${info.url}/mcp`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${info.token}`,
+        Authorization: `Bearer ${launchToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -41,6 +43,84 @@ describe("BrowserMcpIngress", () => {
     expect(body.result.instructions).toContain("browser.disable");
     expect(body.result.instructions).toContain("browser.api");
     expect(body.result.instructions).toContain("@e refs");
+  });
+
+  it("uses trusted OpenCode provider-session identity for agent-created tab ownership", async () => {
+    const resolveProviderSessionIdentity = vi.fn<
+      (providerSessionId: string) => Promise<{ threadId?: string; title?: string } | undefined>
+    >(async (providerSessionId) =>
+      providerSessionId === "session-browser"
+        ? { threadId: "thread-browser", title: "Browser caller" }
+        : undefined,
+    );
+    const RoutedBrowserMcpIngress = BrowserMcpIngress as unknown as new (options: {
+      resolveProviderSessionIdentity(
+        providerSessionId: string,
+      ): Promise<{ threadId?: string; title?: string } | undefined>;
+    }) => BrowserMcpIngress;
+    ingress = new RoutedBrowserMcpIngress({ resolveProviderSessionIdentity });
+    const createTab = vi.fn<
+      (
+        payload: Record<string, unknown>,
+        options: Record<string, unknown>,
+      ) => Promise<{
+        tabId: string;
+        url: string;
+        title: string;
+        loading: boolean;
+        canGoBack: boolean;
+        canGoForward: boolean;
+        devToolsOpen: boolean;
+      }>
+    >(async () => ({
+      tabId: "tab-routed",
+      url: "https://example.test",
+      title: "Example",
+      loading: false,
+      canGoBack: false,
+      canGoForward: false,
+      devToolsOpen: false,
+    }));
+    ingress.setManagerAccessor(
+      () =>
+        ({
+          createTab,
+        }) as unknown as BrowserPanelManager,
+    );
+    const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser");
+
+    const response = await fetch(`${info.url}/mcp`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${launchToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "new_tab",
+          arguments: {
+            __poracode_provider_session_id: "session-browser",
+            url: "https://example.test",
+          },
+        },
+      }),
+    });
+    const body = (await response.json()) as { result: { isError?: boolean } };
+
+    expect(body.result.isError).toBeUndefined();
+    expect(resolveProviderSessionIdentity).toHaveBeenCalledWith("session-browser");
+    expect(createTab).toHaveBeenCalledWith(
+      { url: "https://example.test", activate: true },
+      {
+        agent: true,
+        threadId: "thread-browser",
+        threadTitle: "Browser caller",
+      },
+    );
   });
 
   it("routes MCP reload, get_url, and fill through the browser panel tab", async () => {
@@ -87,6 +167,8 @@ describe("BrowserMcpIngress", () => {
             activeTabId: "tab-1",
           }),
           getActiveTab: () => tab,
+          getActiveTabForThread: () => tab,
+          rememberTabForThread: vi.fn<() => boolean>().mockReturnValue(true),
           getTab: () => tab,
           ensureTabReady: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
           createTab: vi.fn<() => Promise<unknown>>().mockResolvedValue({ tabId: "tab-1" }),
@@ -95,12 +177,15 @@ describe("BrowserMcpIngress", () => {
         }) as unknown as BrowserPanelManager,
     );
     const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-browser-test",
+    });
 
     const callTool = async (name: string, args: Record<string, unknown>) => {
       const response = await fetch(`${info.url}/mcp`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${info.token}`,
+          Authorization: `Bearer ${launchToken}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -144,5 +229,97 @@ describe("BrowserMcpIngress", () => {
       ),
     ).toBe(true);
     expect(tab.webContents.focus).not.toHaveBeenCalled();
+  });
+
+  it("keeps implicit targets per thread and can find or focus existing tabs", async () => {
+    ingress = new BrowserMcpIngress();
+    const threadTab = {
+      tabId: "tab-thread",
+      snapshot: () => ({ url: "https://example.test/thread", title: "Thread workspace" }),
+    };
+    const visibleTab = {
+      tabId: "tab-visible",
+      snapshot: () => ({ url: "https://other.test/", title: "Other agent" }),
+    };
+    const setActiveTab = vi.fn<(tabId: string) => void>();
+    const rememberTabForThread = vi.fn<() => boolean>(() => true);
+    const createTab = vi.fn<() => Promise<Record<string, unknown>>>(async () => ({
+      tabId: "tab-created",
+      url: "https://new.test/",
+      title: "",
+    }));
+    ingress.setManagerAccessor(
+      () =>
+        ({
+          snapshot: () => ({
+            tabs: [
+              {
+                tabId: "tab-thread",
+                url: "https://example.test/thread",
+                title: "Thread workspace",
+                loading: false,
+              },
+              {
+                tabId: "tab-visible",
+                url: "https://other.test/",
+                title: "Other agent",
+                loading: false,
+              },
+            ],
+            activeTabId: "tab-visible",
+            groups: [],
+          }),
+          getActiveTab: () => visibleTab,
+          getActiveTabForThread: () => threadTab,
+          getTab: (tabId: string) => (tabId === "tab-thread" ? threadTab : visibleTab),
+          ensureTabReady: vi.fn<() => Promise<void>>(async () => undefined),
+          setActiveTab,
+          rememberTabForThread,
+          createTab,
+        }) as unknown as BrowserPanelManager,
+    );
+    const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-1",
+    });
+    const call = async (name: string, args: Record<string, unknown>) => {
+      const response = await fetch(`${info.url}/mcp`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${launchToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: name,
+          method: "tools/call",
+          params: { name, arguments: args },
+        }),
+      });
+      return (await response.json()) as {
+        result: { isError?: boolean; content: Array<{ text: string }> };
+      };
+    };
+
+    await expect(call("get_url", {})).resolves.toMatchObject({
+      result: { content: [{ text: '{\n  "url": "https://example.test/thread"\n}' }] },
+    });
+    await expect(call("find_tabs", { query: "workspace" })).resolves.toMatchObject({
+      result: {
+        content: [expect.objectContaining({ text: expect.stringContaining("tab-thread") })],
+      },
+    });
+    const focused = await call("open_or_focus_tab", { url: "https://example.test/thread" });
+    expect(focused.result.isError).toBeUndefined();
+    expect(setActiveTab).toHaveBeenCalledWith("tab-thread");
+    expect(rememberTabForThread).toHaveBeenCalledWith("thread-1", "tab-thread");
+    expect(createTab).not.toHaveBeenCalled();
+
+    const created = await call("open_or_focus_tab", { url: "https://new.test/" });
+    expect(created.result.isError).toBeUndefined();
+    expect(createTab).toHaveBeenCalledWith(
+      { url: "https://new.test/", activate: true },
+      expect.objectContaining({ agent: true, threadId: "thread-1" }),
+    );
   });
 });
