@@ -181,7 +181,7 @@ const MCP_POWERS = [
   { icon: Plug, server: "poracode", title: "mcp.extend.title", desc: "mcp.extend.desc" },
   {
     icon: MousePointerClick,
-    server: "browser · chrome · computer_use",
+    server: "browser · computer_use",
     title: "mcp.surfaces.title",
     desc: "mcp.surfaces.desc",
   },
