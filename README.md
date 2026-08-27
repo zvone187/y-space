@@ -105,7 +105,7 @@ Use Personal Pipedream MCP or connect selected app accounts through Pipedream Co
 
 ### Remote Access
 
-Pair the Y Space web app with your desktop to follow live threads, read terminal output, send messages, and receive notifications from your phone or browser.
+Pair the self-hosted Y Space companion served by your desktop to follow live threads, read terminal output, send messages, and receive notifications from your phone or browser.
 
 ### Remote Machines over SSH
 
@@ -181,3 +181,7 @@ Contributions are welcome! Please open an [issue](https://github.com/zvone187/y-
 ## License
 
 [Apache-2.0](LICENSE)
+
+Y Space is based on the Apache-2.0-licensed
+[SDSLeon/lightcode](https://github.com/SDSLeon/lightcode) project created by Serhii Vecherenko.
+That upstream authorship is preserved separately from the active Y Space maintainers.

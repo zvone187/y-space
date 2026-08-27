@@ -23,7 +23,7 @@ msgstr "…"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "(disconnected)"
-msgstr ""
+msgstr "（切断済み）"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -186,6 +186,12 @@ msgstr "{0}の{time}"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} authenticated."
 msgstr "{0}が認証されました。"
+
+#. placeholder {0}: domain.cookieCount
+#. placeholder {1}: domain.unsupportedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "{0} cookies · {1} unsupported"
+msgstr "{0} 件の Cookie · {1} 件は未対応"
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
@@ -600,11 +606,11 @@ msgstr "{providerLabel} の {serverName}: {disabledLabel}"
 #. placeholder {0}: activeRequest.domains.length
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "{totalCookieCount} cookies across {0} domains"
-msgstr ""
+msgstr "{0} 個のドメインに合計 {totalCookieCount} 件の Cookie"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "{totalUnsupportedCount} unsupported"
-msgstr ""
+msgstr "{totalUnsupportedCount} 件は未対応"
 
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
@@ -662,8 +668,12 @@ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}
 msgstr "/skill-creator-poracode {destinationLabel} 用の新しい管理対象スキルを作成してください。"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
-msgstr "©{currentYear}セルヒイ・ヴェチェレンコ。無断転載を禁じます。"
+#~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
+#~ msgstr "©{currentYear}セルヒイ・ヴェチェレンコ。無断転載を禁じます。"
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "© {currentYear} Y Space contributors. Licensed under Apache-2.0."
+msgstr "© {currentYear} Y Space コントリビューター。Apache-2.0 ライセンス。"
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "<0/> of {matchCount}"
@@ -948,7 +958,7 @@ msgstr "既存のフォルダーを追加"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Add and sign in"
-msgstr ""
+msgstr "追加してサインイン"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
@@ -1249,6 +1259,7 @@ msgstr "すべての推論レベル"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "All files"
 msgstr "すべてのファイル"
 
@@ -1288,7 +1299,7 @@ msgstr "エージェントに Cookie とストレージの読み取り/書き込
 #. placeholder {0}: account.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Allow agents to use {0}"
-msgstr ""
+msgstr "エージェントによる {0} の使用を許可"
 
 #: src/mobile/QrScanner.tsx
 msgid "Allow camera access for this site in your browser settings and try again — or enter the endpoint and token below."
@@ -1987,6 +1998,7 @@ msgid "Browser sign-in"
 msgstr "ブラウザーでサインイン"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Browser tabs"
 msgstr "ブラウザタブ"
 
@@ -2052,7 +2064,7 @@ msgstr "トークン数順"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "BYO Connect"
-msgstr ""
+msgstr "BYO Connect"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Bypass branch protection rules"
@@ -2118,7 +2130,7 @@ msgstr "キャンセル"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Cancel cookie import"
-msgstr ""
+msgstr "Cookie のインポートをキャンセル"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 #~ msgid "Cancel new Claude profile"
@@ -2134,7 +2146,7 @@ msgstr "新しいプロファイルをキャンセル"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Cancel pairing"
-msgstr ""
+msgstr "ペアリングをキャンセル"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2343,7 +2355,15 @@ msgstr "チェック保留中"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose <0>Load unpacked</0> and select the folder that opens below."
-msgstr ""
+msgstr "<0>パッケージ化されていない拡張機能を読み込む</0>を選び、下のボタンで開いたフォルダーを選択します。"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a connected browser profile before previewing cookies."
+msgstr "Cookie をプレビューする前に、接続済みのブラウザプロファイルを選択してください。"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a cookie export"
+msgstr "Cookie のエクスポートを選択"
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -2382,6 +2402,10 @@ msgstr "プロジェクトフォルダ内の画像を選択してください。
 msgid "Choose at least two candidates and enter a prompt."
 msgstr "候補を 2 つ以上選択し、プロンプトを入力してください。"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose at most {MAX_TARGET_ORIGINS} origins."
+msgstr "オリジンは最大 {MAX_TARGET_ORIGINS} 個まで選択できます。"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 #~ msgid "Choose automatically or override with a detected shell for new terminals."
@@ -2389,7 +2413,7 @@ msgstr "候補を 2 つ以上選択し、プロンプトを入力してくださ
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose cookie file"
-msgstr ""
+msgstr "Cookie ファイルを選択"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
@@ -2435,7 +2459,7 @@ msgstr "接続するスレッドを選択してください"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose what to import"
-msgstr ""
+msgstr "インポートする項目を選択"
 
 #: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3110,7 +3134,7 @@ msgstr "スレッドを削除する前に確認"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Confirm disconnect"
-msgstr ""
+msgstr "切断を確認"
 
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3136,7 +3160,7 @@ msgstr "接続"
 #. placeholder {0}: app.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Connect {0}"
-msgstr ""
+msgstr "{0} に接続"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #~ msgid "Connect a server"
@@ -3183,7 +3207,7 @@ msgstr "接続済み"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Connected accounts"
-msgstr ""
+msgstr "接続済みアカウント"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Connecting to the desktop browser…"
@@ -3198,6 +3222,7 @@ msgstr "接続中..."
 #: src/renderer/components/thread/ChatPane/ChatTurnElapsed.tsx
 #: src/renderer/components/thread/ThreadDraftView.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connecting…"
 msgstr "接続中…"
@@ -3327,6 +3352,14 @@ msgstr "エージェントがクリックや入力をしている間、ペアリ
 msgid "Conversation"
 msgstr "会話"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Cookie exports"
+msgstr "Cookie のエクスポート"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Cookie file:"
+msgstr "Cookie ファイル："
+
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
@@ -3368,7 +3401,7 @@ msgstr "現在の URL をコピー"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Copy data from an earlier installation into Y Space. Y Space restarts and keeps a complete backup of its current data."
-msgstr ""
+msgstr "以前のインストールから Y Space にデータをコピーします。Y Space は再起動し、現在のデータの完全なバックアップを保持します。"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy desktop endpoint"
@@ -3419,7 +3452,7 @@ msgstr "相対パスをコピー"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
-msgstr ""
+msgstr "選択したサインイン Cookie を Y Space の埋め込みブラウザにコピーします。この拡張機能はインポート専用で、ほかのブラウザの操作、内容の確認、制御はできません。"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Copy selection"
@@ -3441,9 +3474,21 @@ msgstr "URLをコピー"
 msgid "Could not abort the merge: {detail}"
 msgstr "マージを中止できませんでした:{detail}"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel browser pairing. Try again."
+msgstr "ブラウザのペアリングをキャンセルできませんでした。もう一度お試しください。"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel the cookie import. Try again."
+msgstr "Cookie のインポートをキャンセルできませんでした。もう一度お試しください。"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not complete the merge"
 msgstr "マージを完了できませんでした"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not create a cookie preview. Check that the extension is connected."
+msgstr "Cookie のプレビューを作成できませんでした。拡張機能が接続されていることを確認してください。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not create the project folder."
@@ -3454,22 +3499,42 @@ msgstr "プロジェクトフォルダーを作成できませんでした。"
 msgid "Could not extract context."
 msgstr "コンテキストを抽出できませんでした。"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not forget that browser profile. Try again."
+msgstr "そのブラウザプロファイルの登録を解除できませんでした。もう一度お試しください。"
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not generate commit message: {detail}"
 msgstr "コミットメッセージを生成できませんでした:{detail}"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not import the selected cookies. No cookie values were kept in this screen."
+msgstr "選択した Cookie をインポートできませんでした。この画面には Cookie の値は保存されていません。"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not load browser cookie-import settings."
+msgstr "ブラウザの Cookie インポート設定を読み込めませんでした。"
+
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Could not load connections."
-msgstr ""
+msgstr "接続を読み込めませんでした。"
 
 #. placeholder {0}: failure.project.name
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Could not load pull requests for {0}."
 msgstr "{0} のプルリクエストを読み込めませんでした。"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not open the extension folder. Try again."
+msgstr "拡張機能のフォルダーを開けませんでした。もう一度お試しください。"
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #~ msgid "Could not open this PDF."
 #~ msgstr "このPDFを開けませんでした。"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not preview that cookie file. Use Cookie-Editor JSON or Netscape cookies.txt."
+msgstr "その Cookie ファイルをプレビューできませんでした。Cookie-Editor JSON または Netscape cookies.txt を使用してください。"
 
 #: src/renderer/components/thread/ChatPane/parts/items/useReadAbsoluteFile.tsx
 msgid "Could not read file."
@@ -3488,6 +3553,10 @@ msgstr "{serverName} にサインインできませんでした。"
 #: src/renderer/components/plugins/usePluginOauth.ts
 msgid "Could not sign out of {serverName}."
 msgstr "{serverName} からサインアウトできませんでした。"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not start browser pairing. Try again."
+msgstr "ブラウザのペアリングを開始できませんでした。もう一度お試しください。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Couldn't access the GitHub account \"{login}\". Run \"gh auth login\" and try again."
@@ -3572,7 +3641,7 @@ msgstr "MCP サーバー設定をスキャンできませんでした。"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Couldn't schedule the legacy data import."
-msgstr ""
+msgstr "旧バージョンのデータのインポートを予約できませんでした。"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "Couldn't schedule the Y Space data import."
@@ -3696,6 +3765,10 @@ msgstr "ワークツリーを作成しています…"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Credentials are configured."
 msgstr "資格情報が設定されています。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Credentials are managed by the Y Space environment and never exposed to agents."
+msgstr "認証情報は Y Space 環境によって管理され、エージェントに公開されることはありません。"
 
 #: src/renderer/components/providers/usageFormat.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
@@ -4028,7 +4101,7 @@ msgstr "他の AI エージェントに作業を委任します。"
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Delete"
-msgstr "削除"
+msgstr "登録解除"
 
 #. placeholder {0}: pendingDelete?.name
 #. placeholder {1}: pendingDelete?.absolutePath
@@ -4407,16 +4480,16 @@ msgstr "保存されていないエディターの変更を破棄しますか?"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect"
-msgstr ""
+msgstr "切断"
 
 #. placeholder {0}: account.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect {0}"
-msgstr ""
+msgstr "{0} との接続を切断"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect account?"
-msgstr ""
+msgstr "アカウントの接続を切断しますか？"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Disconnect server"
@@ -4424,7 +4497,7 @@ msgstr "サーバーを切断"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Disconnected"
-msgstr ""
+msgstr "切断済み"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Discovering coding agents…"
@@ -4576,7 +4649,7 @@ msgstr "例: 仕事"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Each one-time code expires quickly and works only on this computer."
-msgstr ""
+msgstr "各ワンタイムコードの有効期限は短く、このコンピューターでのみ使用できます。"
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
@@ -4690,7 +4763,7 @@ msgstr "{tool} を有効にする"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Enable Developer mode."
-msgstr ""
+msgstr "デベロッパー モードを有効にします。"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4742,7 +4815,7 @@ msgstr "<0>Cookie</0> と <1>ストレージ</1> を有効にします。Cookie 
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "End-user Pipedream MCP server named pd."
-msgstr ""
+msgstr "pd という名前のエンドユーザー向け Pipedream MCP サーバーです。"
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
@@ -4804,6 +4877,10 @@ msgstr "有効な SSH 接続先とポートを入力してください。"
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 #~ msgid "Enter an absolute @cursor/sdk package path, or leave this blank for automatic discovery."
 #~ msgstr "@cursor/sdk パッケージへの絶対パスを入力するか、空欄にして自動検出を使用します。"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Enter at least one HTTP(S) origin."
+msgstr "HTTP(S) オリジンを 1 つ以上入力してください。"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter one MCP server configuration."
@@ -5051,7 +5128,7 @@ msgstr "実験のプロンプトを空にすることはできません"
 #. placeholder {0}: formatCountdown(model.pairingRemainingMs)
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Expires in {0}"
-msgstr ""
+msgstr "有効期限まで {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "Explicit selections recorded from past delegations — they feed the routing order above. Edit the tags or remove entries to reshape it."
@@ -5298,7 +5375,7 @@ msgstr "ターミナル内を検索"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Finish connecting in the new embedded browser tab, then refresh accounts."
-msgstr ""
+msgstr "新しい埋め込みブラウザタブで接続を完了してから、アカウントを更新してください。"
 
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Finish your review"
@@ -5469,12 +5546,12 @@ msgstr "ブラウザのページを強制的にリロード"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget"
-msgstr ""
+msgstr "削除"
 
 #. placeholder {0}: source.label
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget {0}"
-msgstr ""
+msgstr "{0} の登録を解除"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5845,7 +5922,7 @@ msgstr "ヘッダー"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Healthy"
-msgstr ""
+msgstr "正常"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Help me create a schedule. Ask for any missing details, then use the Y Space schedule controls to create it for me."
@@ -6047,7 +6124,7 @@ msgstr "インポートして再起動"
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Import browser cookies"
-msgstr ""
+msgstr "ブラウザの Cookie をインポート"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Import conflict"
@@ -6056,7 +6133,7 @@ msgstr "インポートの競合"
 #. placeholder {0}: domain.domain
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Import cookies for {0}"
-msgstr ""
+msgstr "{0} の Cookie をインポート"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6077,11 +6154,11 @@ msgstr "外部スキルをインポート"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data"
-msgstr ""
+msgstr "旧バージョンのデータをインポート"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data again?"
-msgstr ""
+msgstr "旧バージョンのデータをもう一度インポートしますか？"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Import MCP servers"
@@ -6097,7 +6174,7 @@ msgstr "選択項目をインポート"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Import selected cookies"
-msgstr ""
+msgstr "選択した Cookie をインポート"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Import to {destinationProjectName}"
@@ -6124,6 +6201,12 @@ msgstr "グローバルにインポート"
 #: src/renderer/components/skills/SkillImportModal.tsx
 #~ msgid "Imported {0} {1}."
 #~ msgstr "{0} 件の{1}をインポートしました。"
+
+#. placeholder {0}: completedCounts.importedCount
+#. placeholder {1}: completedCounts.skippedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Imported {0} cookies; skipped {1}."
+msgstr "{0} 件の Cookie をインポートし、{1} 件をスキップしました。"
 
 #. placeholder {0}: selectedSkills.length
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6157,7 +6240,7 @@ msgstr "同期に追加"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Incomplete setup"
-msgstr ""
+msgstr "セットアップ未完了"
 
 #: src/renderer/components/plugins/PluginDetail.tsx
 msgid "Information"
@@ -6348,7 +6431,7 @@ msgstr "v{version} をインストール"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Install Y Space Cookie Import"
-msgstr ""
+msgstr "Y Space Cookie Import をインストール"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -6547,7 +6630,7 @@ msgstr "コメントを残す"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Legacy data import is unavailable with a custom data folder."
-msgstr ""
+msgstr "カスタムデータフォルダーを使用している場合、旧バージョンのデータはインポートできません。"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "Less"
@@ -6624,7 +6707,7 @@ msgstr "アカウントを読み込み中…"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Loading browser profiles…"
-msgstr ""
+msgstr "ブラウザプロファイルを読み込み中…"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
@@ -7255,7 +7338,7 @@ msgstr "ミラーリングは利用できません。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Missing configuration:"
-msgstr ""
+msgstr "不足している設定："
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
@@ -7521,7 +7604,7 @@ msgstr "承認が必要です"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Needs attention"
-msgstr ""
+msgstr "要確認"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7814,7 +7897,7 @@ msgstr "ブランチが見つかりませんでした"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "No browser profiles paired yet."
-msgstr ""
+msgstr "ペアリング済みのブラウザプロファイルはまだありません。"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserEmptyState.tsx
 msgid "No browser tab open"
@@ -7864,7 +7947,7 @@ msgstr "設定済みのMCPサーバーはまだありません"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "No connected accounts yet."
-msgstr ""
+msgstr "接続済みのアカウントはまだありません。"
 
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
@@ -7966,7 +8049,7 @@ msgstr "学習済みの選択はまだありません。"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "No legacy app data was found."
-msgstr ""
+msgstr "旧バージョンのアプリデータが見つかりませんでした。"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "No marketplace skills match these filters."
@@ -8159,7 +8242,7 @@ msgstr "サポートされているエージェントが検出されませんで
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "No supported cookies were found for these origins."
-msgstr ""
+msgstr "これらのオリジンに対応する Cookie は見つかりませんでした。"
 
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "No tags — the entry stops influencing tag affinity."
@@ -8231,7 +8314,7 @@ msgstr "Git リポジトリではありません"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Not configured"
-msgstr ""
+msgstr "未設定"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Not found"
@@ -8345,7 +8428,7 @@ msgstr "{0}に1回"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "One exact HTTP(S) origin per line, up to 12."
-msgstr ""
+msgstr "1 行に正確な HTTP(S) オリジンを 1 つずつ、最大 12 個まで入力できます。"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "One Header: value pair per line"
@@ -8392,7 +8475,7 @@ msgstr "{label}を開く"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open <0>chrome://extensions</0> in Chrome, Brave, Edge, Arc, or Chromium."
-msgstr ""
+msgstr "Chrome、Brave、Edge、Arc、または Chromium で <0>chrome://extensions</0> を開きます。"
 
 #: src/renderer/commands/registry.ts
 msgid "Open a new browser tab"
@@ -8474,7 +8557,7 @@ msgstr "実験ボードを開く"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open extension folder"
-msgstr ""
+msgstr "拡張機能のフォルダーを開く"
 
 #: src/renderer/commands/registry.ts
 msgid "Open File"
@@ -8656,7 +8739,7 @@ msgstr "モデルピッカーを開く"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open the Y Space Cookie Import popup in your browser and approve these origins."
-msgstr ""
+msgstr "ブラウザで Y Space Cookie Import のポップアップを開き、これらのオリジンを許可してください。"
 
 #: src/renderer/components/providers/opencode/manifest.ts
 msgid "OpenCode"
@@ -8778,7 +8861,7 @@ msgstr "ペアリング"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pair a browser profile"
-msgstr ""
+msgstr "ブラウザプロファイルをペアリング"
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Pair a connection"
@@ -8799,7 +8882,7 @@ msgstr "もう一度ペアリング"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pair browser profile"
-msgstr ""
+msgstr "ブラウザプロファイルをペアリング"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Pair with Y Space"
@@ -8807,7 +8890,7 @@ msgstr "Y Space とペアリング"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Paired browser profiles"
-msgstr ""
+msgstr "ペアリング済みのブラウザプロファイル"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Paired devices"
@@ -8819,7 +8902,7 @@ msgstr "ペアリング中"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pairing code"
-msgstr ""
+msgstr "ペアリングコード"
 
 #: src/mobile/components.tsx
 #: src/mobile/useRemoteDesktop.ts
@@ -9002,11 +9085,15 @@ msgstr "個人"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal MCP"
-msgstr ""
+msgstr "個人用 MCP"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal MCP sign-in did not complete."
-msgstr ""
+msgstr "個人用 MCP へのサインインが完了しませんでした。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Personal Pipedream tools"
+msgstr "個人用 Pipedream ツール"
 
 #: src/renderer/components/providers/pi/manifest.ts
 msgid "Pi"
@@ -9067,11 +9154,11 @@ msgstr "固定されたタスクルート"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream Connect could not be initialized."
-msgstr ""
+msgstr "Pipedream Connect を初期化できませんでした。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
-msgstr ""
+msgstr "認証済みのローカル MCP リレーを通じて利用できる、Pipedream 管理の OAuth アカウントです。"
 
 #: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
@@ -9277,11 +9364,11 @@ msgstr "{0}をプレビューする"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview extension cookies"
-msgstr ""
+msgstr "拡張機能の Cookie をプレビュー"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
-msgstr ""
+msgstr "プレビューにはドメイン単位の件数のみが表示されます。最終的な選択を確定するまで何もコピーされません。Firefox と Safari からのエクスポートには、Cookie-Editor JSON または Netscape cookies.txt を使用できます。"
 
 #: src/renderer/commands/registry.ts
 msgid "Previous chat"
@@ -9821,7 +9908,7 @@ msgstr "{label} を更新する"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Refresh accounts"
-msgstr ""
+msgstr "アカウントを更新"
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Refresh detected agents"
@@ -10862,7 +10949,7 @@ msgstr "エージェントを検索..."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Search apps"
-msgstr ""
+msgstr "アプリを検索"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Search branches..."
@@ -10911,7 +10998,7 @@ msgstr "アドレスを検索または入力"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Search Pipedream apps"
-msgstr ""
+msgstr "Pipedream アプリを検索"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Search plugins"
@@ -11480,7 +11567,7 @@ msgstr "サインアウトしています。検出されたエージェントは
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Sites to import cookies for"
-msgstr ""
+msgstr "Cookie をインポートするサイト"
 
 #: src/renderer/views/SettingsOverlay/parts/CodexProviderSettings.tsx
 msgid "Sizes shown in the Codex composer. Compaction starts automatically at 95% of the selected window. New chats default to 400k when that size is in the list."
@@ -11638,7 +11725,7 @@ msgstr "ワークツリーの作成前にソースブランチ {branch} が移�
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Source browser profile"
-msgstr ""
+msgstr "インポート元のブラウザプロファイル"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
@@ -11787,7 +11874,7 @@ msgstr "最小化して起動"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Start pairing below, then enter the code in the extension popup."
-msgstr ""
+msgstr "下でペアリングを開始し、拡張機能のポップアップにコードを入力します。"
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 #~ msgid "Start remote thread"
@@ -12356,6 +12443,10 @@ msgstr "アプリ"
 #~ msgid "the base branch"
 #~ msgstr "ベースブランチ"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "The browser accepted them, but disk flush must be retried."
+msgstr "ブラウザには受け入れられましたが、ディスクへの書き込みを再試行する必要があります。"
+
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "The candidates changed after judging. Compare them again."
 msgstr "審査後に候補が変更されました。もう一度比較してください。"
@@ -12424,11 +12515,11 @@ msgstr "通常のアプリシェルをレンダリングできませんでした
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "The Pipedream request failed. Check your connection and configuration."
-msgstr ""
+msgstr "Pipedream のリクエストに失敗しました。接続と設定を確認してください。"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "The preview failed. Reconnect the extension and try again."
-msgstr ""
+msgstr "プレビューに失敗しました。拡張機能を再接続して、もう一度お試しください。"
 
 #: src/renderer/state/remoteServersStore.ts
 msgid "The remote server returned no pairing credential."
@@ -12695,7 +12786,7 @@ msgstr "これにより、後続のメッセージが削除され、チェック
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "This removes the Pipedream account and immediately revokes agent access through Y Space."
-msgstr ""
+msgstr "この操作により Pipedream アカウントが削除され、Y Space を介したエージェントのアクセス権が直ちに取り消されます。"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "This removes the schedule and its latest result from this device."
@@ -13633,7 +13724,7 @@ msgstr "「+」を使用して直接ペアリングするか、SSH 経由でリ�
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Use active embedded tab"
-msgstr ""
+msgstr "アクティブな埋め込みタブを使用"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Use an existing folder"
@@ -13655,6 +13746,10 @@ msgstr "構成を使用する"
 msgid "Use detected session?"
 msgstr "検出されたセッションを使用しますか?"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Use HTTP(S) origins without usernames, passwords, paths, or private URL details."
+msgstr "ユーザー名、パスワード、パス、非公開の URL 情報を含まない HTTP(S) オリジンを使用してください。"
+
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Use ignore files"
@@ -13671,7 +13766,7 @@ msgstr "1 つのグローバルフォルダーを使用するか、各プロジ�
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
-msgstr ""
+msgstr "自分の Pipedream ツールには個人用 MCP を使用し、選択したアプリアカウントをローカルエージェントに許可するには BYO Connect を使用します。"
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"
@@ -13955,8 +14050,6 @@ msgstr "ウェブ検索"
 msgid "Web server"
 msgstr "Webサーバー"
 
-#. External link to the product website
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Website"
 msgstr "ウェブサイト"
@@ -14368,7 +14461,7 @@ msgstr "Y Space は SSH ホストにサーバーをインストールまたは�
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Y Space will restart, back up its current data, and replace it with a complete copy of the legacy installation data."
-msgstr ""
+msgstr "Y Space は再起動し、現在のデータをバックアップしてから、旧バージョンのインストールデータの完全なコピーに置き換えます。"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "Y Space will restart, back up its current data, and replace it with a complete copy of your Y Space data."

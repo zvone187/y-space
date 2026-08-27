@@ -28,16 +28,21 @@ interface WorkerHarness {
   storage: Record<string, unknown>;
   grantedOrigins: Set<string>;
   removedOrigins: string[][];
+  cookieJar: Array<Record<string, unknown>>;
+  cookieQueries: Array<Record<string, unknown>>;
 }
 
 function createWorkerHarness(options?: {
   initialStorage?: Record<string, unknown>;
   initiallyGrantedOrigins?: string[];
   permissionRemovalSucceeds?: boolean;
+  cookies?: Array<Record<string, unknown>>;
 }): WorkerHarness {
   const storage: Record<string, unknown> = structuredClone(options?.initialStorage ?? {});
   const grantedOrigins = new Set(options?.initiallyGrantedOrigins ?? []);
   const removedOrigins: string[][] = [];
+  const cookieJar = structuredClone(options?.cookies ?? []);
+  const cookieQueries: Array<Record<string, unknown>> = [];
   class DormantWebSocket {
     static readonly OPEN = 1;
     readonly readyState = 0;
@@ -69,7 +74,33 @@ function createWorkerHarness(options?: {
         return true;
       },
     },
-    cookies: { getAll: async () => [] },
+    cookies: {
+      getAll: async (query: Record<string, unknown>) => {
+        cookieQueries.push(structuredClone(query));
+        if (typeof query.url !== "string") return structuredClone(cookieJar);
+        const url = new URL(query.url);
+        return structuredClone(
+          cookieJar.filter((cookie) => {
+            const domain = String(cookie.domain ?? "")
+              .replace(/^\.+/u, "")
+              .toLowerCase();
+            const hostMatches =
+              cookie.hostOnly === true
+                ? url.hostname.toLowerCase() === domain
+                : url.hostname.toLowerCase() === domain ||
+                  url.hostname.toLowerCase().endsWith(`.${domain}`);
+            const path = String(cookie.path ?? "/");
+            const pathMatches =
+              url.pathname === path ||
+              (url.pathname.startsWith(path) &&
+                (path.endsWith("/") || url.pathname.charAt(path.length) === "/"));
+            return (
+              hostMatches && pathMatches && (cookie.secure !== true || url.protocol === "https:")
+            );
+          }),
+        );
+      },
+    },
     action: {
       setBadgeBackgroundColor: async () => undefined,
       setBadgeText: async () => undefined,
@@ -104,7 +135,7 @@ function createWorkerHarness(options?: {
   });
   const source = readFileSync(resolve(process.cwd(), "chrome-extension/background.js"), "utf8");
   vm.runInContext(source, context, { filename: "chrome-extension/background.js" });
-  return { context, storage, grantedOrigins, removedOrigins };
+  return { context, storage, grantedOrigins, removedOrigins, cookieJar, cookieQueries };
 }
 
 function setContextValue(context: vm.Context, name: string, value: unknown): void {
@@ -327,5 +358,195 @@ describe("Chrome extension and bridge crypto interoperability", () => {
     );
     expect(lateGrant.grantedOrigins.has(newOrigin)).toBe(false);
     expect(lateGrant.storage.managedRequests).toEqual({});
+  });
+
+  it("serializes preview cancellation and cleans up a permission granted after cancellation", async () => {
+    const requestId = "33333333-3333-4333-8333-333333333333";
+    const origin = "https://new.example/*";
+    const harness = createWorkerHarness();
+    for (let turn = 0; turn < 3; turn += 1) await new Promise(setImmediate);
+    setContextValue(harness.context, "testPreview", {
+      requestId,
+      targetUrls: ["https://new.example"],
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await runInWorker<Promise<void>>(
+      harness.context,
+      "Promise.all([runLifecycleTask(() => preparePreview(testPreview)), runLifecycleTask(() => cancelRequest(testPreview.requestId))]).then(() => undefined)",
+    );
+
+    expect(harness.storage.managedRequests).toMatchObject({
+      [requestId]: { status: "cancelled", newlyGrantedOrigins: [origin] },
+    });
+    harness.grantedOrigins.add(origin);
+    setContextValue(harness.context, "testOrigin", origin);
+    await runInWorker<Promise<void>>(
+      harness.context,
+      "runLifecycleTask(() => resumePreviewAfterPermission(testPreview.requestId, true, [testOrigin]))",
+    );
+    expect(harness.storage.managedRequests).toEqual({});
+    expect(harness.grantedOrigins.has(origin)).toBe(false);
+  });
+
+  it("collects path-scoped cookies without widening the requested host", async () => {
+    const harness = createWorkerHarness({
+      cookies: [
+        {
+          name: "path-session",
+          value: "path-secret",
+          domain: "app.example.com",
+          hostOnly: true,
+          path: "/account",
+          secure: true,
+          httpOnly: true,
+          sameSite: "lax",
+          session: true,
+          storeId: "0",
+        },
+        {
+          name: "other-session",
+          value: "other-secret",
+          domain: "other.example.com",
+          hostOnly: true,
+          path: "/",
+          secure: true,
+          httpOnly: true,
+          sameSite: "lax",
+          session: true,
+          storeId: "0",
+        },
+      ],
+    });
+    for (let turn = 0; turn < 3; turn += 1) await new Promise(setImmediate);
+    setContextValue(harness.context, "testTargets", ["https://app.example.com"]);
+
+    const cookies = await runInWorker<Promise<Array<Record<string, unknown>>>>(
+      harness.context,
+      "collectCookies(testTargets)",
+    );
+
+    expect(cookies.map(({ name }) => name)).toEqual(["path-session"]);
+    expect(harness.cookieQueries).toEqual([{}]);
+  });
+
+  it("includes Secure cookies for trustworthy HTTP loopback targets only", async () => {
+    const harness = createWorkerHarness();
+    for (let turn = 0; turn < 3; turn += 1) await new Promise(setImmediate);
+    setContextValue(harness.context, "testSecureCookie", {
+      domain: "localhost",
+      hostOnly: true,
+      secure: true,
+    });
+    setContextValue(harness.context, "testLoopbackTargets", [
+      "http://localhost:41739/",
+      "http://app.localhost:41739/",
+      "http://127.0.0.1:41739/",
+      "http://127.42.0.9:41739/",
+      "http://[::1]:41739/",
+    ]);
+
+    const allowed = runInWorker<boolean[]>(
+      harness.context,
+      `testLoopbackTargets.map((targetUrl) => {
+        const hostname = new URL(targetUrl).hostname.replace(/^\\[|\\]$/gu, "");
+        return cookieMatchesTarget({ ...testSecureCookie, domain: hostname }, targetUrl);
+      })`,
+    );
+    expect(allowed).toEqual([true, true, true, true, true]);
+
+    expect(
+      runInWorker<boolean>(
+        harness.context,
+        'cookieMatchesTarget({ ...testSecureCookie, domain: "192.168.1.2" }, "http://192.168.1.2/")',
+      ),
+    ).toBe(false);
+    expect(
+      runInWorker<boolean>(
+        harness.context,
+        'cookieMatchesTarget({ ...testSecureCookie, domain: "localhost.example.com" }, "http://localhost.example.com/")',
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores expired auxiliary pairing challenges and keeps saved tokens on unauthenticated errors", async () => {
+    const token = "saved-extension-token-that-must-survive";
+    const harness = createWorkerHarness({ initialStorage: { token } });
+    for (let turn = 0; turn < 3; turn += 1) await new Promise(setImmediate);
+    setContextValue(harness.context, "testExpiredPairing", {
+      pairingId: "11111111-1111-4111-8111-111111111111",
+      expiresAt: Date.now() - 1,
+    });
+
+    await expect(
+      runInWorker<Promise<void>>(
+        harness.context,
+        "Promise.resolve(acceptPairingChallenge(testExpiredPairing))",
+      ),
+    ).resolves.toBeUndefined();
+    expect(runInWorker<unknown>(harness.context, "pairingChallenge")).toBeNull();
+
+    setContextValue(harness.context, "testCurrentPairing", {
+      pairingId: "22222222-2222-4222-8222-222222222222",
+      expiresAt: Date.now() + 60_000,
+    });
+    await runInWorker<Promise<void>>(
+      harness.context,
+      "Promise.resolve(acceptPairingChallenge(testCurrentPairing))",
+    );
+    await runInWorker<Promise<void>>(
+      harness.context,
+      "Promise.resolve(acceptPairingChallenge(testExpiredPairing))",
+    );
+    expect(runInWorker<unknown>(harness.context, "pairingChallenge")).toEqual(
+      expect.objectContaining({ pairingId: "22222222-2222-4222-8222-222222222222" }),
+    );
+
+    setContextValue(
+      harness.context,
+      "testUnauthenticatedError",
+      JSON.stringify({
+        protocolVersion: 1,
+        type: "error",
+        code: "authentication_failed",
+        message: "Untrusted local peer",
+      }),
+    );
+    await runInWorker<Promise<void>>(
+      harness.context,
+      "handleServerMessage(testUnauthenticatedError)",
+    );
+    expect(harness.storage.token).toBe(token);
+  });
+
+  it("exports only cookie identities included in the preview", async () => {
+    const harness = createWorkerHarness();
+    const previewed = {
+      name: "session",
+      value: "refreshed-value",
+      domain: "app.example.com",
+      hostOnly: true,
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "lax",
+      session: true,
+      storeId: "0",
+    };
+    const addedAfterPreview = { ...previewed, name: "new-sensitive-cookie", value: "new-value" };
+    setContextValue(harness.context, "testCookies", [previewed, addedAfterPreview]);
+    setContextValue(harness.context, "testRecord", {
+      previewCookieKeys: ["0\u0000session\u0000app.example.com\u0000/\u0000"],
+    });
+    setContextValue(harness.context, "testSelected", new Set(["app.example.com"]));
+
+    const cookies = runInWorker<Array<Record<string, unknown>>>(
+      harness.context,
+      "filterCookiesForCommit(testCookies, testRecord, testSelected)",
+    );
+
+    expect(cookies.map(({ name, value }) => ({ name, value }))).toEqual([
+      { name: "session", value: "refreshed-value" },
+    ]);
   });
 });

@@ -3,6 +3,7 @@ import { createComputerUseDriver } from "./drivers";
 import type { ComputerUseDriver } from "./mcp/types";
 import {
   StreamableHttpMcpIngress,
+  type McpLaunchContextIdentityResolver,
   type StreamableHttpMcpIngressInfo,
 } from "../mcp/StreamableHttpMcpIngress";
 import {
@@ -25,19 +26,22 @@ export type ComputerUseActivityEvent =
 export interface ComputerUseMcpIngressOptions {
   driver?: ComputerUseDriver;
   onActivity?: (event: ComputerUseActivityEvent) => void;
+  resolveLaunchContextIdentity: McpLaunchContextIdentityResolver;
 }
 
 export class ComputerUseMcpIngress {
   private readonly driver: ComputerUseDriver;
   private readonly ingress: StreamableHttpMcpIngress<ToolContext>;
 
-  constructor(private readonly options: ComputerUseMcpIngressOptions = {}) {
+  constructor(private readonly options: ComputerUseMcpIngressOptions) {
     this.driver = options.driver ?? createComputerUseDriver();
     this.ingress = new StreamableHttpMcpIngress<ToolContext>({
       // Computer-use drives the host's real mouse/keyboard/windows, so the ingress
       // must never be reachable off the machine — bind loopback only (unlike the
       // browser ingress, which binds 0.0.0.0 for WSL reachability).
       bindHost: "127.0.0.1",
+      launchContextAudience: "computer-use",
+      resolveLaunchContextIdentity: options.resolveLaunchContextIdentity,
       serverInfo: { name: "computer_use", version: "0.1.0" },
       instructions: COMPUTER_USE_MCP_INSTRUCTIONS,
       tools: TOOLS,

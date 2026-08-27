@@ -1,7 +1,8 @@
+import { createHmac } from "node:crypto";
 import { request } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
-import { createMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
+import { createMcpLaunchContextToken, type McpLaunchContext } from "@/shared/mcpLaunchContext";
 import {
   StreamableHttpMcpIngress,
   type StreamableHttpMcpIngressInfo,
@@ -28,6 +29,7 @@ function makeScopedIngress(): StreamableHttpMcpIngress<RoutedContext> {
   return new StreamableHttpMcpIngress<RoutedContext>({
     bindHost: "127.0.0.1",
     launchContextAudience: "browser",
+    resolveLaunchContextIdentity: async (context) => context.identity,
     serverInfo: { name: "scoped", version: "0.0.0" },
     instructions: "scoped",
     tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
@@ -46,9 +48,9 @@ interface RoutedContext {
   identity: McpThreadIdentity;
 }
 
-function makeProviderSessionIngress(
-  resolveProviderSessionIdentity: (
-    providerSessionId: string,
+function makeRoutedIngress(
+  resolveLaunchContextIdentity: (
+    context: import("@/shared/mcpLaunchContext").McpLaunchContext,
   ) => Promise<McpThreadIdentity | undefined>,
 ) {
   const dispatchTool = vi.fn<
@@ -62,8 +64,8 @@ function makeProviderSessionIngress(
     identity: ctx.identity,
   }));
   const options: StreamableHttpMcpIngressOptions<RoutedContext> & {
-    resolveProviderSessionIdentity(
-      providerSessionId: string,
+    resolveLaunchContextIdentity(
+      context: import("@/shared/mcpLaunchContext").McpLaunchContext,
     ): Promise<McpThreadIdentity | undefined>;
   } = {
     bindHost: "127.0.0.1",
@@ -72,7 +74,7 @@ function makeProviderSessionIngress(
     instructions: "routed",
     tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
     isKnownToolName: (name) => name === "noop",
-    resolveProviderSessionIdentity,
+    resolveLaunchContextIdentity,
     buildContext: (identity) => ({ identity }),
     dispatchTool,
     formatToolResult: (_name, result) => ({
@@ -85,12 +87,15 @@ function makeProviderSessionIngress(
   };
 }
 
-async function callWithProviderSession(
+async function callWithForgedProviderSession(
   info: StreamableHttpMcpIngressInfo,
   providerSessionId: string,
   query = "",
 ) {
-  const launchToken = createMcpLaunchContextToken(info.token, "app-controls");
+  const launchToken = createMcpLaunchContextToken(info.token, "app-controls", {
+    threadId: "thread-1",
+    title: "Trusted caller",
+  });
   const response = await fetch(`${info.url}/mcp${query}`, {
     method: "POST",
     headers: {
@@ -110,6 +115,20 @@ async function callWithProviderSession(
   return (await response.json()) as {
     result: { isError?: boolean; content: Array<{ type: "text"; text: string }> };
   };
+}
+
+function legacyProviderBindingToken(rootToken: string, providerBindingId: string): string {
+  const encoded = Buffer.from(
+    JSON.stringify({
+      v: 1,
+      audience: "app-controls",
+      routing: "provider-session",
+      providerBindingId,
+    }),
+    "utf8",
+  ).toString("base64url");
+  const signature = createHmac("sha256", rootToken).update(encoded).digest("base64url");
+  return `yspace-mcp-v1.${encoded}.${signature}`;
 }
 
 /**
@@ -227,21 +246,20 @@ describe("StreamableHttpMcpIngress auth + host guards", () => {
   });
 });
 
-describe("StreamableHttpMcpIngress trusted provider-session identity", () => {
-  it("resolves identity and strips the private routing argument before dispatch", async () => {
-    const resolver = vi.fn<(providerSessionId: string) => Promise<McpThreadIdentity | undefined>>(
-      async (providerSessionId) =>
-        providerSessionId === "session-trusted"
-          ? { threadId: "thread-1", title: "Trusted caller" }
-          : undefined,
+describe("StreamableHttpMcpIngress thread-bound launch identity", () => {
+  it("strips a forged provider session id and dispatches as the signed task", async () => {
+    const resolver = vi.fn<(context: McpLaunchContext) => Promise<McpThreadIdentity | undefined>>(
+      async (context) => context.identity,
     );
-    const routed = makeProviderSessionIngress(resolver);
+    const routed = makeRoutedIngress(resolver);
     try {
       const info = await routed.ingress.start();
-      const body = await callWithProviderSession(info, "session-trusted");
+      const body = await callWithForgedProviderSession(info, "session-owned-by-thread-2");
 
       expect(body.result.isError).toBeUndefined();
-      expect(resolver).toHaveBeenCalledWith("session-trusted");
+      expect(resolver).toHaveBeenCalledWith(
+        expect.objectContaining({ identity: { threadId: "thread-1", title: "Trusted caller" } }),
+      );
       expect(routed.dispatchTool).toHaveBeenCalledWith(
         "noop",
         { value: "kept" },
@@ -252,29 +270,17 @@ describe("StreamableHttpMcpIngress trusted provider-session identity", () => {
     }
   });
 
-  it("fails closed when the provider session is stale", async () => {
-    const resolver = vi.fn<() => Promise<McpThreadIdentity | undefined>>(async () => undefined);
-    const routed = makeProviderSessionIngress(resolver);
-    try {
-      const info = await routed.ingress.start();
-      const body = await callWithProviderSession(info, "session-stale");
-
-      expect(body.result.isError).toBe(true);
-      expect(resolver).toHaveBeenCalledWith("session-stale");
-      expect(routed.dispatchTool).not.toHaveBeenCalled();
-    } finally {
-      routed.ingress.dispose();
-    }
-  });
-
-  it("fails closed when a provider-routed tool call omits its private session id", async () => {
-    const resolver = vi.fn<() => Promise<McpThreadIdentity | undefined>>(async () => ({
-      threadId: "thread-1",
+  it("rejects a correctly signed legacy shared-directory binding token", async () => {
+    const resolver = vi.fn<() => Promise<McpThreadIdentity>>(async () => ({
+      threadId: "thread-2",
     }));
-    const routed = makeProviderSessionIngress(resolver);
+    const routed = makeRoutedIngress(resolver);
     try {
       const info = await routed.ingress.start();
-      const launchToken = createMcpLaunchContextToken(info.token, "app-controls");
+      const launchToken = legacyProviderBindingToken(
+        info.token,
+        "opencode-gui:shared-project-binding",
+      );
       const response = await fetch(`${info.url}/mcp`, {
         method: "POST",
         headers: {
@@ -285,12 +291,14 @@ describe("StreamableHttpMcpIngress trusted provider-session identity", () => {
           jsonrpc: "2.0",
           id: 1,
           method: "tools/call",
-          params: { name: "noop", arguments: {} },
+          params: {
+            name: "noop",
+            arguments: { [PROVIDER_SESSION_ID_ARG]: "session-owned-by-thread-2" },
+          },
         }),
       });
-      const body = (await response.json()) as { result: { isError?: boolean } };
 
-      expect(body.result.isError).toBe(true);
+      expect(response.status).toBe(401);
       expect(resolver).not.toHaveBeenCalled();
       expect(routed.dispatchTool).not.toHaveBeenCalled();
     } finally {
@@ -298,15 +306,52 @@ describe("StreamableHttpMcpIngress trusted provider-session identity", () => {
     }
   });
 
-  it("enforces disabled tools returned by trusted provider-session resolution", async () => {
-    const resolver = vi.fn<() => Promise<McpThreadIdentity | undefined>>(async () => ({
+  it("rejects a signed thread credential after server-side liveness is revoked", async () => {
+    let live = true;
+    const routed = new StreamableHttpMcpIngress<RoutedContext>({
+      bindHost: "127.0.0.1",
+      launchContextAudience: "browser",
+      resolveLaunchContextIdentity: async (context) => (live ? context.identity : undefined),
+      serverInfo: { name: "revocable", version: "0.0.0" },
+      instructions: "revocable",
+      tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
+      isKnownToolName: (name) => name === "noop",
+      buildContext: (identity) => ({ identity }),
+      dispatchTool: async () => ({}),
+      formatToolResult: () => ({ content: [{ type: "text", text: "ok" }] }),
+    });
+    try {
+      const info = await routed.start();
+      const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+        threadId: "thread-revoked",
+      });
+      const call = () =>
+        fetch(`${info.url}/mcp`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${launchToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        });
+
+      expect((await call()).status).toBe(200);
+      live = false;
+      expect((await call()).status).toBe(401);
+    } finally {
+      routed.dispose();
+    }
+  });
+
+  it("enforces disabled tools returned by live supervisor revalidation", async () => {
+    const resolver = vi.fn<() => Promise<McpThreadIdentity>>(async () => ({
       threadId: "thread-1",
       disabledTools: ["noop"],
     }));
-    const routed = makeProviderSessionIngress(resolver);
+    const routed = makeRoutedIngress(resolver);
     try {
       const info = await routed.ingress.start();
-      const body = await callWithProviderSession(info, "session-disabled");
+      const body = await callWithForgedProviderSession(info, "session-owned-by-thread-2");
 
       expect(body.result.isError).toBe(true);
       expect(routed.dispatchTool).not.toHaveBeenCalled();
@@ -316,11 +361,10 @@ describe("StreamableHttpMcpIngress trusted provider-session identity", () => {
   });
 
   it("keeps the signed launch identity authoritative over spoofed URL metadata", async () => {
-    const resolver = vi.fn<() => Promise<McpThreadIdentity | undefined>>(async () => ({
-      threadId: "provider-thread",
-      title: "Provider caller",
-    }));
-    const routed = makeProviderSessionIngress(resolver);
+    const resolver = vi.fn<(context: McpLaunchContext) => Promise<McpThreadIdentity | undefined>>(
+      async (context) => context.identity,
+    );
+    const routed = makeRoutedIngress(resolver);
     try {
       const info = await routed.ingress.start();
       const launchToken = createMcpLaunchContextToken(info.token, "app-controls", {
@@ -351,7 +395,11 @@ describe("StreamableHttpMcpIngress trusted provider-session identity", () => {
       };
 
       expect(body.result.isError).toBeUndefined();
-      expect(resolver).not.toHaveBeenCalled();
+      expect(resolver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: { threadId: "trusted-thread", title: "Trusted caller" },
+        }),
+      );
       expect(routed.dispatchTool).toHaveBeenCalledWith(
         "noop",
         { value: "kept" },

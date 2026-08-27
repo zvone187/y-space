@@ -27,14 +27,15 @@ export function resolveOpenCodeSessionDirectory(location: ProjectLocation): stri
   }
 }
 
-function poolKey(location: ProjectLocation): string {
+function poolKey(location: ProjectLocation, serverIsolationKey?: string): string {
+  const isolationSuffix = serverIsolationKey ? `:isolated:${serverIsolationKey}` : "";
   switch (location.kind) {
     case "windows":
-      return "windows";
+      return `windows${isolationSuffix}`;
     case "wsl":
-      return `wsl:${location.distro}`;
+      return `wsl:${location.distro}${isolationSuffix}`;
     case "posix":
-      return "posix";
+      return `posix${isolationSuffix}`;
   }
 }
 
@@ -189,11 +190,9 @@ async function createLegacySdkClient(
 }
 
 async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSnapshot> {
-  // The shared process must load the Poracode plugin before it starts. Besides
-  // lifecycle hooks for terminal launches, the plugin injects the trusted
-  // provider session id used to route Crossagents calls from pooled GUI
-  // sessions. Installing after `opencode serve` starts is too late because its
-  // plugin set is fixed for the lifetime of the shared process.
+  // The process must load the Poracode lifecycle plugin before it starts.
+  // Installing after `opencode serve` starts is too late because its plugin
+  // set is fixed for the lifetime of the process.
   await installSharedServerPlugin(projectLocation);
   const resolvedExecPath = resolveAgentBinaryPath(projectLocation, "opencode");
   const username = "opencode";
@@ -202,7 +201,6 @@ async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSna
   const command = buildOpenCodeServerCommand(projectLocation, resolvedExecPath, {
     OPENCODE_SERVER_USERNAME: username,
     OPENCODE_SERVER_PASSWORD: password,
-    PORACODE_OPENCODE_SESSION_ROUTING: "1",
   });
   const handle = spawnOpenCodeServer(command);
 
@@ -230,6 +228,12 @@ async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSna
 export interface AcquireOpenCodeServerInput {
   projectLocation: ProjectLocation;
   mcpServers?: readonly ResolvedMcpServer[];
+  /**
+   * Isolate provider-global MCP state and credentials for one Y Space task.
+   * GUI sessions always set this to their thread id; terminal/probe callers
+   * omit it and retain the lightweight runtime-wide pool.
+   */
+  serverIsolationKey?: string;
 }
 
 async function addMcpServers(
@@ -306,7 +310,7 @@ async function acquireOpenCodeServerInner(
   input: AcquireOpenCodeServerInput,
   retryMcpConnectionLoss: boolean,
 ): Promise<AcquiredOpenCodeServer> {
-  const key = poolKey(input.projectLocation);
+  const key = poolKey(input.projectLocation, input.serverIsolationKey);
   let entry = pool.get(key);
 
   if (!entry) {

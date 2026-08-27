@@ -27,7 +27,9 @@ function createContext(): ToolContext {
         ],
         activeTabId: "tab-1",
       }),
-    } as ToolContext["manager"],
+      getTab: () => ({ tabId: "tab-1" }),
+      getActiveTab: () => ({ tabId: "tab-1" }),
+    } as unknown as ToolContext["manager"],
   };
 }
 
@@ -205,6 +207,68 @@ const ROUTING_ARGS: Record<string, Record<string, unknown>> = {
 };
 
 describe("browser MCP tool registry", () => {
+  it("hides sensitive integration tabs and rejects agent mutations against them", async () => {
+    const safeTab = {
+      tabId: "safe-tab",
+      url: "https://example.test/",
+      title: "Example",
+      loading: false,
+      canGoBack: false,
+      canGoForward: false,
+      devToolsOpen: false,
+    };
+    const sensitiveTab = {
+      ...safeTab,
+      tabId: "oauth-tab",
+      url: "about:blank",
+      title: "Connecting…",
+      loading: true,
+    };
+    const manager = {
+      snapshot: () => ({
+        tabs: [safeTab, sensitiveTab],
+        activeTabId: sensitiveTab.tabId,
+      }),
+      getTab: (tabId: string) => (tabId === safeTab.tabId ? safeTab : null),
+      getActiveTab: () => null,
+      ensureTabReady: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      setActiveTab: vi.fn<() => void>(),
+      closeTab: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      navigate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      reload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    } as unknown as ToolContext["manager"];
+    const ctx = { allowDataAccess: false, allowEval: false, manager };
+
+    await expect(dispatchTool("list_tabs", {}, ctx)).resolves.toMatchObject({
+      tabs: [{ tabId: "safe-tab" }],
+      activeTabId: null,
+      implicitTabId: null,
+    });
+    await expect(dispatchTool("find_tabs", { query: "connecting" }, ctx)).resolves.toMatchObject({
+      tabs: [],
+    });
+    await expect(dispatchTool("activate_tab", { tabId: sensitiveTab.tabId }, ctx)).rejects.toThrow(
+      "unknown tab oauth-tab",
+    );
+    await expect(dispatchTool("close_tab", { tabId: sensitiveTab.tabId }, ctx)).rejects.toThrow(
+      "unknown tab oauth-tab",
+    );
+    await expect(
+      dispatchTool(
+        "navigate",
+        { tabId: sensitiveTab.tabId, url: "https://attacker.example/" },
+        ctx,
+      ),
+    ).rejects.toThrow("unknown tab oauth-tab");
+    await expect(dispatchTool("reload", { tabId: sensitiveTab.tabId }, ctx)).rejects.toThrow(
+      "unknown tab oauth-tab",
+    );
+    expect(manager.setActiveTab).not.toHaveBeenCalled();
+    expect(manager.closeTab).not.toHaveBeenCalled();
+    expect(manager.navigate).not.toHaveBeenCalled();
+    expect(manager.reload).not.toHaveBeenCalled();
+  });
+
   it("surfaces an API map as the first tool", async () => {
     expect(TOOLS[0]?.name).toBe("api");
     expect(isKnownToolName("api")).toBe(true);

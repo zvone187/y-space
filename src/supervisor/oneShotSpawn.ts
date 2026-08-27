@@ -8,6 +8,7 @@ import { buildAgentCommand, type CommandSpec } from "./agents/base";
 import { ensureNodePtySpawnHelperExecutable } from "./nodePty";
 import { markOneShotOutput, stripOneShotBanner } from "./oneShotOutputMarker";
 import { processEnvRecord } from "./processEnv";
+import { sanitizePrivilegedChildEnvironment } from "./privilegedChildEnvironment";
 
 export interface OneShotSpecOptions {
   /**
@@ -96,7 +97,9 @@ export function spawnAgent(
       windowsHide: true,
       timeout: timeoutMs,
       ...(spec.cwd ? { cwd: spec.cwd } : {}),
-      ...(spec.env ? { env: { ...process.env, ...spec.env } } : {}),
+      ...(spec.env
+        ? { env: sanitizePrivilegedChildEnvironment({ ...process.env, ...spec.env }) }
+        : {}),
     });
 
     const onAbort = () => {
@@ -156,7 +159,7 @@ export function spawnAgentPty(
         cols: 120,
         rows: 30,
         ...(spec.cwd ? { cwd: spec.cwd } : {}),
-        env: { ...processEnvRecord(), ...spec.env },
+        env: sanitizePrivilegedChildEnvironment({ ...processEnvRecord(), ...spec.env }),
       });
     } catch (error) {
       reject(error);

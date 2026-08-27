@@ -676,7 +676,7 @@
         {
           "kind": "added",
           "label": "PWA",
-          "text": "Take your work anywhere with the Y Space PWA at app.poracode.com — pair it with your desktop over your local network or an SSH connection to follow live threads, read terminal output, and send messages from a phone or any browser, with dynamic port forwarding and native iOS and Android betas on the way."
+          "text": "Take your work anywhere with the self-hosted Y Space companion — pair it with your desktop over your local network or an SSH connection to follow live threads, read terminal output, and send messages from a phone or browser, with dynamic port forwarding and native iOS and Android betas on the way."
         },
         {
           "kind": "added",

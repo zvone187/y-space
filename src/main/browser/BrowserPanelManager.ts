@@ -31,20 +31,6 @@ const AUTOMATION_GRACE_MS = 45_000;
 const INTERNAL_BROWSER_PROTOCOLS = new Set(["http:", "https:"]);
 const SYSTEM_BROWSER_PROTOCOLS = new Set(["mailto:"]);
 const REDACTED_INTEGRATION_URL = "about:blank";
-const REDACTED_INTEGRATION_TITLE = "Connecting\u2026";
-const SENSITIVE_INTEGRATION_QUERY_KEYS = new Set([
-  "access_token",
-  "client_secret",
-  "code",
-  "code_challenge",
-  "code_verifier",
-  "connectlink",
-  "oauth_token",
-  "refresh_token",
-  "session_token",
-  "state",
-  "token",
-]);
 
 interface PersistedTabsState {
   tabs: Array<{ url: string; title: string; groupId?: string }>;
@@ -84,7 +70,7 @@ interface CreateTabOptions {
 }
 
 interface SensitiveIntegrationTabState {
-  privateUrl: string;
+  privateUrl: string | null;
   navigationStarted: boolean;
 }
 
@@ -232,10 +218,9 @@ export class BrowserPanelManager {
     this.clearPickerShortcut();
     this.loginCoordinator.cancelLoginConfirmations();
     for (const t of this.tabs) {
-      void t.destroy();
+      void t.destroy().finally(() => this.sensitiveIntegrationTabs.delete(t.tabId));
     }
     this.tabs = [];
-    this.sensitiveIntegrationTabs.clear();
     this.activeTabId = null;
     this.hosts.clear();
   }
@@ -416,17 +401,14 @@ export class BrowserPanelManager {
       return this.openSystemBrowser(url.toString());
     }
 
-    const payload = { url: url.toString(), activate: true, reveal: true };
-    const create = isSensitiveIntegrationUrl(url)
-      ? this.createSensitiveIntegrationTab(payload)
-      : this.createTab(payload);
-    void create.catch(() => {});
+    void this.createTab({ url: url.toString(), activate: true, reveal: true }).catch(() => {});
     return true;
   }
 
   private toInfo(t: BrowserTab): BrowserTabInfo {
     const s = this.publicSnapshot(t, t.snapshot());
     const groupId = this.tabGroups.groupIdForTab(s.tabId);
+    const sensitiveIntegration = this.sensitiveIntegrationTabs.has(s.tabId);
     return {
       tabId: s.tabId,
       url: s.url,
@@ -437,6 +419,7 @@ export class BrowserPanelManager {
       devToolsOpen: s.devToolsOpen,
       ...(s.faviconUrl ? { faviconUrl: s.faviconUrl } : {}),
       ...(groupId ? { groupId } : {}),
+      ...(sensitiveIntegration ? { sensitiveIntegration: true } : {}),
     };
   }
 
@@ -455,6 +438,14 @@ export class BrowserPanelManager {
 
   setGroupCollapsed(groupId: string, collapsed: boolean): void {
     if (!this.tabGroups.setCollapsed(groupId, collapsed)) return;
+    if (
+      collapsed &&
+      this.activeTabId &&
+      this.tabGroups.groupIdForTab(this.activeTabId) === groupId
+    ) {
+      const activeIndex = this.tabs.findIndex((tab) => tab.tabId === this.activeTabId);
+      this.activeTabId = this.visibleTabIdAtOrNear(activeIndex + 1);
+    }
     this.emitState();
     this.schedulePersist();
   }
@@ -528,9 +519,11 @@ export class BrowserPanelManager {
     }
     tab.attach(wc);
     const sensitive = this.sensitiveIntegrationTabs.get(tabId);
-    if (sensitive && !sensitive.navigationStarted) {
+    if (sensitive && !sensitive.navigationStarted && sensitive.privateUrl) {
+      const privateUrl = sensitive.privateUrl;
       sensitive.navigationStarted = true;
-      void tab.loadURL(sensitive.privateUrl).catch(() => {
+      sensitive.privateUrl = null;
+      void tab.loadURL(privateUrl).catch(() => {
         // Keep the one-use URL redacted even when navigation fails. The user
         // can safely close the blank integration tab and try again.
       });
@@ -627,7 +620,9 @@ export class BrowserPanelManager {
     return {
       tabId: tab.tabId,
       url: REDACTED_INTEGRATION_URL,
-      title: REDACTED_INTEGRATION_TITLE,
+      // Keep localized presentation in the renderer. Main exposes only the
+      // semantic sensitive-tab flag alongside a blank, non-secret title.
+      title: "",
       loading: true,
       canGoBack: false,
       canGoForward: false,
@@ -636,21 +631,11 @@ export class BrowserPanelManager {
   }
 
   private onTabUpdate(tab: BrowserTab, snapshot: BrowserTabSnapshot): void {
-    const sensitive = this.sensitiveIntegrationTabs.get(tab.tabId);
-    if (sensitive) {
-      if (isSafeIntegrationLandingUrl(snapshot.url, sensitive.privateUrl)) {
-        // Drop the private state before clearing history. BrowserTab may emit a
-        // synchronous update from clearHistory(); that update is now safe.
-        this.sensitiveIntegrationTabs.delete(tab.tabId);
-        tab.clearHistory();
-        const landing = tab.snapshot();
-        this.emit({ type: "tab-updated", tab: { ...landing } });
-        if (!landing.loading) this.history.record(landing.url, landing.title, Date.now());
-        this.schedulePersist();
-        return;
-      }
-
-      this.emit({ type: "tab-updated", tab: { ...this.publicSnapshot(tab, snapshot) } });
+    if (this.sensitiveIntegrationTabs.has(tab.tabId)) {
+      this.emit({
+        type: "tab-updated",
+        tab: { ...this.publicSnapshot(tab, snapshot), sensitiveIntegration: true },
+      });
       this.schedulePersist();
       return;
     }
@@ -692,18 +677,54 @@ export class BrowserPanelManager {
     if (idx < 0) return;
     const [tab] = this.tabs.splice(idx, 1);
     if (!tab) return;
-    this.sensitiveIntegrationTabs.delete(tabId);
     for (const [threadId, activeTabId] of this.activeAgentTabByThread) {
       if (activeTabId === tabId) this.activeAgentTabByThread.delete(threadId);
     }
-    await tab.destroy();
+    try {
+      await tab.destroy();
+    } finally {
+      this.sensitiveIntegrationTabs.delete(tabId);
+    }
     this.tabGroups.removeTab(tabId);
     if (this.activeTabId === tabId) {
-      const next = this.tabs[idx] ?? this.tabs[idx - 1] ?? this.tabs[0];
-      this.activeTabId = next?.tabId ?? null;
+      this.activeTabId = this.visibleTabIdAtOrNear(idx);
     }
     this.emitState();
     this.schedulePersist();
+  }
+
+  /**
+   * Pick the nearest tab that is actually represented by a focusable tab in
+   * the strip. Prefer the tab at/to the right of `index`, then walk left.
+   */
+  private visibleTabIdAtOrNear(index: number): string | null {
+    const collapsedGroupIds = new Set(
+      this.tabGroups
+        .snapshot()
+        .filter((group) => group.collapsed)
+        .map((group) => group.id),
+    );
+    const isVisible = (tab: BrowserTab) => {
+      const groupId = this.tabGroups.groupIdForTab(tab.tabId);
+      return !groupId || !collapsedGroupIds.has(groupId);
+    };
+    for (
+      let candidateIndex = Math.max(0, index);
+      candidateIndex < this.tabs.length;
+      candidateIndex += 1
+    ) {
+      const candidate = this.tabs[candidateIndex];
+      if (candidate && isVisible(candidate)) return candidate.tabId;
+    }
+    for (
+      let candidateIndex = Math.min(index - 1, this.tabs.length - 1);
+      candidateIndex >= 0;
+      candidateIndex -= 1
+    ) {
+      const candidate = this.tabs[candidateIndex];
+      if (candidate && isVisible(candidate)) return candidate.tabId;
+    }
+    return null;
   }
 
   async navigate(tabId: string, url: string): Promise<void> {
@@ -1009,26 +1030,6 @@ function parseInternalBrowserUrl(rawUrl: string): URL | null {
   } catch {
     return null;
   }
-}
-
-function isSensitiveIntegrationUrl(url: URL): boolean {
-  for (const key of url.searchParams.keys()) {
-    if (SENSITIVE_INTEGRATION_QUERY_KEYS.has(key.toLowerCase())) return true;
-  }
-  const fragment = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
-  if (fragment.includes("=")) {
-    const fragmentParams = new URLSearchParams(fragment);
-    for (const key of fragmentParams.keys()) {
-      if (SENSITIVE_INTEGRATION_QUERY_KEYS.has(key.toLowerCase())) return true;
-    }
-  }
-  return false;
-}
-
-function isSafeIntegrationLandingUrl(rawUrl: string, privateUrl: string): boolean {
-  if (!rawUrl || rawUrl === REDACTED_INTEGRATION_URL || rawUrl === privateUrl) return false;
-  const url = parseInternalBrowserUrl(rawUrl);
-  return url !== null && !isSensitiveIntegrationUrl(url);
 }
 
 function isEscapeKeyDown(input: Electron.Input): boolean {

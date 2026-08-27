@@ -939,6 +939,51 @@ describe("Poracode app control tools — settings", () => {
     expect(stdioServer?.transport.args).toEqual(["--api-key=«redacted»", "--verbose"]);
   });
 
+  it("get_settings masks sequential secret argv, headers, and URL userinfo", async () => {
+    const settings = settingsWithSecret();
+    const http = settings.mcpServers[0]!;
+    const stdio = settings.mcpServers[1]!;
+    if (http.transport.type !== "http" || stdio.transport.type !== "stdio") {
+      throw new Error("invalid fixture");
+    }
+    http.transport.url =
+      "https://user:password-secret@example.test/mcp?token=query-secret#fragment-secret";
+    stdio.transport.args = [
+      "--api-key",
+      "sequential-api-secret",
+      "--header",
+      "Authorization: Bearer header-secret",
+      "-H",
+      "X-Api-Key: short-header-secret",
+      "--verbose",
+    ];
+
+    const { ctx } = context({ settings });
+    const result = (await dispatchTool("get_settings", {}, ctx)) as {
+      settings: { mcpServers: Array<{ transport: Record<string, unknown> }> };
+    };
+    const serialized = JSON.stringify(result);
+    for (const secret of [
+      "password-secret",
+      "query-secret",
+      "fragment-secret",
+      "sequential-api-secret",
+      "header-secret",
+      "short-header-secret",
+    ]) {
+      expect(serialized).not.toContain(secret);
+    }
+    expect(result.settings.mcpServers[1]?.transport.args).toEqual([
+      "--api-key",
+      "«redacted»",
+      "--header",
+      "«redacted»",
+      "-H",
+      "«redacted»",
+      "--verbose",
+    ]);
+  });
+
   it("get_settings section=mcpServers returns the same redacted servers", async () => {
     const { ctx } = context({ settings: settingsWithSecret() });
     const result = (await dispatchTool("get_settings", { section: "mcpServers" }, ctx)) as {

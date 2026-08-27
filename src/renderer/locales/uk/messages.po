@@ -23,7 +23,7 @@ msgstr "…"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "(disconnected)"
-msgstr ""
+msgstr "(від’єднано)"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -186,6 +186,12 @@ msgstr "{0} о {time}"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} authenticated."
 msgstr "{0} автентифіковано."
+
+#. placeholder {0}: domain.cookieCount
+#. placeholder {1}: domain.unsupportedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "{0} cookies · {1} unsupported"
+msgstr "{0} файлів cookie · {1} без підтримки"
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
@@ -601,11 +607,11 @@ msgstr "{serverName} з {providerLabel}: {disabledLabel}"
 #. placeholder {0}: activeRequest.domains.length
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "{totalCookieCount} cookies across {0} domains"
-msgstr ""
+msgstr "{totalCookieCount} файлів cookie у {0} доменах"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "{totalUnsupportedCount} unsupported"
-msgstr ""
+msgstr "{totalUnsupportedCount} без підтримки"
 
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
@@ -663,8 +669,12 @@ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}
 msgstr "/skill-creator-poracode Створіть нову керовану навичку для {destinationLabel}."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
-msgstr "© {currentYear} Serhii Vecherenko. Усі права захищено."
+#~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
+#~ msgstr "© {currentYear} Serhii Vecherenko. Усі права захищено."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "© {currentYear} Y Space contributors. Licensed under Apache-2.0."
+msgstr "© {currentYear} Учасники Y Space. Ліцензія Apache-2.0."
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "<0/> of {matchCount}"
@@ -949,7 +959,7 @@ msgstr "Додати наявну папку"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Add and sign in"
-msgstr ""
+msgstr "Додати й увійти"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
@@ -1250,6 +1260,7 @@ msgstr "Усі рівні зусиль"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "All files"
 msgstr "Усі файли"
 
@@ -1289,7 +1300,7 @@ msgstr "Дозволити агентам читати/записувати фа
 #. placeholder {0}: account.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Allow agents to use {0}"
-msgstr ""
+msgstr "Дозволити агентам використовувати {0}"
 
 #: src/mobile/QrScanner.tsx
 msgid "Allow camera access for this site in your browser settings and try again — or enter the endpoint and token below."
@@ -1988,6 +1999,7 @@ msgid "Browser sign-in"
 msgstr "Вхід через браузер"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Browser tabs"
 msgstr "Вкладки браузера"
 
@@ -2053,7 +2065,7 @@ msgstr "за токенами"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "BYO Connect"
-msgstr ""
+msgstr "BYO Connect"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Bypass branch protection rules"
@@ -2119,7 +2131,7 @@ msgstr "Скасувати"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Cancel cookie import"
-msgstr ""
+msgstr "Скасувати імпорт файлів cookie"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 #~ msgid "Cancel new Claude profile"
@@ -2135,7 +2147,7 @@ msgstr "Скасувати новий профіль"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Cancel pairing"
-msgstr ""
+msgstr "Скасувати сполучення"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2344,7 +2356,15 @@ msgstr "Перевірки очікують виконання"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose <0>Load unpacked</0> and select the folder that opens below."
-msgstr ""
+msgstr "Виберіть <0>Завантажити розпаковане розширення</0>, а потім виберіть папку, яка відкриється нижче."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a connected browser profile before previewing cookies."
+msgstr "Перед попереднім переглядом файлів cookie виберіть підключений профіль браузера."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a cookie export"
+msgstr "Виберіть експорт файлів cookie"
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -2383,6 +2403,10 @@ msgstr "Оберіть зображення всередині теки проє
 msgid "Choose at least two candidates and enter a prompt."
 msgstr "Виберіть щонайменше двох кандидатів і введіть промпт."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose at most {MAX_TARGET_ORIGINS} origins."
+msgstr "Виберіть не більше {MAX_TARGET_ORIGINS} джерел."
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 #~ msgid "Choose automatically or override with a detected shell for new terminals."
@@ -2390,7 +2414,7 @@ msgstr "Виберіть щонайменше двох кандидатів і �
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose cookie file"
-msgstr ""
+msgstr "Вибрати файл cookie"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
@@ -2436,7 +2460,7 @@ msgstr "Виберіть тред для прикріплення"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose what to import"
-msgstr ""
+msgstr "Вибрати дані для імпорту"
 
 #: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3111,7 +3135,7 @@ msgstr "Підтверджувати видалення потоків"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Confirm disconnect"
-msgstr ""
+msgstr "Підтвердити від’єднання"
 
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3137,7 +3161,7 @@ msgstr "Підключити"
 #. placeholder {0}: app.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Connect {0}"
-msgstr ""
+msgstr "Підключити {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #~ msgid "Connect a server"
@@ -3184,7 +3208,7 @@ msgstr "Підключено"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Connected accounts"
-msgstr ""
+msgstr "Підключені облікові записи"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Connecting to the desktop browser…"
@@ -3199,6 +3223,7 @@ msgstr "Підключення..."
 #: src/renderer/components/thread/ChatPane/ChatTurnElapsed.tsx
 #: src/renderer/components/thread/ThreadDraftView.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connecting…"
 msgstr "Підключення…"
@@ -3328,6 +3353,14 @@ msgstr "Керує спареним робочим столом, поки аге
 msgid "Conversation"
 msgstr "Розмова"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Cookie exports"
+msgstr "Експорти файлів cookie"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Cookie file:"
+msgstr "Файл cookie:"
+
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
@@ -3369,7 +3402,7 @@ msgstr "Копіювати поточний URL"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Copy data from an earlier installation into Y Space. Y Space restarts and keeps a complete backup of its current data."
-msgstr ""
+msgstr "Скопіюйте дані з попередньої інсталяції до Y Space. Y Space перезапуститься та збереже повну резервну копію поточних даних."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy desktop endpoint"
@@ -3420,7 +3453,7 @@ msgstr "Копіювати відносний шлях"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
-msgstr ""
+msgstr "Скопіюйте вибрані файли cookie для входу до вбудованого браузера Y Space. Розширення призначене лише для імпорту й не може переходити між сторінками, перевіряти вміст або керувати іншим браузером."
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Copy selection"
@@ -3442,9 +3475,21 @@ msgstr "Копіювати URL"
 msgid "Could not abort the merge: {detail}"
 msgstr "Не вдалося перервати злиття: {detail}"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel browser pairing. Try again."
+msgstr "Не вдалося скасувати сполучення з браузером. Спробуйте ще раз."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel the cookie import. Try again."
+msgstr "Не вдалося скасувати імпорт файлів cookie. Спробуйте ще раз."
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not complete the merge"
 msgstr "Не вдалося завершити злиття"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not create a cookie preview. Check that the extension is connected."
+msgstr "Не вдалося створити попередній перегляд файлів cookie. Переконайтеся, що розширення підключено."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not create the project folder."
@@ -3455,22 +3500,42 @@ msgstr "Не вдалося створити папку проєкту."
 msgid "Could not extract context."
 msgstr "Не вдалося витягнути контекст."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not forget that browser profile. Try again."
+msgstr "Не вдалося видалити цей профіль браузера. Спробуйте ще раз."
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not generate commit message: {detail}"
 msgstr "Не вдалося згенерувати повідомлення коміту: {detail}"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not import the selected cookies. No cookie values were kept in this screen."
+msgstr "Не вдалося імпортувати вибрані файли cookie. На цьому екрані не збережено жодних значень cookie."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not load browser cookie-import settings."
+msgstr "Не вдалося завантажити налаштування імпорту файлів cookie браузера."
+
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Could not load connections."
-msgstr ""
+msgstr "Не вдалося завантажити підключення."
 
 #. placeholder {0}: failure.project.name
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Could not load pull requests for {0}."
 msgstr "Не вдалося завантажити pull request для {0}."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not open the extension folder. Try again."
+msgstr "Не вдалося відкрити папку розширення. Спробуйте ще раз."
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #~ msgid "Could not open this PDF."
 #~ msgstr "Не вдалося відкрити цей PDF-файл."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not preview that cookie file. Use Cookie-Editor JSON or Netscape cookies.txt."
+msgstr "Не вдалося попередньо переглянути цей файл cookie. Використовуйте Cookie-Editor JSON або Netscape cookies.txt."
 
 #: src/renderer/components/thread/ChatPane/parts/items/useReadAbsoluteFile.tsx
 msgid "Could not read file."
@@ -3489,6 +3554,10 @@ msgstr "Не вдалося ввійти до {serverName}."
 #: src/renderer/components/plugins/usePluginOauth.ts
 msgid "Could not sign out of {serverName}."
 msgstr "Не вдалося вийти з {serverName}."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not start browser pairing. Try again."
+msgstr "Не вдалося розпочати сполучення з браузером. Спробуйте ще раз."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Couldn't access the GitHub account \"{login}\". Run \"gh auth login\" and try again."
@@ -3573,7 +3642,7 @@ msgstr "Не вдалося просканувати конфігурації MC
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Couldn't schedule the legacy data import."
-msgstr ""
+msgstr "Не вдалося запланувати імпорт даних із попередньої інсталяції."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "Couldn't schedule the Y Space data import."
@@ -3697,6 +3766,10 @@ msgstr "Створення worktree…"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Credentials are configured."
 msgstr "Облікові дані налаштовано."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Credentials are managed by the Y Space environment and never exposed to agents."
+msgstr "Облікові дані керуються середовищем Y Space і ніколи не розкриваються агентам."
 
 #: src/renderer/components/providers/usageFormat.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
@@ -4408,16 +4481,16 @@ msgstr "Скасувати незбережені зміни в редактор
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect"
-msgstr ""
+msgstr "Від’єднати"
 
 #. placeholder {0}: account.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect {0}"
-msgstr ""
+msgstr "Від’єднати {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect account?"
-msgstr ""
+msgstr "Від’єднати обліковий запис?"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Disconnect server"
@@ -4425,7 +4498,7 @@ msgstr "Відключити сервер"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Disconnected"
-msgstr ""
+msgstr "Від’єднано"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Discovering coding agents…"
@@ -4577,7 +4650,7 @@ msgstr "напр. Робота"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Each one-time code expires quickly and works only on this computer."
-msgstr ""
+msgstr "Термін дії кожного одноразового коду швидко спливає, і він працює лише на цьому комп’ютері."
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
@@ -4691,7 +4764,7 @@ msgstr "Увімкнути {tool}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Enable Developer mode."
-msgstr ""
+msgstr "Увімкніть режим розробника."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4743,7 +4816,7 @@ msgstr "Вмикає <0>файли cookie</0> та <1>сховище</1>. Фай
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "End-user Pipedream MCP server named pd."
-msgstr ""
+msgstr "Сервер Pipedream MCP для кінцевих користувачів під назвою pd."
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
@@ -4805,6 +4878,10 @@ msgstr "Введіть дійсну SSH-адресу та порт."
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 #~ msgid "Enter an absolute @cursor/sdk package path, or leave this blank for automatic discovery."
 #~ msgstr "Введіть абсолютний шлях до пакета @cursor/sdk або залиште поле порожнім для автоматичного виявлення."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Enter at least one HTTP(S) origin."
+msgstr "Введіть принаймні одне джерело HTTP(S)."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter one MCP server configuration."
@@ -5052,7 +5129,7 @@ msgstr "Промпт експерименту не може бути порож�
 #. placeholder {0}: formatCountdown(model.pairingRemainingMs)
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Expires in {0}"
-msgstr ""
+msgstr "Спливає через {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "Explicit selections recorded from past delegations — they feed the routing order above. Edit the tags or remove entries to reshape it."
@@ -5299,7 +5376,7 @@ msgstr "Пошук у терміналі"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Finish connecting in the new embedded browser tab, then refresh accounts."
-msgstr ""
+msgstr "Завершіть підключення в новій вкладці вбудованого браузера, а потім оновіть облікові записи."
 
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Finish your review"
@@ -5470,12 +5547,12 @@ msgstr "Примусово перезавантажити сторінку бр�
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget"
-msgstr ""
+msgstr "Видалити"
 
 #. placeholder {0}: source.label
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget {0}"
-msgstr ""
+msgstr "Видалити {0}"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5846,7 +5923,7 @@ msgstr "Заголовки"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Healthy"
-msgstr ""
+msgstr "Працює належним чином"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Help me create a schedule. Ask for any missing details, then use the Y Space schedule controls to create it for me."
@@ -6048,7 +6125,7 @@ msgstr "Імпортувати й перезапустити"
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Import browser cookies"
-msgstr ""
+msgstr "Імпортувати файли cookie браузера"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Import conflict"
@@ -6057,7 +6134,7 @@ msgstr "Конфлікт імпорту"
 #. placeholder {0}: domain.domain
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Import cookies for {0}"
-msgstr ""
+msgstr "Імпортувати файли cookie для {0}"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6078,11 +6155,11 @@ msgstr "Імпортувати зовнішні навички"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data"
-msgstr ""
+msgstr "Імпортувати дані з попередньої інсталяції"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data again?"
-msgstr ""
+msgstr "Імпортувати дані з попередньої інсталяції ще раз?"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Import MCP servers"
@@ -6098,7 +6175,7 @@ msgstr "Імпортувати вибрані"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Import selected cookies"
-msgstr ""
+msgstr "Імпортувати вибрані файли cookie"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Import to {destinationProjectName}"
@@ -6125,6 +6202,12 @@ msgstr "Імпортувати глобально"
 #: src/renderer/components/skills/SkillImportModal.tsx
 #~ msgid "Imported {0} {1}."
 #~ msgstr "Імпортовано: {0} {1}."
+
+#. placeholder {0}: completedCounts.importedCount
+#. placeholder {1}: completedCounts.skippedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Imported {0} cookies; skipped {1}."
+msgstr "Імпортовано файлів cookie: {0}; пропущено: {1}."
 
 #. placeholder {0}: selectedSkills.length
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6158,7 +6241,7 @@ msgstr "Додати до синхронізації"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Incomplete setup"
-msgstr ""
+msgstr "Налаштування не завершено"
 
 #: src/renderer/components/plugins/PluginDetail.tsx
 msgid "Information"
@@ -6349,7 +6432,7 @@ msgstr "Встановити v{version}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Install Y Space Cookie Import"
-msgstr ""
+msgstr "Установити Y Space Cookie Import"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -6548,7 +6631,7 @@ msgstr "Залишити коментар"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Legacy data import is unavailable with a custom data folder."
-msgstr ""
+msgstr "Імпорт даних із попередньої інсталяції недоступний, якщо використовується власна папка даних."
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "Less"
@@ -6625,7 +6708,7 @@ msgstr "Завантаження облікових записів…"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Loading browser profiles…"
-msgstr ""
+msgstr "Завантаження профілів браузера…"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
@@ -7257,7 +7340,7 @@ msgstr "Дзеркалювання недоступне."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Missing configuration:"
-msgstr ""
+msgstr "Відсутня конфігурація:"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
@@ -7523,7 +7606,7 @@ msgstr "Потребує підтвердження"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Needs attention"
-msgstr ""
+msgstr "Потребує уваги"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7816,7 +7899,7 @@ msgstr "Гілки не знайдено"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "No browser profiles paired yet."
-msgstr ""
+msgstr "Ще немає сполучених профілів браузера."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserEmptyState.tsx
 msgid "No browser tab open"
@@ -7866,7 +7949,7 @@ msgstr "Сервери MCP ще не налаштовано"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "No connected accounts yet."
-msgstr ""
+msgstr "Ще немає підключених облікових записів."
 
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
@@ -7968,7 +8051,7 @@ msgstr "Вивчених виборів поки немає."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "No legacy app data was found."
-msgstr ""
+msgstr "Дані попередньої версії програми не знайдено."
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "No marketplace skills match these filters."
@@ -8161,7 +8244,7 @@ msgstr "Підтримуваних агентів не виявлено"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "No supported cookies were found for these origins."
-msgstr ""
+msgstr "Для цих джерел не знайдено підтримуваних файлів cookie."
 
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "No tags — the entry stops influencing tag affinity."
@@ -8233,7 +8316,7 @@ msgstr "Не репозиторій Git"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Not configured"
-msgstr ""
+msgstr "Не налаштовано"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Not found"
@@ -8347,7 +8430,7 @@ msgstr "Один раз: {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "One exact HTTP(S) origin per line, up to 12."
-msgstr ""
+msgstr "По одному точному джерелу HTTP(S) у рядку, щонайбільше 12."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "One Header: value pair per line"
@@ -8394,7 +8477,7 @@ msgstr "Відкрити {label}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open <0>chrome://extensions</0> in Chrome, Brave, Edge, Arc, or Chromium."
-msgstr ""
+msgstr "Відкрийте <0>chrome://extensions</0> у Chrome, Brave, Edge, Arc або Chromium."
 
 #: src/renderer/commands/registry.ts
 msgid "Open a new browser tab"
@@ -8476,7 +8559,7 @@ msgstr "Відкрити дошку експерименту"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open extension folder"
-msgstr ""
+msgstr "Відкрити папку розширення"
 
 #: src/renderer/commands/registry.ts
 msgid "Open File"
@@ -8658,7 +8741,7 @@ msgstr "Відкрити вибір моделі"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open the Y Space Cookie Import popup in your browser and approve these origins."
-msgstr ""
+msgstr "Відкрийте спливне вікно Y Space Cookie Import у своєму браузері та схваліть ці джерела."
 
 #: src/renderer/components/providers/opencode/manifest.ts
 msgid "OpenCode"
@@ -8780,7 +8863,7 @@ msgstr "Підключити"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pair a browser profile"
-msgstr ""
+msgstr "Сполучити профіль браузера"
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Pair a connection"
@@ -8801,7 +8884,7 @@ msgstr "Підключити знову"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pair browser profile"
-msgstr ""
+msgstr "Сполучити профіль браузера"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Pair with Y Space"
@@ -8809,7 +8892,7 @@ msgstr "З’єднати з Y Space"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Paired browser profiles"
-msgstr ""
+msgstr "Сполучені профілі браузера"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Paired devices"
@@ -8821,7 +8904,7 @@ msgstr "Підключення"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pairing code"
-msgstr ""
+msgstr "Код сполучення"
 
 #: src/mobile/components.tsx
 #: src/mobile/useRemoteDesktop.ts
@@ -9004,11 +9087,15 @@ msgstr "Особисте"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal MCP"
-msgstr ""
+msgstr "Особистий MCP"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal MCP sign-in did not complete."
-msgstr ""
+msgstr "Вхід до особистого MCP не завершено."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Personal Pipedream tools"
+msgstr "Особисті інструменти Pipedream"
 
 #: src/renderer/components/providers/pi/manifest.ts
 msgid "Pi"
@@ -9069,11 +9156,11 @@ msgstr "Закріплені маршрути завдань"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream Connect could not be initialized."
-msgstr ""
+msgstr "Не вдалося ініціалізувати Pipedream Connect."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
-msgstr ""
+msgstr "Облікові записи OAuth під керуванням Pipedream, доступні через автентифіковані локальні ретранслятори MCP."
 
 #: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
@@ -9279,11 +9366,11 @@ msgstr "Попередній перегляд {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview extension cookies"
-msgstr ""
+msgstr "Попередній перегляд файлів cookie розширення"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
-msgstr ""
+msgstr "У попередньому перегляді показано лише кількість для кожного домену. Нічого не копіюється, доки ви не підтвердите остаточний вибір. Для експорту з Firefox і Safari можна використовувати Cookie-Editor JSON або Netscape cookies.txt."
 
 #: src/renderer/commands/registry.ts
 msgid "Previous chat"
@@ -9823,7 +9910,7 @@ msgstr "Оновити {label}"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Refresh accounts"
-msgstr ""
+msgstr "Оновити облікові записи"
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Refresh detected agents"
@@ -10864,7 +10951,7 @@ msgstr "Пошук агентів..."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Search apps"
-msgstr ""
+msgstr "Пошук програм"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Search branches..."
@@ -10913,7 +11000,7 @@ msgstr "Пошук або введення адреси"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Search Pipedream apps"
-msgstr ""
+msgstr "Пошук програм Pipedream"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Search plugins"
@@ -11482,7 +11569,7 @@ msgstr "Вихід. Виявлені агенти оновляться післ�
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Sites to import cookies for"
-msgstr ""
+msgstr "Сайти, для яких слід імпортувати файли cookie"
 
 #: src/renderer/views/SettingsOverlay/parts/CodexProviderSettings.tsx
 msgid "Sizes shown in the Codex composer. Compaction starts automatically at 95% of the selected window. New chats default to 400k when that size is in the list."
@@ -11640,7 +11727,7 @@ msgstr "Вихідна гілка {branch} перемістилася до ст�
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Source browser profile"
-msgstr ""
+msgstr "Вихідний профіль браузера"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
@@ -11789,7 +11876,7 @@ msgstr "Запускати згорнутим"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Start pairing below, then enter the code in the extension popup."
-msgstr ""
+msgstr "Розпочніть сполучення нижче, а потім введіть код у спливному вікні розширення."
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 #~ msgid "Start remote thread"
@@ -12358,6 +12445,10 @@ msgstr "програму"
 #~ msgid "the base branch"
 #~ msgstr "базову гілку"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "The browser accepted them, but disk flush must be retried."
+msgstr "Браузер прийняв файли cookie, але запис на диск потрібно повторити."
+
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "The candidates changed after judging. Compare them again."
 msgstr "Кандидати змінилися після оцінювання. Порівняйте їх знову."
@@ -12426,11 +12517,11 @@ msgstr "Звичайна оболонка програми не змогла в�
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "The Pipedream request failed. Check your connection and configuration."
-msgstr ""
+msgstr "Запит Pipedream завершився помилкою. Перевірте підключення та конфігурацію."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "The preview failed. Reconnect the extension and try again."
-msgstr ""
+msgstr "Не вдалося створити попередній перегляд. Повторно підключіть розширення та спробуйте ще раз."
 
 #: src/renderer/state/remoteServersStore.ts
 msgid "The remote server returned no pairing credential."
@@ -12697,7 +12788,7 @@ msgstr "Це видаляє наступні повідомлення та ві�
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "This removes the Pipedream account and immediately revokes agent access through Y Space."
-msgstr ""
+msgstr "Ця дія видаляє обліковий запис Pipedream і негайно скасовує доступ агентів через Y Space."
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "This removes the schedule and its latest result from this device."
@@ -13635,7 +13726,7 @@ msgstr "Скористайтеся +, щоб створити пару безп�
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Use active embedded tab"
-msgstr ""
+msgstr "Використати активну вбудовану вкладку"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Use an existing folder"
@@ -13657,6 +13748,10 @@ msgstr "Використати конфігурацію"
 msgid "Use detected session?"
 msgstr "Використати виявлену сесію?"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Use HTTP(S) origins without usernames, passwords, paths, or private URL details."
+msgstr "Використовуйте джерела HTTP(S) без імен користувачів, паролів, шляхів або конфіденційних даних URL-адреси."
+
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Use ignore files"
@@ -13673,7 +13768,7 @@ msgstr "Використовуйте одну глобальну папку аб
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
-msgstr ""
+msgstr "Використовуйте особистий MCP для власних інструментів Pipedream або BYO Connect, щоб надати локальним агентам доступ до вибраних облікових записів програм."
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"
@@ -13957,8 +14052,6 @@ msgstr "Веб-пошук"
 msgid "Web server"
 msgstr "Веб-сервер"
 
-#. External link to the product website
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Website"
 msgstr "Вебсайт"
@@ -14370,7 +14463,7 @@ msgstr "Y Space встановить або повторно використа�
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Y Space will restart, back up its current data, and replace it with a complete copy of the legacy installation data."
-msgstr ""
+msgstr "Y Space перезапуститься, створить резервну копію поточних даних і замінить їх повною копією даних із попередньої інсталяції."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "Y Space will restart, back up its current data, and replace it with a complete copy of your Y Space data."

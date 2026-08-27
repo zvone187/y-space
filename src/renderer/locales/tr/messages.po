@@ -23,7 +23,7 @@ msgstr "…"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "(disconnected)"
-msgstr ""
+msgstr "(bağlantı kesildi)"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
@@ -186,6 +186,12 @@ msgstr "{0} saat {time}"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} authenticated."
 msgstr "{0} kimliği doğrulandı."
+
+#. placeholder {0}: domain.cookieCount
+#. placeholder {1}: domain.unsupportedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "{0} cookies · {1} unsupported"
+msgstr "{0} çerez · {1} desteklenmiyor"
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
@@ -601,11 +607,11 @@ msgstr "{providerLabel} kaynağından {serverName}: {disabledLabel}"
 #. placeholder {0}: activeRequest.domains.length
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "{totalCookieCount} cookies across {0} domains"
-msgstr ""
+msgstr "{0} alan adında toplam {totalCookieCount} çerez"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "{totalUnsupportedCount} unsupported"
-msgstr ""
+msgstr "{totalUnsupportedCount} desteklenmiyor"
 
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
@@ -663,8 +669,12 @@ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}
 msgstr "/skill-creator-poracode {destinationLabel} için yeni bir yönetilen beceri oluştur."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
-msgstr "© {currentYear} Serhii Vecherenko. Tüm hakları saklıdır."
+#~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
+#~ msgstr "© {currentYear} Serhii Vecherenko. Tüm hakları saklıdır."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "© {currentYear} Y Space contributors. Licensed under Apache-2.0."
+msgstr "© {currentYear} Y Space katkıda bulunanları. Apache-2.0 ile lisanslanmıştır."
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "<0/> of {matchCount}"
@@ -949,7 +959,7 @@ msgstr "Mevcut klasör ekle"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Add and sign in"
-msgstr ""
+msgstr "Ekle ve oturum aç"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
@@ -1250,6 +1260,7 @@ msgstr "Tüm efor düzeyleri"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "All files"
 msgstr "Tüm dosyalar"
 
@@ -1289,7 +1300,7 @@ msgstr "Aracıların çerezleri ve depolamayı okumasına/yazmasına izin ver"
 #. placeholder {0}: account.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Allow agents to use {0}"
-msgstr ""
+msgstr "Aracıların {0} kullanmasına izin ver"
 
 #: src/mobile/QrScanner.tsx
 msgid "Allow camera access for this site in your browser settings and try again — or enter the endpoint and token below."
@@ -1988,6 +1999,7 @@ msgid "Browser sign-in"
 msgstr "Tarayıcıyla oturum aç"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Browser tabs"
 msgstr "Tarayıcı sekmeleri"
 
@@ -2053,7 +2065,7 @@ msgstr "token'a göre"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "BYO Connect"
-msgstr ""
+msgstr "BYO Connect"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Bypass branch protection rules"
@@ -2119,7 +2131,7 @@ msgstr "İptal"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Cancel cookie import"
-msgstr ""
+msgstr "Çerez içe aktarmayı iptal et"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 #~ msgid "Cancel new Claude profile"
@@ -2135,7 +2147,7 @@ msgstr "Yeni profili iptal et"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Cancel pairing"
-msgstr ""
+msgstr "Eşleştirmeyi iptal et"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2344,7 +2356,15 @@ msgstr "Kontroller beklemede"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose <0>Load unpacked</0> and select the folder that opens below."
-msgstr ""
+msgstr "<0>Paketlenmemiş öğe yükle</0> seçeneğini belirleyin ve ardından aşağıda açılan klasörü seçin."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a connected browser profile before previewing cookies."
+msgstr "Çerezleri önizlemeden önce bağlı bir tarayıcı profili seçin."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a cookie export"
+msgstr "Çerez dışa aktarımını seçin"
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -2383,6 +2403,10 @@ msgstr "Proje klasörü içinden bir görsel seçin."
 msgid "Choose at least two candidates and enter a prompt."
 msgstr "En az iki aday seçin ve bir istem girin."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose at most {MAX_TARGET_ORIGINS} origins."
+msgstr "En fazla {MAX_TARGET_ORIGINS} kaynak seçin."
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 #~ msgid "Choose automatically or override with a detected shell for new terminals."
@@ -2390,7 +2414,7 @@ msgstr "En az iki aday seçin ve bir istem girin."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose cookie file"
-msgstr ""
+msgstr "Çerez dosyası seç"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
@@ -2436,7 +2460,7 @@ msgstr "Eklenecek konuyu seçin"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose what to import"
-msgstr ""
+msgstr "İçe aktarılacakları seç"
 
 #: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3111,7 +3135,7 @@ msgstr "İş parçacıklarını silmeden önce onayla"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Confirm disconnect"
-msgstr ""
+msgstr "Bağlantıyı kesmeyi onayla"
 
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3137,7 +3161,7 @@ msgstr "Bağlan"
 #. placeholder {0}: app.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Connect {0}"
-msgstr ""
+msgstr "{0} hizmetine bağlan"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #~ msgid "Connect a server"
@@ -3184,7 +3208,7 @@ msgstr "Bağlı"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Connected accounts"
-msgstr ""
+msgstr "Bağlı hesaplar"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Connecting to the desktop browser…"
@@ -3199,6 +3223,7 @@ msgstr "Bağlanıyor..."
 #: src/renderer/components/thread/ChatPane/ChatTurnElapsed.tsx
 #: src/renderer/components/thread/ThreadDraftView.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connecting…"
 msgstr "Bağlanıyor…"
@@ -3328,6 +3353,14 @@ msgstr "Ajan tıklarken veya yazarken eşleştirilmiş masaüstünü kontrol ede
 msgid "Conversation"
 msgstr "Konuşma"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Cookie exports"
+msgstr "Çerez dışa aktarımları"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Cookie file:"
+msgstr "Çerez dosyası:"
+
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
@@ -3369,7 +3402,7 @@ msgstr "Mevcut URL'yi Kopyala"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Copy data from an earlier installation into Y Space. Y Space restarts and keeps a complete backup of its current data."
-msgstr ""
+msgstr "Önceki bir kurulumdaki verileri Y Space'e kopyalayın. Y Space yeniden başlatılır ve mevcut verilerin eksiksiz bir yedeğini tutar."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy desktop endpoint"
@@ -3420,7 +3453,7 @@ msgstr "Göreli Yolu Kopyala"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
-msgstr ""
+msgstr "Seçilen oturum açma çerezlerini Y Space'in yerleşik tarayıcısına kopyalayın. Uzantı yalnızca içe aktarma içindir; diğer tarayıcınızda gezinemez, içeriği inceleyemez veya tarayıcıyı kontrol edemez."
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Copy selection"
@@ -3442,9 +3475,21 @@ msgstr "URL'yi kopyala"
 msgid "Could not abort the merge: {detail}"
 msgstr "Birleştirme iptal edilemedi: {detail}"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel browser pairing. Try again."
+msgstr "Tarayıcı eşleştirmesi iptal edilemedi. Yeniden deneyin."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel the cookie import. Try again."
+msgstr "Çerez içe aktarma iptal edilemedi. Yeniden deneyin."
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not complete the merge"
 msgstr "Birleştirme tamamlanamadı"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not create a cookie preview. Check that the extension is connected."
+msgstr "Çerez önizlemesi oluşturulamadı. Uzantının bağlı olduğunu kontrol edin."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not create the project folder."
@@ -3455,22 +3500,42 @@ msgstr "Proje klasörü oluşturulamadı."
 msgid "Could not extract context."
 msgstr "Bağlam çıkarılamadı."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not forget that browser profile. Try again."
+msgstr "Bu tarayıcı profili kaldırılamadı. Yeniden deneyin."
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not generate commit message: {detail}"
 msgstr "Commit mesajı oluşturulamadı: {detail}"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not import the selected cookies. No cookie values were kept in this screen."
+msgstr "Seçilen çerezler içe aktarılamadı. Bu ekranda hiçbir çerez değeri saklanmadı."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not load browser cookie-import settings."
+msgstr "Tarayıcı çerezi içe aktarma ayarları yüklenemedi."
+
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Could not load connections."
-msgstr ""
+msgstr "Bağlantılar yüklenemedi."
 
 #. placeholder {0}: failure.project.name
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Could not load pull requests for {0}."
 msgstr "{0} için çekme istekleri yüklenemedi."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not open the extension folder. Try again."
+msgstr "Uzantı klasörü açılamadı. Yeniden deneyin."
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #~ msgid "Could not open this PDF."
 #~ msgstr "Bu PDF açılamadı."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not preview that cookie file. Use Cookie-Editor JSON or Netscape cookies.txt."
+msgstr "Bu çerez dosyası önizlenemedi. Cookie-Editor JSON veya Netscape cookies.txt kullanın."
 
 #: src/renderer/components/thread/ChatPane/parts/items/useReadAbsoluteFile.tsx
 msgid "Could not read file."
@@ -3489,6 +3554,10 @@ msgstr "{serverName} oturumu açılamadı."
 #: src/renderer/components/plugins/usePluginOauth.ts
 msgid "Could not sign out of {serverName}."
 msgstr "{serverName} oturumu kapatılamadı."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not start browser pairing. Try again."
+msgstr "Tarayıcı eşleştirmesi başlatılamadı. Yeniden deneyin."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Couldn't access the GitHub account \"{login}\". Run \"gh auth login\" and try again."
@@ -3573,7 +3642,7 @@ msgstr "MCP sunucusu yapılandırmaları taranamadı."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Couldn't schedule the legacy data import."
-msgstr ""
+msgstr "Eski verilerin içe aktarılması planlanamadı."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "Couldn't schedule the Y Space data import."
@@ -3697,6 +3766,10 @@ msgstr "Çalışma ağacı oluşturuluyor…"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Credentials are configured."
 msgstr "Kimlik bilgileri yapılandırıldı."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Credentials are managed by the Y Space environment and never exposed to agents."
+msgstr "Kimlik bilgileri Y Space ortamı tarafından yönetilir ve hiçbir zaman aracılara gösterilmez."
 
 #: src/renderer/components/providers/usageFormat.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
@@ -4408,16 +4481,16 @@ msgstr "Kaydedilmemiş düzenleyici değişiklikleri silinsin mi?"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect"
-msgstr ""
+msgstr "Bağlantıyı kes"
 
 #. placeholder {0}: account.name
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect {0}"
-msgstr ""
+msgstr "{0} bağlantısını kes"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Disconnect account?"
-msgstr ""
+msgstr "Hesabın bağlantısı kesilsin mi?"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Disconnect server"
@@ -4425,7 +4498,7 @@ msgstr "Sunucu bağlantısını kes"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Disconnected"
-msgstr ""
+msgstr "Bağlantı kesildi"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Discovering coding agents…"
@@ -4577,7 +4650,7 @@ msgstr "örneğin İş"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Each one-time code expires quickly and works only on this computer."
-msgstr ""
+msgstr "Her tek kullanımlık kodun süresi kısa sürede dolar ve kod yalnızca bu bilgisayarda çalışır."
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
@@ -4691,7 +4764,7 @@ msgstr "{tool} aracını etkinleştir"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Enable Developer mode."
-msgstr ""
+msgstr "Geliştirici modunu etkinleştirin."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4743,7 +4816,7 @@ msgstr "<0>Çerezler</0>'i ve <1>depolamayı</1> etkinleştirir. Çerezler oturu
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "End-user Pipedream MCP server named pd."
-msgstr ""
+msgstr "pd adlı son kullanıcı Pipedream MCP sunucusu."
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
@@ -4805,6 +4878,10 @@ msgstr "Geçerli bir SSH hedefi ve bağlantı noktası girin."
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 #~ msgid "Enter an absolute @cursor/sdk package path, or leave this blank for automatic discovery."
 #~ msgstr "@cursor/sdk paketi için mutlak bir yol girin veya otomatik keşif için bu alanı boş bırakın."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Enter at least one HTTP(S) origin."
+msgstr "En az bir HTTP(S) kaynağı girin."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter one MCP server configuration."
@@ -5052,7 +5129,7 @@ msgstr "Deney istemi boş olmamalıdır"
 #. placeholder {0}: formatCountdown(model.pairingRemainingMs)
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Expires in {0}"
-msgstr ""
+msgstr "{0} içinde sona erer"
 
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "Explicit selections recorded from past delegations — they feed the routing order above. Edit the tags or remove entries to reshape it."
@@ -5299,7 +5376,7 @@ msgstr "Terminalde bul"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Finish connecting in the new embedded browser tab, then refresh accounts."
-msgstr ""
+msgstr "Yeni yerleşik tarayıcı sekmesinde bağlantıyı tamamlayın, ardından hesapları yenileyin."
 
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Finish your review"
@@ -5470,12 +5547,12 @@ msgstr "Tarayıcı sayfasını zorla yeniden yükle"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget"
-msgstr ""
+msgstr "Kaldır"
 
 #. placeholder {0}: source.label
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget {0}"
-msgstr ""
+msgstr "{0} öğesini kaldır"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5846,7 +5923,7 @@ msgstr "Üstbilgiler"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Healthy"
-msgstr ""
+msgstr "Sorunsuz"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Help me create a schedule. Ask for any missing details, then use the Y Space schedule controls to create it for me."
@@ -6048,7 +6125,7 @@ msgstr "İçe aktar ve yeniden başlat"
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Import browser cookies"
-msgstr ""
+msgstr "Tarayıcı çerezlerini içe aktar"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Import conflict"
@@ -6057,7 +6134,7 @@ msgstr "İçe aktarma çakışması"
 #. placeholder {0}: domain.domain
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Import cookies for {0}"
-msgstr ""
+msgstr "{0} için çerezleri içe aktar"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6078,11 +6155,11 @@ msgstr "Harici becerileri içe aktar"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data"
-msgstr ""
+msgstr "Eski verileri içe aktar"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data again?"
-msgstr ""
+msgstr "Eski veriler yeniden içe aktarılsın mı?"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Import MCP servers"
@@ -6098,7 +6175,7 @@ msgstr "Seçilenleri içe aktar"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Import selected cookies"
-msgstr ""
+msgstr "Seçilen çerezleri içe aktar"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Import to {destinationProjectName}"
@@ -6125,6 +6202,12 @@ msgstr "Genel kapsama içe aktar"
 #: src/renderer/components/skills/SkillImportModal.tsx
 #~ msgid "Imported {0} {1}."
 #~ msgstr "{0} {1} içe aktarıldı."
+
+#. placeholder {0}: completedCounts.importedCount
+#. placeholder {1}: completedCounts.skippedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Imported {0} cookies; skipped {1}."
+msgstr "{0} çerez içe aktarıldı; {1} çerez atlandı."
 
 #. placeholder {0}: selectedSkills.length
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6158,7 +6241,7 @@ msgstr "Senkronizasyona ekle"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Incomplete setup"
-msgstr ""
+msgstr "Kurulum tamamlanmadı"
 
 #: src/renderer/components/plugins/PluginDetail.tsx
 msgid "Information"
@@ -6349,7 +6432,7 @@ msgstr "v{version} sürümünü yükle"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Install Y Space Cookie Import"
-msgstr ""
+msgstr "Y Space Cookie Import uzantısını yükle"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -6548,7 +6631,7 @@ msgstr "Yorum bırak"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Legacy data import is unavailable with a custom data folder."
-msgstr ""
+msgstr "Özel bir veri klasörü kullanıldığında eski verileri içe aktarma özelliği kullanılamaz."
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "Less"
@@ -6625,7 +6708,7 @@ msgstr "Hesaplar yükleniyor…"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Loading browser profiles…"
-msgstr ""
+msgstr "Tarayıcı profilleri yükleniyor…"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
@@ -7257,7 +7340,7 @@ msgstr "Yansıtma kullanılamıyor."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Missing configuration:"
-msgstr ""
+msgstr "Eksik yapılandırma:"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
@@ -7523,7 +7606,7 @@ msgstr "Onay gerekiyor"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Needs attention"
-msgstr ""
+msgstr "İlgilenilmesi gerekiyor"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7816,7 +7899,7 @@ msgstr "Şube bulunamadı"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "No browser profiles paired yet."
-msgstr ""
+msgstr "Henüz eşleştirilmiş tarayıcı profili yok."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserEmptyState.tsx
 msgid "No browser tab open"
@@ -7866,7 +7949,7 @@ msgstr "Henüz yapılandırılmış MCP sunucusu yok"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "No connected accounts yet."
-msgstr ""
+msgstr "Henüz bağlı hesap yok."
 
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
@@ -7968,7 +8051,7 @@ msgstr "Henüz öğrenilen seçim yok."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "No legacy app data was found."
-msgstr ""
+msgstr "Eski uygulamaya ait veri bulunamadı."
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "No marketplace skills match these filters."
@@ -8161,7 +8244,7 @@ msgstr "Desteklenen aracı algılanmadı"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "No supported cookies were found for these origins."
-msgstr ""
+msgstr "Bu kaynaklar için desteklenen çerez bulunamadı."
 
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "No tags — the entry stops influencing tag affinity."
@@ -8233,7 +8316,7 @@ msgstr "Git deposu değil"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Not configured"
-msgstr ""
+msgstr "Yapılandırılmadı"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Not found"
@@ -8347,7 +8430,7 @@ msgstr "{0} tarihinde bir kez"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "One exact HTTP(S) origin per line, up to 12."
-msgstr ""
+msgstr "Her satıra tam bir HTTP(S) kaynağı girin (en fazla 12)."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "One Header: value pair per line"
@@ -8394,7 +8477,7 @@ msgstr "{label} öğesini aç"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open <0>chrome://extensions</0> in Chrome, Brave, Edge, Arc, or Chromium."
-msgstr ""
+msgstr "Chrome, Brave, Edge, Arc veya Chromium'da <0>chrome://extensions</0> sayfasını açın."
 
 #: src/renderer/commands/registry.ts
 msgid "Open a new browser tab"
@@ -8476,7 +8559,7 @@ msgstr "Deney panosunu aç"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open extension folder"
-msgstr ""
+msgstr "Uzantı klasörünü aç"
 
 #: src/renderer/commands/registry.ts
 msgid "Open File"
@@ -8658,7 +8741,7 @@ msgstr "Model seçiciyi açın"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Open the Y Space Cookie Import popup in your browser and approve these origins."
-msgstr ""
+msgstr "Tarayıcınızda Y Space Cookie Import açılır penceresini açın ve bu kaynakları onaylayın."
 
 #: src/renderer/components/providers/opencode/manifest.ts
 msgid "OpenCode"
@@ -8780,7 +8863,7 @@ msgstr "Eşleştir"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pair a browser profile"
-msgstr ""
+msgstr "Bir tarayıcı profili eşleştir"
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Pair a connection"
@@ -8801,7 +8884,7 @@ msgstr "Tekrar eşleştir"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pair browser profile"
-msgstr ""
+msgstr "Tarayıcı profilini eşleştir"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Pair with Y Space"
@@ -8809,7 +8892,7 @@ msgstr "Y Space ile eşleştir"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Paired browser profiles"
-msgstr ""
+msgstr "Eşleştirilmiş tarayıcı profilleri"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Paired devices"
@@ -8821,7 +8904,7 @@ msgstr "Eşleştiriliyor"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Pairing code"
-msgstr ""
+msgstr "Eşleştirme kodu"
 
 #: src/mobile/components.tsx
 #: src/mobile/useRemoteDesktop.ts
@@ -9004,11 +9087,15 @@ msgstr "Kişisel"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal MCP"
-msgstr ""
+msgstr "Kişisel MCP"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal MCP sign-in did not complete."
-msgstr ""
+msgstr "Kişisel MCP oturum açma işlemi tamamlanmadı."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Personal Pipedream tools"
+msgstr "Kişisel Pipedream araçları"
 
 #: src/renderer/components/providers/pi/manifest.ts
 msgid "Pi"
@@ -9069,11 +9156,11 @@ msgstr "Sabitlenmiş görev rotaları"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream Connect could not be initialized."
-msgstr ""
+msgstr "Pipedream Connect başlatılamadı."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
-msgstr ""
+msgstr "Kimliği doğrulanmış yerel MCP aktarıcıları üzerinden kullanılabilen, Pipedream tarafından yönetilen OAuth hesapları."
 
 #: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
@@ -9279,11 +9366,11 @@ msgstr "Önizleme {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview extension cookies"
-msgstr ""
+msgstr "Uzantı çerezlerini önizle"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
-msgstr ""
+msgstr "Önizlemede yalnızca alan adı düzeyindeki sayılar gösterilir. Son seçimi onaylayana kadar hiçbir şey kopyalanmaz. Firefox ve Safari dışa aktarımlarında Cookie-Editor JSON veya Netscape cookies.txt kullanılabilir."
 
 #: src/renderer/commands/registry.ts
 msgid "Previous chat"
@@ -9823,7 +9910,7 @@ msgstr "{label} sağlayıcısını yenile"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Refresh accounts"
-msgstr ""
+msgstr "Hesapları yenile"
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Refresh detected agents"
@@ -10864,7 +10951,7 @@ msgstr "Aracıları ara..."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Search apps"
-msgstr ""
+msgstr "Uygulamalarda ara"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Search branches..."
@@ -10913,7 +11000,7 @@ msgstr "Adres arayın veya girin"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Search Pipedream apps"
-msgstr ""
+msgstr "Pipedream uygulamalarında ara"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Search plugins"
@@ -11482,7 +11569,7 @@ msgstr "Çıkış yapılıyor. Algılanan aracılar tamamlandığında yenilenec
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Sites to import cookies for"
-msgstr ""
+msgstr "Çerezleri içe aktarılacak siteler"
 
 #: src/renderer/views/SettingsOverlay/parts/CodexProviderSettings.tsx
 msgid "Sizes shown in the Codex composer. Compaction starts automatically at 95% of the selected window. New chats default to 400k when that size is in the list."
@@ -11640,7 +11727,7 @@ msgstr "Kaynak şube {branch}, çalışma ağacı oluşturulmadan önce taşınd
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Source browser profile"
-msgstr ""
+msgstr "Kaynak tarayıcı profili"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
@@ -11789,7 +11876,7 @@ msgstr "Simge durumunda başlat"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Start pairing below, then enter the code in the extension popup."
-msgstr ""
+msgstr "Aşağıdan eşleştirmeyi başlatın, ardından uzantının açılır penceresine kodu girin."
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 #~ msgid "Start remote thread"
@@ -12358,6 +12445,10 @@ msgstr "uygulama"
 #~ msgid "the base branch"
 #~ msgstr "ana şube"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "The browser accepted them, but disk flush must be retried."
+msgstr "Tarayıcı çerezleri kabul etti ancak diske yazma işlemi yeniden denenmeli."
+
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "The candidates changed after judging. Compare them again."
 msgstr "Adaylar değerlendirmeden sonra değişti. Yeniden karşılaştırın."
@@ -12426,11 +12517,11 @@ msgstr "Normal uygulama kabuğu oluşturulamadı. Arızanın araştırılabilmes
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "The Pipedream request failed. Check your connection and configuration."
-msgstr ""
+msgstr "Pipedream isteği başarısız oldu. Bağlantınızı ve yapılandırmanızı kontrol edin."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "The preview failed. Reconnect the extension and try again."
-msgstr ""
+msgstr "Önizleme başarısız oldu. Uzantıyı yeniden bağlayıp tekrar deneyin."
 
 #: src/renderer/state/remoteServersStore.ts
 msgid "The remote server returned no pairing credential."
@@ -12697,7 +12788,7 @@ msgstr "Bu, daha sonraki mesajları kaldırır ve bir denetim noktası anlık g�
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "This removes the Pipedream account and immediately revokes agent access through Y Space."
-msgstr ""
+msgstr "Bu işlem Pipedream hesabını kaldırır ve aracıların Y Space üzerinden erişimini hemen iptal eder."
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "This removes the schedule and its latest result from this device."
@@ -13635,7 +13726,7 @@ msgstr "Doğrudan eşleştirmek veya SSH üzerinden uzak bir makineye bağlanmak
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Use active embedded tab"
-msgstr ""
+msgstr "Etkin yerleşik sekmeyi kullan"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Use an existing folder"
@@ -13657,6 +13748,10 @@ msgstr "Yapılandırmayı kullan"
 msgid "Use detected session?"
 msgstr "Algılanan oturum kullanılsın mı?"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Use HTTP(S) origins without usernames, passwords, paths, or private URL details."
+msgstr "Kullanıcı adı, parola, yol veya özel URL ayrıntısı içermeyen HTTP(S) kaynakları kullanın."
+
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Use ignore files"
@@ -13673,7 +13768,7 @@ msgstr "Tek bir genel klasör kullanın veya çalışma ağaçlarını her proje
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
-msgstr ""
+msgstr "Kendi Pipedream araçlarınız için Kişisel MCP'yi kullanın veya seçilen uygulama hesaplarına yerel aracıların erişmesine izin vermek için BYO Connect'i kullanın."
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"
@@ -13957,8 +14052,6 @@ msgstr "Web araması"
 msgid "Web server"
 msgstr "Web sunucusu"
 
-#. External link to the product website
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Website"
 msgstr "Web sitesi"
@@ -14370,7 +14463,7 @@ msgstr "Y Space, sunucusunu SSH ana makinesine yükler veya mevcut sunucuyu yeni
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Y Space will restart, back up its current data, and replace it with a complete copy of the legacy installation data."
-msgstr ""
+msgstr "Y Space yeniden başlatılacak, mevcut verileri yedekleyecek ve bunları eski kurulum verilerinin eksiksiz bir kopyasıyla değiştirecektir."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "Y Space will restart, back up its current data, and replace it with a complete copy of your Y Space data."

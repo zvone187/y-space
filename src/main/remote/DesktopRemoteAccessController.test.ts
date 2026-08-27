@@ -65,6 +65,7 @@ const h = vi.hoisted(() => ({
   disableTailscaleServe: vi.fn<() => Promise<void>>(),
   launchTailscaleApp: vi.fn<() => Promise<{ ok: true } | { ok: false; message: string }>>(),
   resolveRemoteAccessPort: vi.fn<() => Promise<number>>(),
+  pairingAppUrl: undefined as string | undefined,
 }));
 
 vi.mock("../db", () => ({
@@ -85,7 +86,7 @@ vi.mock("./auth", () => ({
 vi.mock("./config", () => ({
   remoteAccessAdvertisedHost: () => "127.0.0.1",
   remoteAccessHost: () => "127.0.0.1",
-  remoteAccessPairingAppUrl: () => undefined,
+  remoteAccessPairingAppUrl: () => h.pairingAppUrl,
   resolveRemoteAccessPort: () => h.resolveRemoteAccessPort(),
 }));
 
@@ -286,6 +287,7 @@ describe("DesktopRemoteAccessController", () => {
     h.disableTailscaleServe.mockResolvedValue();
     h.launchTailscaleApp.mockResolvedValue({ ok: true });
     h.resolveRemoteAccessPort.mockResolvedValue(38987);
+    h.pairingAppUrl = undefined;
     delete process.env.PORACODE_REMOTE_ACCESS_ADVERTISED_HOST;
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -299,15 +301,12 @@ describe("DesktopRemoteAccessController", () => {
     delete process.env.PORACODE_REMOTE_ACCESS_ADVERTISED_HOST;
   });
 
-  it("uses the hosted pairing app in production and the local mobile app in development", async () => {
+  it("uses the self-hosted pairing app in production and the local mobile app in development", async () => {
     const production = createController();
     await production.setEnabled(true);
 
-    expect(h.servers[0]?.options.pairingAppUrl).toBe("https://poracode.com");
-    expect(h.servers[0]?.options.trustedCorsOrigins).toEqual([
-      "https://app.poracode.com",
-      "https://app-nightly.poracode.com",
-    ]);
+    expect(h.servers[0]?.options.pairingAppUrl).toBeUndefined();
+    expect(h.servers[0]?.options.trustedCorsOrigins).toBeUndefined();
     expect(h.servers[0]?.options.devMobileAppUrl).toBeUndefined();
     expect(h.servers[0]?.options.isDev).toBe(false);
 
@@ -320,15 +319,21 @@ describe("DesktopRemoteAccessController", () => {
     expect(h.servers[1]?.options.isDev).toBe(true);
   });
 
-  it("uses the nightly web app by default while trusting both hosted apps", async () => {
+  it("uses the self-hosted pairing app for nightly builds too", async () => {
     const nightly = createController(undefined, "nightly");
     await nightly.setEnabled(true);
 
-    expect(h.servers[0]?.options.pairingAppUrl).toBe("https://app-nightly.poracode.com");
-    expect(h.servers[0]?.options.trustedCorsOrigins).toEqual([
-      "https://app.poracode.com",
-      "https://app-nightly.poracode.com",
-    ]);
+    expect(h.servers[0]?.options.pairingAppUrl).toBeUndefined();
+    expect(h.servers[0]?.options.trustedCorsOrigins).toBeUndefined();
+  });
+
+  it("honors an explicit pairing app override", async () => {
+    h.pairingAppUrl = "https://pairing.example.test";
+    const controller = createController();
+    await controller.setEnabled(true);
+
+    expect(h.servers[0]?.options.pairingAppUrl).toBe("https://pairing.example.test");
+    expect(h.servers[0]?.options.trustedCorsOrigins).toBeUndefined();
   });
 
   it("publishes the rotated pairing state from the server", async () => {

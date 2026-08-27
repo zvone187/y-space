@@ -58,3 +58,31 @@ describe("resolveAcpTerminalCwd", () => {
     ).toBe("E:\\work\\repo");
   });
 });
+
+describe("buildAcpTerminalLaunch privileged environment isolation", () => {
+  it("strips ambient and request-supplied Pipedream/MCP credentials", () => {
+    const saved = process.env.PIPEDREAM_CLIENT_SECRET;
+    process.env.PIPEDREAM_CLIENT_SECRET = "ambient-developer-secret";
+    try {
+      const launch = buildAcpTerminalLaunch(
+        { kind: "posix", path: "/tmp/project" },
+        "/tmp/project",
+        "/usr/bin/env",
+        [],
+        {
+          SAFE_REQUEST_VALUE: "kept",
+          PORACODE_APP_CONTROLS_MCP_TOKEN: "app-root",
+          PIPEDREAM_PROJECT_ID: "project-secret",
+        },
+      );
+
+      expect(launch.env.SAFE_REQUEST_VALUE).toBe("kept");
+      expect(launch.env.PIPEDREAM_CLIENT_SECRET).toBeUndefined();
+      expect(launch.env.PIPEDREAM_PROJECT_ID).toBeUndefined();
+      expect(launch.env.PORACODE_APP_CONTROLS_MCP_TOKEN).toBeUndefined();
+    } finally {
+      if (saved === undefined) delete process.env.PIPEDREAM_CLIENT_SECRET;
+      else process.env.PIPEDREAM_CLIENT_SECRET = saved;
+    }
+  });
+});

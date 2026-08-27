@@ -11,6 +11,7 @@ const browserTabs = vi.hoisted(
       string,
       {
         emitUrl(url: string, title?: string): void;
+        emitPopup(url: string): void;
         clearHistory: ReturnType<typeof vi.fn>;
       }
     >(),
@@ -73,6 +74,7 @@ vi.mock("./BrowserTab", () => ({
         initialUrl?: string;
         initialTitle?: string;
         onUpdate(snapshot: unknown): void;
+        onPopup?(sourceTabId: string, popupUrl: string): void;
       },
     ) {
       this.tabId = options.tabId;
@@ -90,6 +92,7 @@ vi.mock("./BrowserTab", () => ({
           this.snapshotValue = { ...this.snapshotValue, url, title, loading: false };
           options.onUpdate(this.snapshotValue);
         },
+        emitPopup: (url) => options.onPopup?.(options.tabId, url),
         clearHistory: this.clearHistory,
       });
     }
@@ -331,6 +334,67 @@ describe("BrowserPanelManager", () => {
     expect(state.groups).toEqual([]);
   });
 
+  it("selects the nearest visible tab when collapsing the active tab's group", async () => {
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+    const group = {
+      id: "group-agent",
+      title: "Y Space",
+      color: "purple",
+      collapsed: false,
+    } satisfies BrowserTabGroupInfo;
+    seedGroupState(
+      manager,
+      [
+        createFakeTab("tab-before"),
+        createFakeTab("tab-group-1"),
+        createFakeTab("tab-group-2"),
+        createFakeTab("tab-after"),
+      ],
+      [group],
+      [
+        ["tab-group-1", group.id],
+        ["tab-group-2", group.id],
+      ],
+    );
+    (manager as unknown as { activeTabId: string }).activeTabId = "tab-group-1";
+
+    manager.setGroupCollapsed(group.id, true);
+
+    expect(manager.snapshot().activeTabId).toBe("tab-after");
+  });
+
+  it("clears the active tab when collapsing the only visible group", async () => {
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+    const group = {
+      id: "group-agent",
+      title: "Y Space",
+      color: "purple",
+      collapsed: false,
+    } satisfies BrowserTabGroupInfo;
+    seedGroupState(
+      manager,
+      [createFakeTab("tab-group-1"), createFakeTab("tab-group-2")],
+      [group],
+      [
+        ["tab-group-1", group.id],
+        ["tab-group-2", group.id],
+      ],
+    );
+    (manager as unknown as { activeTabId: string }).activeTabId = "tab-group-2";
+
+    manager.setGroupCollapsed(group.id, true);
+
+    expect(manager.snapshot().activeTabId).toBeNull();
+  });
+
   it("keeps every HTTP(S) link inside Y Space even when legacy settings request the system browser", async () => {
     const { readSharedSettingsFile } = await import("../sharedSettingsFile");
     vi.mocked(readSharedSettingsFile).mockReturnValue({
@@ -347,6 +411,21 @@ describe("BrowserPanelManager", () => {
     expect(shellOpenExternal).not.toHaveBeenCalled();
     expect(manager.snapshot().tabs).toHaveLength(1);
     expect(manager.snapshot().tabs[0]?.url).toBe("https://example.test/path");
+  });
+
+  it("does not classify ordinary links as sensitive from generic query parameter names", async () => {
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+    const ordinaryUrl = "https://example.test/search?state=California&code=SPRING";
+
+    await expect(manager.openLink(ordinaryUrl)).resolves.toBe(true);
+
+    const created = manager.snapshot().tabs[0];
+    expect(created?.url).toBe(ordinaryUrl);
+    expect(created && manager.getTab(created.tabId)).not.toBeNull();
   });
 
   it("flushes the newest tab state when disposed before the persistence debounce", async () => {
@@ -397,7 +476,7 @@ describe("BrowserPanelManager", () => {
     });
   });
 
-  it("never emits, records, or persists a one-use integration URL and reveals only the safe landing URL", async () => {
+  it("keeps an explicitly sensitive integration tab redacted and agent-inaccessible for its full lifetime", async () => {
     vi.useFakeTimers();
     const { BrowserPanelManager } = await import("./BrowserPanelManager");
     const manager = new BrowserPanelManager(
@@ -424,10 +503,47 @@ describe("BrowserPanelManager", () => {
     browserTabs.get(created.tabId)?.emitUrl("https://pipedream.com/connected", "Connected");
     await vi.runAllTimersAsync();
 
-    expect(manager.snapshot().tabs[0]?.url).toBe("https://pipedream.com/connected");
-    expect(manager.getTab(created.tabId)?.tabId).toBe(created.tabId);
-    expect(browserTabs.get(created.tabId)?.clearHistory).toHaveBeenCalled();
+    expect(manager.snapshot().tabs[0]).toMatchObject({
+      tabId: created.tabId,
+      url: "about:blank",
+      title: "",
+      sensitiveIntegration: true,
+    });
+    expect(manager.getTab(created.tabId)).toBeNull();
+    expect(manager.getActiveTab()).toBeNull();
+    expect(browserTabs.get(created.tabId)?.clearHistory).not.toHaveBeenCalled();
+    expect(JSON.stringify(events)).not.toContain("https://pipedream.com/connected");
     expect(JSON.stringify(events)).not.toContain("connect-token-private");
     expect(JSON.stringify(dbSetState.mock.calls)).not.toContain("connect-token-private");
+
+    await manager.closeTab(created.tabId);
+    await vi.runAllTimersAsync();
+    expect(manager.snapshot().tabs).toEqual([]);
+    expect(JSON.stringify(dbSetState.mock.calls)).not.toContain("https://pipedream.com/connected");
+  });
+
+  it("inherits sensitive lifetime protection for popups opened by a sensitive tab", async () => {
+    const { BrowserPanelManager } = await import("./BrowserPanelManager");
+    const manager = new BrowserPanelManager(
+      { settingsPath: "settings.json" } as never,
+      "Mozilla/5.0 Chrome/141.0.0.0 Safari/537.36",
+    );
+    const parent = await manager.createSensitiveIntegrationTab(
+      { url: "https://oauth.example.test/authorize?state=private", activate: true },
+      { awaitAttach: false },
+    );
+
+    browserTabs
+      .get(parent.tabId)
+      ?.emitPopup("https://accounts.example.test/consent?state=popup-private");
+    await vi.waitFor(() => expect(manager.snapshot().tabs).toHaveLength(2));
+
+    const popup = manager.snapshot().tabs.find((tab) => tab.tabId !== parent.tabId);
+    expect(popup).toMatchObject({
+      url: "about:blank",
+      title: "",
+      sensitiveIntegration: true,
+    });
+    expect(popup && manager.getTab(popup.tabId)).toBeNull();
   });
 });

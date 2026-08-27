@@ -1,5 +1,5 @@
 import type { Dirent, Stats } from "node:fs";
-import { readdir, readFile, rename, rm, stat, writeFile, mkdir } from "node:fs/promises";
+import { readdir, readFile, realpath, rename, rm, stat, writeFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, posix, relative, resolve } from "node:path";
 import type {
@@ -693,6 +693,7 @@ export class ProjectTreeService {
     const absolute = joinProjectPosixPath(location, relativePath);
     const result = await wslClient.readFile(location, absolute, {
       maxBytes,
+      enforceRealpathContainment: true,
     });
     if (result.tooLarge) {
       return { kind: "tooLarge", modifiedAtMs: result.mtimeMs };
@@ -946,7 +947,19 @@ export class ProjectTreeService {
     location: ProjectLocation,
     relativePath: string,
   ): Promise<{ fullPath: string; fileStat: Stats }> {
-    const fullPath = this.resolveEntryPath(location, relativePath);
+    const lexicalPath = this.resolveEntryPath(location, relativePath);
+    const [rootPath, fullPath] = await Promise.all([
+      realpath(getProjectFsPath(location)),
+      realpath(lexicalPath),
+    ]);
+    const relativeRealPath = relative(rootPath, fullPath);
+    if (
+      relativeRealPath === ".." ||
+      relativeRealPath.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) ||
+      isAbsolute(relativeRealPath)
+    ) {
+      throw new Error("Path resolves outside the project root.");
+    }
     return { fullPath, fileStat: await stat(fullPath) };
   }
 

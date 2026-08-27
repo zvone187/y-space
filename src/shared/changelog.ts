@@ -5,18 +5,19 @@ import { z } from "zod";
  *
  * The actual release data is NOT bundled here. It lives in a single source of
  * truth — `website/public/changelog.json` on master — served by the marketing
- * site and fetched at runtime:
+ * repository and fetched at runtime:
  *
- *   https://poracode.com/changelog.json
+ *   https://raw.githubusercontent.com/zvone187/y-space/master/website/public/changelog.json
  *
  * so the notes can be edited, reworded, or extended by committing to master
- * (Vercel redeploys the site) without shipping a new app build. The desktop app
+ * without shipping a new app build. The desktop app
  * fetches + caches it (see `src/renderer/state/changelogStore.ts`); the site's
  * own /changelog page imports the same file at build time. This module only
  * carries the shape + the pure helpers.
  */
 
-export const CHANGELOG_URL = "https://poracode.com/changelog.json";
+export const CHANGELOG_URL =
+  "https://raw.githubusercontent.com/zvone187/y-space/master/website/public/changelog.json";
 
 export type ChangelogChangeKind = "added" | "improved" | "fixed";
 

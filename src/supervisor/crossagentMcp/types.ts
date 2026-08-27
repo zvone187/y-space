@@ -231,7 +231,10 @@ export interface SubagentRunHost {
     threadId: string,
     identity: McpThreadIdentity,
     targetAgentKind: AgentKind,
+    childConfig: ThreadConfig,
   ): Promise<{ mcpServers?: ResolvedMcpServer[] }>;
+  /** Release a structured child's launch-scoped MCP authorization. */
+  releaseParentMcpAccess?(parentThreadId: string, childThreadId: string): void;
   /** Append a (re-tagged) runtime event into the parent thread's event stream. */
   appendRuntimeEvent(parentThreadId: string, event: RuntimeEvent): void;
 }

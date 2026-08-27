@@ -49,6 +49,13 @@ class MessageQueue {
       if (message.type === type) return message;
     }
   }
+
+  async nextMessage(): Promise<WireMessage> {
+    return (
+      this.messages.shift() ??
+      (await new Promise<WireMessage>((resolve) => this.waiters.push(resolve)))
+    );
+  }
 }
 
 async function unusedPort(): Promise<number> {
@@ -312,5 +319,197 @@ describe("CookieImportBridgeServer authenticated transport", () => {
       }),
     );
     await expect(tamperedPromise).rejects.toThrow(/invalid encrypted/i);
+  });
+
+  it("rejects a proof-valid hello with an invalid P-256 point without throwing", async () => {
+    const port = await unusedPort();
+    const authenticationKey = sha256(TOKEN);
+    const pairingStore = new CookieImportPairingStore({
+      load: () => ({
+        version: 1,
+        sources: [
+          {
+            sourceId: SOURCE_ID,
+            label: "Stored profile",
+            browserFamily: "chrome",
+            extensionVersion: "1.0.0",
+            pairedAt: Date.now(),
+            tokenHash: authenticationKey.toString("hex"),
+          },
+        ],
+      }),
+    });
+    const bridge = new CookieImportBridgeServer({ pairingStore, ports: [port] });
+    bridges.push(bridge);
+    const info = await bridge.start();
+    const { socket, queue } = await connect(info.url);
+    sockets.push(socket);
+    const challenge = await queue.next("connection.challenge");
+    const clientNonce = "C".repeat(43);
+    const invalidPublicKey = "A".repeat(87);
+    const transcript = canonicalCookieImportTranscript([
+      "hello.client.v1",
+      challenge.challenge,
+      clientNonce,
+      invalidPublicKey,
+      SOURCE_ID,
+      "Stored profile",
+      "chrome",
+      "1.0.0",
+    ]);
+
+    socket.send(
+      JSON.stringify({
+        protocolVersion: 1,
+        type: "hello",
+        sourceId: SOURCE_ID,
+        clientNonce,
+        clientPublicKey: invalidPublicKey,
+        proof: hmacProof(authenticationKey, transcript),
+        extensionVersion: "1.0.0",
+        browserFamily: "chrome",
+        label: "Stored profile",
+      }),
+    );
+
+    await expect(queue.next("error")).resolves.toMatchObject({
+      code: "authentication_failed",
+    });
+    await once(socket, "close");
+    expect(bridge.listSources()).toMatchObject([{ sourceId: SOURCE_ID, connected: false }]);
+  });
+
+  it("prunes an expired auxiliary pairing before a saved-token reconnect", async () => {
+    const port = await unusedPort();
+    let now = Date.now();
+    const authenticationKey = sha256(TOKEN);
+    const pairingStore = new CookieImportPairingStore({
+      load: () => ({
+        version: 1,
+        sources: [
+          {
+            sourceId: SOURCE_ID,
+            label: "Stored profile",
+            browserFamily: "chrome",
+            extensionVersion: "1.0.0",
+            pairedAt: now,
+            tokenHash: authenticationKey.toString("hex"),
+          },
+        ],
+      }),
+      now: () => now,
+      randomCode: () => "12345678",
+      randomId: () => PAIRING_ID,
+    });
+    const bridge = new CookieImportBridgeServer({
+      pairingStore,
+      ports: [port],
+      now: () => now,
+    });
+    bridges.push(bridge);
+    const info = await bridge.start();
+    bridge.beginPairing();
+    now += 5 * 60 * 1000 + 1;
+
+    const { socket, queue } = await connect(info.url);
+    sockets.push(socket);
+    const challenge = await queue.next("connection.challenge");
+    const clientKeys = createEphemeralKeyPair();
+    const clientNonce = "D".repeat(43);
+    const transcript = canonicalCookieImportTranscript([
+      "hello.client.v1",
+      challenge.challenge,
+      clientNonce,
+      clientKeys.publicKey,
+      SOURCE_ID,
+      "Stored profile",
+      "chrome",
+      "1.0.0",
+    ]);
+    socket.send(
+      JSON.stringify({
+        protocolVersion: 1,
+        type: "hello",
+        sourceId: SOURCE_ID,
+        clientNonce,
+        clientPublicKey: clientKeys.publicKey,
+        proof: hmacProof(authenticationKey, transcript),
+        extensionVersion: "1.0.0",
+        browserFamily: "chrome",
+        label: "Stored profile",
+      }),
+    );
+
+    await expect(queue.nextMessage()).resolves.toMatchObject({ type: "hello.result" });
+    expect(bridge.listSources()).toMatchObject([{ sourceId: SOURCE_ID, connected: true }]);
+  });
+
+  it("closes a live source before reporting a revocation persistence failure", async () => {
+    const port = await unusedPort();
+    const authenticationKey = sha256(TOKEN);
+    let saveCount = 0;
+    const pairingStore = new CookieImportPairingStore({
+      load: () => ({
+        version: 1,
+        sources: [
+          {
+            sourceId: SOURCE_ID,
+            label: "Stored profile",
+            browserFamily: "chrome",
+            extensionVersion: "1.0.0",
+            pairedAt: Date.now(),
+            tokenHash: authenticationKey.toString("hex"),
+          },
+        ],
+      }),
+      save: () => {
+        saveCount += 1;
+        if (saveCount > 1) throw new Error("simulated persistence failure");
+      },
+    });
+    const bridge = new CookieImportBridgeServer({ pairingStore, ports: [port] });
+    bridges.push(bridge);
+    const info = await bridge.start();
+    const { socket, queue } = await connect(info.url);
+    sockets.push(socket);
+    const challenge = await queue.next("connection.challenge");
+    const clientKeys = createEphemeralKeyPair();
+    const clientNonce = "E".repeat(43);
+    const transcript = canonicalCookieImportTranscript([
+      "hello.client.v1",
+      challenge.challenge,
+      clientNonce,
+      clientKeys.publicKey,
+      SOURCE_ID,
+      "Stored profile",
+      "chrome",
+      "1.0.0",
+    ]);
+    socket.send(
+      JSON.stringify({
+        protocolVersion: 1,
+        type: "hello",
+        sourceId: SOURCE_ID,
+        clientNonce,
+        clientPublicKey: clientKeys.publicKey,
+        proof: hmacProof(authenticationKey, transcript),
+        extensionVersion: "1.0.0",
+        browserFamily: "chrome",
+        label: "Stored profile",
+      }),
+    );
+    await queue.next("hello.result");
+
+    const closed = once(socket, "close");
+    expect(() => bridge.forgetSource(SOURCE_ID)).toThrow(/persistence failure/i);
+    await expect(
+      Promise.race([
+        closed,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("revoked source stayed connected")), 500),
+        ),
+      ]),
+    ).resolves.toBeDefined();
+    expect(bridge.listSources()).toEqual([]);
   });
 });

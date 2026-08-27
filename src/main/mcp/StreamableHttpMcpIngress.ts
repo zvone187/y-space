@@ -4,8 +4,8 @@ import { isIP } from "node:net";
 import { decodeThreadIdentity, type McpThreadIdentity } from "@/shared/browserMcpThread";
 import { isLocalhostOrigin, readBoundedNodeRequestBody, writeJsonResponse } from "@/shared/http";
 import {
+  type McpLaunchContext,
   type McpLaunchContextAudience,
-  type McpLaunchContextRouting,
   verifyMcpLaunchContextToken,
 } from "@/shared/mcpLaunchContext";
 
@@ -33,9 +33,9 @@ export interface StreamableHttpMcpToolResult {
   isError?: boolean;
 }
 
-/** Resolves a provider-owned session id through the supervisor trust boundary. */
-export type ProviderSessionIdentityResolver = (
-  providerSessionId: string,
+/** Revalidates a signed launch context through the live supervisor boundary. */
+export type McpLaunchContextIdentityResolver = (
+  context: McpLaunchContext,
 ) => Promise<McpThreadIdentity | undefined>;
 
 export interface StreamableHttpMcpIngressOptions<TContext> {
@@ -64,12 +64,8 @@ export interface StreamableHttpMcpIngressOptions<TContext> {
    */
   launchContextAudience?: McpLaunchContextAudience;
   onBeforeToolCall?(name: string, ctx: TContext): void;
-  /**
-   * Optional trusted fallback for pooled provider runtimes whose MCP URL cannot
-   * carry a per-thread identity. The private caller id is stripped before tool
-   * validation and dispatch.
-   */
-  resolveProviderSessionIdentity?: ProviderSessionIdentityResolver;
+  /** Revalidate the signed thread capability against live supervisor state. */
+  resolveLaunchContextIdentity?: McpLaunchContextIdentityResolver;
   serverInfo: { name: string; version: string };
   tools: readonly StreamableHttpMcpToolSpec[];
 }
@@ -101,7 +97,7 @@ type JsonRpcResponse = JsonRpcResponseOk | JsonRpcResponseErr;
 
 interface McpRequestTrust {
   identity: McpThreadIdentity;
-  routing?: McpLaunchContextRouting;
+  launchContext?: McpLaunchContext;
 }
 
 export class StreamableHttpMcpIngress<TContext> {
@@ -167,7 +163,9 @@ export class StreamableHttpMcpIngress<TContext> {
         : undefined;
     }
 
-    return candidate ? verifyMcpLaunchContextToken(this.token, audience, candidate) : undefined;
+    if (!candidate) return undefined;
+    const launchContext = verifyMcpLaunchContextToken(this.token, audience, candidate);
+    return launchContext ? { ...launchContext, launchContext } : undefined;
   }
 
   /**
@@ -250,10 +248,31 @@ export class StreamableHttpMcpIngress<TContext> {
         return;
       }
 
-      const trust = this.resolveRequestTrust(req);
+      let trust = this.resolveRequestTrust(req);
       if (!trust) {
         this.sendJson(res, 401, { error: "unauthorized" });
         return;
+      }
+      if (trust.launchContext) {
+        const resolver = this.options.resolveLaunchContextIdentity;
+        if (!resolver) {
+          this.sendJson(res, 401, { error: "launch context validation unavailable" });
+          return;
+        }
+        let liveIdentity: McpThreadIdentity | undefined;
+        try {
+          liveIdentity = await resolver(trust.launchContext);
+        } catch {
+          liveIdentity = undefined;
+        }
+        if (!liveIdentity?.threadId) {
+          this.sendJson(res, 401, { error: "launch context is stale or revoked" });
+          return;
+        }
+        trust = {
+          ...trust,
+          identity: mergeMcpIdentities(trust.identity, liveIdentity),
+        };
       }
 
       if (path === "/mcp" || path === "/mcp/") {
@@ -284,7 +303,7 @@ export class StreamableHttpMcpIngress<TContext> {
     res: ServerResponse,
     trust: McpRequestTrust,
   ): Promise<void> {
-    const { identity, routing } = trust;
+    const { identity } = trust;
     const raw = await this.readBody(req);
     let body: unknown;
     try {
@@ -311,13 +330,13 @@ export class StreamableHttpMcpIngress<TContext> {
     if (Array.isArray(body)) {
       const out: JsonRpcResponse[] = [];
       for (const message of body) {
-        const reply = await this.handleSingle(message, identity, routing);
+        const reply = await this.handleSingle(message, identity);
         if (reply) out.push(reply);
       }
       this.sendJson(res, 200, out);
       return;
     }
-    const reply = await this.handleSingle(body, identity, routing);
+    const reply = await this.handleSingle(body, identity);
     if (!reply) {
       // notification — no response
       res.statusCode = 202;
@@ -330,7 +349,6 @@ export class StreamableHttpMcpIngress<TContext> {
   private async handleSingle(
     message: unknown,
     identity: McpThreadIdentity,
-    routing?: McpLaunchContextRouting,
   ): Promise<JsonRpcResponse | null> {
     if (!isJsonRpcRequest(message)) return null;
     const { id = null, method, params } = message;
@@ -366,39 +384,11 @@ export class StreamableHttpMcpIngress<TContext> {
         const name = String(p.name ?? "");
         const rawArgs = (p.arguments ?? {}) as Record<string, unknown>;
         const args = { ...rawArgs };
-        const hasProviderSessionId = Object.prototype.hasOwnProperty.call(
-          args,
-          PROVIDER_SESSION_ID_ARG,
-        );
-        const providerSessionId = args[PROVIDER_SESSION_ID_ARG];
+        // OpenCode's hook still adds this compatibility field. It is never an
+        // authority input: the signed thread capability is the sole identity.
         delete args[PROVIDER_SESSION_ID_ARG];
 
-        let callIdentity = identity;
-        if (routing === "provider-session" && !hasProviderSessionId) {
-          return this.toolError(id, "Provider session identity is unavailable");
-        }
-        if ((!identity.threadId && hasProviderSessionId) || routing === "provider-session") {
-          const resolver = this.options.resolveProviderSessionIdentity;
-          if (
-            typeof providerSessionId !== "string" ||
-            providerSessionId.length === 0 ||
-            !resolver
-          ) {
-            return this.toolError(id, "Provider session identity is unavailable");
-          }
-          let resolvedIdentity: McpThreadIdentity | undefined;
-          try {
-            resolvedIdentity = await resolver(providerSessionId);
-          } catch {
-            return this.toolError(id, "Provider session identity is unavailable");
-          }
-          if (!resolvedIdentity?.threadId) {
-            return this.toolError(id, "Provider session is stale or unknown");
-          }
-          callIdentity = mergeMcpIdentities(identity, resolvedIdentity);
-        }
-
-        if (callIdentity.disabledTools?.includes(name)) {
+        if (identity.disabledTools?.includes(name)) {
           return {
             jsonrpc: "2.0",
             id,
@@ -418,7 +408,7 @@ export class StreamableHttpMcpIngress<TContext> {
             },
           };
         }
-        const ctx = this.options.buildContext(callIdentity);
+        const ctx = this.options.buildContext(identity);
         if (!ctx) {
           return {
             jsonrpc: "2.0",
@@ -460,17 +450,6 @@ export class StreamableHttpMcpIngress<TContext> {
         error: { code: -32000, message: (err as Error).message ?? "internal" },
       };
     }
-  }
-
-  private toolError(id: number | string | null, message: string): JsonRpcResponseOk {
-    return {
-      jsonrpc: "2.0",
-      id,
-      result: {
-        isError: true,
-        content: [{ type: "text", text: message }],
-      },
-    };
   }
 }
 

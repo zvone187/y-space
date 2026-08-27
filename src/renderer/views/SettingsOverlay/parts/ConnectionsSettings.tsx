@@ -22,18 +22,21 @@ const EMPTY_APPS: PipedreamListAppsResult = { apps: [], totalCount: 0 };
 const PERSONAL_MCP_URL = "https://mcp.pipedream.net/v2";
 const PERSONAL_MCP_ID = "pipedream-personal-mcp";
 
-function personalMcpServer(): McpServer {
+function personalMcpServer(description: string): McpServer {
   return {
     id: PERSONAL_MCP_ID,
     name: "pd",
-    description: "Personal Pipedream tools",
+    description,
     enabled: true,
     timeoutMs: 30_000,
     transport: { type: "http", url: PERSONAL_MCP_URL, headers: {} },
   };
 }
 
-function withPersonalMcpServer(servers: readonly McpServer[]): {
+function withPersonalMcpServer(
+  servers: readonly McpServer[],
+  description: string,
+): {
   server: McpServer;
   servers: McpServer[];
 } {
@@ -47,7 +50,7 @@ function withPersonalMcpServer(servers: readonly McpServer[]): {
   );
   if (collision) throw new Error("The MCP server name pd is already in use.");
 
-  const canonical = personalMcpServer();
+  const canonical = personalMcpServer(description);
   const next = servers.filter((server) => {
     if (server.id === PERSONAL_MCP_ID) return false;
     return !(
@@ -120,7 +123,7 @@ export function ConnectionsSettings() {
 
   const signInPersonalMcp = () =>
     run("personal-mcp", async () => {
-      const managed = withPersonalMcpServer(mcpServers);
+      const managed = withPersonalMcpServer(mcpServers, t`Personal Pipedream tools`);
       setMcpServers(managed.servers);
       await waitForPendingSharedSettings();
       const authenticated = await personalOauth.authenticate(managed.server);
@@ -133,7 +136,7 @@ export function ConnectionsSettings() {
 
   const signOutPersonalMcp = () =>
     run("personal-mcp", async () => {
-      const managed = withPersonalMcpServer(mcpServers);
+      const managed = withPersonalMcpServer(mcpServers, t`Personal Pipedream tools`);
       await personalOauth.signOut(managed.server);
       setSnapshot(await readBridge().pipedreamGetSnapshot());
     });
@@ -246,6 +249,13 @@ export function ConnectionsSettings() {
               <span aria-hidden="true">·</span>
               <span>{connect.projectIdHint}</span>
             </div>
+            {connect.credentialSource === "environment" ? (
+              <p className="rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
+                <Trans>
+                  Credentials are managed by the Y Space environment and never exposed to agents.
+                </Trans>
+              </p>
+            ) : null}
 
             <div className="flex items-center gap-2">
               <Input

@@ -26,8 +26,15 @@ const OG_LOCALE: Record<Locale, string> = {
 };
 
 export const SITE_NAME = "Y Space";
-export const SITE_URL = "https://poracode.com";
-export const GITHUB_URL = "https://github.com/zvone187/y-space";
+export const GITHUB_URL = contact.projectUrl;
+export const SUPPORT_URL = contact.supportUrl;
+export const SECURITY_URL = contact.securityUrl;
+const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+export const SITE_URL = configuredSiteUrl
+  ? new URL(configuredSiteUrl).toString().replace(/\/$/, "")
+  : GITHUB_URL;
+const HAS_HOSTED_SITE = Boolean(configuredSiteUrl);
+const RAW_PUBLIC_URL = "https://raw.githubusercontent.com/zvone187/y-space/master/website/public";
 export const SOCIAL_IMAGE_PATH = "/hero-screenshot.png";
 export const SOCIAL_IMAGE_ALT = "Y Space AI coding agent orchestrator social card";
 const SOCIAL_IMAGE_WIDTH = 1200;
@@ -73,7 +80,29 @@ export const SITEMAP_ROUTES = [
 ] as const;
 
 export function absoluteUrl(path: string): string {
-  return new URL(path, SITE_URL).toString();
+  if (HAS_HOSTED_SITE) return new URL(path, `${SITE_URL}/`).toString();
+
+  const pathname = new URL(path, "https://local.invalid").pathname;
+  if (/\.(?:avif|ico|jpe?g|json|png|svg|webmanifest|webp)$/i.test(pathname)) {
+    const assetPath =
+      pathname === "/opengraph-image" || pathname === "/twitter-image"
+        ? SOCIAL_IMAGE_PATH
+        : pathname;
+    return `${RAW_PUBLIC_URL}${assetPath}`;
+  }
+  if (pathname === "/opengraph-image" || pathname === "/twitter-image") {
+    return `${RAW_PUBLIC_URL}${SOCIAL_IMAGE_PATH}`;
+  }
+  if (pathname.endsWith("/support")) return SUPPORT_URL;
+  if (pathname.endsWith("/privacy")) return SECURITY_URL;
+  if (
+    pathname.endsWith("/download") ||
+    pathname.endsWith("/changelog") ||
+    pathname.endsWith("/nightly")
+  ) {
+    return `${GITHUB_URL}/releases`;
+  }
+  return GITHUB_URL;
 }
 
 /**
@@ -106,13 +135,14 @@ export function createPageMetadata({
   const localized = SITEMAP_ROUTES.find((route) => route.path === path)?.localized ?? true;
 
   return {
+    metadataBase: new URL(SITE_URL),
     title: {
       absolute: title,
     },
     description,
     keywords: SEO_KEYWORDS,
     alternates: {
-      canonical,
+      canonical: url,
       ...(localized ? { languages: buildLanguageAlternates(path) } : {}),
     },
     openGraph: {
@@ -159,7 +189,6 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     name: SITE_NAME,
     url: SITE_URL,
     description: SITE_DESCRIPTION,
-    email: contact.supportEmail,
     logo: {
       "@type": "ImageObject",
       url: absoluteUrl("/icon-512.png"),
@@ -170,8 +199,7 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "technical support",
-      email: contact.supportEmail,
-      url: absoluteUrl("/support"),
+      url: SUPPORT_URL,
     },
   };
 
@@ -180,26 +208,23 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     "@type": "SoftwareApplication",
     "@id": `${SITE_URL}/#software`,
     name: SITE_NAME,
-    // Brand aliases help Google disambiguate the app from the unrelated
-    // "Y Space" music project and other software firms ranking for the term,
-    // and tie the entity to the poracode.com domain-match query.
+    // Brand aliases help disambiguate the app from unrelated projects.
     alternateName: [
       "Y Space App",
       "Y Space Desktop",
       "Y Space Desktop App",
       "Y Space AI Agent Orchestrator",
-      "poracode.com",
     ],
     applicationCategory: "DeveloperApplication",
     applicationSubCategory: "AI coding assistant workspace",
     operatingSystem: "macOS, Windows, Linux",
     url: SITE_URL,
-    downloadUrl: absoluteUrl("/download"),
+    downloadUrl: `${GITHUB_URL}/releases`,
     image: absoluteUrl(SOCIAL_IMAGE_PATH),
     description: SITE_DESCRIPTION,
     codeRepository: GITHUB_URL,
     license: "https://www.apache.org/licenses/LICENSE-2.0",
-    releaseNotes: absoluteUrl("/changelog"),
+    releaseNotes: `${GITHUB_URL}/releases`,
     sameAs: [GITHUB_URL],
     offers: {
       "@type": "Offer",
@@ -229,7 +254,7 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     ],
     potentialAction: {
       "@type": "DownloadAction",
-      target: absoluteUrl("/download"),
+      target: `${GITHUB_URL}/releases`,
     },
     ...(release.version ? { softwareVersion: release.version } : {}),
   };
@@ -239,7 +264,7 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
     name: SITE_NAME,
-    alternateName: ["YSpace", "y.space", "poracode.com"],
+    alternateName: ["YSpace", "Y Space Desktop"],
     url: SITE_URL,
     description: SITE_DESCRIPTION,
     publisher: {

@@ -61,6 +61,7 @@ export interface CookieImportBridgeServerOptions {
   pairingStore: CookieImportPairingStore;
   ports?: readonly number[];
   requestTimeoutMs?: number;
+  now?(): number;
   onStateChange?(): void;
 }
 
@@ -85,13 +86,16 @@ export class CookieImportBridgeServer implements CookieImportBridge {
   private readonly pending = new Map<string, PendingRequest>();
   private readonly ports: readonly number[];
   private readonly requestTimeoutMs: number;
+  private readonly now: () => number;
   private server: WebSocketServer | null = null;
   private info: CookieImportBridgeInfo | null = null;
   private activePairing: CookieImportPairingChallenge | null = null;
+  private pairingExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly options: CookieImportBridgeServerOptions) {
     this.ports = options.ports?.length ? [...options.ports] : DEFAULT_PORTS;
     this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+    this.now = options.now ?? Date.now;
   }
 
   async start(): Promise<CookieImportBridgeInfo> {
@@ -107,7 +111,9 @@ export class CookieImportBridgeServer implements CookieImportBridge {
 
   beginPairing(): CookieImportPairingChallenge {
     if (this.activePairing) this.options.pairingStore.cancelPairing(this.activePairing.pairingId);
+    this.clearPairingExpiryTimer();
     this.activePairing = this.options.pairingStore.beginPairing();
+    this.schedulePairingExpiry();
     this.broadcastPairingChallenge();
     this.notifyStateChange();
     return { ...this.activePairing };
@@ -115,15 +121,33 @@ export class CookieImportBridgeServer implements CookieImportBridge {
 
   cancelPairing(pairingId: string): void {
     this.options.pairingStore.cancelPairing(pairingId);
-    if (this.activePairing?.pairingId === pairingId) this.activePairing = null;
+    if (this.activePairing?.pairingId === pairingId) {
+      this.activePairing = null;
+      this.clearPairingExpiryTimer();
+    }
     this.notifyStateChange();
   }
 
   forgetSource(sourceId: string): void {
-    this.options.pairingStore.forgetSource(sourceId);
-    const connection = this.authenticatedBySourceId.get(sourceId);
-    if (connection) connection.socket.close(1008, "Pairing revoked");
-    this.notifyStateChange();
+    this.revokeSourceConnection(sourceId);
+    try {
+      const result = this.options.pairingStore.forgetSource(sourceId);
+      if (result.purgedAll) {
+        for (const connectedSourceId of [...this.authenticatedBySourceId.keys()]) {
+          this.revokeSourceConnection(connectedSourceId);
+        }
+      }
+    } finally {
+      const retainedSourceIds = new Set(
+        this.options.pairingStore.listSources().map((source) => source.sourceId),
+      );
+      for (const connectedSourceId of [...this.authenticatedBySourceId.keys()]) {
+        if (!retainedSourceIds.has(connectedSourceId)) {
+          this.revokeSourceConnection(connectedSourceId);
+        }
+      }
+      this.notifyStateChange();
+    }
   }
 
   listSources(): CookieImportRendererSource[] {
@@ -205,6 +229,7 @@ export class CookieImportBridgeServer implements CookieImportBridge {
     this.server = null;
     this.info = null;
     this.activePairing = null;
+    this.clearPairingExpiryTimer();
     this.notifyStateChange();
   }
 
@@ -324,7 +349,8 @@ export class CookieImportBridgeServer implements CookieImportBridge {
       type: "connection.challenge",
       challenge: connection.challenge,
     });
-    if (this.activePairing) this.sendPairingChallenge(socket, this.activePairing);
+    const activePairing = this.getActivePairing();
+    if (activePairing) this.sendPairingChallenge(socket, activePairing);
   }
 
   private handleMessage(connection: BridgeConnection, data: unknown): void {
@@ -459,6 +485,7 @@ export class CookieImportBridgeServer implements CookieImportBridge {
         ]),
       );
       this.activePairing = null;
+      this.clearPairingExpiryTimer();
       connection.sessionKey = sessionKey;
       this.authenticateConnection(connection, accepted.source);
       this.send(connection.socket, {
@@ -484,68 +511,82 @@ export class CookieImportBridgeServer implements CookieImportBridge {
     connection: BridgeConnection,
     message: Extract<ReturnType<typeof cookieImportClientMessageSchema.parse>, { type: "hello" }>,
   ): void {
-    const clientTranscript = canonicalCookieImportTranscript([
-      "hello.client.v1",
-      connection.challenge,
-      message.clientNonce,
-      message.clientPublicKey,
-      message.sourceId,
-      message.label,
-      message.browserFamily,
-      message.extensionVersion,
-    ]);
-    const authenticated = this.options.pairingStore.authenticateProof({
-      sourceId: message.sourceId,
-      transcript: clientTranscript,
-      proof: message.proof,
-    });
-    if (!authenticated) {
+    let nextSessionKey: Buffer | null = null;
+    try {
+      const clientTranscript = canonicalCookieImportTranscript([
+        "hello.client.v1",
+        connection.challenge,
+        message.clientNonce,
+        message.clientPublicKey,
+        message.sourceId,
+        message.label,
+        message.browserFamily,
+        message.extensionVersion,
+      ]);
+      const authenticated = this.options.pairingStore.authenticateProof({
+        sourceId: message.sourceId,
+        transcript: clientTranscript,
+        proof: message.proof,
+      });
+      if (!authenticated) throw new Error("Invalid pairing proof.");
+
+      const serverKeys = createEphemeralKeyPair();
+      const sessionTranscript = canonicalCookieImportTranscript([
+        "hello.session.v1",
+        connection.challenge,
+        message.clientNonce,
+        message.clientPublicKey,
+        serverKeys.publicKey,
+        message.sourceId,
+      ]);
+      nextSessionKey = deriveConnectionKey({
+        ecdh: serverKeys.ecdh,
+        peerPublicKey: message.clientPublicKey,
+        authenticationKey: authenticated.authenticationKey,
+        transcript: sessionTranscript,
+      });
+      const serverProof = hmacProof(
+        authenticated.authenticationKey,
+        canonicalCookieImportTranscript(["hello.server.v1", sessionTranscript]),
+      );
+      this.options.pairingStore.refreshSourceMetadata(message.sourceId, {
+        label: message.label,
+        browserFamily: message.browserFamily,
+        extensionVersion: message.extensionVersion,
+      });
+      const refreshedSource = this.options.pairingStore
+        .listSources()
+        .find((source) => source.sourceId === message.sourceId);
+      if (!refreshedSource) throw new Error("Pairing not found.");
+
+      connection.sessionKey?.fill(0);
+      connection.sessionKey = nextSessionKey;
+      nextSessionKey = null;
+      this.authenticateConnection(connection, refreshedSource);
       this.send(connection.socket, {
         protocolVersion: COOKIE_IMPORT_PROTOCOL_VERSION,
-        type: "error",
-        code: "authentication_failed",
-        message: "Pairing is no longer valid. Pair this browser again.",
+        type: "hello.result",
+        sourceId: refreshedSource.sourceId,
+        serverPublicKey: serverKeys.publicKey,
+        proof: serverProof,
       });
+      this.notifyStateChange();
+    } catch {
+      nextSessionKey?.fill(0);
+      connection.sessionKey?.fill(0);
+      connection.sessionKey = null;
+      try {
+        this.send(connection.socket, {
+          protocolVersion: COOKIE_IMPORT_PROTOCOL_VERSION,
+          type: "error",
+          code: "authentication_failed",
+          message: "Pairing is no longer valid. Pair this browser again.",
+        });
+      } catch {
+        // The peer may already have disconnected during authentication.
+      }
       connection.socket.close(1008, "Invalid pairing");
-      return;
     }
-    this.options.pairingStore.refreshSourceMetadata(message.sourceId, {
-      label: message.label,
-      browserFamily: message.browserFamily,
-      extensionVersion: message.extensionVersion,
-    });
-    const serverKeys = createEphemeralKeyPair();
-    const sessionTranscript = canonicalCookieImportTranscript([
-      "hello.session.v1",
-      connection.challenge,
-      message.clientNonce,
-      message.clientPublicKey,
-      serverKeys.publicKey,
-      message.sourceId,
-    ]);
-    connection.sessionKey = deriveConnectionKey({
-      ecdh: serverKeys.ecdh,
-      peerPublicKey: message.clientPublicKey,
-      authenticationKey: authenticated.authenticationKey,
-      transcript: sessionTranscript,
-    });
-    const serverProof = hmacProof(
-      authenticated.authenticationKey,
-      canonicalCookieImportTranscript(["hello.server.v1", sessionTranscript]),
-    );
-    const refreshedSource = this.options.pairingStore
-      .listSources()
-      .find((source) => source.sourceId === message.sourceId);
-    if (!refreshedSource) throw new Error("Pairing not found.");
-    this.authenticateConnection(connection, refreshedSource);
-    this.send(connection.socket, {
-      protocolVersion: COOKIE_IMPORT_PROTOCOL_VERSION,
-      type: "hello.result",
-      sourceId: refreshedSource.sourceId,
-      serverPublicKey: serverKeys.publicKey,
-      proof: serverProof,
-    });
-    this.notifyStateChange();
   }
 
   private authenticateConnection(connection: BridgeConnection, source: CookieImportPairedSource) {
@@ -555,6 +596,18 @@ export class CookieImportBridgeServer implements CookieImportBridge {
     clearTimeout(connection.authenticationTimer);
     this.authenticatedBySourceId.set(source.sourceId, connection);
     if (previous && previous !== connection) previous.socket.close(1008, "Newer connection opened");
+  }
+
+  private revokeSourceConnection(sourceId: string): void {
+    const connection = this.authenticatedBySourceId.get(sourceId);
+    if (!connection) return;
+    this.authenticatedBySourceId.delete(sourceId);
+    connection.authenticated = false;
+    try {
+      connection.socket.close(1008, "Pairing revoked");
+    } finally {
+      this.closeConnection(connection);
+    }
   }
 
   private rejectPending(requestId: string, connection: BridgeConnection, code: string): void {
@@ -586,11 +639,41 @@ export class CookieImportBridgeServer implements CookieImportBridge {
   }
 
   private broadcastPairingChallenge(): void {
-    if (!this.activePairing) return;
+    const activePairing = this.getActivePairing();
+    if (!activePairing) return;
     for (const connection of this.connections) {
-      if (!connection.authenticated)
-        this.sendPairingChallenge(connection.socket, this.activePairing);
+      if (!connection.authenticated) this.sendPairingChallenge(connection.socket, activePairing);
     }
+  }
+
+  private getActivePairing(): CookieImportPairingChallenge | null {
+    const pairing = this.activePairing;
+    if (!pairing || this.now() < pairing.expiresAt) return pairing;
+    this.options.pairingStore.cancelPairing(pairing.pairingId);
+    this.activePairing = null;
+    this.clearPairingExpiryTimer();
+    this.notifyStateChange();
+    return null;
+  }
+
+  private schedulePairingExpiry(): void {
+    this.clearPairingExpiryTimer();
+    const pairing = this.activePairing;
+    if (!pairing) return;
+    this.pairingExpiryTimer = setTimeout(
+      () => {
+        this.pairingExpiryTimer = null;
+        if (this.getActivePairing()) this.schedulePairingExpiry();
+      },
+      Math.max(0, pairing.expiresAt - this.now()),
+    );
+    this.pairingExpiryTimer.unref?.();
+  }
+
+  private clearPairingExpiryTimer(): void {
+    if (!this.pairingExpiryTimer) return;
+    clearTimeout(this.pairingExpiryTimer);
+    this.pairingExpiryTimer = null;
   }
 
   private sendPairingChallenge(socket: WebSocket, pairing: CookieImportPairingChallenge): void {

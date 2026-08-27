@@ -151,6 +151,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "installUpdate",
   "browserGetState",
   "browserCreateTab",
+  "browserCreateSensitiveTab",
   "browserCloseTab",
   "browserActivateTab",
   "browserMoveTab",

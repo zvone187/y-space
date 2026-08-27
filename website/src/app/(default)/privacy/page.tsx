@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-import contact from "../../../../../branding/contact.json";
-import { createPageMetadata } from "@/lib/seo";
+import { createPageMetadata, SECURITY_URL, SUPPORT_URL } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Y Space Privacy Policy",
@@ -130,8 +129,9 @@ export default function PrivacyPage() {
                 operational or security logs according to their policies.
               </p>
               <p>
-                If you email support or open a GitHub issue, Y Space receives the information you
-                choose to provide and uses it to investigate the request and respond.
+                If you open a GitHub issue or submit a private security report, Y Space receives the
+                information you choose to provide and uses it to investigate the request and
+                respond.
               </p>
             </div>
           </section>
@@ -149,12 +149,19 @@ export default function PrivacyPage() {
             <h2 className="mb-3 text-xl font-semibold text-white">Changes and contact</h2>
             <p>
               We may update this policy as Y Space changes and will publish the new effective date
-              here. Questions or privacy requests can be sent to{" "}
+              here. For ordinary questions, use the{" "}
               <a
-                href={`mailto:${contact.supportEmail}`}
+                href={SUPPORT_URL}
                 className="text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white"
               >
-                {contact.supportEmail}
+                Y Space issue tracker
+              </a>
+              . For sensitive privacy or security reports, follow the{" "}
+              <a
+                href={SECURITY_URL}
+                className="text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white"
+              >
+                security policy and private reporting guidance
               </a>
               .
             </p>

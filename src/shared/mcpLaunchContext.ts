@@ -1,11 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { McpThreadIdentity } from "./browserMcpThread";
 
-export type McpLaunchContextAudience = "browser" | "app-controls";
-export type McpLaunchContextRouting = "thread" | "provider-session";
+export type McpLaunchContextAudience = "browser" | "computer-use" | "app-controls";
+export type McpLaunchContextRouting = "thread";
 
 export interface McpLaunchContext {
-  routing: McpLaunchContextRouting;
+  routing: "thread";
   identity: McpThreadIdentity;
 }
 
@@ -14,6 +14,7 @@ interface SerializedMcpLaunchContext {
   audience: McpLaunchContextAudience;
   routing: McpLaunchContextRouting;
   threadId?: string;
+  launchId?: string;
   title?: string;
   disabledTools?: string[];
 }
@@ -21,6 +22,7 @@ interface SerializedMcpLaunchContext {
 const TOKEN_PREFIX = "yspace-mcp-v1";
 export const MCP_LAUNCH_CONTEXT_HEADER = "x-y-space-mcp-context";
 const MAX_THREAD_ID_LENGTH = 1024;
+const MAX_LAUNCH_ID_LENGTH = 128;
 const MAX_TITLE_LENGTH = 80;
 const MAX_DISABLED_TOOLS = 512;
 const MAX_TOOL_NAME_LENGTH = 256;
@@ -34,18 +36,21 @@ const MAX_PAYLOAD_LENGTH = 128 * 1024;
 export function createMcpLaunchContextToken(
   rootToken: string,
   audience: McpLaunchContextAudience,
-  identity?: McpThreadIdentity,
+  identity: McpThreadIdentity,
 ): string {
   if (!rootToken) throw new Error("MCP launch context root token is required");
 
   const threadId = normalizeNonEmptyString(identity?.threadId, MAX_THREAD_ID_LENGTH);
+  const launchId = normalizeNonEmptyString(identity?.launchId, MAX_LAUNCH_ID_LENGTH);
   const title = normalizeNonEmptyString(identity?.title, MAX_TITLE_LENGTH);
   const disabledTools = normalizeDisabledTools(identity?.disabledTools);
+  if (!threadId) throw new Error("MCP launch context requires a thread identity");
   const payload: SerializedMcpLaunchContext = {
     v: 1,
     audience,
-    routing: threadId ? "thread" : "provider-session",
-    ...(threadId ? { threadId } : {}),
+    routing: "thread",
+    threadId,
+    ...(launchId ? { launchId } : {}),
     ...(title ? { title } : {}),
     ...(disabledTools.length > 0 ? { disabledTools } : {}),
   };
@@ -76,19 +81,22 @@ export function verifyMcpLaunchContextToken(
     return undefined;
   }
   if (!isRecord(value) || value.v !== 1 || value.audience !== audience) return undefined;
-  if (value.routing !== "thread" && value.routing !== "provider-session") return undefined;
+  if (value.routing !== "thread") return undefined;
 
   const threadId = readBoundedString(value.threadId, MAX_THREAD_ID_LENGTH);
+  const launchId = readBoundedString(value.launchId, MAX_LAUNCH_ID_LENGTH);
   const title = readBoundedString(value.title, MAX_TITLE_LENGTH);
   const disabledTools = readDisabledTools(value.disabledTools);
-  if (threadId === null || title === null || disabledTools === null) return undefined;
-  if (value.routing === "thread" && !threadId) return undefined;
-  if (value.routing === "provider-session" && threadId) return undefined;
+  if (threadId === null || launchId === null || title === null || disabledTools === null) {
+    return undefined;
+  }
+  if (!threadId) return undefined;
 
   return {
-    routing: value.routing,
+    routing: "thread",
     identity: {
-      ...(threadId ? { threadId } : {}),
+      threadId,
+      ...(launchId ? { launchId } : {}),
       ...(title ? { title } : {}),
       ...(disabledTools.length > 0 ? { disabledTools } : {}),
     },

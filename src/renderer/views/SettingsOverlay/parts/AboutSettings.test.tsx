@@ -72,4 +72,10 @@ describe("AboutSettings Lightcode data import", () => {
     rerender(<AboutSettings />);
     expect(screen.queryByRole("button", { name: "Import again" })).not.toBeInTheDocument();
   });
+
+  it("credits Y Space contributors and the Apache-2.0 license", () => {
+    render(<AboutSettings />);
+
+    expect(screen.getByText(/Y Space contributors\. Licensed under Apache-2\.0\./)).toBeVisible();
+  });
 });

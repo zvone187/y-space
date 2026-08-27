@@ -15,11 +15,39 @@ export type CookieImportMappingResult =
   | { ok: false; reason: CookieImportSkipReason };
 
 function normalizeDomain(domain: string): string {
-  return domain.trim().replace(/^\.+/, "").toLowerCase();
+  return normalizeHostname(domain.trim().replace(/^\.+/, ""));
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname
+    .trim()
+    .replace(/^\[|\]$/gu, "")
+    .replace(/\.$/u, "")
+    .toLowerCase();
+}
+
+function isChromiumTrustworthyLoopback(hostname: string): boolean {
+  const normalized = normalizeHostname(hostname);
+  if (normalized === "localhost" || normalized.endsWith(".localhost") || normalized === "::1") {
+    return true;
+  }
+  const octets = normalized.split(".");
+  return (
+    octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((octet) => /^\d{1,3}$/u.test(octet) && Number(octet) <= 255)
+  );
+}
+
+function targetSupportsSecureCookies(url: URL): boolean {
+  return (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && isChromiumTrustworthyLoopback(url.hostname))
+  );
 }
 
 function hostnameMatchesDomain(hostname: string, domain: string): boolean {
-  const normalizedHostname = hostname.toLowerCase();
+  const normalizedHostname = normalizeHostname(hostname);
   return normalizedHostname === domain || normalizedHostname.endsWith(`.${domain}`);
 }
 
@@ -64,11 +92,11 @@ export function mapImportedCookie(input: {
       continue;
     }
     const domainMatches = cookie.hostOnly
-      ? url.hostname.toLowerCase() === cookieDomain
+      ? normalizeHostname(url.hostname) === cookieDomain
       : hostnameMatchesDomain(url.hostname, cookieDomain);
     if (!domainMatches) continue;
     domainMatchingTarget ??= targetUrl;
-    if (!cookie.secure || url.protocol === "https:") {
+    if (!cookie.secure || targetSupportsSecureCookies(url)) {
       matchingTarget = targetUrl;
       break;
     }

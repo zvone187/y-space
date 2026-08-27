@@ -201,16 +201,19 @@
         "Request import for the exact active origin and approve temporary permission in the extension.",
         "Verify preview shows domain/count/unsupported metadata only and confirm selected domains in Y Space.",
         "Reload the embedded page, open a second embedded tab, and ask Codex to verify the authenticated UI.",
-        "Quit/relaunch and repeat checks for persistent versus session cookies."
+        "Capture /cookie-status and /account/cookie-status in the source and embedded browsers; verify the value-free presence rows for persistent, session, path, prefix, expired, and partitioned cases.",
+        "Quit/relaunch, capture both status pages again, and verify persistent cookies remain while the session cookie is absent."
       ],
       "expectedResults": [
         "No values cross during preview.",
         "Commit writes only validated in-scope cookies and flushes the embedded partition.",
-        "Both embedded tabs and the agent can use the authenticated UI; persistence behavior matches cookie type."
+        "Both embedded tabs and the agent can use the authenticated UI; persistence behavior matches cookie type.",
+        "The partitioned and expired rows stay absent in Y Space, the path-scoped row appears only under /account, and no status response contains the sentinel."
       ],
       "proofToCapture": [
         "Preview and confirmation screenshots.",
         "Authenticated embedded-page screenshots.",
+        "Value-free root/account cookie-status captures before import, after import, and after restart.",
         "Redacted import counts and restart results."
       ],
       "status": "pending"

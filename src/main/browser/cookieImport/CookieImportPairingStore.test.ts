@@ -34,6 +34,7 @@ interface PairingStoreConstructor {
   new (options: {
     load: () => unknown;
     save: (state: unknown) => void;
+    purge?: () => void;
     now: () => number;
     randomCode: () => string;
     randomToken: () => string;
@@ -117,6 +118,19 @@ function acceptPairing(
 }
 
 describe("CookieImportPairingStore", () => {
+  it("starts unpaired when persisted pairing metadata is invalid", async () => {
+    const CookieImportPairingStore = await loadPairingStore();
+    const store = new CookieImportPairingStore({
+      load: () => ({ version: 1, sources: [{ tokenHash: "not-a-valid-pairing" }] }),
+      save: () => undefined,
+      now: Date.now,
+      randomCode: () => "12345678",
+      randomToken: () => "replacement-token",
+    });
+
+    expect(store.listSources()).toEqual([]);
+  });
+
   it("issues an eight-digit five-minute code and persists only a token hash", async () => {
     const fixture = await makeStore();
     const pairing = fixture.store.beginPairing();
@@ -217,5 +231,40 @@ describe("CookieImportPairingStore", () => {
       "11111111-1111-4111-8111-111111111111",
       "44444444-4444-4444-8444-444444444444",
     ]);
+  });
+
+  it("purges every pairing when revocation cannot persist the reduced store", async () => {
+    const CookieImportPairingStore = await loadPairingStore();
+    let purged = false;
+    const store = new CookieImportPairingStore({
+      load: () => ({
+        version: 1,
+        sources: [
+          {
+            ...source(),
+            pairedAt: 1,
+            tokenHash: sha256("first-token").toString("hex"),
+          },
+          {
+            ...source("44444444-4444-4444-8444-444444444444"),
+            pairedAt: 2,
+            tokenHash: sha256("second-token").toString("hex"),
+          },
+        ],
+      }),
+      save: () => {
+        throw new Error("simulated persistence failure");
+      },
+      purge: () => {
+        purged = true;
+      },
+      now: Date.now,
+      randomCode: () => "12345678",
+      randomToken: () => "replacement-token",
+    });
+
+    expect(() => store.forgetSource(source().sourceId)).not.toThrow();
+    expect(purged).toBe(true);
+    expect(store.listSources()).toEqual([]);
   });
 });

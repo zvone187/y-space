@@ -86,9 +86,13 @@ import {
   type WorkflowGetRunResult,
 } from "../schemas";
 
+const mcpCallerServerIdSchema = z.enum(["browser", "computer-use", "app-controls"]);
+
 export const resolveMcpCallerIdentityPayloadSchema = z.object({
-  providerSessionId: z.string().trim().min(1).max(1024),
-  serverId: z.enum(["browser", "app-controls"]),
+  routing: z.literal("thread"),
+  threadId: z.string().trim().min(1).max(1024),
+  launchId: z.string().trim().min(1).max(128).optional(),
+  serverId: mcpCallerServerIdSchema,
 });
 
 export type ResolveMcpCallerIdentityPayload = z.infer<typeof resolveMcpCallerIdentityPayloadSchema>;

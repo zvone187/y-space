@@ -1,18 +1,16 @@
 import { ImageResponse } from "next/og";
 
-import { SITE_URL, SOCIAL_IMAGE_ALT } from "@/lib/seo";
+import { SITE_URL } from "@/lib/seo";
 
-// Branded social card used for og:image and twitter:image across the whole site.
-// Generated at build time by next/og (Satori) so there is no binary asset to keep
-// in sync, and it renders at the ideal 1.91:1 ratio (1200x630) that X/LinkedIn
-// crop to — unlike the 1.55:1 app screenshot it replaces.
-export const alt = SOCIAL_IMAGE_ALT;
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+// A stable explicit route avoids Next's hashed metadata-file URLs under route
+// groups while retaining a build-cacheable 1.91:1 social card.
+export const dynamic = "force-static";
+
+const size = { width: 1200, height: 630 };
 
 const AGENTS = ["Claude", "Codex", "Gemini", "Cursor", "OpenCode", "Copilot"];
 
-export default function OpengraphImage() {
+export function GET() {
   return new ImageResponse(
     <div
       style={{

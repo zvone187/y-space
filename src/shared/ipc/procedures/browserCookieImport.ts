@@ -77,6 +77,15 @@ export const browserCookieImportPreviewPayloadSchema = z
   })
   .strict();
 
+export const browserCookieImportChooseFilePayloadSchema = z
+  .object({
+    targetUrls: z.array(targetUrlSchema).min(1).max(MAX_TARGETS),
+    dialogTitle: z.string().trim().min(1).max(160),
+    cookieExportsFilterName: z.string().trim().min(1).max(80),
+    allFilesFilterName: z.string().trim().min(1).max(80),
+  })
+  .strict();
+
 export const browserCookieImportCommitPayloadSchema = z
   .object({
     requestId: z.string().uuid(),
@@ -129,14 +138,10 @@ export const browserCookieImportProcedures = {
     "main-local",
   ),
   browserCookieImportChooseFile: definePayloadProcedure<
-    { targetUrls: string[] },
+    z.infer<typeof browserCookieImportChooseFilePayloadSchema>,
     z.infer<typeof browserCookieImportActiveRequestSchema> | null,
     "main-local"
-  >(
-    "browserCookieImportChooseFile",
-    "main-local",
-    z.object({ targetUrls: z.array(targetUrlSchema).min(1).max(MAX_TARGETS) }).strict(),
-  ),
+  >("browserCookieImportChooseFile", "main-local", browserCookieImportChooseFilePayloadSchema),
   browserCookieImportBeginPairing: defineNoArgProcedure<
     BrowserCookieImportPairingChallenge,
     "main-local"

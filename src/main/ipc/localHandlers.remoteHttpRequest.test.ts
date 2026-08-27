@@ -4,7 +4,14 @@ import { createLocalIpcHandlers } from "./localHandlers";
 type FetchMock = (url: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
 function makeHandlers(
-  browserPanelManager: { openLink(url: string): Promise<boolean> } | null = null,
+  browserPanelManager: {
+    openLink(url: string): Promise<boolean>;
+    createSensitiveIntegrationTab?(payload: {
+      url: string;
+      activate?: boolean;
+      reveal?: boolean;
+    }): Promise<{ tabId: string }>;
+  } | null = null,
   openSystemUrl?: (url: string) => Promise<void>,
 ) {
   return createLocalIpcHandlers({
@@ -163,6 +170,29 @@ describe("local remoteHttpRequest handler", () => {
 });
 
 describe("local external-link handlers", () => {
+  it("opens an explicitly sensitive OAuth URL through a dedicated embedded-tab handler", async () => {
+    const createSensitiveIntegrationTab = vi.fn<
+      (payload: { url: string; activate?: boolean; reveal?: boolean }) => Promise<{ tabId: string }>
+    >(async () => ({ tabId: "oauth-tab" }));
+    const handlers = makeHandlers({
+      openLink: vi.fn<(url: string) => Promise<boolean>>(async () => true),
+      createSensitiveIntegrationTab,
+    });
+
+    await expect(
+      handlers.browserCreateSensitiveTab({
+        url: "https://oauth.example.test/authorize?state=private",
+        activate: true,
+        reveal: true,
+      }),
+    ).resolves.toMatchObject({ tabId: "oauth-tab" });
+    expect(createSensitiveIntegrationTab).toHaveBeenCalledWith({
+      url: "https://oauth.example.test/authorize?state=private",
+      activate: true,
+      reveal: true,
+    });
+  });
+
   it.each(["openExternal", "openExternalNative"] as const)(
     "routes %s HTTP(S) links into the embedded browser",
     async (handlerName) => {

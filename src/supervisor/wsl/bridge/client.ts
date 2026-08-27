@@ -93,12 +93,13 @@ export class WslBridgeClient {
   async readFile(
     location: WslLocation,
     absolutePath: string,
-    options?: { maxBytes?: number },
+    options?: { maxBytes?: number; enforceRealpathContainment?: boolean },
   ): Promise<WslReadFileResult> {
     return this.call<WslReadFileResult>(location, "/v1/fs/read", {
       projectRoot: location.linuxPath,
       path: absolutePath,
       maxBytes: options?.maxBytes ?? 0,
+      enforceRealpathContainment: options?.enforceRealpathContainment === true,
     });
   }
 

@@ -42,6 +42,8 @@ export const browserTabSchema = z.object({
   canGoForward: z.boolean(),
   devToolsOpen: z.boolean().optional(),
   groupId: z.string().optional(),
+  /** True for short-lived authorization tabs whose URL and title are redacted. */
+  sensitiveIntegration: z.literal(true).optional(),
 });
 export type BrowserTabInfo = z.infer<typeof browserTabSchema>;
 
@@ -68,6 +70,10 @@ export const browserCreateTabPayloadSchema = z.object({
   activate: z.boolean().optional(),
   /** When true, reveal the browser using the user's panel/overlay preference. */
   reveal: z.boolean().optional(),
+});
+
+export const browserCreateSensitiveTabPayloadSchema = browserCreateTabPayloadSchema.extend({
+  url: z.string().min(1),
 });
 
 export const browserTabIdPayloadSchema = z.object({
@@ -190,6 +196,11 @@ export const browserProcedures = {
     BrowserTabInfo,
     "main-local"
   >("browserCreateTab", "main-local", browserCreateTabPayloadSchema),
+  browserCreateSensitiveTab: definePayloadProcedure<
+    z.infer<typeof browserCreateSensitiveTabPayloadSchema>,
+    BrowserTabInfo,
+    "main-local"
+  >("browserCreateSensitiveTab", "main-local", browserCreateSensitiveTabPayloadSchema),
   browserCloseTab: definePayloadProcedure<
     z.infer<typeof browserTabIdPayloadSchema>,
     void,

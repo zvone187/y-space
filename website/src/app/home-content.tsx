@@ -72,7 +72,6 @@ import { LightboxProvider, LightboxTrigger, useLightbox } from "@/components/Lig
 import { LandingFaq } from "./landing-faq";
 
 const ACP_REGISTRY_CDN = "https://cdn.agentclientprotocol.com/registry/v1/latest";
-const WEB_APP_URL = "https://app.poracode.com";
 
 // lucide-react 1.14.0 dropped brand glyphs, so the GitHub mark is inlined.
 function GithubMark({ className }: { className?: string }) {
@@ -520,13 +519,6 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
             <BrandLockup />
           </Link>
           <div className="flex items-center gap-1 sm:gap-2">
-            <a
-              href={WEB_APP_URL}
-              className="hidden items-center gap-1.5 rounded-md px-3 py-2 font-mono text-[13px] text-dim transition-colors hover:bg-white/[0.04] hover:text-moon md:inline-flex"
-            >
-              <Globe className="h-4 w-4" />
-              {t("nav.webApp")}
-            </a>
             <Link
               href={aboutHref}
               prefetch={false}
@@ -590,14 +582,6 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
             >
               <Download className="h-4 w-4" />
               {t("hero.downloadFor", { platform: platform.label })}
-            </a>
-            <a
-              href={WEB_APP_URL}
-              className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 font-semibold text-moon transition will-change-transform hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]"
-            >
-              <Globe className="h-4 w-4 text-accent" />
-              {t("hero.openWebApp")}
-              <ArrowUpRight className="h-4 w-4 text-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </a>
             <a
               href="https://github.com/zvone187/y-space"
@@ -961,13 +945,12 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
  * The web-app pitch rendered as a real browser window — the address bar is the
  * message. Chrome bar (traffic lights, nav, Y Space Remote address pill with
  * a live pora-dot), a living pairing link (desktop ⇄ browser), and the localized
- * description. The whole window links to the web app.
+ * description.
  */
 function WebAppCard({ className, description }: { className?: string; description: string }) {
   return (
-    <a
-      href={WEB_APP_URL}
-      className={`group brand-glow relative block w-full overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.18] ${className ?? ""}`}
+    <div
+      className={`brand-glow relative block w-full overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 text-left ${className ?? ""}`}
     >
       <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
       {/* browser chrome — on lg the right side yields to the docked phone */}
@@ -986,7 +969,6 @@ function WebAppCard({ className, description }: { className?: string; descriptio
           <span className="truncate font-mono text-[12px] text-dim">Y Space Remote</span>
           <span className="pora-dot pora-pulse h-1 w-1 shrink-0" />
         </span>
-        <ArrowUpRight className="h-4 w-4 shrink-0 text-dim transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-moon" />
       </span>
       {/* body: pairing link + pitch */}
       <span className="relative block px-6 py-12 sm:px-8 sm:py-14 lg:py-16 lg:pr-72">
@@ -1006,7 +988,7 @@ function WebAppCard({ className, description }: { className?: string; descriptio
         </span>
       </span>
       <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
-    </a>
+    </div>
   );
 }
 
@@ -1014,13 +996,12 @@ function WebAppCard({ className, description }: { className?: string; descriptio
  * The web app on a phone — the paired state. Where the browser card pitches the
  * pairing (traveling dot), the phone shows its outcome: the app glyph breathing,
  * a confirmed `paired` status, and the Y Space Remote address pill. Pure
- * CSS/SVG; no capture asset. The whole device links to the web app.
+ * CSS/SVG; no capture asset.
  */
 function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; className?: string }) {
   return (
-    <a
-      href={WEB_APP_URL}
-      className={`group brand-glow relative block w-[260px] shrink-0 rounded-[2.75rem] border border-white/[0.12] bg-tile p-2 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.22] ${className ?? ""}`}
+    <div
+      className={`brand-glow relative block w-[260px] shrink-0 rounded-[2.75rem] border border-white/[0.12] bg-tile p-2 text-left ${className ?? ""}`}
     >
       <span className="pointer-events-none absolute inset-x-10 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
       <span className="relative flex h-[520px] flex-col overflow-hidden rounded-[2.25rem] border border-white/[0.06] bg-night">
@@ -1058,7 +1039,7 @@ function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; classNam
         <span className="mx-auto mb-2.5 h-1 w-24 rounded-full bg-white/20" />
       </span>
       <span className="pointer-events-none absolute inset-0 rounded-[2.75rem] ring-1 ring-inset ring-white/[0.06]" />
-    </a>
+    </div>
   );
 }
 

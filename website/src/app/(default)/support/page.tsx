@@ -1,17 +1,14 @@
 import type { Metadata } from "next";
-import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
+import { ArrowLeft, LifeBuoy, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
-import contact from "../../../../../branding/contact.json";
-import { createPageMetadata } from "@/lib/seo";
+import { createPageMetadata, SECURITY_URL, SUPPORT_URL } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
   title: "Y Space Support",
   description: "Get help pairing the Y Space mobile companion or report a problem.",
   path: "/support",
 });
-
-const ISSUES_URL = "https://github.com/zvone187/y-space/issues";
 
 export default function SupportPage() {
   return (
@@ -44,22 +41,26 @@ export default function SupportPage() {
 
         <div className="mb-12 grid gap-4 sm:grid-cols-2">
           <a
-            href={`mailto:${contact.supportEmail}`}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.05]"
-          >
-            <Mail className="mb-4 size-5 text-gray-400" />
-            <span className="block font-semibold text-white">Email support</span>
-            <span className="mt-1 block text-sm text-gray-400">{contact.supportEmail}</span>
-          </a>
-          <a
-            href={ISSUES_URL}
+            href={SUPPORT_URL}
             target="_blank"
             rel="noreferrer"
             className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.05]"
           >
-            <ExternalLink className="mb-4 size-5 text-gray-400" />
-            <span className="block font-semibold text-white">Report a bug</span>
-            <span className="mt-1 block text-sm text-gray-400">Open a GitHub issue</span>
+            <LifeBuoy className="mb-4 size-5 text-gray-400" />
+            <span className="block font-semibold text-white">Project support</span>
+            <span className="mt-1 block text-sm text-gray-400">Open the GitHub issue tracker</span>
+          </a>
+          <a
+            href={SECURITY_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.05]"
+          >
+            <ShieldCheck className="mb-4 size-5 text-gray-400" />
+            <span className="block font-semibold text-white">Security guidance</span>
+            <span className="mt-1 block text-sm text-gray-400">
+              Review private reporting options
+            </span>
           </a>
         </div>
 

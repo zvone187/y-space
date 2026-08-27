@@ -67,32 +67,35 @@ export function runAgentLoginCommand(input: {
   }
 
   const shellId = `login:${crypto.randomUUID()}`;
-  // On WSL the agent CLI can't reach the Windows browser on its own, so we
-  // suppress its opener and watch stdout for auth URLs to hand off via the
-  // Windows shell. Clearing the WSLg display variables matters for CLIs such
-  // as Kimi that call xdg-open directly instead of honoring BROWSER. Native
-  // macOS / Windows CLIs already open their own browser, so a renderer-side
-  // watcher would just double-launch.
-  const suppressWslBrowser = project.location.kind === "wsl";
-  const interceptWslUrls = suppressWslBrowser && !isGeminiLoginCommand(input);
+  // Keep every HTTP(S) authentication flow inside Y Space's embedded browser.
+  // Most provider CLIs honor BROWSER; WSL also needs its graphical display
+  // variables cleared for CLIs that call xdg-open directly. The URL watcher
+  // recognizes authorization endpoints rather than opening every URL printed
+  // by a provider, so documentation links remain inert.
+  const interceptLoginUrls = true;
+  const browserNoop =
+    project.location.kind === "wsl"
+      ? "/bin/true"
+      : project.location.kind === "posix"
+        ? "/usr/bin/true"
+        : "true";
   // Wipe the bash prompt + echoed script line that briefly appear before the
   // TUI takes over. `clear` (POSIX) / `Clear-Host` (PowerShell) gives the
   // overlay a clean canvas so the user only sees the agent's own UI.
   const loginCommand = buildTerminalCommand({
     command: input.command,
-    env: suppressWslBrowser
+    env: interceptLoginUrls
       ? {
           ...(input.env ?? {}),
-          BROWSER: "/bin/true",
-          DISPLAY: "",
-          WAYLAND_DISPLAY: "",
+          BROWSER: browserNoop,
+          ...(project.location.kind === "wsl" ? { DISPLAY: "", WAYLAND_DISPLAY: "" } : {}),
         }
       : input.env,
     locationKind: project.location.kind,
   });
   const command =
     project.location.kind === "windows" ? `Clear-Host; ${loginCommand}` : `clear; ${loginCommand}`;
-  const stopOpeningUrls = interceptWslUrls ? watchUrlsInEmbeddedBrowser(shellId) : undefined;
+  const stopOpeningUrls = interceptLoginUrls ? watchUrlsInEmbeddedBrowser(shellId) : undefined;
   const completionToken = createCompletionToken();
   const script = appendCompletionSignal(command, project, completionToken);
 
@@ -107,7 +110,7 @@ export function runAgentLoginCommand(input: {
     shellId,
     completionToken,
     (exitCode) => {
-      stopOpeningUrls?.(true);
+      stopOpeningUrls?.(true, true);
       fireOnce(exitCode);
       if (exitCode === 0) {
         // Auto-dismiss the overlay shortly after the command exits so the user
@@ -128,7 +131,7 @@ export function runAgentLoginCommand(input: {
     projectLocation: project.location,
     onForceClose: () => {
       stopWatching();
-      stopOpeningUrls?.();
+      stopOpeningUrls?.(false, true);
       fireOnce(-1);
     },
   });
@@ -295,19 +298,25 @@ function buildTerminalCommand(input: {
   return `${prefix} ${input.command}`;
 }
 
-function isGeminiLoginCommand(input: { label: string; command: string }): boolean {
-  return input.label.trim().toLowerCase() === "gemini" || /^\s*gemini(?:\s|$)/u.test(input.command);
-}
-
 function isCompleteLoginUrl(text: string): boolean {
   try {
     const url = new URL(text);
-    if (url.pathname.includes("/authorize") && url.searchParams.has("response_type")) {
+    const path = url.pathname.toLowerCase();
+    if (path.includes("/authorize") && url.searchParams.has("response_type")) {
       return url.searchParams.has("client_id") && url.searchParams.has("redirect_uri");
     }
     // Device-code flow: provider prints a code-entry URL the user opens manually.
-    if (url.pathname.includes("/device") && url.searchParams.has("user_code")) return true;
-    return true;
+    if (path.includes("/device") && url.searchParams.has("user_code")) return true;
+    if (url.hostname === "auth.openai.com" && path === "/codex/device") return true;
+    const hasAuthorizationParameter = [
+      "client_id",
+      "code_challenge",
+      "response_type",
+      "state",
+      "user_code",
+      "challenge",
+    ].some((key) => url.searchParams.has(key));
+    return /(?:auth|login|device)/u.test(path) && hasAuthorizationParameter;
   } catch {
     return false;
   }
@@ -344,12 +353,16 @@ function isLoopbackUrl(text: string): boolean {
   }
 }
 
-function watchUrlsInEmbeddedBrowser(shellId: string): (flushPending?: boolean) => void {
+function watchUrlsInEmbeddedBrowser(
+  shellId: string,
+): (flushPending?: boolean, closeOpenedTabs?: boolean) => void {
   let buffer = "";
   let done = false;
   let flushTimer = 0;
   let unsubscribe: () => void = () => undefined;
   const opened = new Set<string>();
+  const openedTabIds = new Set<string>();
+  let closeTabsWhenOpened = false;
 
   const openUrl = (url: string) => {
     if (isLoopbackUrl(url)) return;
@@ -357,7 +370,16 @@ function watchUrlsInEmbeddedBrowser(shellId: string): (flushPending?: boolean) =
     if (opened.has(normalizedUrl) || !isCompleteLoginUrl(normalizedUrl)) return;
     opened.add(normalizedUrl);
     void readBridge()
-      .openExternalNative(normalizedUrl)
+      .browserCreateSensitiveTab({ url: normalizedUrl, activate: true, reveal: true })
+      .then((tab) => {
+        if (closeTabsWhenOpened) {
+          void readBridge()
+            .browserCloseTab({ tabId: tab.tabId })
+            .catch(() => undefined);
+          return;
+        }
+        openedTabIds.add(tab.tabId);
+      })
       .catch(() => undefined);
   };
 
@@ -391,15 +413,24 @@ function watchUrlsInEmbeddedBrowser(shellId: string): (flushPending?: boolean) =
     scheduleFlush();
   });
 
-  return (flushPending = false) => {
+  return (flushPending = false, closeOpenedTabs = false) => {
     if (done) return;
     if (flushPending) {
       flush();
     }
     done = true;
+    closeTabsWhenOpened = closeOpenedTabs;
     window.clearTimeout(timeout);
     if (flushTimer !== 0) window.clearTimeout(flushTimer);
     unsubscribe();
+    if (closeOpenedTabs) {
+      for (const tabId of openedTabIds) {
+        void readBridge()
+          .browserCloseTab({ tabId })
+          .catch(() => undefined);
+      }
+      openedTabIds.clear();
+    }
   };
 }
 

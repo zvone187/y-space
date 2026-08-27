@@ -2,6 +2,8 @@
 
 export interface McpThreadIdentity {
   threadId?: string;
+  /** Opaque per-launch nonce used to revoke capabilities across task restarts. */
+  launchId?: string;
   title?: string;
   disabledTools?: readonly string[];
 }

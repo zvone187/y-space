@@ -128,6 +128,11 @@ describe("ConnectionsSettings", () => {
     expect(await screen.findByText("Personal MCP")).toBeInTheDocument();
     expect(screen.getByText("Authenticated")).toBeInTheDocument();
     expect(screen.getByText("Y Space Slack")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Credentials are managed by the Y Space environment and never exposed to agents.",
+      ),
+    ).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(
       /client[_-]?secret|access[_-]?token|connect[_-]?token/i,
     );

@@ -179,7 +179,7 @@ function redactMcpTransport(transport: McpTransport): McpTransport {
   if (transport.type === "stdio") {
     return {
       ...transport,
-      args: transport.args.map(redactSecretArg),
+      args: redactSecretArgs(transport.args),
       env: maskValues(transport.env),
     };
   }
@@ -190,7 +190,10 @@ function redactMcpTransport(transport: McpTransport): McpTransport {
   };
 }
 
-const SECRET_ARG_PATTERN = /^(--?[^=]*(?:key|token|secret|password|auth|credential)[^=]*)=.+$/i;
+const SECRET_ARG_PATTERN =
+  /^(--?[^=]*(?:key|token|secret|password|auth|credential|header|cookie)[^=]*)=.+$/i;
+const SECRET_ARG_FLAG_PATTERN =
+  /^(?:-H|--?[^=]*(?:key|token|secret|password|auth|credential|header|cookie)[^=]*)$/i;
 
 /** Mask the value of secret-shaped `--flag=value` args, keeping the flag name. */
 function redactSecretArg(arg: string): string {
@@ -198,19 +201,55 @@ function redactSecretArg(arg: string): string {
   return match ? `${match[1]}=${REDACTED_VALUE}` : arg;
 }
 
+/**
+ * Mask both `--secret=value` and the common two-argv `--secret value` form.
+ * Header flags are treated as secret-bearing regardless of the header name:
+ * an Authorization/Cookie value must not survive because it was passed via
+ * `-H` instead of an environment variable.
+ */
+function redactSecretArgs(args: readonly string[]): string[] {
+  const redacted: string[] = [];
+  let redactNext = false;
+  for (const arg of args) {
+    if (redactNext) {
+      redacted.push(REDACTED_VALUE);
+      redactNext = false;
+      continue;
+    }
+    const inline = redactSecretArg(arg);
+    redacted.push(inline);
+    if (inline === arg && SECRET_ARG_FLAG_PATTERN.test(arg)) redactNext = true;
+  }
+  return redacted;
+}
+
 /** Mask every query-string value in a URL (tokens are commonly passed there), keeping keys. */
 function redactUrlQuery(url: string): string {
-  const queryStart = url.indexOf("?");
-  if (queryStart === -1) return url;
-  const query = url
-    .slice(queryStart + 1)
-    .split("&")
-    .map((pair) => {
-      const eq = pair.indexOf("=");
-      return eq === -1 ? pair : `${pair.slice(0, eq)}=${REDACTED_VALUE}`;
-    })
-    .join("&");
-  return `${url.slice(0, queryStart)}?${query}`;
+  const placeholder = "__Y_SPACE_REDACTED__";
+  try {
+    const parsed = new URL(url);
+    if (parsed.username) parsed.username = placeholder;
+    if (parsed.password) parsed.password = placeholder;
+    for (const key of new Set(parsed.searchParams.keys())) {
+      parsed.searchParams.set(key, placeholder);
+    }
+    if (parsed.hash) parsed.hash = placeholder;
+    return parsed.toString().replaceAll(placeholder, REDACTED_VALUE);
+  } catch {
+    // Preserve the old best-effort behavior for provider-specific URL-like
+    // strings that are not accepted by the WHATWG parser.
+    const queryStart = url.indexOf("?");
+    if (queryStart === -1) return url;
+    const query = url
+      .slice(queryStart + 1)
+      .split("&")
+      .map((pair) => {
+        const eq = pair.indexOf("=");
+        return eq === -1 ? pair : `${pair.slice(0, eq)}=${REDACTED_VALUE}`;
+      })
+      .join("&");
+    return `${url.slice(0, queryStart)}?${query}`;
+  }
 }
 
 /** Map every value of a string record to the redaction marker, preserving keys. */

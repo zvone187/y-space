@@ -55,12 +55,6 @@ function buildOpenCodeMcpEnv(
   return {
     ...launch.env,
     OPENCODE_CONFIG_CONTENT: launch.configContent,
-    ...(mcpServers.some(
-      (server) =>
-        server.id === "browser" || server.id === "app-controls" || server.id === "crossagents",
-    )
-      ? { PORACODE_OPENCODE_SESSION_ROUTING: "1" }
-      : {}),
   };
 }
 
@@ -193,8 +187,8 @@ export function createOpenCodeAdapter(): AgentAdapter {
     // then releases its SDK acquisition because `liveInputMode === "terminal"`.
     // The shared runtime server stays warm; the TUI launches with `--session
     // <id>` and resumes from SQLite. Same observable behaviour as the previous
-    // `opencode acp` allocation, just over HTTP+SDK so GUI projects share the
-    // runtime sidecar.
+    // `opencode acp` allocation. GUI tasks use the same SDK path but retain
+    // their own isolated sidecar for task-bound MCP credentials.
     //
     // GUI mode: same handle stays alive for the thread's lifetime; SSE
     // events stream through `sdkCanonicalMapping` into chat items.

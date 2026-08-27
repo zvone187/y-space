@@ -304,6 +304,34 @@ describeOnPosix("bridge.mjs fs endpoints", () => {
     expect(envelope.code).toBe("ESCAPE");
   });
 
+  it("read rejects a symlink whose real target escapes the project root", async () => {
+    const externalDir = mkdtempSync(join(tmpdir(), "lc-bridge-external-"));
+    const secretPath = join(externalDir, "secret.txt");
+    writeFileSync(secretPath, "outside-project-secret");
+    symlinkSync(secretPath, join(projectRoot, "linked-secret.txt"));
+    try {
+      const { status, body } = await post(`${bridge.baseUrl}/v1/fs/read`, {
+        projectRoot,
+        path: join(projectRoot, "linked-secret.txt"),
+        enforceRealpathContainment: true,
+      });
+      expect(status).toBe(400);
+      expect(body).toMatchObject({ ok: false, code: "ESCAPE" });
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
+  });
+
+  it("allows realpath-contained reads when the project root is the filesystem root", async () => {
+    const { status, body } = await post(`${bridge.baseUrl}/v1/fs/read`, {
+      projectRoot: "/",
+      path: "/etc/hosts",
+      enforceRealpathContainment: true,
+    });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ ok: true });
+  });
+
   it("rejects unauthorized requests", async () => {
     const response = await fetch(`${bridge.baseUrl}/v1/fs/readdir`, {
       method: "POST",
@@ -433,7 +461,7 @@ describeOnPosix("bridge.mjs fs endpoints", () => {
       const envelope = body as { ok: boolean; data: { commit: string } };
       expect(envelope.ok).toBe(true);
       expect(git(projectRoot, "log", "-1", "--format=%an <%ae>", envelope.data.commit).trim()).toBe(
-        "Poracode <checkpoints@poracode.local>",
+        "Y Space <checkpoints@poracode.local>",
       );
     } finally {
       await identityBridge.dispose();

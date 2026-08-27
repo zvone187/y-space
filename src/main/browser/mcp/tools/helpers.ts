@@ -26,6 +26,7 @@ export async function resolveTabId(
 ): Promise<string> {
   const requested = typeof payload.tabId === "string" ? payload.tabId : null;
   if (requested) {
+    if (!ctx.manager.getTab(requested)) throw new Error(`unknown tab ${requested}`);
     // Marks agent activity + revives the tab if it was unmounted while idle.
     await ctx.manager.ensureTabReady(requested);
     if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, requested);

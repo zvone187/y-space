@@ -1,14 +1,6 @@
 import { accessSync, constants as fsConstants, existsSync, statSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
-import {
-  COMPUTER_USE_MCP_TOKEN_ENV,
-  COMPUTER_USE_MCP_URL_ENV,
-} from "@/supervisor/agents/computerUseMcp";
-import { BROWSER_MCP_TOKEN_ENV, BROWSER_MCP_URL_ENV } from "@/supervisor/agents/browserMcp";
-import {
-  APP_CONTROLS_MCP_TOKEN_ENV,
-  APP_CONTROLS_MCP_URL_ENV,
-} from "@/supervisor/agents/appControlsMcp";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 
 export function describeSpawnFailure(
   kind: "shell" | "agent",
@@ -75,33 +67,10 @@ export function sanitizeEnv(source: NodeJS.ProcessEnv): Record<string, string> {
   return out;
 }
 
-// The computer-use MCP endpoint controls the host's real desktop. Its URL +
-// token arrive in the supervisor's process.env only long enough for bootstrap
-// to capture them in memory. They must not cascade into any spawned PTY, shell,
-// or provider process. This filtering is defense-in-depth for isolated runtimes
-// and tests that construct launch components without the normal bootstrap.
-const SCOPED_LAUNCH_ONLY_ENV_KEYS = [
-  COMPUTER_USE_MCP_URL_ENV,
-  COMPUTER_USE_MCP_TOKEN_ENV,
-  BROWSER_MCP_URL_ENV,
-  BROWSER_MCP_TOKEN_ENV,
-  APP_CONTROLS_MCP_URL_ENV,
-  APP_CONTROLS_MCP_TOKEN_ENV,
-  // Compatibility cleanup only: the external-Chrome controller is retired,
-  // but an older launcher may still provide these secrets. Never fan them out
-  // into unrelated shells or agent processes.
-  "PORACODE_CHROME_MCP_URL",
-  "PORACODE_CHROME_MCP_TOKEN",
-] as const;
-
 // process.env is effectively static after supervisor boot — sanitize once
 // instead of re-scanning ~150–300 entries on every startShell call.
 export function sanitizeChildProcessEnv(source: NodeJS.ProcessEnv): Record<string, string> {
-  const env = sanitizeEnv(source);
-  for (const key of SCOPED_LAUNCH_ONLY_ENV_KEYS) {
-    delete env[key];
-  }
-  return env;
+  return sanitizePrivilegedChildEnvironment(source);
 }
 
 export const sanitizedProcessEnv = sanitizeChildProcessEnv(process.env);

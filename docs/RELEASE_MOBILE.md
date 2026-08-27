@@ -32,17 +32,17 @@ reads the three-integer marketing version from `package.json` (or a
 
 ## Public URLs
 
-These URLs are Y Space's hosted-PWA, legal, and verified-link acceptance gates.
+Y Space does not currently publish a shared hosted PWA or product domain. Use
+the project links below for support, and configure deployment-owned origins for
+PWA and verified-link acceptance gates.
 Internal TestFlight and Play installation can work without the association
 endpoints, but the links must be live before testing universal/app links or
 using them as store metadata:
 
-- Stable PWA: `https://app.poracode.com/`
-- Nightly PWA: `https://app-nightly.poracode.com/`
-- Privacy policy: `https://poracode.com/privacy`
-- Support: `https://poracode.com/support`
-- Apple association: `https://poracode.com/.well-known/apple-app-site-association`
-- Android association: `https://poracode.com/.well-known/assetlinks.json`
+- Project and source: `https://github.com/zvone187/y-space`
+- Support: `https://github.com/zvone187/y-space/issues`
+- Security and private reporting: `https://github.com/zvone187/y-space/security/policy`
+- Stable/nightly PWA and association URLs: deployment-owned, with no default
 
 The association routes are owned by the marketing website. Configure these in
 the production environment for that Vercel project:
@@ -60,19 +60,23 @@ values exist. After configuration, verify a direct 200 response with
 The production push gateway runs in the same Vercel project. Configure these as
 encrypted production environment variables before testing notifications:
 
-| Variable                     | Value                                                           |
-| ---------------------------- | --------------------------------------------------------------- |
-| `FCM_PROJECT_ID`             | Firebase project ID                                             |
-| `FCM_CLIENT_EMAIL`           | Firebase service-account email                                  |
-| `FCM_PRIVATE_KEY`            | Firebase service-account private key                            |
-| `APNS_KEY_ID`                | Apple Push Notifications key ID                                 |
-| `APNS_TEAM_ID`               | Apple Developer Team ID                                         |
-| `APNS_AUTH_KEY`              | Full Apple Push Notifications `.p8` contents                    |
-| `APNS_TOPIC`                 | `com.lightcodeapp.mobile`                                       |
-| `APNS_ENV`                   | `production` (the default; use `sandbox` only for development)  |
-| `WEB_PUSH_VAPID_PUBLIC_KEY`  | Public VAPID key used by installed PWAs                         |
-| `WEB_PUSH_VAPID_PRIVATE_KEY` | Matching private VAPID key; keep encrypted                      |
-| `WEB_PUSH_VAPID_SUBJECT`     | Optional contact URI; defaults to `mailto:support@poracode.com` |
+Set `PORACODE_PUSH_GATEWAY_URL` for the desktop/server process to that
+deployment-owned gateway origin. With no override, remote push is disabled and
+does not contact an upstream service.
+
+| Variable                     | Value                                                             |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `FCM_PROJECT_ID`             | Firebase project ID                                               |
+| `FCM_CLIENT_EMAIL`           | Firebase service-account email                                    |
+| `FCM_PRIVATE_KEY`            | Firebase service-account private key                              |
+| `APNS_KEY_ID`                | Apple Push Notifications key ID                                   |
+| `APNS_TEAM_ID`               | Apple Developer Team ID                                           |
+| `APNS_AUTH_KEY`              | Full Apple Push Notifications `.p8` contents                      |
+| `APNS_TOPIC`                 | `com.lightcodeapp.mobile`                                         |
+| `APNS_ENV`                   | `production` (the default; use `sandbox` only for development)    |
+| `WEB_PUSH_VAPID_PUBLIC_KEY`  | Public VAPID key used by installed PWAs                           |
+| `WEB_PUSH_VAPID_PRIVATE_KEY` | Matching private VAPID key; keep encrypted                        |
+| `WEB_PUSH_VAPID_SUBJECT`     | Optional contact URI; defaults to the Y Space security policy URL |
 
 Generate the VAPID pair once with
 `pnpm --dir website exec web-push generate-vapid-keys --json`. Keep the same
@@ -84,7 +88,7 @@ new browser subscription the next time it connects.
 The `mobile-android` and `mobile-ios` environments are used by the native
 release workflow (`release-mobile.yml`); the `mobile-web` environment is used by
 the standalone PWA workflow (`release-pwa.yml`). Set
-`PORACODE_MOBILE_APP_HOST=poracode.com` in all three and `PLAY_TRACK=internal`
+`PORACODE_MOBILE_APP_HOST` to a domain you control in all three and `PLAY_TRACK=internal`
 in `mobile-android`. Each environment requires approval from the repository
 owner and only accepts deployments from `master` or a `mobile-v*` tag. The
 workflows pin third-party actions to immutable commits and scope publisher
@@ -147,8 +151,9 @@ backups.
 4. Create the App Store Connect app record: platform iOS, name `Y Space`, bundle
    ID `com.lightcodeapp.mobile`, primary language English (U.S.), and a unique
    SKU such as `poracode-ios`.
-5. Set Privacy Policy URL to `https://poracode.com/privacy` and Support URL to
-   `https://poracode.com/support`.
+5. Publish a privacy policy on a domain you control. Set the Support URL to
+   `https://github.com/zvone187/y-space/issues` and use the repository security
+   policy for private reporting guidance.
 6. Complete App Privacy, age rating, content-rights, and export-compliance
    questions. Do not automatically answer “no encryption”: Y Space includes an
    SSH client and SwiftCrypto, so the encryption/export answer must be reviewed
@@ -174,7 +179,7 @@ What to Test:
 > notifications, universal links, and Live Activity status. Report the desktop
 > and mobile versions, device model, iOS version, and exact reproduction steps.
 
-Feedback email: `support@poracode.com`
+Feedback: `https://github.com/zvone187/y-space/issues`
 
 Review note:
 
@@ -228,9 +233,9 @@ Initial release note:
 > First beta: pair with Y Space desktop, monitor and steer agent threads, scan
 > pairing QR codes, and receive optional status notifications.
 
-Privacy policy: `https://poracode.com/privacy`
+Privacy policy: publish on a deployment-owned domain before store submission.
 
-Support: `https://poracode.com/support`
+Support: `https://github.com/zvone187/y-space/issues`
 
 ## First release
 

@@ -13,7 +13,6 @@ import appIconStableUrl from "../../../../../build/icon.png";
 import appIconNightlyUrl from "../../../../../build/icon-nightly.png";
 
 const GITHUB_REPO = "https://github.com/zvone187/y-space";
-const WEBSITE_URL = GITHUB_REPO;
 
 function AboutLink(props: { href: string; children: React.ReactNode }) {
   return (
@@ -217,10 +216,6 @@ export function AboutSettings() {
         ) : null}
 
         <div className="mt-8 space-y-3 border-t border-[var(--hairline)] pt-6">
-          <AboutLink href={WEBSITE_URL}>
-            <Trans comment="External link to the product website">Website</Trans>
-          </AboutLink>
-          <br />
           <AboutLink href={GITHUB_REPO}>
             <Trans>GitHub Repository</Trans>
           </AboutLink>
@@ -239,7 +234,7 @@ export function AboutSettings() {
         </div>
 
         <p className="mt-8 text-xs text-muted">
-          <Trans>&copy; {currentYear} Serhii Vecherenko. All rights reserved.</Trans>
+          <Trans>&copy; {currentYear} Y Space contributors. Licensed under Apache-2.0.</Trans>
         </p>
       </SettingsPage>
       <ConfirmDialog

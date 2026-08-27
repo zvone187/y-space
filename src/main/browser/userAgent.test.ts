@@ -12,23 +12,33 @@ describe("buildBrowserUserAgent", () => {
     );
   });
 
-  it("keeps the app product token before Chrome (Google rejects a bare Chrome UA from an embedded browser)", () => {
+  it("rebrands the legacy packaged app token before Chrome without changing the crypto identity timing", () => {
     expect(
       buildBrowserUserAgent(
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Poracode/1.3.2 Chrome/146.0.0.0 Electron/41.7.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Lightcode/1.6.6 Chrome/146.0.0.0 Electron/41.7.0 Safari/537.36",
+        {
+          currentProductName: "Lightcode",
+          brandedProductName: "Y Space",
+          appVersion: "1.6.6",
+        },
       ),
     ).toBe(
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Poracode/1.3.2 Chrome/146.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Y Space/1.6.6 Chrome/146.0.0.0 Safari/537.36",
     );
   });
 
-  it("preserves a channel-suffixed app token such as Poracode Nightly", () => {
+  it("rebrands a channel-suffixed packaged app token", () => {
     expect(
       buildBrowserUserAgent(
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Poracode Nightly/1.3.2 Chrome/146.0.0.0 Electron/41.7.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Lightcode Nightly/1.6.6 Chrome/146.0.0.0 Electron/41.7.0 Safari/537.36",
+        {
+          currentProductName: "Lightcode Nightly",
+          brandedProductName: "Y Space Nightly",
+          appVersion: "1.6.6",
+        },
       ),
     ).toBe(
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Poracode Nightly/1.3.2 Chrome/146.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Y Space Nightly/1.6.6 Chrome/146.0.0.0 Safari/537.36",
     );
   });
 });

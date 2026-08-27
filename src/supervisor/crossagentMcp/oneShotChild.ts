@@ -6,6 +6,7 @@ import { withCommandBaseSpawnEnv, type AgentAdapter } from "@/supervisor/agents/
 import { buildOneShotSpec } from "@/supervisor/oneShotSpawn";
 import { ensureNodePtySpawnHelperExecutable } from "@/supervisor/nodePty";
 import { processEnvRecord } from "@/supervisor/processEnv";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 
 /**
  * Hard ceiling on a one-shot child's process lifetime. Unlike a structured
@@ -202,7 +203,9 @@ function spawnProcessTransport(spec: SpawnSpec): ChildTransport {
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
     ...(spec.cwd ? { cwd: spec.cwd } : {}),
-    ...(spec.env ? { env: { ...processEnvRecord(), ...spec.env } } : {}),
+    ...(spec.env
+      ? { env: sanitizePrivilegedChildEnvironment({ ...processEnvRecord(), ...spec.env }) }
+      : {}),
   });
 
   const stderrChunks: string[] = [];
@@ -248,7 +251,7 @@ function spawnPtyTransport(spec: SpawnSpec): ChildTransport {
     cols: 120,
     rows: 30,
     ...(spec.cwd ? { cwd: spec.cwd } : {}),
-    env: { ...processEnvRecord(), ...spec.env },
+    env: sanitizePrivilegedChildEnvironment({ ...processEnvRecord(), ...spec.env }),
   });
 
   let dataDisposable: IDisposable | undefined;

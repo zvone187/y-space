@@ -79,6 +79,7 @@ import {
   upsertCrossagentRoutingOverride,
 } from "@/shared/crossagentRanking";
 import { getAppName } from "@/shared/appName";
+import type { McpLaunchContext } from "@/shared/mcpLaunchContext";
 import { productNameFor, resolvePoracodeChannel } from "@/shared/channel";
 import {
   IPC_EVENT_CHANNELS,
@@ -184,7 +185,14 @@ if (process.platform === "linux") {
   app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal");
 }
 
-const browserUserAgent = buildBrowserUserAgent(app.userAgentFallback);
+const browserUserAgent = buildBrowserUserAgent(app.userAgentFallback, {
+  // `app.name` is intentionally still the pre-rebrand identity here on
+  // packaged macOS/Linux builds so Chromium can initialize safeStorage with
+  // existing Keychain/libsecret entries. Only the browser UA is rebranded.
+  currentProductName: app.name,
+  brandedProductName: productNameFor(channel),
+  appVersion: app.getVersion(),
+});
 app.userAgentFallback = browserUserAgent;
 
 if (baseDirOverride) {
@@ -875,10 +883,13 @@ if (!hasSingleInstanceLock) {
           showAndFocusWindow(ensureMainWindow());
         },
       });
-      const resolveProviderSessionIdentity =
-        (serverId: "browser" | "app-controls") => async (providerSessionId: string) =>
+      const resolveLaunchContextIdentity =
+        (serverId: "browser" | "computer-use" | "app-controls") =>
+        async (context: McpLaunchContext) =>
           (await supervisorClient.call("resolveMcpCallerIdentity", {
-            providerSessionId,
+            routing: "thread",
+            threadId: context.identity.threadId!,
+            ...(context.identity.launchId ? { launchId: context.identity.launchId } : {}),
             serverId,
           })) ?? undefined;
       const scheduleCoordinator = new ScheduleRunCoordinator({
@@ -996,7 +1007,7 @@ if (!hasSingleInstanceLock) {
         getProjects: dbGetProjects,
         getProject: dbGetProject,
         getProjectNotes: dbGetProjectNotes,
-        resolveProviderSessionIdentity: resolveProviderSessionIdentity("app-controls"),
+        resolveLaunchContextIdentity: resolveLaunchContextIdentity("app-controls"),
         ...sharedAppControlsDeps,
         settings: {
           read: () => readSharedSettingsFile(requirePoracodePaths().settingsPath),
@@ -1064,7 +1075,7 @@ if (!hasSingleInstanceLock) {
         focusExtractedWindow: focusBrowserExtractWindow,
       });
       browserMcpIngress = new BrowserMcpIngress({
-        resolveProviderSessionIdentity: resolveProviderSessionIdentity("browser"),
+        resolveLaunchContextIdentity: resolveLaunchContextIdentity("browser"),
       });
       browserMcpIngress.setManagerAccessor(() => browserPanelManager);
       primeBrowserAllowFlags(initialSettings);
@@ -1098,6 +1109,7 @@ if (!hasSingleInstanceLock) {
           },
         });
         computerUseMcpIngress = new ComputerUseMcpIngress({
+          resolveLaunchContextIdentity: resolveLaunchContextIdentity("computer-use"),
           onActivity: (event) => computerUseDesktopOverlay?.setActivity(event),
         });
         computerUseMcpInfoReady = computerUseMcpIngress.start().catch((err) => {

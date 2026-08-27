@@ -23,7 +23,12 @@ import type {
 import type { WslHostAccessResolver } from "@/supervisor/wsl/hostAccess";
 import { PipedreamApiClient, type PipedreamRemoteAccountSummary } from "./PipedreamApiClient";
 import { PipedreamConnectionStore } from "./PipedreamConnectionStore";
-import { PipedreamLoopbackRelay, type PipedreamRelayBindingInfo } from "./PipedreamLoopbackRelay";
+import {
+  PipedreamLoopbackRelay,
+  type PipedreamLoopbackRelayOptions,
+  type PipedreamRelayBindingInfo,
+  type RegisterPipedreamRelayBindingInput,
+} from "./PipedreamLoopbackRelay";
 import { PipedreamTokenBroker } from "./PipedreamTokenBroker";
 
 export const PIPEDREAM_PERSONAL_MCP_URL = "https://mcp.pipedream.net/v2";
@@ -36,13 +41,20 @@ export interface PipedreamSupervisorServiceOptions {
   };
   readonly fetch?: typeof globalThis.fetch;
   readonly wslHostAccess?: WslHostAccessResolver;
+  readonly createRelay?: (options: PipedreamLoopbackRelayOptions) => PipedreamRelay;
+}
+
+export interface PipedreamRelay {
+  registerBinding(input: RegisterPipedreamRelayBindingInput): Promise<PipedreamRelayBindingInfo>;
+  unregisterBinding(bindingId: string): void;
+  dispose(): Promise<void>;
 }
 
 interface ReadyRuntime {
   readonly projectId: string;
   readonly environment: "development" | "production";
   readonly api: PipedreamApiClient;
-  readonly relay: PipedreamLoopbackRelay;
+  readonly relay: PipedreamRelay;
 }
 
 interface SharedRelayBinding {
@@ -61,19 +73,26 @@ interface RelayReachability {
   readonly advertisedHost?: string;
 }
 
+interface PendingRelayBinding {
+  readonly authorizationRevision: number;
+  readonly promise: Promise<SharedRelayBinding | undefined>;
+}
+
 /** Owns Pipedream's secret-bearing server-side clients and projects only safe data outward. */
 export class PipedreamSupervisorService {
   readonly #options: PipedreamSupervisorServiceOptions;
   readonly #store: PipedreamConnectionStore;
   readonly #sharedBindings = new Map<string, SharedRelayBinding>();
-  readonly #pendingBindings = new Map<string, Promise<SharedRelayBinding>>();
+  readonly #pendingBindings = new Map<string, PendingRelayBinding>();
   readonly #bindingKeysByThread = new Map<string, Set<string>>();
+  readonly #accountIdByBindingKey = new Map<string, string>();
   #bootstrap: PipedreamPrivilegedBootstrapPayload["bootstrap"] = { state: "absent" };
   #ready: ReadyRuntime | undefined;
   #accountsReconciled = false;
   #accountsRefresh: Promise<void> | undefined;
   #projectName = "Pipedream Connect";
   #errorCode: "authentication-failed" | "configuration-invalid" | "request-failed" | undefined;
+  #authorizationRevision = 0;
 
   constructor(options: PipedreamSupervisorServiceOptions) {
     this.#options = options;
@@ -83,11 +102,13 @@ export class PipedreamSupervisorService {
   }
 
   configure(payload: PipedreamPrivilegedBootstrapPayload): void {
+    this.#authorizationRevision += 1;
     const previousRelay = this.#ready?.relay;
     this.#ready = undefined;
     this.#sharedBindings.clear();
     this.#pendingBindings.clear();
     this.#bindingKeysByThread.clear();
+    this.#accountIdByBindingKey.clear();
     this.#accountsReconciled = false;
     this.#accountsRefresh = undefined;
     this.#projectName = "Pipedream Connect";
@@ -111,14 +132,16 @@ export class PipedreamSupervisorService {
         invalidateAccessToken: () => broker.invalidate(),
         ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
       });
-      const relay = new PipedreamLoopbackRelay({
+      const relayOptions: PipedreamLoopbackRelayOptions = {
         projectId: credentials.projectId,
         environment: credentials.environment,
         externalUserId: payload.externalUserId,
         getAccessToken: () => broker.getAccessToken(),
         invalidateAccessToken: () => broker.invalidate(),
         ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
-      });
+      };
+      const relay =
+        this.#options.createRelay?.(relayOptions) ?? new PipedreamLoopbackRelay(relayOptions);
       this.#store.configureScope(
         [credentials.projectId, credentials.environment, payload.externalUserId.trim()].join(
           "\u0000",
@@ -209,15 +232,21 @@ export class PipedreamSupervisorService {
 
   async disconnectAccount(payload: PipedreamDisconnectAccountPayload): Promise<PipedreamSnapshot> {
     const { accountId } = pipedreamDisconnectAccountPayloadSchema.parse(payload);
-    await this.#withReadyRequest((ready) => ready.api.disconnectAccount(accountId));
+    this.#requireReady();
+    // Local authorization is the security boundary. Revoke it before the
+    // upstream request so a slow or failed disconnect can never leave an
+    // already-running agent route usable.
+    this.#authorizationRevision += 1;
     this.#store.remove(accountId);
     this.#releaseBindingsUsingAccount(accountId);
+    await this.#withReadyRequest((ready) => ready.api.disconnectAccount(accountId));
     return this.getSnapshot();
   }
 
   setAccountAgentAccess(payload: PipedreamSetAccountAgentAccessPayload): PipedreamSnapshot {
     const { accountId, enabled } = pipedreamSetAccountAgentAccessPayloadSchema.parse(payload);
     this.#requireReady();
+    this.#authorizationRevision += 1;
     this.#store.setAgentAccess(accountId, enabled);
     if (!enabled) this.#releaseBindingsUsingAccount(accountId);
     return this.getSnapshot();
@@ -246,6 +275,7 @@ export class PipedreamSupervisorService {
     }
 
     const accounts = this.#store.listGrantedForRelay();
+    const authorizationRevision = this.#authorizationRevision;
     const providerBindingId = input.providerBindingId?.trim() || `thread:${input.threadId}`;
     const desiredKeys = new Set(
       accounts.map(({ localAccountId }) =>
@@ -253,10 +283,21 @@ export class PipedreamSupervisorService {
       ),
     );
     this.#releaseObsoleteThreadBindings(input.threadId, desiredKeys);
+    if (desiredKeys.size > 0) {
+      const threadKeys = this.#bindingKeysByThread.get(input.threadId) ?? new Set<string>();
+      for (const key of desiredKeys) threadKeys.add(key);
+      this.#bindingKeysByThread.set(input.threadId, threadKeys);
+      for (const { account, localAccountId } of accounts) {
+        this.#accountIdByBindingKey.set(
+          sharedBindingKey(providerBindingId, localAccountId, reachability.key),
+          account.id,
+        );
+      }
+    }
     if (accounts.length === 0) return [];
 
     const resolved = await Promise.all(
-      accounts.map(async ({ account, localAccountId }): Promise<ResolvedMcpServer> => {
+      accounts.map(async ({ account, localAccountId }): Promise<ResolvedMcpServer | undefined> => {
         const key = sharedBindingKey(providerBindingId, localAccountId, reachability.key);
         const shared = await this.#getOrCreateSharedBinding({
           ready,
@@ -266,12 +307,19 @@ export class PipedreamSupervisorService {
           upstreamAccountId: account.id,
           localAccountId,
           appSlug: account.app.slug,
+          authorizationRevision,
           ...(reachability.advertisedHost ? { advertisedHost: reachability.advertisedHost } : {}),
         });
+        if (
+          !shared ||
+          this.#authorizationRevision !== authorizationRevision ||
+          this.#sharedBindings.get(key) !== shared ||
+          !this.#bindingKeysByThread.get(input.threadId)?.has(key) ||
+          !this.#isGrantCurrent(account.id, localAccountId, account.app.slug)
+        ) {
+          return undefined;
+        }
         shared.memberThreadIds.add(input.threadId);
-        const threadKeys = this.#bindingKeysByThread.get(input.threadId) ?? new Set<string>();
-        threadKeys.add(key);
-        this.#bindingKeysByThread.set(input.threadId, threadKeys);
         return {
           id: `pipedream:${localAccountId}`,
           name: `pipedream-${account.app.slug}-${opaqueNameSuffix(localAccountId)}`,
@@ -280,7 +328,7 @@ export class PipedreamSupervisorService {
         };
       }),
     );
-    return resolved;
+    return resolved.filter((server): server is ResolvedMcpServer => server !== undefined);
   }
 
   releaseMcpBindings(threadId: string): void {
@@ -293,7 +341,9 @@ export class PipedreamSupervisorService {
     this.#bindingKeysByThread.clear();
     this.#sharedBindings.clear();
     this.#pendingBindings.clear();
+    this.#accountIdByBindingKey.clear();
     this.#accountsRefresh = undefined;
+    this.#authorizationRevision += 1;
     const relay = this.#ready?.relay;
     this.#ready = undefined;
     await relay?.dispose();
@@ -336,6 +386,7 @@ export class PipedreamSupervisorService {
       throw new Error("Pipedream configuration changed while refreshing accounts.");
     }
     this.#store.replaceRemoteAccounts(accounts);
+    this.#authorizationRevision += 1;
     this.#revokeBindingsNoLongerGranted();
     this.#accountsReconciled = true;
     const project = await readyAtStart.api.getProject().catch(() => undefined);
@@ -368,14 +419,15 @@ export class PipedreamSupervisorService {
     upstreamAccountId: string;
     localAccountId: string;
     appSlug: string;
+    authorizationRevision: number;
     advertisedHost?: string;
-  }): Promise<SharedRelayBinding> {
+  }): Promise<SharedRelayBinding | undefined> {
     const existing = this.#sharedBindings.get(input.key);
     if (existing) return existing;
     const pending = this.#pendingBindings.get(input.key);
-    if (pending) return pending;
+    if (pending?.authorizationRevision === input.authorizationRevision) return pending.promise;
 
-    let creation!: Promise<SharedRelayBinding>;
+    let creation!: Promise<SharedRelayBinding | undefined>;
     creation = input.ready.relay
       .registerBinding({
         threadId: input.threadId,
@@ -385,9 +437,14 @@ export class PipedreamSupervisorService {
         ...(input.advertisedHost ? { advertisedHost: input.advertisedHost } : {}),
       })
       .then((info) => {
-        if (this.#ready !== input.ready) {
+        if (
+          this.#ready !== input.ready ||
+          this.#authorizationRevision !== input.authorizationRevision ||
+          !this.#isGrantCurrent(input.upstreamAccountId, input.localAccountId, input.appSlug) ||
+          !this.#isBindingDesired(input.key)
+        ) {
           input.ready.relay.unregisterBinding(info.bindingId);
-          throw new Error("Pipedream configuration changed during launch.");
+          return undefined;
         }
         const raced = this.#sharedBindings.get(input.key);
         if (raced) {
@@ -408,11 +465,15 @@ export class PipedreamSupervisorService {
         return shared;
       })
       .finally(() => {
-        if (this.#pendingBindings.get(input.key) === creation) {
+        if (this.#pendingBindings.get(input.key)?.promise === creation) {
           this.#pendingBindings.delete(input.key);
         }
+        this.#cleanupBindingKeyMetadata(input.key);
       });
-    this.#pendingBindings.set(input.key, creation);
+    this.#pendingBindings.set(input.key, {
+      authorizationRevision: input.authorizationRevision,
+      promise: creation,
+    });
     return creation;
   }
 
@@ -422,11 +483,15 @@ export class PipedreamSupervisorService {
     if (threadKeys?.size === 0) this.#bindingKeysByThread.delete(threadId);
 
     const shared = this.#sharedBindings.get(key);
-    if (!shared) return;
+    if (!shared) {
+      this.#cleanupBindingKeyMetadata(key);
+      return;
+    }
     shared.memberThreadIds.delete(threadId);
     if (shared.memberThreadIds.size > 0) return;
     this.#ready?.relay.unregisterBinding(shared.bindingId);
     this.#sharedBindings.delete(key);
+    this.#cleanupBindingKeyMetadata(key);
   }
 
   #revokeSharedBinding(binding: SharedRelayBinding): void {
@@ -437,6 +502,7 @@ export class PipedreamSupervisorService {
       keys?.delete(binding.key);
       if (keys?.size === 0) this.#bindingKeysByThread.delete(threadId);
     }
+    this.#cleanupBindingKeyMetadata(binding.key);
   }
 
   async #withReadyRequest<T>(run: (ready: ReadyRuntime) => Promise<T>): Promise<T> {
@@ -463,6 +529,10 @@ export class PipedreamSupervisorService {
   }
 
   #releaseBindingsUsingAccount(accountId: string): void {
+    const keys = [...this.#accountIdByBindingKey.entries()]
+      .filter(([, candidateAccountId]) => candidateAccountId === accountId)
+      .map(([key]) => key);
+    for (const key of keys) this.#removeBindingKeyFromAllThreads(key);
     const matching = [...this.#sharedBindings.values()].filter(
       (binding) => binding.upstreamAccountId === accountId,
     );
@@ -475,6 +545,47 @@ export class PipedreamSupervisorService {
     );
     for (const binding of [...this.#sharedBindings.values()]) {
       if (!grantedAccountIds.has(binding.upstreamAccountId)) this.#revokeSharedBinding(binding);
+    }
+    for (const [key, accountId] of this.#accountIdByBindingKey) {
+      if (!grantedAccountIds.has(accountId)) this.#removeBindingKeyFromAllThreads(key);
+    }
+  }
+
+  #isGrantCurrent(accountId: string, localAccountId: string, appSlug: string): boolean {
+    return this.#store
+      .listGrantedForRelay()
+      .some(
+        (candidate) =>
+          candidate.account.id === accountId &&
+          candidate.localAccountId === localAccountId &&
+          candidate.account.app.slug === appSlug,
+      );
+  }
+
+  #isBindingDesired(key: string): boolean {
+    for (const keys of this.#bindingKeysByThread.values()) {
+      if (keys.has(key)) return true;
+    }
+    return false;
+  }
+
+  #removeBindingKeyFromAllThreads(key: string): void {
+    for (const [threadId, keys] of this.#bindingKeysByThread) {
+      if (!keys.delete(key)) continue;
+      if (keys.size === 0) this.#bindingKeysByThread.delete(threadId);
+    }
+    const shared = this.#sharedBindings.get(key);
+    if (shared) this.#revokeSharedBinding(shared);
+    this.#cleanupBindingKeyMetadata(key);
+  }
+
+  #cleanupBindingKeyMetadata(key: string): void {
+    if (
+      !this.#sharedBindings.has(key) &&
+      !this.#pendingBindings.has(key) &&
+      !this.#isBindingDesired(key)
+    ) {
+      this.#accountIdByBindingKey.delete(key);
     }
   }
 }

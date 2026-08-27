@@ -15,6 +15,7 @@ const MAX_ENCRYPTED_PLAINTEXT_BYTES = 3_000_000;
 const MAX_TARGETS = 12;
 const PAIRING_KDF_ITERATIONS = 310_000;
 const HEARTBEAT_INTERVAL_MS = 20_000;
+const HANDSHAKE_TIMEOUT_MS = 30_000;
 const KEEPALIVE_ALARM = "y-space-cookie-import-keepalive";
 const SCAN_DELAY_MS = 250;
 const IDLE_RETRY_MS = 4000;
@@ -27,6 +28,7 @@ const PORTS = [
 let socket = null;
 let connecting = false;
 let reconnectTimer = null;
+let handshakeTimer = null;
 let portIndex = 0;
 let lastError = null;
 let pairingChallenge = null;
@@ -35,12 +37,25 @@ let pendingHandshake = null;
 let authenticated = false;
 let sessionKey = null;
 let managedMutation = Promise.resolve();
+let lifecycleMutation = Promise.resolve();
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 function isSocketOpen() {
   return socket?.readyState === WebSocket.OPEN;
+}
+
+function runLifecycleTask(task) {
+  const operation = lifecycleMutation.then(task);
+  lifecycleMutation = operation.catch(() => undefined);
+  return operation;
+}
+
+function clearHandshakeTimer() {
+  if (!handshakeTimer) return;
+  clearTimeout(handshakeTimer);
+  handshakeTimer = null;
 }
 
 function payloadBytes(value) {
@@ -335,20 +350,27 @@ async function connect() {
   candidate.addEventListener("open", () => {
     if (socket !== candidate) return;
     connecting = false;
-    portIndex = 0;
     lastError = null;
     authenticated = false;
     connectionChallenge = null;
     pendingHandshake = null;
     sessionKey = null;
+    clearHandshakeTimer();
+    handshakeTimer = setTimeout(() => {
+      handshakeTimer = null;
+      if (socket !== candidate || authenticated) return;
+      lastError = "Y Space did not authenticate this connection.";
+      candidate.close(1008, "Authentication timed out");
+    }, HANDSHAKE_TIMEOUT_MS);
     void broadcastStatus();
   });
 
   candidate.addEventListener("message", (event) => {
-    void handleServerMessage(event.data);
+    void runLifecycleTask(() => handleServerMessage(event.data));
   });
 
   candidate.addEventListener("close", () => {
+    if (socket === candidate) clearHandshakeTimer();
     if (socket === candidate) socket = null;
     connecting = false;
     authenticated = false;
@@ -356,7 +378,7 @@ async function connect() {
     pendingHandshake = null;
     sessionKey = null;
     portIndex += 1;
-    void releaseAllManagedRequests();
+    void runLifecycleTask(() => releaseAllManagedRequests());
     void broadcastStatus();
     scheduleReconnect();
   });
@@ -455,7 +477,7 @@ async function handleServerMessage(raw) {
         return;
       case "error":
         pendingHandshake = null;
-        if (message.code === "authentication_failed") {
+        if (message.code === "authentication_failed" && authenticated) {
           await chrome.storage.local.remove(["token"]);
           authenticated = false;
           sessionKey = null;
@@ -483,12 +505,15 @@ async function acceptConnectionChallenge(message) {
 }
 
 function acceptPairingChallenge(message) {
-  if (
-    typeof message.pairingId !== "string" ||
-    typeof message.expiresAt !== "number" ||
-    message.expiresAt <= Date.now()
-  ) {
+  if (typeof message.pairingId !== "string" || typeof message.expiresAt !== "number") {
     throw new Error("Invalid pairing challenge.");
+  }
+  if (message.expiresAt <= Date.now()) {
+    if (pairingChallenge?.pairingId === message.pairingId) {
+      pairingChallenge = null;
+      void broadcastStatus();
+    }
+    return;
   }
   pairingChallenge = { pairingId: message.pairingId, expiresAt: message.expiresAt };
   void broadcastStatus();
@@ -562,6 +587,8 @@ async function acceptHelloResult(message) {
   );
   pendingHandshake = null;
   authenticated = true;
+  clearHandshakeTimer();
+  portIndex = 0;
   pairingChallenge = null;
   lastError = null;
   void broadcastStatus();
@@ -611,6 +638,8 @@ async function acceptPairResult(message) {
   sessionKey = derivedSessionKey;
   pendingHandshake = null;
   authenticated = true;
+  clearHandshakeTimer();
+  portIndex = 0;
   pairingChallenge = null;
   lastError = null;
   void broadcastStatus();
@@ -670,6 +699,7 @@ async function preparePreview(message) {
         requestId: message.requestId,
         targetUrls,
         previewDomains: [],
+        previewCookieKeys: [],
         newlyGrantedOrigins,
         expiresAt: message.expiresAt,
         status: newlyGrantedOrigins.length > 0 ? "awaiting-permission" : "previewing",
@@ -729,20 +759,57 @@ function cookieKey(cookie) {
   return `${cookie.storeId || ""}\u0000${cookie.name}\u0000${cookie.domain}\u0000${cookie.path}\u0000${partition}`;
 }
 
+function normalizeHostname(hostname) {
+  return String(hostname)
+    .trim()
+    .replace(/^\[|\]$/gu, "")
+    .replace(/\.$/u, "")
+    .toLowerCase();
+}
+
+function isChromiumTrustworthyLoopback(hostname) {
+  const normalized = normalizeHostname(hostname);
+  if (normalized === "localhost" || normalized.endsWith(".localhost") || normalized === "::1") {
+    return true;
+  }
+  const octets = normalized.split(".");
+  return (
+    octets.length === 4 &&
+    octets[0] === "127" &&
+    octets.every((octet) => /^\d{1,3}$/u.test(octet) && Number(octet) <= 255)
+  );
+}
+
+function targetSupportsSecureCookies(target) {
+  return (
+    target.protocol === "https:" ||
+    (target.protocol === "http:" && isChromiumTrustworthyLoopback(target.hostname))
+  );
+}
+
+function cookieMatchesTarget(cookie, targetUrl) {
+  const target = new URL(targetUrl);
+  const hostname = normalizeHostname(target.hostname);
+  const domain = normalizedCookieDomain(cookie);
+  const domainMatches = cookie.hostOnly
+    ? hostname === domain
+    : hostname === domain || hostname.endsWith(`.${domain}`);
+  return domainMatches && (!cookie.secure || targetSupportsSecureCookies(target));
+}
+
 async function collectCookies(targetUrls) {
   const unique = new Map();
-  for (const targetUrl of targetUrls) {
-    const cookies = await chrome.cookies.getAll({ url: targetUrl });
-    for (const cookie of cookies) {
-      unique.set(cookieKey(cookie), cookie);
-      if (unique.size > MAX_COOKIES) throw new Error("Cookie count limit exceeded.");
-    }
+  const cookies = await chrome.cookies.getAll({});
+  for (const cookie of cookies) {
+    if (!targetUrls.some((targetUrl) => cookieMatchesTarget(cookie, targetUrl))) continue;
+    unique.set(cookieKey(cookie), cookie);
+    if (unique.size > MAX_COOKIES) throw new Error("Cookie count limit exceeded.");
   }
   return [...unique.values()];
 }
 
 function normalizedCookieDomain(cookie) {
-  return cookie.domain.replace(/^\.+/u, "").toLowerCase();
+  return normalizeHostname(cookie.domain.replace(/^\.+/u, ""));
 }
 
 async function previewCookies(requestId) {
@@ -771,6 +838,7 @@ async function previewCookies(requestId) {
         throw new Error("Cookie preview was cancelled.");
       }
       current.previewDomains = domains.map(({ domain }) => domain);
+      current.previewCookieKeys = cookies.map(cookieKey);
       current.status = "ready";
     });
     send({ type: "preview.result", requestId, domains });
@@ -811,6 +879,18 @@ function arraysEqual(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function filterCookiesForCommit(cookies, record, selectedDomains) {
+  if (!Array.isArray(record.previewCookieKeys)) {
+    throw new Error("Cookie preview identities are unavailable.");
+  }
+  const previewCookieKeys = new Set(record.previewCookieKeys);
+  return cookies.filter(
+    (cookie) =>
+      selectedDomains.has(normalizedCookieDomain(cookie)) &&
+      previewCookieKeys.has(cookieKey(cookie)),
+  );
+}
+
 async function commitCookies(message) {
   try {
     requireFutureDeadline(message.expiresAt);
@@ -845,9 +925,9 @@ async function commitCookies(message) {
       }
       current.status = "committing";
     });
-    const cookies = (await collectCookies(targetUrls))
-      .filter((cookie) => selected.has(normalizedCookieDomain(cookie)))
-      .map(toWireCookie);
+    const cookies = filterCookiesForCommit(await collectCookies(targetUrls), record, selected).map(
+      toWireCookie,
+    );
     const serialized = JSON.stringify({ requestId: message.requestId, cookies });
     if (payloadBytes(serialized) > MAX_ENCRYPTED_PLAINTEXT_BYTES) {
       throw new Error("Encrypted cookie export exceeds the payload limit.");
@@ -1009,17 +1089,19 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
         await submitPairingCode(String(message.code || ""));
         return { ok: true };
       case "permissionResult":
-        await resumePreviewAfterPermission(
-          String(message.requestId || ""),
-          Boolean(message.granted),
-          message.origins,
+        await runLifecycleTask(() =>
+          resumePreviewAfterPermission(
+            String(message.requestId || ""),
+            Boolean(message.granted),
+            message.origins,
+          ),
         );
         return { ok: true };
       case "setProfileLabel":
         await setProfileLabel(message.label);
         return { ok: true };
       case "forgetPairing":
-        await forgetPairing();
+        await runLifecycleTask(() => forgetPairing());
         return { ok: true };
       default:
         return { ok: false, error: "Unsupported extension request." };
@@ -1040,7 +1122,7 @@ function runHeartbeat() {
   } else {
     void connect();
   }
-  void releaseExpiredRequests();
+  void runLifecycleTask(() => releaseExpiredRequests());
 }
 
 async function releaseExpiredRequests() {
@@ -1054,10 +1136,10 @@ async function releaseExpiredRequests() {
 }
 
 function cleanUpAndConnect() {
-  void (async () => {
+  void runLifecycleTask(async () => {
     await releaseAllManagedRequests();
     await connect();
-  })();
+  });
 }
 
 chrome.runtime.onInstalled.addListener(() => {

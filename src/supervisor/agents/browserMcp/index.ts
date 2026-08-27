@@ -60,7 +60,7 @@ export interface BrowserMcpBridge {
  */
 export function resolveBrowserMcpHttpConfig(
   location: BrowserMcpLocation,
-  identity?: McpThreadIdentity,
+  identity: McpThreadIdentity,
 ): BrowserMcpHttpConfig | null {
   const env = readBrowserMcpEnv();
   if (!env) return null;
@@ -83,6 +83,7 @@ export async function resolveBrowserMcpHttpConfigForLaunch(
   identity?: McpThreadIdentity,
 ): Promise<BrowserMcpHttpConfig | undefined> {
   if (!enabled) return undefined;
+  if (!identity?.threadId) return undefined;
   if (location.kind === "wsl") {
     if (!bridge) return undefined;
     const env = readBrowserMcpEnv();

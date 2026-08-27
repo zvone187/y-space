@@ -23,6 +23,7 @@ import {
 import type { AgentSlashCommand, AuthState, ThreadMode } from "@/shared/contracts";
 import { sortEffortsByCanonicalOrder } from "@/shared/effortOrder";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 import {
   findThoughtLevelConfigOption,
   isToggleOnlyThoughtLevelConfig,
@@ -480,7 +481,7 @@ export async function probeAcpCapabilities(
     child = spawn(command, args, {
       cwd: options?.processCwd,
       stdio: ["pipe", "pipe", "pipe"],
-      env: options?.env ? { ...process.env, ...options.env } : process.env,
+      env: sanitizePrivilegedChildEnvironment({ ...process.env, ...(options?.env ?? {}) }),
       shell: false,
       windowsHide: true,
       detached: ownedProcessGroup,
@@ -875,7 +876,11 @@ export async function authenticateAcpAgent(
     child = spawn(command, args, {
       ...(options?.processCwd ? { cwd: options.processCwd } : {}),
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, TERM: "xterm-256color", ...(options?.env ?? {}) },
+      env: sanitizePrivilegedChildEnvironment({
+        ...process.env,
+        TERM: "xterm-256color",
+        ...(options?.env ?? {}),
+      }),
       shell: false,
       windowsHide: true,
     });
@@ -952,7 +957,11 @@ export async function logoutAcpAgent(
     child = spawn(command, args, {
       ...(options?.processCwd ? { cwd: options.processCwd } : {}),
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, TERM: "xterm-256color", ...(options?.env ?? {}) },
+      env: sanitizePrivilegedChildEnvironment({
+        ...process.env,
+        TERM: "xterm-256color",
+        ...(options?.env ?? {}),
+      }),
       shell: false,
       windowsHide: true,
     });

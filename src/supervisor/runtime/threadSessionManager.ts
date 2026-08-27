@@ -29,9 +29,11 @@ import {
   type RuntimeEvent,
   type McpLaunchSnapshot,
   type ResolvedMcpServer,
+  disabledBuiltInMcpServerIds,
   mergeMcpServers,
   resolveEnabledMcpServers,
 } from "@/shared/contracts";
+import type { ResolveMcpCallerIdentityPayload } from "@/shared/ipc/procedures/thread";
 import { applyHomeScopePermissions } from "@/shared/agents/unrestrictedPermissions";
 import { TranscriptBuffer } from "@/shared/transcriptBuffer";
 import {
@@ -68,6 +70,8 @@ import { StructuredInterruptWatchdog } from "./threadSession/structuredInterrupt
 import { SteerCoordinator, clearPendingSteerSlot } from "./threadSession/steerCoordinator";
 import { buildShellCommand } from "./threadSession/shellCommand";
 import {
+  type McpLaunchAuthorization,
+  type McpLaunchIdentity,
   SpawnPipeline,
   workspaceLaunchConfig,
   type SpawnThreadInput,
@@ -80,6 +84,20 @@ export { isUserInterruptKeystroke, USER_INTERRUPT_RECOVERY_GRACE_MS, writeSubmit
 export type { ThreadSessionManagerOptions };
 
 const RECENTLY_REMOVED_THREAD_LIMIT = 256;
+
+type RootMcpLaunchAuthority =
+  | { phase: "pending"; authorization: McpLaunchAuthorization }
+  | {
+      phase: "active";
+      authorization: McpLaunchAuthorization;
+      sessionInstanceId: string;
+    };
+
+interface SubagentMcpLaunchAuthority {
+  parentThreadId: string;
+  parentSessionInstanceId: string;
+  authorization: McpLaunchAuthorization;
+}
 
 export class ThreadSessionManager {
   readonly sessions = new Map<string, SessionRuntime>();
@@ -101,6 +119,10 @@ export class ThreadSessionManager {
   private readonly structuredTurnQueue: StructuredTurnQueue;
   private readonly structuredFailureReporter = new StructuredFailureReporter();
   private readonly recentlyRemovedThreadIds = new Set<string>();
+  /** Canonical authority for root provider launches, including startup. */
+  private readonly rootMcpLaunchAuthorities = new Map<string, RootMcpLaunchAuthority>();
+  /** Ephemeral structured-child authority, tied to the exact live parent. */
+  private readonly subagentMcpLaunchAuthorities = new Map<string, SubagentMcpLaunchAuthority>();
   private disposed = false;
 
   constructor(private readonly options: ThreadSessionManagerOptions) {
@@ -177,6 +199,10 @@ export class ThreadSessionManager {
       failStructuredSession: (session, error) => this.failStructuredSession(session, error),
       isCurrentSession: (session) => this.isCurrentSession(session),
       resolveAgentSettings: (adapter) => this.resolveAgentSettings(adapter),
+      beginMcpLaunchAuthorization: (authorization) =>
+        this.beginMcpLaunchAuthorization(authorization),
+      activateMcpLaunchAuthorization: (session) => this.activateMcpLaunchAuthorization(session),
+      revokeMcpLaunchAuthorization: (identity) => this.revokeMcpLaunchAuthorization(identity),
       emitOptimisticUserMessage: (threadId, prompt, segments, requestedItemId) =>
         this.structuredTurnQueue.emitOptimisticUserMessage(
           threadId,
@@ -192,6 +218,9 @@ export class ThreadSessionManager {
       ptyLifecycle: this.ptyLifecycle,
       isCurrentSession: (session) => this.isCurrentSession(session),
       failStructuredSession: (session, error) => this.failStructuredSession(session, error),
+      beginMcpLaunchAuthorization: (authorization) =>
+        this.beginMcpLaunchAuthorization(authorization),
+      revokeMcpLaunchAuthorization: (identity) => this.revokeMcpLaunchAuthorization(identity),
       settleAfterStructuredDispose: () => sleep(150),
       primeProjectShellEnv,
       resolveLaunchSpec,
@@ -214,15 +243,157 @@ export class ThreadSessionManager {
    */
   getMcpIdentityByProviderSessionId(
     providerSessionId: string,
-    serverId?: "browser" | "app-controls",
+    serverId?: "browser" | "computer-use" | "app-controls",
   ): McpThreadIdentity | undefined {
+    const session = this.getSessionByProviderSessionId(providerSessionId);
+    return session ? this.identityForBuiltInServer(session, serverId) : undefined;
+  }
+
+  /**
+   * Revalidate an ingress launch capability against live session state. Signed
+   * token metadata selects a thread/binding, but this method is authoritative
+   * for liveness, current global/provider opt-outs, and disabled-tool policy.
+   */
+  resolveMcpCallerIdentity(
+    payload: ResolveMcpCallerIdentityPayload,
+  ): McpThreadIdentity | undefined {
+    const rootAuthority = this.rootMcpLaunchAuthorities.get(payload.threadId);
+    if (rootAuthority) {
+      if (!this.isExactMcpLaunch(rootAuthority.authorization.identity, payload.launchId)) {
+        return undefined;
+      }
+      if (rootAuthority.phase === "active") {
+        const session = this.sessions.get(payload.threadId);
+        if (
+          !session ||
+          !this.isCurrentSession(session) ||
+          session.instanceId !== rootAuthority.sessionInstanceId
+        ) {
+          return undefined;
+        }
+      }
+      return this.liveIdentityForMcpAuthorization(rootAuthority.authorization, payload.serverId);
+    }
+
+    const childAuthority = this.subagentMcpLaunchAuthorities.get(payload.threadId);
+    if (
+      !childAuthority ||
+      !this.isExactMcpLaunch(childAuthority.authorization.identity, payload.launchId)
+    ) {
+      return undefined;
+    }
+    const parent = this.sessions.get(childAuthority.parentThreadId);
+    if (
+      !parent ||
+      !this.isCurrentSession(parent) ||
+      parent.instanceId !== childAuthority.parentSessionInstanceId ||
+      parent.ignoreExit === true
+    ) {
+      return undefined;
+    }
+    return this.liveIdentityForMcpAuthorization(childAuthority.authorization, payload.serverId);
+  }
+
+  private isExactMcpLaunch(identity: McpThreadIdentity, launchId: string | undefined): boolean {
+    return identity.launchId !== undefined && identity.launchId === launchId;
+  }
+
+  private beginMcpLaunchAuthorization(authorization: McpLaunchAuthorization): void {
+    // Pipedream relays carry their own launch bearer, so rotate those alongside
+    // the built-in capability nonce before a restart/recovery can begin.
+    this.options.releasePipedreamMcpBindings?.(authorization.identity.threadId);
+    this.revokeSubagentMcpAccessForParent(authorization.identity.threadId);
+    this.rootMcpLaunchAuthorities.set(authorization.identity.threadId, {
+      phase: "pending",
+      authorization,
+    });
+  }
+
+  private activateMcpLaunchAuthorization(session: SessionRuntime): void {
+    const identity = session.mcpIdentity;
+    if (!identity?.threadId || !identity.launchId) return;
+    const current = this.rootMcpLaunchAuthorities.get(identity.threadId);
+    if (
+      !current ||
+      current.phase !== "pending" ||
+      current.authorization.identity.launchId !== identity.launchId
+    ) {
+      return;
+    }
+    this.rootMcpLaunchAuthorities.set(identity.threadId, {
+      phase: "active",
+      authorization: {
+        ...current.authorization,
+        identity: identity as McpLaunchIdentity,
+        config: session.config,
+        launchConfig: session.launchConfig ?? current.authorization.launchConfig,
+        mcpLaunchSnapshot: session.mcpLaunchSnapshot,
+      },
+      sessionInstanceId: session.instanceId,
+    });
+  }
+
+  private refreshActiveMcpLaunchAuthorization(session: SessionRuntime): void {
+    const identity = session.mcpIdentity;
+    if (!identity?.threadId || !identity.launchId) return;
+    const current = this.rootMcpLaunchAuthorities.get(identity.threadId);
+    if (
+      !current ||
+      current.phase !== "active" ||
+      current.sessionInstanceId !== session.instanceId ||
+      current.authorization.identity.launchId !== identity.launchId
+    ) {
+      return;
+    }
+    this.rootMcpLaunchAuthorities.set(identity.threadId, {
+      ...current,
+      authorization: {
+        ...current.authorization,
+        identity: identity as McpLaunchIdentity,
+        config: session.config,
+        launchConfig: session.launchConfig ?? current.authorization.launchConfig,
+        mcpLaunchSnapshot: session.mcpLaunchSnapshot,
+      },
+    });
+  }
+
+  private revokeMcpLaunchAuthorization(identity: McpLaunchIdentity): void {
+    const current = this.rootMcpLaunchAuthorities.get(identity.threadId);
+    if (
+      current?.phase === "pending" &&
+      current.authorization.identity.launchId === identity.launchId
+    ) {
+      this.rootMcpLaunchAuthorities.delete(identity.threadId);
+      this.options.releasePipedreamMcpBindings?.(identity.threadId);
+      return;
+    }
+    // Close/dispose can remove the authority while async launch resolution is
+    // still unwinding. Release any relay created after that earlier cleanup.
+    if (!current) this.options.releasePipedreamMcpBindings?.(identity.threadId);
+  }
+
+  private revokeMcpAccessForThread(threadId: string): void {
+    this.rootMcpLaunchAuthorities.delete(threadId);
+    this.revokeSubagentMcpAccessForParent(threadId);
+  }
+
+  private revokeSubagentMcpAccessForParent(parentThreadId: string): void {
+    for (const [childThreadId, authority] of this.subagentMcpLaunchAuthorities) {
+      if (authority.parentThreadId === parentThreadId) {
+        this.subagentMcpLaunchAuthorities.delete(childThreadId);
+        this.options.releasePipedreamMcpBindings?.(childThreadId);
+      }
+    }
+  }
+
+  private getSessionByProviderSessionId(providerSessionId: string): SessionRuntime | undefined {
     const indexed = this.sessionsBySessionId.get(providerSessionId);
     if (indexed) {
       if (
         this.isCurrentSession(indexed) &&
         indexed.adapter.capabilities.crossagentMcpRouting === "provider-session"
       ) {
-        return this.identityForBuiltInServer(indexed, serverId);
+        return indexed;
       }
       this.sessionsBySessionId.delete(providerSessionId);
     }
@@ -231,10 +402,10 @@ export class ThreadSessionManager {
       if (session.adapter.capabilities.crossagentMcpRouting !== "provider-session") continue;
       if (session.sessionRef?.providerSessionId === providerSessionId) {
         this.sessionsBySessionId.set(providerSessionId, session);
-        return this.identityForBuiltInServer(session, serverId);
+        return session;
       }
       if (session.structuredSession?.ownsProviderSession?.(providerSessionId)) {
-        return this.identityForBuiltInServer(session, serverId);
+        return session;
       }
     }
     return undefined;
@@ -242,7 +413,7 @@ export class ThreadSessionManager {
 
   private identityForBuiltInServer(
     session: SessionRuntime,
-    serverId: "browser" | "app-controls" | undefined,
+    serverId: "browser" | "computer-use" | "app-controls" | undefined,
   ): McpThreadIdentity {
     const identity = session.mcpIdentity ?? { threadId: session.threadId };
     if (!serverId) return identity;
@@ -251,6 +422,50 @@ export class ThreadSessionManager {
     return {
       ...identity,
       disabledTools: [...new Set([...(identity.disabledTools ?? []), ...disabledTools])],
+    };
+  }
+
+  private liveIdentityForMcpAuthorization(
+    authorization: McpLaunchAuthorization,
+    serverId: "browser" | "computer-use" | "app-controls",
+  ): McpThreadIdentity | undefined {
+    const settings = readSupervisorSharedSettings(this.options.settingsPath);
+    const globallyDisabled = disabledBuiltInMcpServerIds(settings.disabledBuiltInMcpServers);
+    if (
+      globallyDisabled.includes(serverId) ||
+      authorization.mcpLaunchSnapshot.disabledBuiltInMcpServerIds.includes(serverId)
+    ) {
+      return undefined;
+    }
+    const launchConfig =
+      authorization.adapter.capabilities.mcpConfigSource === "agentSettings"
+        ? this.spawnPipeline.resolveMcpLaunchConfig(
+            authorization.config,
+            {
+              ...authorization.mcpLaunchSnapshot,
+              disabledBuiltInMcpServerIds: globallyDisabled,
+            },
+            authorization.adapter,
+            authorization.identity.threadId,
+          )
+        : authorization.launchConfig;
+    // Match launch-time authorization exactly. An omitted Browser flag means
+    // this session did not receive Browser, so a bearer minted for an earlier
+    // incarnation of the same thread id must not become valid again.
+    if (serverId === "browser" && launchConfig.browserMcp !== true) return undefined;
+    if (serverId === "computer-use" && launchConfig.computerUse !== true) return undefined;
+
+    const identity = authorization.identity;
+    const disabledTools = [
+      ...new Set([
+        ...(identity.disabledTools ?? []),
+        ...(authorization.mcpLaunchSnapshot.disabledBuiltInMcpTools?.[serverId] ?? []),
+        ...(settings.disabledBuiltInMcpTools[serverId] ?? []),
+      ]),
+    ];
+    return {
+      ...identity,
+      ...(disabledTools.length > 0 ? { disabledTools } : {}),
     };
   }
 
@@ -343,7 +558,8 @@ export class ThreadSessionManager {
       }
     | undefined {
     const session = this.sessions.get(threadId);
-    if (!session) return undefined;
+    if (!session || !this.isCurrentSession(session) || session.ignoreExit === true)
+      return undefined;
     // Children inherit the effective launch config with built-in disables applied.
     const disabledIds = session.mcpLaunchSnapshot.disabledBuiltInMcpServerIds;
     const effectiveConfig = workspaceLaunchConfig(
@@ -365,29 +581,68 @@ export class ThreadSessionManager {
     threadId: string,
     identity: McpThreadIdentity,
     targetAgentKind: AgentKind,
+    childConfig: ThreadConfig,
   ): Promise<{ mcpServers?: ResolvedMcpServer[] }> {
     const session = this.sessions.get(threadId);
-    if (!session) return {};
+    if (!session || !this.isCurrentSession(session) || session.ignoreExit === true) return {};
     const targetAdapter = this.options.adapters.get(targetAgentKind);
-    if (!targetAdapter) return {};
+    if (!targetAdapter || !identity.threadId) return {};
     const mcpLaunchSnapshot = session.mcpLaunchSnapshot;
-    const launchConfig = workspaceLaunchConfig(
-      session.projectLocation,
-      session.config,
-      targetAdapter,
-      mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
-      mcpLaunchSnapshot.pluginBuiltInMcpServerIds,
-    );
-    const mcpServers = await this.spawnPipeline.resolveMcpServersForLaunch({
-      location: session.projectLocation,
-      config: launchConfig,
+    const launchConfig = this.spawnPipeline.resolveMcpLaunchConfig(
+      workspaceLaunchConfig(
+        session.projectLocation,
+        childConfig,
+        targetAdapter,
+        mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
+        mcpLaunchSnapshot.pluginBuiltInMcpServerIds,
+      ),
       mcpLaunchSnapshot,
-      identity,
+      targetAdapter,
+      identity.threadId,
+    );
+    const childIdentity: McpLaunchIdentity = {
+      ...identity,
+      threadId: identity.threadId,
+      launchId: randomUUID(),
+    };
+    const authorization: McpLaunchAuthorization = {
+      identity: childIdentity,
       adapter: targetAdapter,
+      config: childConfig,
+      launchConfig,
+      mcpLaunchSnapshot,
+    };
+    this.subagentMcpLaunchAuthorities.set(childIdentity.threadId, {
+      parentThreadId: threadId,
+      parentSessionInstanceId: session.instanceId,
+      authorization,
     });
-    return mcpServers.length > 0 || targetAdapter.capabilities.mcpConfigSource === "agentSettings"
-      ? { mcpServers }
-      : {};
+    try {
+      const mcpServers = await this.spawnPipeline.resolveMcpServersForLaunch({
+        location: session.projectLocation,
+        config: launchConfig,
+        mcpLaunchSnapshot,
+        identity: childIdentity,
+        adapter: targetAdapter,
+      });
+      if (!this.isCurrentSession(session) || Boolean(session.ignoreExit)) {
+        this.releaseSubagentParentMcpAccess(threadId, childIdentity.threadId);
+        return {};
+      }
+      return mcpServers.length > 0 || targetAdapter.capabilities.mcpConfigSource === "agentSettings"
+        ? { mcpServers }
+        : {};
+    } catch (error) {
+      this.releaseSubagentParentMcpAccess(threadId, childIdentity.threadId);
+      throw error;
+    }
+  }
+
+  releaseSubagentParentMcpAccess(parentThreadId: string, childThreadId: string): void {
+    const authority = this.subagentMcpLaunchAuthorities.get(childThreadId);
+    if (authority && authority.parentThreadId !== parentThreadId) return;
+    this.subagentMcpLaunchAuthorities.delete(childThreadId);
+    this.options.releasePipedreamMcpBindings?.(childThreadId);
   }
 
   /**
@@ -439,6 +694,7 @@ export class ThreadSessionManager {
             session.mcpLaunchSnapshot = refreshed.snapshot;
             session.nativePlugins = refreshed.nativePlugins;
             session.launchConfig = launchConfig;
+            this.refreshActiveMcpLaunchAuthorization(session);
             this.outputPipeline.emitState(session);
           } catch (error) {
             console.warn(
@@ -997,6 +1253,9 @@ export class ThreadSessionManager {
 
   async closeThread(payload: CloseThreadPayload): Promise<void> {
     this.options.releasePipedreamMcpBindings?.(payload.threadId);
+    // Revoke before any asynchronous provider teardown so a bearer cannot race
+    // close, restart, or a pending-start abort.
+    this.revokeMcpAccessForThread(payload.threadId);
     const shell = this.shellSessions.get(payload.threadId);
     if (shell) {
       shell.ignoreExit = true;
@@ -1216,6 +1475,8 @@ export class ThreadSessionManager {
     );
     this.sessions.clear();
     this.sessionsBySessionId.clear();
+    this.rootMcpLaunchAuthorities.clear();
+    this.subagentMcpLaunchAuthorities.clear();
 
     for (const shell of this.shellSessions.values()) {
       shell.ignoreExit = true;

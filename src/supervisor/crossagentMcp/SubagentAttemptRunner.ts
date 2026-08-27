@@ -41,6 +41,9 @@ export class SubagentAttemptRunner {
   }
 
   async teardown(state: AttemptExecutionState): Promise<void> {
+    // Revoke before awaiting process teardown so an in-flight bearer stops
+    // authorizing Browser/App calls as soon as the attempt settles.
+    this.host.releaseParentMcpAccess?.(state.parentThreadId, state.childThreadId);
     if (state.oneShot) {
       state.oneShot.cancel();
       state.oneShot = undefined;
@@ -62,8 +65,12 @@ export class SubagentAttemptRunner {
         state.parentThreadId,
         { threadId: state.childThreadId, title: state.label },
         adapter.kind,
+        config,
       );
-      if (!callbacks.isActive()) return;
+      if (!callbacks.isActive()) {
+        this.host.releaseParentMcpAccess?.(state.parentThreadId, state.childThreadId);
+        return;
+      }
 
       const handle = await adapter.createStructuredSession?.({
         threadId: state.childThreadId,

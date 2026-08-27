@@ -35,7 +35,6 @@ const channelTable = requireFromHere("./electron-builder.shared.cjs");
 const { restoreMacUpdaterManifests, snapshotMacUpdaterManifests } = requireFromHere(
   "./mac-updater-manifest.cjs",
 );
-const { supportEmail } = requireFromHere("../branding/contact.json");
 
 // Runtime externals — packages tsdown does NOT inline into dist/main/*.cjs.
 // Regenerate with `node scripts/scan-runtime-externals.mjs`.
@@ -183,6 +182,7 @@ function buildStagePackageJson(rootPkg) {
     homepage: rootPkg.homepage,
     license: rootPkg.license,
     author: rootPkg.author,
+    contributors: rootPkg.contributors,
     repository: rootPkg.repository,
     private: true,
     type: rootPkg.type ?? "module",
@@ -609,7 +609,7 @@ linux:
         - x64
   icon: build/icon${iconSuffix}.png
   category: Development
-  maintainer: SDSLeon <${supportEmail}>
+  maintainer: Y Space contributors
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:

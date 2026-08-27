@@ -248,7 +248,7 @@ describe("OpencodeSdkSession", () => {
     expect(secondDispose).toHaveBeenCalledTimes(1);
   });
 
-  it("joins the shared pool and forwards the MCP set", async () => {
+  it("isolates a GUI task server and forwards its MCP set", async () => {
     const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mocks.acquireOpenCodeServer.mockResolvedValue({
       eventClient: emptyEventClient(),
@@ -288,7 +288,11 @@ describe("OpencodeSdkSession", () => {
     await session.activate();
 
     expect(mocks.acquireOpenCodeServer).toHaveBeenCalledWith(
-      expect.objectContaining({ projectLocation, mcpServers }),
+      expect.objectContaining({
+        projectLocation,
+        mcpServers,
+        serverIsolationKey: "thread-host-42",
+      }),
     );
 
     await session.dispose();
@@ -322,6 +326,7 @@ describe("OpencodeSdkSession", () => {
 
     const input = mocks.acquireOpenCodeServer.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(input.mcpServers).toBeUndefined();
+    expect(input.serverIsolationKey).toBe("thread-plain");
 
     await session.dispose();
   });
@@ -429,6 +434,9 @@ describe("OpencodeSdkSession", () => {
     });
 
     await session.activate();
+    expect(mocks.acquireOpenCodeServer).toHaveBeenCalledWith(
+      expect.not.objectContaining({ serverIsolationKey: expect.anything() }),
+    );
     await expect(session.openThread(config)).resolves.toBe("ses_created");
 
     expect(session.launchOptions.resumeThreadId).toBe("ses_created");

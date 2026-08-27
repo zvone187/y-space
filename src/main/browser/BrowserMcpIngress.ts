@@ -2,7 +2,7 @@ import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import type { BrowserPanelManager } from "./BrowserPanelManager";
 import {
   StreamableHttpMcpIngress,
-  type ProviderSessionIdentityResolver,
+  type McpLaunchContextIdentityResolver,
   type StreamableHttpMcpIngressInfo,
 } from "../mcp/StreamableHttpMcpIngress";
 import {
@@ -17,7 +17,7 @@ import {
 export type BrowserMcpIngressInfo = StreamableHttpMcpIngressInfo;
 
 export interface BrowserMcpIngressOptions {
-  resolveProviderSessionIdentity?: ProviderSessionIdentityResolver;
+  resolveLaunchContextIdentity: McpLaunchContextIdentityResolver;
 }
 
 /**
@@ -32,9 +32,10 @@ export class BrowserMcpIngress {
   private getManager: (() => BrowserPanelManager | null) | null = null;
   private readonly ingress: StreamableHttpMcpIngress<ToolContext>;
 
-  constructor(options: BrowserMcpIngressOptions = {}) {
+  constructor(options: BrowserMcpIngressOptions) {
     this.ingress = new StreamableHttpMcpIngress<ToolContext>({
       launchContextAudience: "browser",
+      resolveLaunchContextIdentity: options.resolveLaunchContextIdentity,
       serverInfo: { name: "browser", version: "2.0.0" },
       instructions: BROWSER_MCP_INSTRUCTIONS,
       tools: TOOLS,
@@ -47,9 +48,6 @@ export class BrowserMcpIngress {
       contextUnavailableMessage: "browser panel not ready",
       dispatchTool,
       formatToolResult,
-      ...(options.resolveProviderSessionIdentity
-        ? { resolveProviderSessionIdentity: options.resolveProviderSessionIdentity }
-        : {}),
     });
   }
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLingui } from "@lingui/react/macro";
 import { readBridge } from "@/renderer/bridge";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import type {
@@ -51,7 +52,7 @@ export interface BrowserCookieImportModel {
 
 interface ParsedOrigins {
   readonly targetUrls: string[];
-  readonly error: string | null;
+  readonly error: "missing" | "too-many" | "invalid" | null;
 }
 
 export function safeHttpOrigin(value: string | undefined): string | null {
@@ -73,10 +74,10 @@ export function parseTargetOrigins(input: string): ParsedOrigins {
     .filter(Boolean);
 
   if (candidates.length === 0) {
-    return { targetUrls: [], error: "Enter at least one HTTP(S) origin." };
+    return { targetUrls: [], error: "missing" };
   }
   if (candidates.length > MAX_TARGET_ORIGINS) {
-    return { targetUrls: [], error: `Choose at most ${MAX_TARGET_ORIGINS} origins.` };
+    return { targetUrls: [], error: "too-many" };
   }
 
   const origins = new Set<string>();
@@ -93,14 +94,14 @@ export function parseTargetOrigins(input: string): ParsedOrigins {
       ) {
         return {
           targetUrls: [],
-          error: "Use HTTP(S) origins without usernames, passwords, paths, or private URL details.",
+          error: "invalid",
         };
       }
       origins.add(url.origin);
     } catch {
       return {
         targetUrls: [],
-        error: "Use HTTP(S) origins without usernames, passwords, paths, or private URL details.",
+        error: "invalid",
       };
     }
   }
@@ -112,28 +113,8 @@ function initialState(): BrowserCookieImportState {
   return { sources: [], activeRequest: null };
 }
 
-function genericFailure(operation: Exclude<CookieImportOperation, "loading" | null>): string {
-  switch (operation) {
-    case "opening-extension":
-      return "Could not open the extension folder. Try again.";
-    case "choosing-file":
-      return "Could not preview that cookie file. Use Cookie-Editor JSON or Netscape cookies.txt.";
-    case "pairing":
-      return "Could not start browser pairing. Try again.";
-    case "cancelling-pairing":
-      return "Could not cancel browser pairing. Try again.";
-    case "forgetting-source":
-      return "Could not forget that browser profile. Try again.";
-    case "previewing":
-      return "Could not create a cookie preview. Check that the extension is connected.";
-    case "committing":
-      return "Could not import the selected cookies. No cookie values were kept in this screen.";
-    case "cancelling-import":
-      return "Could not cancel the cookie import. Try again.";
-  }
-}
-
 export function useBrowserCookieImport(): BrowserCookieImportModel {
+  const { t } = useLingui();
   const activeTabUrl = useBrowserPanelStore((browserState) => {
     const activeTab = browserState.tabs.find((tab) => tab.tabId === browserState.activeTabId);
     return activeTab?.url;
@@ -151,12 +132,56 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
   const [operation, setOperation] = useState<CookieImportOperation>("loading");
   const [error, setError] = useState<string | null>(null);
   const pairingBaselineRef = useRef<Set<string> | null>(null);
-  const activeRequestIdRef = useRef<string | null>(null);
+  const activeRequestRef = useRef<Pick<ActiveRequest, "requestId" | "status"> | null>(null);
+  const operationGenerationRef = useRef(0);
   const mountedRef = useRef(true);
 
+  const originErrorText = useCallback(
+    (originErrorCode: Exclude<ParsedOrigins["error"], null>): string => {
+      switch (originErrorCode) {
+        case "missing":
+          return t`Enter at least one HTTP(S) origin.`;
+        case "too-many":
+          return t`Choose at most ${MAX_TARGET_ORIGINS} origins.`;
+        case "invalid":
+          return t`Use HTTP(S) origins without usernames, passwords, paths, or private URL details.`;
+      }
+    },
+    [t],
+  );
+
+  const genericFailure = useCallback(
+    (nextOperation: Exclude<CookieImportOperation, "loading" | null>): string => {
+      switch (nextOperation) {
+        case "opening-extension":
+          return t`Could not open the extension folder. Try again.`;
+        case "choosing-file":
+          return t`Could not preview that cookie file. Use Cookie-Editor JSON or Netscape cookies.txt.`;
+        case "pairing":
+          return t`Could not start browser pairing. Try again.`;
+        case "cancelling-pairing":
+          return t`Could not cancel browser pairing. Try again.`;
+        case "forgetting-source":
+          return t`Could not forget that browser profile. Try again.`;
+        case "previewing":
+          return t`Could not create a cookie preview. Check that the extension is connected.`;
+        case "committing":
+          return t`Could not import the selected cookies. No cookie values were kept in this screen.`;
+        case "cancelling-import":
+          return t`Could not cancel the cookie import. Try again.`;
+      }
+    },
+    [t],
+  );
+
   const applyActiveRequest = useCallback((request: ActiveRequest | null) => {
-    if (request?.requestId !== activeRequestIdRef.current) {
-      activeRequestIdRef.current = request?.requestId ?? null;
+    const previousRequest = activeRequestRef.current;
+    const requestChanged = request?.requestId !== previousRequest?.requestId;
+    const becameReady = request?.status === "ready" && previousRequest?.status !== "ready";
+    activeRequestRef.current = request
+      ? { requestId: request.requestId, status: request.status }
+      : null;
+    if (requestChanged || becameReady) {
       setSelectedDomains(
         new Set(
           request?.status === "ready"
@@ -203,7 +228,7 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
         if (mountedRef.current) applyState(nextState);
       } catch {
         if (!quiet && mountedRef.current) {
-          setError("Could not load browser cookie-import settings.");
+          setError(t`Could not load browser cookie-import settings.`);
         }
       } finally {
         if (mountedRef.current) {
@@ -211,7 +236,7 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
         }
       }
     },
-    [applyState],
+    [applyState, t],
   );
 
   useEffect(() => {
@@ -244,19 +269,23 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
   const run = useCallback(
     async (
       nextOperation: Exclude<CookieImportOperation, "loading" | null>,
-      work: () => Promise<void>,
+      work: (isCurrent: () => boolean) => Promise<void>,
     ) => {
+      const operationGeneration = operationGenerationRef.current + 1;
+      operationGenerationRef.current = operationGeneration;
+      const isCurrent = () =>
+        mountedRef.current && operationGenerationRef.current === operationGeneration;
       setOperation(nextOperation);
       setError(null);
       try {
-        await work();
+        await work(isCurrent);
       } catch {
-        if (mountedRef.current) setError(genericFailure(nextOperation));
+        if (isCurrent()) setError(genericFailure(nextOperation));
       } finally {
-        if (mountedRef.current) setOperation(null);
+        if (isCurrent()) setOperation(null);
       }
     },
-    [],
+    [genericFailure],
   );
 
   const beginPairing = useCallback(
@@ -282,19 +311,22 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
   const chooseFile = useCallback(async () => {
     const parsed = parseTargetOrigins(targetInput);
     if (parsed.error) {
-      setError(parsed.error);
+      setError(originErrorText(parsed.error));
       return;
     }
     await run("choosing-file", async () => {
       const request = await readBridge().browserCookieImportChooseFile({
         targetUrls: parsed.targetUrls,
+        dialogTitle: t`Choose a cookie export`,
+        cookieExportsFilterName: t`Cookie exports`,
+        allFilesFilterName: t`All files`,
       });
       if (!request || !mountedRef.current) return;
       setCompletion(null);
       applyActiveRequest(request);
       setState((currentState) => ({ ...currentState, activeRequest: request }));
     });
-  }, [applyActiveRequest, run, targetInput]);
+  }, [applyActiveRequest, originErrorText, run, t, targetInput]);
 
   const cancelPairing = useCallback(
     () =>
@@ -328,26 +360,26 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
   const preview = useCallback(async () => {
     const parsed = parseTargetOrigins(targetInput);
     if (parsed.error) {
-      setError(parsed.error);
+      setError(originErrorText(parsed.error));
       return;
     }
     const source = state.sources.find((candidate) => candidate.sourceId === selectedSourceId);
     if (!source?.connected) {
-      setError("Choose a connected browser profile before previewing cookies.");
+      setError(t`Choose a connected browser profile before previewing cookies.`);
       return;
     }
 
-    await run("previewing", async () => {
+    await run("previewing", async (isCurrent) => {
       const request = await readBridge().browserCookieImportPreview({
         sourceId: source.sourceId,
         targetUrls: parsed.targetUrls,
       });
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return;
       setCompletion(null);
       applyActiveRequest(request);
       setState((currentState) => ({ ...currentState, activeRequest: request }));
     });
-  }, [applyActiveRequest, run, selectedSourceId, state.sources, targetInput]);
+  }, [applyActiveRequest, originErrorText, run, selectedSourceId, state.sources, t, targetInput]);
 
   const commit = useCallback(
     () =>
@@ -384,7 +416,7 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
         if (!request) return;
         await readBridge().browserCookieImportCancel({ requestId: request.requestId });
         if (!mountedRef.current) return;
-        activeRequestIdRef.current = null;
+        activeRequestRef.current = null;
         setSelectedDomains(new Set());
         setState((currentState) => ({ ...currentState, activeRequest: null }));
       }),

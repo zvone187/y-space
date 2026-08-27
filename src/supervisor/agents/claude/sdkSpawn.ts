@@ -10,6 +10,10 @@ import {
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { sanitizeChildProcessEnv } from "@/supervisor/runtime/threadSession/spawnDiagnostics";
+import {
+  isPrivilegedChildEnvKey,
+  posixPrivilegedEnvironmentUnsetPrefix,
+} from "@/supervisor/privilegedChildEnvironment";
 
 type WindowsProjectLocation = Extract<ProjectLocation, { kind: "windows" }>;
 
@@ -50,6 +54,7 @@ function filteredEnv(env: Record<string, string | undefined>): Record<string, st
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) continue;
     if (WINDOWS_HOST_ENV_KEYS.has(key.toLowerCase())) continue;
+    if (isPrivilegedChildEnvKey(key)) continue;
     out[key] = value;
   }
   return out;
@@ -65,7 +70,8 @@ function buildDirectWslEnvCommandArgs(
     .map(([key, value]) => `export ${key}=${quotePosixShellArg(value)}`)
     .join("; ");
   const exec = `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
-  return ["/bin/sh", "-c", exports ? `${exports}; ${exec}` : exec];
+  const script = `${posixPrivilegedEnvironmentUnsetPrefix()}${exports ? `${exports}; ` : ""}${exec}`;
+  return ["/bin/sh", "-c", script];
 }
 
 export function spawnClaudeInWsl(location: ProjectLocation, options: SpawnOptions): SpawnedProcess {
@@ -112,7 +118,11 @@ export function spawnClaudeNative(
       env,
     );
     return spawn(spec.command, spec.args, {
-      ...(spec.env ? { env: spec.env } : Object.keys(env).length > 0 ? { env } : {}),
+      ...(spec.env
+        ? { env: sanitizeChildProcessEnv(spec.env) }
+        : Object.keys(env).length > 0
+          ? { env: sanitizeChildProcessEnv(env) }
+          : {}),
       signal: options.signal,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
@@ -120,7 +130,7 @@ export function spawnClaudeNative(
     }) as unknown as SpawnedProcess;
   }
   return spawn(command, options.args, {
-    env: options.env,
+    env: sanitizeChildProcessEnv(options.env),
     signal: options.signal,
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,

@@ -102,6 +102,43 @@ describe("mapImportedCookie", () => {
     });
   });
 
+  it.each([
+    "http://localhost:41739/",
+    "http://app.localhost:41739/",
+    "http://127.0.0.1:41739/",
+    "http://127.42.0.9:41739/",
+    "http://[::1]:41739/",
+  ])("maps a Secure cookie for Chromium-trustworthy loopback target %s", async (targetUrl) => {
+    const { mapImportedCookie } = await loadMapper();
+    const hostname = new URL(targetUrl).hostname.replace(/^\[|\]$/gu, "");
+    const result = mapImportedCookie({
+      cookie: baseCookie({ domain: hostname, secure: true }),
+      targetUrls: [targetUrl],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      details: { url: targetUrl, secure: true, httpOnly: true },
+    });
+  });
+
+  it.each([
+    "http://localhost.example.com/",
+    "http://127.0.0.1.example.com/",
+    "http://192.168.1.2/",
+  ])(
+    "does not weaken Secure-cookie rejection for non-loopback HTTP target %s",
+    async (targetUrl) => {
+      const { mapImportedCookie } = await loadMapper();
+      const result = mapImportedCookie({
+        cookie: baseCookie({ domain: new URL(targetUrl).hostname, secure: true }),
+        targetUrls: [targetUrl],
+      });
+
+      expect(result).toEqual({ ok: false, reason: "secure-cookie-over-http" });
+    },
+  );
+
   it("omits expirationDate for session cookies and preserves it for persistent cookies", async () => {
     const { mapImportedCookie } = await loadMapper();
     const session = mapImportedCookie({

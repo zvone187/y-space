@@ -62,7 +62,9 @@ describe("spawnCursorSdkWorker", () => {
     const fixture = makeProtocolFixture();
     const calls: Array<{ command: string; args: readonly string[]; options: SpawnOptions }> = [];
     const originalApiKey = process.env.CURSOR_API_KEY;
+    const originalPipedreamSecret = process.env.PIPEDREAM_CLIENT_SECRET;
     delete process.env.CURSOR_API_KEY;
+    process.env.PIPEDREAM_CLIENT_SECRET = "ambient-pipedream-secret";
     const spawnProcess: CursorSdkWorkerSpawnProcess = (command, args, options) => {
       calls.push({ command, args, options });
       const child = spawn(process.execPath, [fixture.path], {
@@ -94,6 +96,7 @@ describe("spawnCursorSdkWorker", () => {
           env: {
             CURSOR_API_KEY: "must-not-appear-in-command",
             PORACODE_SAFE_TEST_VALUE: "visible",
+            PIPEDREAM_PROJECT_ID: "override-pipedream-project",
           },
         },
         {
@@ -120,7 +123,10 @@ describe("spawnCursorSdkWorker", () => {
       expect(serializedArgv).toContain("/tmp/poracode-test/cursor-sdk/cursor-sdk-worker.mjs");
       expect(serializedArgv).toContain("PORACODE_SAFE_TEST_VALUE");
       expect(serializedArgv).not.toContain("must-not-appear-in-command");
+      expect(serializedArgv).not.toContain("override-pipedream-project");
       expect(call!.options.env?.CURSOR_API_KEY).toBeUndefined();
+      expect(call!.options.env?.PIPEDREAM_CLIENT_SECRET).toBeUndefined();
+      expect(call!.options.env?.PIPEDREAM_PROJECT_ID).toBeUndefined();
       expect(resolveNode).toHaveBeenCalledExactlyOnceWith("Ubuntu", {
         minimumVersion: "22.13.0",
       });
@@ -128,6 +134,8 @@ describe("spawnCursorSdkWorker", () => {
     } finally {
       if (originalApiKey === undefined) delete process.env.CURSOR_API_KEY;
       else process.env.CURSOR_API_KEY = originalApiKey;
+      if (originalPipedreamSecret === undefined) delete process.env.PIPEDREAM_CLIENT_SECRET;
+      else process.env.PIPEDREAM_CLIENT_SECRET = originalPipedreamSecret;
     }
   });
 

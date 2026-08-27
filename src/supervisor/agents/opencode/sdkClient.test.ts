@@ -260,7 +260,7 @@ describe("acquireOpenCodeServer", () => {
     >;
     expect(credentials.OPENCODE_SERVER_USERNAME).toBe("opencode");
     expect(credentials.OPENCODE_SERVER_PASSWORD).toEqual(expect.any(String));
-    expect(credentials.PORACODE_OPENCODE_SESSION_ROUTING).toBe("1");
+    expect(credentials.PORACODE_OPENCODE_SESSION_ROUTING).toBeUndefined();
     const authorization = `Basic ${Buffer.from(
       `opencode:${credentials.OPENCODE_SERVER_PASSWORD}`,
     ).toString("base64")}`;
@@ -281,6 +281,39 @@ describe("acquireOpenCodeServer", () => {
     await first.dispose();
     await second.dispose();
     expect(handle.dispose).not.toHaveBeenCalled();
+  });
+
+  it("never pools two GUI task capabilities even in the same project directory", async () => {
+    const firstHandle = makeHandle("http://127.0.0.1:4301");
+    const secondHandle = makeHandle("http://127.0.0.1:4302");
+    const firstEventClient = makeSubagentClient();
+    const firstDirectoryClient = makeSubagentClient();
+    const secondEventClient = makeSubagentClient();
+    const secondDirectoryClient = makeSubagentClient();
+    mocks.spawnOpenCodeServer.mockReturnValueOnce(firstHandle).mockReturnValueOnce(secondHandle);
+    mocks.createOpencodeClient
+      .mockReturnValueOnce(firstEventClient)
+      .mockReturnValueOnce(firstDirectoryClient)
+      .mockReturnValueOnce(secondEventClient)
+      .mockReturnValueOnce(secondDirectoryClient);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const first = await acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-shared" },
+      serverIsolationKey: "thread-first",
+    });
+    const second = await acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-shared" },
+      serverIsolationKey: "thread-second",
+    });
+
+    expect(mocks.spawnOpenCodeServer).toHaveBeenCalledTimes(2);
+    expect(first.baseUrl).toBe("http://127.0.0.1:4301");
+    expect(second.baseUrl).toBe("http://127.0.0.1:4302");
+    expect(first.eventClient).not.toBe(second.eventClient);
+
+    await first.dispose();
+    await second.dispose();
   });
 
   it("stops the shared sidecar after its last lease stays idle", async () => {

@@ -2,11 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentKind, McpServer } from "@/shared/contracts";
+import type { AgentKind, McpServer, ResolvedMcpServer } from "@/shared/contracts";
+import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import type { SupervisorEvent } from "@/shared/ipc";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { WindowsShellPreference } from "../shellPreference";
 import type { SessionRuntime } from "./sessionTypes";
+import type { McpLaunchAuthorization, McpLaunchIdentity } from "./threadSession/spawnPipeline";
 
 const captureSupervisorException = vi.hoisted(() =>
   vi.fn<(error: unknown, tags?: Record<string, string>) => void>(),
@@ -180,6 +182,33 @@ function createInactiveRuntime(
   } as unknown as SessionRuntime;
 }
 
+function attachAuthorizedRuntime(
+  manager: ThreadSessionManager,
+  runtime: SessionRuntime,
+): McpLaunchIdentity {
+  const identity: McpLaunchIdentity = {
+    ...runtime.mcpIdentity,
+    threadId: runtime.threadId,
+    launchId: runtime.mcpIdentity?.launchId ?? `launch-${runtime.threadId}`,
+  };
+  runtime.mcpIdentity = identity;
+  manager.sessions.set(runtime.threadId, runtime);
+  const authorization: McpLaunchAuthorization = {
+    identity,
+    adapter: runtime.adapter,
+    config: runtime.config,
+    launchConfig: runtime.launchConfig ?? runtime.config,
+    mcpLaunchSnapshot: runtime.mcpLaunchSnapshot,
+  };
+  const capabilityManager = manager as unknown as {
+    beginMcpLaunchAuthorization(authorization: McpLaunchAuthorization): void;
+    activateMcpLaunchAuthorization(session: SessionRuntime): void;
+  };
+  capabilityManager.beginMcpLaunchAuthorization(authorization);
+  capabilityManager.activateMcpLaunchAuthorization(runtime);
+  return identity;
+}
+
 const guardedStructuredProviders = ["codex", "opencode"] as const;
 const managersToDispose: ThreadSessionManager[] = [];
 const tempDirs: string[] = [];
@@ -194,6 +223,73 @@ afterEach(async () => {
 });
 
 describe("ThreadSessionManager provider-session routing", () => {
+  it.each(["codex", "claude", "opencode"] as const)(
+    "authorizes %s Browser and App Controls during provider creation before runtime attachment",
+    async (agentKind) => {
+      const structuredSession = createStructuredSession(Promise.resolve());
+      const adapter = createAdapter(agentKind, structuredSession);
+      let manager!: ThreadSessionManager;
+      let launchIdentity: McpThreadIdentity | undefined;
+      let browserDuringCreation: McpThreadIdentity | undefined;
+      let appControlsDuringCreation: McpThreadIdentity | undefined;
+      let hadAttachedSessionDuringCreation = true;
+
+      vi.mocked(adapter.createStructuredSession!).mockImplementation(async (input) => {
+        launchIdentity = input.mcpIdentity;
+        hadAttachedSessionDuringCreation = manager.sessions.has(input.threadId);
+        if (input.mcpIdentity?.threadId && input.mcpIdentity.launchId) {
+          browserDuringCreation = manager.resolveMcpCallerIdentity({
+            routing: "thread",
+            threadId: input.mcpIdentity.threadId,
+            launchId: input.mcpIdentity.launchId,
+            serverId: "browser",
+          });
+          appControlsDuringCreation = manager.resolveMcpCallerIdentity({
+            routing: "thread",
+            threadId: input.mcpIdentity.threadId,
+            launchId: input.mcpIdentity.launchId,
+            serverId: "app-controls",
+          });
+        }
+        return structuredSession;
+      });
+      manager = createManager(agentKind, adapter);
+
+      await manager.startThread({
+        threadId: `launch-capability-${agentKind}`,
+        projectLocation: { kind: "windows", path: "C:\\repo" },
+        agentKind,
+        config: { model: `${agentKind}/model`, browserMcp: true },
+        prompt: "",
+        initialSize: { cols: 80, rows: 24 },
+        presentationMode: "gui",
+      });
+
+      expect(hadAttachedSessionDuringCreation).toBe(false);
+      expect(launchIdentity?.launchId).toEqual(expect.any(String));
+      expect(browserDuringCreation).toEqual(launchIdentity);
+      expect(appControlsDuringCreation).toEqual(launchIdentity);
+      expect(
+        manager.resolveMcpCallerIdentity({
+          routing: "thread",
+          threadId: launchIdentity!.threadId!,
+          launchId: launchIdentity!.launchId,
+          serverId: "browser",
+        }),
+      ).toEqual(launchIdentity);
+
+      await manager.closeThread({ threadId: launchIdentity!.threadId! });
+      expect(
+        manager.resolveMcpCallerIdentity({
+          routing: "thread",
+          threadId: launchIdentity!.threadId!,
+          launchId: launchIdentity!.launchId,
+          serverId: "browser",
+        }),
+      ).toBeUndefined();
+    },
+  );
+
   it("resolves both root and provider-owned child sessions to the live thread", () => {
     const structuredSession = createStructuredSession(Promise.resolve());
     structuredSession.ownsProviderSession = (sessionId) => sessionId === "ses_child";
@@ -258,6 +354,301 @@ describe("ThreadSessionManager provider-session routing", () => {
     manager.sessions.delete(runtime.threadId);
     manager.sessionsBySessionId.delete("ses_existing");
     expect(identityManager.getMcpIdentityByProviderSessionId("ses_existing")).toBeUndefined();
+  });
+
+  it("binds built-in MCP identity to the exact live task even in one OpenCode directory", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    adapter.capabilities.agentSettingsDefaults = { browserMcp: true };
+    adapter.capabilities.crossagentMcpRouting = "provider-session";
+    const manager = createManager("opencode", adapter);
+    const first = createInactiveRuntime("opencode", adapter, structuredSession);
+    first.threadId = "thread-first";
+    first.projectLocation = { kind: "posix", path: "/repo/shared" };
+    first.config = { model: "opencode/model", browserMcp: true };
+    first.launchConfig = { ...first.config };
+    first.sessionRef = { providerSessionId: "ses_first", discoveredAt: new Date().toISOString() };
+    first.mcpIdentity = { threadId: first.threadId, title: "First" };
+    const second = createInactiveRuntime("opencode", adapter, structuredSession);
+    second.threadId = "thread-second";
+    second.projectLocation = { kind: "posix", path: "/repo/shared" };
+    second.config = { model: "opencode/model", browserMcp: true };
+    second.launchConfig = { ...second.config };
+    second.sessionRef = {
+      providerSessionId: "ses_second",
+      discoveredAt: new Date().toISOString(),
+    };
+    second.mcpIdentity = { threadId: second.threadId, title: "Second" };
+    attachAuthorizedRuntime(manager, first);
+    attachAuthorizedRuntime(manager, second);
+    manager.sessionsBySessionId.set("ses_first", first);
+    manager.sessionsBySessionId.set("ses_second", second);
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: "thread-first",
+        launchId: first.mcpIdentity!.launchId,
+        serverId: "browser",
+      }),
+    ).toEqual(first.mcpIdentity);
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: "thread-second",
+        launchId: second.mcpIdentity!.launchId,
+        serverId: "browser",
+      }),
+    ).toEqual(second.mcpIdentity);
+
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ agentSettings: { opencode: { browserMcp: false } } }),
+      "utf8",
+    );
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: "thread-first",
+        launchId: first.mcpIdentity!.launchId,
+        serverId: "browser",
+      }),
+    ).toBeUndefined();
+
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ disabledBuiltInMcpServers: { browser: true } }),
+      "utf8",
+    );
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: "thread-first",
+        launchId: first.mcpIdentity!.launchId,
+        serverId: "browser",
+      }),
+    ).toBeUndefined();
+
+    manager.sessions.delete(first.threadId);
+    manager.sessionsBySessionId.delete("ses_first");
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: "thread-first",
+        launchId: first.mcpIdentity!.launchId,
+        serverId: "app-controls",
+      }),
+    ).toBeUndefined();
+  });
+
+  it("rejects an old Browser capability when the live task did not launch Browser", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "thread-reused-without-browser";
+    runtime.config = { model: "codex/model" };
+    runtime.launchConfig = { ...runtime.config };
+    runtime.mcpIdentity = { threadId: runtime.threadId, title: "Reused task" };
+    attachAuthorizedRuntime(manager, runtime);
+
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: runtime.threadId,
+        launchId: runtime.mcpIdentity.launchId,
+        serverId: "browser",
+      }),
+    ).toBeUndefined();
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: runtime.threadId,
+        launchId: runtime.mcpIdentity.launchId,
+        serverId: "app-controls",
+      }),
+    ).toEqual(runtime.mcpIdentity);
+  });
+
+  it("rejects a capability from an earlier launch of the same persistent task", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "thread-restarted";
+    runtime.config = { model: "codex/model", browserMcp: true };
+    runtime.launchConfig = { ...runtime.config };
+    runtime.mcpIdentity = {
+      threadId: runtime.threadId,
+      launchId: "current-launch",
+      title: "Restarted task",
+    };
+    attachAuthorizedRuntime(manager, runtime);
+
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: runtime.threadId,
+        launchId: "previous-launch",
+        serverId: "browser",
+      }),
+    ).toBeUndefined();
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: runtime.threadId,
+        launchId: "current-launch",
+        serverId: "browser",
+      }),
+    ).toEqual(runtime.mcpIdentity);
+  });
+
+  it("rotates authority before restart creation and revokes a failed replacement launch", async () => {
+    const initialSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", initialSession);
+    let initialIdentity: McpThreadIdentity | undefined;
+    vi.mocked(adapter.createStructuredSession!).mockImplementationOnce(async (input) => {
+      initialIdentity = input.mcpIdentity;
+      return initialSession;
+    });
+    const manager = createManager("codex", adapter);
+
+    await manager.startThread({
+      threadId: "restart-capability",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model", browserMcp: true },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      sessionRef: {
+        providerSessionId: "ses_restart",
+        discoveredAt: "2026-08-15T00:00:00.000Z",
+      },
+      presentationMode: "gui",
+    });
+    const runtime = manager.sessions.get("restart-capability")!;
+    runtime.status = "inactive";
+
+    const replacement = createStructuredSession(Promise.resolve());
+    replacement.activate = vi.fn<NonNullable<StructuredSessionHandle["activate"]>>(async () => {
+      throw new Error("replacement activation failed");
+    });
+    let replacementIdentity: McpThreadIdentity | undefined;
+    let oldDuringReplacement: McpThreadIdentity | undefined;
+    let replacementDuringCreation: McpThreadIdentity | undefined;
+    vi.mocked(adapter.createStructuredSession!).mockImplementationOnce(async (input) => {
+      replacementIdentity = input.mcpIdentity;
+      oldDuringReplacement = manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: initialIdentity!.threadId!,
+        launchId: initialIdentity!.launchId,
+        serverId: "browser",
+      });
+      replacementDuringCreation = manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: input.mcpIdentity!.threadId!,
+        launchId: input.mcpIdentity!.launchId,
+        serverId: "browser",
+      });
+      return replacement;
+    });
+
+    await expect(
+      manager.sendThreadInput({
+        threadId: runtime.threadId,
+        prompt: "resume",
+        config: { model: "codex/model", browserMcp: true },
+      }),
+    ).rejects.toThrow("replacement activation failed");
+
+    expect(initialIdentity?.launchId).toEqual(expect.any(String));
+    expect(replacementIdentity?.launchId).toEqual(expect.any(String));
+    expect(replacementIdentity?.launchId).not.toBe(initialIdentity?.launchId);
+    expect(oldDuringReplacement).toBeUndefined();
+    expect(replacementDuringCreation).toEqual(replacementIdentity);
+    for (const identity of [initialIdentity!, replacementIdentity!]) {
+      expect(
+        manager.resolveMcpCallerIdentity({
+          routing: "thread",
+          threadId: identity.threadId!,
+          launchId: identity.launchId,
+          serverId: "browser",
+        }),
+      ).toBeUndefined();
+    }
+  });
+
+  it("authorizes a structured child only while its lease and parent are live", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const parent = createInactiveRuntime("codex", adapter, structuredSession);
+    parent.threadId = "parent-with-child-capability";
+    parent.config = { model: "codex/model", browserMcp: true };
+    parent.launchConfig = { ...parent.config };
+    manager.sessions.set(parent.threadId, parent);
+
+    const spawnPipeline = (
+      manager as unknown as {
+        spawnPipeline: {
+          resolveMcpServersForLaunch(input: {
+            identity: McpThreadIdentity;
+          }): Promise<ResolvedMcpServer[]>;
+        };
+      }
+    ).spawnPipeline;
+    const childIdentities: McpThreadIdentity[] = [];
+    vi.spyOn(spawnPipeline, "resolveMcpServersForLaunch").mockImplementation(async (input) => {
+      childIdentities.push(input.identity);
+      return [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          transport: { type: "http", url: "http://browser/mcp", headers: {} },
+        },
+        {
+          id: "app-controls",
+          name: "app_controls",
+          timeoutMs: 30_000,
+          transport: { type: "http", url: "http://app-controls/mcp", headers: {} },
+        },
+      ];
+    });
+
+    const authorizeChild = async (childThreadId: string) => {
+      await manager.resolveSubagentParentMcpAccess(
+        parent.threadId,
+        { threadId: childThreadId, title: childThreadId },
+        "codex",
+        { model: "codex/model", browserMcp: true },
+      );
+      return childIdentities.at(-1)!;
+    };
+    const resolveChild = (identity: McpThreadIdentity, serverId: "browser" | "app-controls") =>
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: identity.threadId!,
+        launchId: identity.launchId,
+        serverId,
+      });
+
+    const releasedChild = await authorizeChild("structured-child-released");
+    expect(releasedChild.launchId).toEqual(expect.any(String));
+    expect(resolveChild(releasedChild, "browser")).toEqual(releasedChild);
+    expect(resolveChild(releasedChild, "app-controls")).toEqual(releasedChild);
+
+    manager.releaseSubagentParentMcpAccess(parent.threadId, releasedChild.threadId!);
+    expect(resolveChild(releasedChild, "browser")).toBeUndefined();
+    expect(resolveChild(releasedChild, "app-controls")).toBeUndefined();
+
+    const parentClosedChild = await authorizeChild("structured-child-parent-closed");
+    expect(resolveChild(parentClosedChild, "browser")).toEqual(parentClosedChild);
+    await manager.closeThread({ threadId: parent.threadId });
+    expect(resolveChild(parentClosedChild, "browser")).toBeUndefined();
+    expect(resolveChild(parentClosedChild, "app-controls")).toBeUndefined();
   });
 });
 

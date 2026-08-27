@@ -50,10 +50,16 @@ interface ActivePairing extends CookieImportPairingChallenge {
 export interface CookieImportPairingStoreOptions {
   load?(): unknown;
   save?(state: PersistedState): void;
+  purge?(): void;
   now?(): number;
   randomCode?(): string;
   randomToken?(): string;
   randomId?(): string;
+}
+
+export interface CookieImportPairingRevocationResult {
+  revoked: boolean;
+  purgedAll: boolean;
 }
 
 function defaultRandomCode(): string {
@@ -73,6 +79,7 @@ export class CookieImportPairingStore {
   private readonly activePairings = new Map<string, ActivePairing>();
   private readonly loadState: () => unknown;
   private readonly saveState: (state: PersistedState) => void;
+  private readonly purgeState: (() => void) | undefined;
   private readonly now: () => number;
   private readonly randomCode: () => string;
   private readonly randomToken: () => string;
@@ -81,6 +88,7 @@ export class CookieImportPairingStore {
   constructor(options: CookieImportPairingStoreOptions = {}) {
     this.loadState = options.load ?? (() => undefined);
     this.saveState = options.save ?? (() => undefined);
+    this.purgeState = options.purge;
     this.now = options.now ?? Date.now;
     this.randomCode = options.randomCode ?? defaultRandomCode;
     this.randomToken = options.randomToken ?? defaultRandomToken;
@@ -88,7 +96,9 @@ export class CookieImportPairingStore {
 
     const loaded = this.loadState();
     if (loaded === undefined || loaded === null) return;
-    const state = persistedStateSchema.parse(loaded);
+    const parsedState = persistedStateSchema.safeParse(loaded);
+    if (!parsedState.success) return;
+    const state = parsedState.data;
     for (const source of state.sources) this.sources.set(source.sourceId, source);
   }
 
@@ -182,7 +192,7 @@ export class CookieImportPairingStore {
     const pairing = this.activePairings.get(pairingId);
     if (!pairing) throw new Error("Pairing request was not found.");
     if (pairing.locked) throw new Error("Pairing is locked after too many attempts.");
-    if (this.now() > pairing.expiresAt) {
+    if (this.now() >= pairing.expiresAt) {
       this.activePairings.delete(pairing.pairingId);
       throw new Error("Pairing code has expired.");
     }
@@ -194,8 +204,23 @@ export class CookieImportPairingStore {
     if (pairing.failedAttempts >= MAX_PAIRING_ATTEMPTS) pairing.locked = true;
   }
 
-  forgetSource(sourceId: string): void {
-    if (this.sources.delete(sourceId)) this.persist();
+  forgetSource(sourceId: string): CookieImportPairingRevocationResult {
+    if (!this.sources.delete(sourceId)) return { revoked: false, purgedAll: false };
+    try {
+      this.persist();
+      return { revoked: true, purgedAll: false };
+    } catch (writeError) {
+      this.sources.clear();
+      if (!this.purgeState) throw writeError;
+      try {
+        this.purgeState();
+      } catch (purgeError) {
+        throw new Error("Unable to persist or securely purge browser-cookie pairings.", {
+          cause: purgeError,
+        });
+      }
+      return { revoked: true, purgedAll: true };
+    }
   }
 
   listSources(): CookieImportPairedSource[] {
@@ -221,7 +246,7 @@ export class CookieImportPairingStore {
   private pruneExpiredPairings(): void {
     const now = this.now();
     for (const [pairingId, pairing] of this.activePairings) {
-      if (pairing.expiresAt < now) this.activePairings.delete(pairingId);
+      if (pairing.expiresAt <= now) this.activePairings.delete(pairingId);
     }
   }
 }

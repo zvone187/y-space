@@ -342,7 +342,8 @@ export function BrowserCookieImportSettings() {
               <div className="mt-3 rounded-lg border border-border/15 bg-background/25 p-3">
                 {activeRequest.sourceKind === "file" && activeRequest.sourceLabel ? (
                   <p className="mb-2 text-[11px] text-muted">
-                    Cookie file: <span className="font-mono">{activeRequest.sourceLabel}</span>
+                    <Trans>Cookie file:</Trans>{" "}
+                    <span className="font-mono">{activeRequest.sourceLabel}</span>
                   </p>
                 ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -375,7 +376,7 @@ export function BrowserCookieImportSettings() {
                             {domain.domain}
                           </p>
                           <p className="text-[11px] text-muted">
-                            {domain.cookieCount} cookies · {domain.unsupportedCount} unsupported
+                            {t`${domain.cookieCount} cookies · ${domain.unsupportedCount} unsupported`}
                           </p>
                         </div>
                       </li>
@@ -391,7 +392,7 @@ export function BrowserCookieImportSettings() {
                   size="sm"
                   variant="ghost"
                   isPending={model.operation === "cancelling-import"}
-                  isDisabled={isBusy}
+                  isDisabled={isBusy && model.operation !== "previewing"}
                   onPress={() => void model.cancelImport()}
                 >
                   <Trans>Cancel cookie import</Trans>
@@ -417,11 +418,13 @@ export function BrowserCookieImportSettings() {
               >
                 <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden="true" />
                 <p>
-                  Imported {completedCounts.importedCount} cookies; skipped{" "}
-                  {completedCounts.skippedCount}.
-                  {completedCounts.flushFailed
-                    ? " The browser accepted them, but disk flush must be retried."
-                    : ""}
+                  <Trans>
+                    Imported {completedCounts.importedCount} cookies; skipped{" "}
+                    {completedCounts.skippedCount}.
+                  </Trans>{" "}
+                  {completedCounts.flushFailed ? (
+                    <Trans>The browser accepted them, but disk flush must be retried.</Trans>
+                  ) : null}
                 </p>
               </div>
             ) : null}

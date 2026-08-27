@@ -42,6 +42,7 @@ import { isThreadTurnActive, resolveMcpLaunchSnapshot } from "@/shared/contracts
 import { buildRemoteGitTargetInterests } from "@/shared/gitStateInterestPolicy";
 import { pickRemoteSettings, remoteProjectCommandResultSchema } from "@/shared/remote";
 import { configureSecretStorageKey } from "@/shared/secretStorage";
+import type { McpLaunchContext } from "@/shared/mcpLaunchContext";
 import {
   createDeviceScheduleService,
   ensureHomeProjectRow,
@@ -119,6 +120,25 @@ export interface HeadlessRemoteHost {
 
 /** Bind hosts that mean "all interfaces" — the server then also listens on loopback. */
 const WILDCARD_BIND_HOSTS = new Set(["0.0.0.0", "::", "::0"]);
+
+/**
+ * Revalidate a signed headless MCP capability against the currently running
+ * launch. Keeping the per-launch nonce in this adapter prevents a token from a
+ * previous incarnation of the same persistent thread from becoming valid
+ * again after the thread is restarted.
+ */
+export function createHeadlessMcpLaunchContextIdentityResolver(
+  supervisorClient: Pick<SupervisorClient, "call">,
+  serverId: "app-controls",
+) {
+  return async (context: McpLaunchContext) =>
+    (await supervisorClient.call("resolveMcpCallerIdentity", {
+      routing: "thread",
+      threadId: context.identity.threadId!,
+      ...(context.identity.launchId ? { launchId: context.identity.launchId } : {}),
+      serverId,
+    })) ?? undefined;
+}
 
 /**
  * The base URL the relay host adapter should proxy visitor traffic to on this
@@ -224,10 +244,7 @@ export async function createHeadlessRemoteHost(
       // WebSocket reconnect (the replay window covers transient drops).
     },
   });
-  const resolveProviderSessionIdentity =
-    (serverId: "browser" | "app-controls") => async (providerSessionId: string) =>
-      (await supervisorClient.call("resolveMcpCallerIdentity", { providerSessionId, serverId })) ??
-      undefined;
+  const resolveLaunchContextIdentity = createHeadlessMcpLaunchContextIdentityResolver;
   const scheduleCoordinator = new ScheduleRunCoordinator({
     startThread: (payload) => supervisorClient.call("startThread", payload),
     getAgentStatuses: (wslDistros) => supervisorClient.call("getAgentStatuses", { wslDistros }),
@@ -315,7 +332,7 @@ export async function createHeadlessRemoteHost(
     getProjects: () => dbGetProjects(),
     getProject: dbGetProject,
     getProjectNotes: dbGetProjectNotes,
-    resolveProviderSessionIdentity: resolveProviderSessionIdentity("app-controls"),
+    resolveLaunchContextIdentity: resolveLaunchContextIdentity(supervisorClient, "app-controls"),
     ...sharedAppControlsDeps,
     settings: {
       read: () => readSharedSettingsFile(paths.settingsPath),

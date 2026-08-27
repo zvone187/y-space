@@ -279,13 +279,18 @@ export function createLocalIpcHandlers(
       if (error) throw new Error("Unable to open the Y Space Cookie Import extension folder.");
     },
     browserCookieImportGetState: () => options.browserCookieImportService.getState(),
-    browserCookieImportChooseFile: async ({ targetUrls }) => {
+    browserCookieImportChooseFile: async ({
+      targetUrls,
+      dialogTitle,
+      cookieExportsFilterName,
+      allFilesFilterName,
+    }) => {
       const result = await dialog.showOpenDialog(options.getMainWindow()!, {
-        title: "Choose a cookie export",
+        title: dialogTitle,
         properties: ["openFile"],
         filters: [
-          { name: "Cookie exports", extensions: ["json", "txt", "cookies"] },
-          { name: "All files", extensions: ["*"] },
+          { name: cookieExportsFilterName, extensions: ["json", "txt", "cookies"] },
+          { name: allFilesFilterName, extensions: ["*"] },
         ],
       });
       const filePath = result.filePaths[0];
@@ -615,6 +620,12 @@ export function createLocalIpcHandlers(
     browserCreateTab: (payload) =>
       requireBrowserPanel(options.getBrowserPanelManager).createTab({
         ...(payload.url !== undefined ? { url: payload.url } : {}),
+        ...(payload.activate !== undefined ? { activate: payload.activate } : {}),
+        ...(payload.reveal !== undefined ? { reveal: payload.reveal } : {}),
+      }),
+    browserCreateSensitiveTab: (payload) =>
+      requireBrowserPanel(options.getBrowserPanelManager).createSensitiveIntegrationTab({
+        url: payload.url,
         ...(payload.activate !== undefined ? { activate: payload.activate } : {}),
         ...(payload.reveal !== undefined ? { reveal: payload.reveal } : {}),
       }),

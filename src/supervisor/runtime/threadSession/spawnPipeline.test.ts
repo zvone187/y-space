@@ -129,7 +129,7 @@ describe("workspaceLaunchConfig — Home scope unrestricted for every agent", ()
 });
 
 describe("applyAgentSettingsMcpFlags", () => {
-  it("maps agentSettings booleans and keeps Crossagents off without provider-session routing", () => {
+  it("maps agentSettings booleans and keeps Crossagents off without trusted routing", () => {
     const result = applyAgentSettingsMcpFlags(baseConfig, { browserMcp: true }, [], false);
     expect(result).toEqual({
       ...baseConfig,
@@ -139,7 +139,7 @@ describe("applyAgentSettingsMcpFlags", () => {
     });
   });
 
-  it("enables provider-level Crossagents when trusted provider-session routing is available", () => {
+  it("enables provider-level Crossagents when trusted routing is available", () => {
     const result = applyAgentSettingsMcpFlags(baseConfig, { crossagentMcp: true }, [], true);
     expect(result.crossagentMcp).toBe(true);
   });
@@ -162,14 +162,31 @@ describe("applyAgentSettingsMcpFlags", () => {
 
 describe("usesProviderSessionCrossagentRouting", () => {
   const adapter = {
+    kind: "codex",
     capabilities: {
       presentationMode: "terminal",
       crossagentMcpRouting: "provider-session",
     },
   } as const;
 
-  it("uses provider-session routing for a GUI thread", () => {
+  it("retains provider-session routing for providers with a trusted native caller id", () => {
     expect(usesProviderSessionCrossagentRouting(adapter, "gui", "thread-1")).toBe(true);
+  });
+
+  it("keeps isolated OpenCode GUI tasks on their direct thread token", () => {
+    expect(
+      usesProviderSessionCrossagentRouting(
+        {
+          kind: "opencode",
+          capabilities: {
+            presentationMode: "gui",
+            crossagentMcpRouting: "thread-token",
+          },
+        },
+        "gui",
+        "thread-1",
+      ),
+    ).toBe(false);
   });
 
   it("keeps terminal threads on direct routing", () => {
@@ -190,7 +207,7 @@ describe("usesProviderSessionCrossagentRouting", () => {
 });
 
 describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
-  it("uses provider-session routing for OpenCode terminal Browser calls", async () => {
+  it("keeps OpenCode terminal Browser calls bound to their concrete thread", async () => {
     const previousUrl = process.env.PORACODE_BROWSER_MCP_URL;
     const previousToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
     process.env.PORACODE_BROWSER_MCP_URL = "http://127.0.0.1:43210";
@@ -206,7 +223,7 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
         capabilities: {
           presentationMode: "terminal",
           mcpConfigSource: "agentSettings",
-          crossagentMcpRouting: "provider-session",
+          crossagentMcpRouting: "thread-token",
         },
       } as unknown as AgentAdapter;
 
@@ -235,8 +252,8 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
           authorization?.replace(/^Bearer /u, "") ?? "",
         ),
       ).toEqual({
-        routing: "provider-session",
-        identity: {},
+        routing: "thread",
+        identity: { threadId: "thread-terminal", title: "Terminal caller" },
       });
     } finally {
       if (previousUrl === undefined) delete process.env.PORACODE_BROWSER_MCP_URL;
@@ -244,6 +261,113 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
       if (previousToken === undefined) delete process.env.PORACODE_BROWSER_MCP_TOKEN;
       else process.env.PORACODE_BROWSER_MCP_TOKEN = previousToken;
     }
+  });
+
+  it("keeps OpenCode GUI Browser calls bound to their concrete Y Space task", async () => {
+    const previousUrl = process.env.PORACODE_BROWSER_MCP_URL;
+    const previousToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
+    process.env.PORACODE_BROWSER_MCP_URL = "http://127.0.0.1:43211";
+    process.env.PORACODE_BROWSER_MCP_TOKEN = "browser-gui-token";
+
+    try {
+      const pipeline = new SpawnPipeline({
+        options: {},
+        resolveAgentSettings: () => ({ browserMcp: true }),
+      } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+      const adapter = {
+        kind: "opencode",
+        capabilities: {
+          presentationMode: "gui",
+          mcpConfigSource: "agentSettings",
+          crossagentMcpRouting: "thread-token",
+        },
+      } as unknown as AgentAdapter;
+
+      const servers = await pipeline.resolveMcpServersForLaunch({
+        location: { kind: "posix", path: "/repo/shared" },
+        config: { model: "opencode/big-pickle" },
+        mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: [] },
+        identity: { threadId: "thread-gui", title: "GUI caller" },
+        crossagentThreadId: "thread-gui",
+        adapter,
+        presentationMode: "gui",
+      });
+
+      const browser = servers.find((server) => server.id === "browser");
+      if (browser?.transport.type !== "http") throw new Error("Browser MCP was not resolved.");
+      expect(
+        verifyMcpLaunchContextToken(
+          "browser-gui-token",
+          "browser",
+          browser.transport.headers.Authorization?.replace(/^Bearer /u, "") ?? "",
+        ),
+      ).toEqual({
+        routing: "thread",
+        identity: { threadId: "thread-gui", title: "GUI caller" },
+      });
+    } finally {
+      if (previousUrl === undefined) delete process.env.PORACODE_BROWSER_MCP_URL;
+      else process.env.PORACODE_BROWSER_MCP_URL = previousUrl;
+      if (previousToken === undefined) delete process.env.PORACODE_BROWSER_MCP_TOKEN;
+      else process.env.PORACODE_BROWSER_MCP_TOKEN = previousToken;
+    }
+  });
+
+  it("registers isolated OpenCode GUI Crossagents with a direct thread token", async () => {
+    const register = vi.fn<
+      (
+        threadId: string,
+        disabledTools: readonly string[],
+      ) => {
+        url: string;
+        token: string;
+        headers: Record<string, string>;
+        disabledTools: string[];
+      }
+    >(() => ({
+      url: "http://127.0.0.1:43212/mcp",
+      token: "thread-crossagents-token",
+      headers: { Authorization: "Bearer thread-crossagents-token" },
+      disabledTools: [],
+    }));
+    const registerProviderSession =
+      vi.fn<(threadId: string, disabledTools: readonly string[]) => undefined>();
+    const pipeline = new SpawnPipeline({
+      options: {
+        crossagentMcp: {
+          register,
+          registerProviderSession,
+          unregister: vi.fn<(threadId: string) => void>(),
+        },
+      },
+      resolveAgentSettings: () => ({ crossagentMcp: true }),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+    const adapter = {
+      kind: "opencode",
+      capabilities: {
+        presentationMode: "gui",
+        mcpConfigSource: "agentSettings",
+        crossagentMcpRouting: "thread-token",
+      },
+    } as unknown as AgentAdapter;
+
+    const servers = await pipeline.resolveMcpServersForLaunch({
+      location: { kind: "posix", path: "/repo/shared" },
+      config: { model: "opencode/big-pickle" },
+      mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: [] },
+      identity: { threadId: "thread-gui", title: "GUI caller" },
+      crossagentThreadId: "thread-gui",
+      adapter,
+      presentationMode: "gui",
+    });
+
+    expect(register).toHaveBeenCalledWith("thread-gui", []);
+    expect(registerProviderSession).not.toHaveBeenCalled();
+    expect(servers.find((server) => server.id === "crossagents")?.transport).toEqual({
+      type: "http",
+      url: "http://127.0.0.1:43212/mcp",
+      headers: { Authorization: "Bearer thread-crossagents-token" },
+    });
   });
 
   it("uses a stable same-directory Pipedream binding for OpenCode GUI reloads", async () => {
@@ -263,7 +387,7 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
       capabilities: {
         presentationMode: "gui",
         mcpConfigSource: "agentSettings",
-        crossagentMcpRouting: "provider-session",
+        crossagentMcpRouting: "thread-token",
       },
     } as unknown as AgentAdapter;
     const location = { kind: "posix" as const, path: "/repo" };

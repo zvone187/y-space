@@ -130,6 +130,16 @@ function createHarness() {
       return { command: argv.binary, args: argv.args };
     },
   );
+  const beginMcpLaunchAuthorization = vi.fn<
+    InvalidSessionRecoveryContext["beginMcpLaunchAuthorization"]
+  >(() => {
+    events.push("authorize");
+  });
+  const revokeMcpLaunchAuthorization = vi.fn<
+    InvalidSessionRecoveryContext["revokeMcpLaunchAuthorization"]
+  >(() => {
+    events.push("revoke");
+  });
 
   const context: InvalidSessionRecoveryContext = {
     spawnPipeline: {
@@ -145,6 +155,8 @@ function createHarness() {
     ptyLifecycle: { kill },
     isCurrentSession: (candidate) => currentSession?.instanceId === candidate.instanceId,
     failStructuredSession,
+    beginMcpLaunchAuthorization,
+    revokeMcpLaunchAuthorization,
     settleAfterStructuredDispose,
     primeProjectShellEnv,
     resolveLaunchSpec,
@@ -163,6 +175,8 @@ function createHarness() {
     primeProjectShellEnv,
     kill,
     failStructuredSession,
+    beginMcpLaunchAuthorization,
+    revokeMcpLaunchAuthorization,
     setCurrentSession(next: SessionRuntime | undefined) {
       currentSession = next;
     },
@@ -176,6 +190,7 @@ describe("InvalidSessionRecoveryCoordinator", () => {
     await harness.coordinator.recover(harness.session);
 
     expect(harness.events).toEqual([
+      "authorize",
       "clear",
       "dispose",
       "settle",
@@ -187,6 +202,7 @@ describe("InvalidSessionRecoveryCoordinator", () => {
       "prime",
       "resolve",
       "spawn",
+      "revoke",
     ]);
     expect(harness.spawnThread).toHaveBeenCalledTimes(1);
     const spawnInput = harness.spawnThread.mock.calls[0]![0];
@@ -198,6 +214,27 @@ describe("InvalidSessionRecoveryCoordinator", () => {
       launchPrompt: "",
       extraEnv: { PORACODE_HOOK_URL: "http://127.0.0.1/hook" },
     });
+  });
+
+  it("mints and persists one fresh MCP launch identity for invalid-session recovery", async () => {
+    const harness = createHarness();
+    harness.session.mcpIdentity = {
+      threadId: THREAD_ID,
+      launchId: "stale-launch",
+      title: "Recover",
+    };
+
+    await harness.coordinator.recover(harness.session);
+
+    const authorization = harness.beginMcpLaunchAuthorization.mock.calls[0]![0];
+    const resolvedIdentity = harness.resolveMcpServersForLaunch.mock.calls[0]![0].identity;
+    const spawnedIdentity = harness.spawnThread.mock.calls[0]![0].mcpIdentity;
+    if (!resolvedIdentity) throw new Error("Expected recovery MCP identity.");
+    expect(resolvedIdentity).toMatchObject({ threadId: THREAD_ID, title: "Recover" });
+    expect(resolvedIdentity.launchId).toEqual(expect.any(String));
+    expect(resolvedIdentity.launchId).not.toBe("stale-launch");
+    expect(authorization.identity).toBe(resolvedIdentity);
+    expect(spawnedIdentity).toBe(resolvedIdentity);
   });
 
   it("returns the same in-flight recovery when the banner repeats", async () => {
@@ -278,6 +315,7 @@ describe("InvalidSessionRecoveryCoordinator", () => {
       "browser MCP unavailable",
     );
     expect(harness.spawnThread).not.toHaveBeenCalled();
+    expect(harness.revokeMcpLaunchAuthorization).toHaveBeenCalledOnce();
   });
 
   it("reports a shared recovery failure only once when the banner repeats", async () => {

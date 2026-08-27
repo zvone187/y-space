@@ -1,4 +1,12 @@
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import {
+  mkdtempSync,
+  rmSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+  symlinkSync,
+} from "node:fs";
 import { dirname, join, posix, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
@@ -76,6 +84,22 @@ describe("ProjectTreeService", () => {
     });
 
     expect(result.status).toBe("binary");
+  });
+
+  it("refuses project reads through a symlink that resolves outside the project root", async () => {
+    if (process.platform === "win32") return;
+    const externalDir = mkdtempSync(join(tmpdir(), "poracode-project-tree-secret-"));
+    const secretPath = join(externalDir, "secret.txt");
+    writeFileSync(secretPath, "outside-project-secret\n", "utf8");
+    symlinkSync(secretPath, join(tempDir, "linked-secret.txt"));
+
+    try {
+      await expect(
+        service.readProjectFile({ projectLocation: location, path: "linked-secret.txt" }),
+      ).rejects.toThrow(/project root/i);
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
   });
 
   it("treats PDFs as binary without loading body bytes", async () => {
@@ -458,7 +482,6 @@ describe("ProjectTreeService.browseHostDirectory", () => {
 
   it("classifies a symlink to a directory as a directory", async () => {
     if (process.platform === "win32") return; // symlink perms differ on Windows CI
-    const { symlinkSync } = await import("node:fs");
     mkdirSync(join(tempDir, "real"));
     symlinkSync(join(tempDir, "real"), join(tempDir, "link"));
 

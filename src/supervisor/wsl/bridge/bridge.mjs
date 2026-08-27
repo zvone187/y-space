@@ -42,16 +42,17 @@ import {
   statSync,
   existsSync,
   lstatSync,
+  realpathSync,
   writeFileSync,
   watch as fsWatch,
 } from "node:fs";
 // We always run on Linux inside a distro, so force POSIX semantics — this
 // also keeps the unit tests path-agnostic when executed on a Windows host.
-import { isAbsolute, normalize, resolve as resolvePath } from "node:path/posix";
+import { isAbsolute, normalize, relative, resolve as resolvePath } from "node:path/posix";
 import { createRequire } from "node:module";
 
 // Bumped on every behavioural change. Windows side reads this via regex.
-const BRIDGE_VERSION = "2.16.0";
+const BRIDGE_VERSION = "2.17.0";
 
 /**
  * Lazily loads `@parcel/watcher` (staged next to this script as
@@ -258,7 +259,10 @@ function resolveSafePath(projectRoot, target) {
   if (typeof target !== "string" || !isAbsolute(target)) return null;
   const normRoot = normalize(projectRoot);
   const normTarget = normalize(target);
-  if (normTarget !== normRoot && !normTarget.startsWith(normRoot + "/")) return null;
+  const relativeTarget = relative(normRoot, normTarget);
+  if (relativeTarget === ".." || relativeTarget.startsWith("../") || isAbsolute(relativeTarget)) {
+    return null;
+  }
   return normTarget;
 }
 
@@ -409,8 +413,26 @@ function findHandler(req, body) {
 }
 
 function readFileHandler(req, body) {
-  const target = resolveSafePath(body.projectRoot, body.path);
+  let target = resolveSafePath(body.projectRoot, body.path);
   if (!target) return { status: 400, code: "ESCAPE", message: "path escapes projectRoot" };
+  if (body.enforceRealpathContainment === true) {
+    try {
+      const realRoot = realpathSync(body.projectRoot);
+      const realTarget = realpathSync(target);
+      const relativeTarget = relative(realRoot, realTarget);
+      if (
+        relativeTarget === ".." ||
+        relativeTarget.startsWith("../") ||
+        isAbsolute(relativeTarget)
+      ) {
+        return { status: 400, code: "ESCAPE", message: "path resolves outside projectRoot" };
+      }
+      target = realTarget;
+    } catch (err) {
+      const code = typeof err?.code === "string" ? err.code : "EIO";
+      return { status: code === "ENOENT" ? 404 : 500, code, message: String(err?.message ?? err) };
+    }
+  }
   let st;
   try {
     st = statSync(target);

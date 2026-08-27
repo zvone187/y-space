@@ -730,14 +730,16 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
   }
 
-  /**
-   * Assemble a provider-neutral acquisition for this session. OpenCode routes
-   * the directory-scoped client and MCP state inside the shared runtime server.
-   */
+  /** Assemble a provider-neutral acquisition for this session. */
   private buildAcquireInput(): AcquireOpenCodeServerInput {
     const { mcpServers } = this;
     return {
       projectLocation: this.input.projectLocation,
+      // OpenCode's MCP registry is directory-scoped, not task-scoped. Give
+      // each long-lived GUI task its own authenticated server so one model can
+      // never reuse another task's Browser/App/Computer capability. Terminal
+      // allocation is short-lived and continues to use the shared pool.
+      ...(this.isGui ? { serverIsolationKey: this.threadId } : {}),
       ...(mcpServers !== undefined ? { mcpServers } : {}),
     };
   }

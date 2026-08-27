@@ -77,6 +77,7 @@ interface Harness {
   inputs: CreateStructuredSessionInput[];
   appended: Array<{ threadId: string; event: RuntimeEvent }>;
   mcpTargets: string[];
+  releasedMcpChildren: string[];
   releaseCreate: () => void;
 }
 
@@ -95,6 +96,7 @@ function makeHarness(options?: {
   const inputs: CreateStructuredSessionInput[] = [];
   const appended: Array<{ threadId: string; event: RuntimeEvent }> = [];
   const mcpTargets: string[] = [];
+  const releasedMcpChildren: string[] = [];
   let createFailures = options?.createFailures ?? 0;
   let releaseCreate!: () => void;
   const createGate = new Promise<void>((resolve) => {
@@ -166,6 +168,9 @@ function makeHarness(options?: {
         })),
       };
     },
+    releaseParentMcpAccess: (parentThreadId, childThreadId) => {
+      if (parentThreadId === PARENT) releasedMcpChildren.push(childThreadId);
+    },
     appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
   };
 
@@ -176,7 +181,15 @@ function makeHarness(options?: {
     ...(hasStatusCapabilities ? { getStatusCapabilities: () => statusCapabilities } : {}),
     host,
   });
-  return { manager, handles, inputs, appended, mcpTargets, releaseCreate };
+  return {
+    manager,
+    handles,
+    inputs,
+    appended,
+    mcpTargets,
+    releasedMcpChildren,
+    releaseCreate,
+  };
 }
 
 describe("SubagentRunManager", () => {
@@ -400,6 +413,30 @@ describe("SubagentRunManager", () => {
       status: "completed",
       output: "",
     });
+  });
+
+  it("releases structured-child MCP access on completion, launch failure, and cancellation", async () => {
+    const completed = makeHarness();
+    const completedRun = completed.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    completed.handles[0]!.update("idle");
+    await completed.manager.waitFor(completedRun.runId, 1000);
+    await flush();
+    expect(completed.releasedMcpChildren).toEqual([completed.inputs[0]!.threadId]);
+
+    const failed = makeHarness({ createFailures: 1 });
+    const failedRun = failed.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await expect(failed.manager.waitFor(failedRun.runId, 1000)).resolves.toMatchObject({
+      status: "failed",
+    });
+    await flush();
+    expect(failed.releasedMcpChildren).toEqual([failed.inputs[0]!.threadId]);
+
+    const cancelled = makeHarness();
+    const cancelledRun = cancelled.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    await cancelled.manager.cancel(cancelledRun.runId);
+    expect(cancelled.releasedMcpChildren).toEqual([cancelled.inputs[0]!.threadId]);
   });
 
   it("does NOT forward child turn.completed onto the parent stream", async () => {

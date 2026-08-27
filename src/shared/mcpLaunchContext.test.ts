@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createMcpLaunchContextToken, verifyMcpLaunchContextToken } from "./mcpLaunchContext";
 
@@ -7,6 +8,7 @@ describe("MCP launch contexts", () => {
   it("binds a thread identity and disabled-tool policy to a signed bearer", () => {
     const token = createMcpLaunchContextToken(rootToken, "browser", {
       threadId: "thread-1",
+      launchId: "launch-1",
       title: "Trusted task",
       disabledTools: ["close_tab"],
     });
@@ -15,6 +17,7 @@ describe("MCP launch contexts", () => {
       routing: "thread",
       identity: {
         threadId: "thread-1",
+        launchId: "launch-1",
         title: "Trusted task",
         disabledTools: ["close_tab"],
       },
@@ -34,11 +37,23 @@ describe("MCP launch contexts", () => {
     expect(verifyMcpLaunchContextToken(rootToken, "app-controls", token)).toBeUndefined();
   });
 
-  it("mints a provider-session context when the provider owns thread routing", () => {
-    const token = createMcpLaunchContextToken(rootToken, "app-controls");
-    expect(verifyMcpLaunchContextToken(rootToken, "app-controls", token)).toEqual({
-      routing: "provider-session",
-      identity: {},
-    });
+  it("rejects a correctly signed legacy provider-binding credential", () => {
+    const encoded = Buffer.from(
+      JSON.stringify({
+        v: 1,
+        audience: "app-controls",
+        routing: "provider-session",
+        providerBindingId: "opencode-gui:shared-directory",
+      }),
+      "utf8",
+    ).toString("base64url");
+    const signature = createHmac("sha256", rootToken).update(encoded).digest("base64url");
+    const token = `yspace-mcp-v1.${encoded}.${signature}`;
+
+    expect(verifyMcpLaunchContextToken(rootToken, "app-controls", token)).toBeUndefined();
+  });
+
+  it("refuses to mint a capability without a concrete thread", () => {
+    expect(() => createMcpLaunchContextToken(rootToken, "browser", {})).toThrow(/thread identity/i);
   });
 });

@@ -1,7 +1,6 @@
-// Vercel build entry for the hosted PWA. Stable and nightly deployments each
-// own a dedicated origin (app.poracode.com and app-nightly.poracode.com), so
-// both builds are rooted at `/` and get origin-isolated storage, permissions,
-// assets, and service workers.
+// Vercel build entry for a deployment-owned PWA. Stable and nightly deployments
+// should use separate origins so both builds are rooted at `/` and get
+// origin-isolated storage, permissions, assets, and service workers.
 import { spawnSync } from "node:child_process";
 
 const channel = process.env.VERCEL_ENV === "preview" ? "nightly" : "stable";

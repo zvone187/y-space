@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { compactAgentProviderMetadata, type AgentProviderMetadata } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 import {
   emailFromUserStatus,
   GET_USER_STATUS,
@@ -89,7 +90,10 @@ async function spawnAndReadAccount(
     // that keeps re-arming the CLI's background self-updater — and the updater
     // detaches into its own console window (see
     // ANTIGRAVITY_DISABLE_AUTO_UPDATE_ENV in detection.ts).
-    env: { ...process.env, ...ANTIGRAVITY_DISABLE_AUTO_UPDATE_ENV },
+    env: sanitizePrivilegedChildEnvironment({
+      ...process.env,
+      ...ANTIGRAVITY_DISABLE_AUTO_UPDATE_ENV,
+    }),
   });
   try {
     const deadline = Date.now() + SPAWN_LS_TIMEOUT_MS;

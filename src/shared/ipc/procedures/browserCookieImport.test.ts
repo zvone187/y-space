@@ -12,6 +12,7 @@ interface Procedure {
 interface BrowserCookieImportIpcModule {
   browserCookieImportSourceSchema: StrictSchema;
   browserCookieImportStateSchema: StrictSchema;
+  browserCookieImportChooseFilePayloadSchema: StrictSchema;
   browserCookieImportPreviewPayloadSchema: StrictSchema;
   browserCookieImportCommitPayloadSchema: StrictSchema;
   browserCookieImportProcedures: Record<string, Procedure>;
@@ -69,6 +70,25 @@ describe("browser cookie-import IPC", () => {
     expect(
       browserCookieImportStateSchema.safeParse({ sources: [source], activeRequest }).success,
     ).toBe(true);
+  });
+
+  it("requires renderer-localized file-picker copy", async () => {
+    const { browserCookieImportChooseFilePayloadSchema } = await loadIpc();
+    const localizedPayload = {
+      targetUrls: ["https://example.com"],
+      dialogTitle: "Cookie-Datei auswählen",
+      cookieExportsFilterName: "Cookie-Exporte",
+      allFilesFilterName: "Alle Dateien",
+    };
+
+    expect(browserCookieImportChooseFilePayloadSchema.safeParse(localizedPayload).success).toBe(
+      true,
+    );
+    expect(
+      browserCookieImportChooseFilePayloadSchema.safeParse({
+        targetUrls: localizedPayload.targetUrls,
+      }).success,
+    ).toBe(false);
   });
 
   it.each(["value", "cookies", "token", "tokenHash"])(

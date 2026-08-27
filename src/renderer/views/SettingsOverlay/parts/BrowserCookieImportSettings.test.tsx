@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
@@ -15,7 +15,14 @@ const { bridgeMock } = vi.hoisted(() => ({
     browserCookieImportOpenExtensionFolder: vi.fn<() => Promise<void>>(),
     browserCookieImportGetState: vi.fn<() => Promise<BrowserCookieImportState>>(),
     browserCookieImportChooseFile:
-      vi.fn<(payload: { targetUrls: string[] }) => Promise<ActiveRequest | null>>(),
+      vi.fn<
+        (payload: {
+          targetUrls: string[];
+          dialogTitle: string;
+          cookieExportsFilterName: string;
+          allFilesFilterName: string;
+        }) => Promise<ActiveRequest | null>
+      >(),
     browserCookieImportBeginPairing: vi.fn<() => Promise<BrowserCookieImportPairingChallenge>>(),
     browserCookieImportCancelPairing: vi.fn<(payload: { pairingId: string }) => Promise<void>>(),
     browserCookieImportForgetSource: vi.fn<(payload: { sourceId: string }) => Promise<void>>(),
@@ -279,6 +286,9 @@ describe("BrowserCookieImportSettings", () => {
     await waitFor(() =>
       expect(bridgeMock.browserCookieImportChooseFile).toHaveBeenCalledWith({
         targetUrls: ["https://example.com"],
+        dialogTitle: "Choose a cookie export",
+        cookieExportsFilterName: "Cookie exports",
+        allFilesFilterName: "All files",
       }),
     );
     expect(await screen.findByText("cookies.txt")).toBeInTheDocument();
@@ -299,5 +309,125 @@ describe("BrowserCookieImportSettings", () => {
       }),
     );
     expect(bridgeMock.browserCookieImportCommit).not.toHaveBeenCalled();
+  });
+
+  it("keeps cancellation available while permission approval is pending", async () => {
+    let rejectPreview: (error: Error) => void = () => undefined;
+    bridgeMock.browserCookieImportGetState
+      .mockResolvedValueOnce({ sources: [connectedSource], activeRequest: null })
+      .mockResolvedValue({
+        sources: [connectedSource],
+        activeRequest: { ...readyRequest, status: "requesting-preview", domains: [] },
+      });
+    bridgeMock.browserCookieImportPreview.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectPreview = reject;
+        }),
+    );
+    bridgeMock.browserCookieImportCancel.mockImplementation(async () => {
+      rejectPreview(new Error("cancelled"));
+    });
+    setActiveBrowserUrl("https://app.example.com/dashboard");
+    render(<BrowserCookieImportSettings />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Preview extension cookies" }));
+    const cancelButton = await screen.findByRole(
+      "button",
+      { name: "Cancel cookie import" },
+      { timeout: 3_000 },
+    );
+    await waitFor(() => expect(cancelButton).toBeEnabled(), { timeout: 3_000 });
+    fireEvent.click(cancelButton);
+
+    await waitFor(() =>
+      expect(bridgeMock.browserCookieImportCancel).toHaveBeenCalledWith({ requestId: REQUEST_ID }),
+    );
+  });
+
+  it("does not resurrect a cancelled import when its preview resolves late", async () => {
+    let resolvePreview: (request: ActiveRequest) => void = () => undefined;
+    let polledRequest: ActiveRequest | null = {
+      ...readyRequest,
+      status: "requesting-preview",
+      domains: [],
+    };
+    bridgeMock.browserCookieImportGetState
+      .mockResolvedValueOnce({ sources: [connectedSource], activeRequest: null })
+      .mockImplementation(async () => ({
+        sources: [connectedSource],
+        activeRequest: polledRequest,
+      }));
+    bridgeMock.browserCookieImportPreview.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        }),
+    );
+    bridgeMock.browserCookieImportCancel.mockImplementation(async () => {
+      polledRequest = null;
+    });
+    setActiveBrowserUrl("https://app.example.com/dashboard");
+    render(<BrowserCookieImportSettings />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Preview extension cookies" }));
+    const cancelButton = await screen.findByRole(
+      "button",
+      { name: "Cancel cookie import" },
+      { timeout: 3_000 },
+    );
+    await waitFor(() => expect(cancelButton).toBeEnabled(), { timeout: 3_000 });
+    fireEvent.click(cancelButton);
+    await waitFor(() =>
+      expect(bridgeMock.browserCookieImportCancel).toHaveBeenCalledWith({ requestId: REQUEST_ID }),
+    );
+
+    await act(async () => {
+      resolvePreview(readyRequest);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("checkbox", { name: "Import cookies for .example.com" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Import selected cookies" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("selects supported domains when a polled request transitions from requesting to ready", async () => {
+    let resolvePreview: (request: ActiveRequest) => void = () => undefined;
+    bridgeMock.browserCookieImportGetState
+      .mockResolvedValueOnce({ sources: [connectedSource], activeRequest: null })
+      .mockResolvedValue({
+        sources: [connectedSource],
+        activeRequest: { ...readyRequest, status: "requesting-preview", domains: [] },
+      });
+    bridgeMock.browserCookieImportPreview.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePreview = resolve;
+        }),
+    );
+    setActiveBrowserUrl("https://app.example.com/dashboard");
+    render(<BrowserCookieImportSettings />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Preview extension cookies" }));
+    await screen.findByText(/approve these origins/i, undefined, { timeout: 3_000 });
+    resolvePreview(readyRequest);
+
+    const firstDomain = await screen.findByRole("checkbox", {
+      name: "Import cookies for .example.com",
+    });
+    const secondDomain = screen.getByRole("checkbox", {
+      name: "Import cookies for app.example.com",
+    });
+    await waitFor(() => {
+      expect(firstDomain).toBeChecked();
+      expect(secondDomain).toBeChecked();
+      expect(screen.getByRole("button", { name: "Import selected cookies" })).toBeEnabled();
+    });
   });
 });

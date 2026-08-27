@@ -30,8 +30,8 @@ function readMcpSettings(
     // Every Y Space agent should be able to inspect and operate the embedded
     // browser unless the user explicitly opts this provider out.
     browserMcp: settings?.browserMcp !== false,
-    // OpenCode's provider-session routing is safe by default. An explicit
-    // false remains an opt-out for users who do not want delegation.
+    // Each OpenCode GUI task gets an isolated sidecar and direct thread token.
+    // An explicit false remains an opt-out for users who do not want delegation.
     crossagentMcp: settings?.crossagentMcp !== false,
     computerUse: settings?.computerUse === true,
   };

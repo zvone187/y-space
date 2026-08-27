@@ -150,7 +150,7 @@ export async function dispatchTool(
         .toLowerCase();
       if (!query) throw new Error("query required");
       const limit = clampInteger(payload.limit, 20, 1, 100);
-      const state = ctx.manager.snapshot();
+      const state = agentVisibleState(ctx);
       return {
         tabs: state.tabs
           .filter((tab) =>
@@ -169,6 +169,7 @@ export async function dispatchTool(
     }
     case "activate_tab": {
       const tabId = String(payload.tabId ?? "");
+      if (!ctx.manager.getTab(tabId)) throw new Error(`unknown tab ${tabId}`);
       ctx.manager.setActiveTab(tabId);
       if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, tabId);
       return { ok: true };
@@ -178,9 +179,9 @@ export async function dispatchTool(
       if (!url) throw new Error("url required");
       const match =
         payload.match === "origin" || payload.match === "prefix" ? payload.match : "exact";
-      const existing = ctx.manager
-        .snapshot()
-        .tabs.find((tab) => tabUrlMatches(tab.url, url, match));
+      const existing = agentVisibleState(ctx).tabs.find((tab) =>
+        tabUrlMatches(tab.url, url, match),
+      );
       if (existing) {
         if (payload.activate !== false) ctx.manager.setActiveTab(existing.tabId);
         if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, existing.tabId);
@@ -192,7 +193,9 @@ export async function dispatchTool(
       return { created: true, tab };
     }
     case "close_tab": {
-      await ctx.manager.closeTab(String(payload.tabId ?? ""));
+      const tabId = String(payload.tabId ?? "");
+      if (!ctx.manager.getTab(tabId)) throw new Error(`unknown tab ${tabId}`);
+      await ctx.manager.closeTab(tabId);
       return { ok: true };
     }
     case "navigate": {
@@ -692,12 +695,22 @@ export async function dispatchTool(
 function tabOverview(ctx: ToolContext): ReturnType<ToolContext["manager"]["snapshot"]> & {
   implicitTabId: string | null;
 } {
-  const state = ctx.manager.snapshot();
+  const state = agentVisibleState(ctx);
   return {
     ...state,
     implicitTabId: ctx.threadId
       ? (ctx.manager.getActiveTabForThread(ctx.threadId)?.tabId ?? null)
-      : state.activeTabId,
+      : (ctx.manager.getActiveTab()?.tabId ?? null),
+  };
+}
+
+function agentVisibleState(ctx: ToolContext): ReturnType<ToolContext["manager"]["snapshot"]> {
+  const state = ctx.manager.snapshot();
+  const tabs = state.tabs.filter((tab) => ctx.manager.getTab(tab.tabId) !== null);
+  return {
+    ...state,
+    tabs,
+    activeTabId: tabs.some((tab) => tab.tabId === state.activeTabId) ? state.activeTabId : null,
   };
 }
 

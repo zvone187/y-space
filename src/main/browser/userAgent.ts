@@ -14,8 +14,25 @@
 // browsers, which keep their app token and only drop Electron, are accepted).
 const ELECTRON_PRODUCT_RE = /\sElectron\/[^\s]+/g;
 
-export function buildBrowserUserAgent(defaultUserAgent: string): string {
-  return defaultUserAgent
+export interface BrowserUserAgentBrand {
+  /** The technical app name Electron used while constructing its fallback UA. */
+  currentProductName: string;
+  /** The public product name embedded sites should see. */
+  brandedProductName: string;
+  appVersion: string;
+}
+
+export function buildBrowserUserAgent(
+  defaultUserAgent: string,
+  brand?: BrowserUserAgentBrand,
+): string {
+  const brandedUserAgent = brand
+    ? defaultUserAgent.replace(
+        `${brand.currentProductName}/${brand.appVersion}`,
+        `${brand.brandedProductName}/${brand.appVersion}`,
+      )
+    : defaultUserAgent;
+  return brandedUserAgent
     .replace(ELECTRON_PRODUCT_RE, "")
     .replace(/\s{2,}/g, " ")
     .trim();

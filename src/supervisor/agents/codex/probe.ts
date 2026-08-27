@@ -12,6 +12,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { AgentSlashCommand, ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 import { resolveNodeForDistro } from "../../wsl/runtime";
 import { resolveProbeSpawnCwd } from "../probeCwd";
 import { buildCodexAppServerCommand } from "./argv";
@@ -462,7 +463,11 @@ async function runWithCodexAppServer<T>(
 
     appServer = spawn(cmd.command, cmd.args, {
       cwd: spawnCwd ?? undefined,
-      env: { ...process.env, ...cmd.env, TERM: "xterm-256color" },
+      env: sanitizePrivilegedChildEnvironment({
+        ...process.env,
+        ...cmd.env,
+        TERM: "xterm-256color",
+      }),
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
       windowsHide: true,

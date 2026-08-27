@@ -72,7 +72,12 @@ import {
   StructuredRuntimeDiagnosticError,
   structuredRuntimeFeatureArea,
 } from "./structuredRuntimeDiagnosticError";
-import { describeSpawnFailure, sanitizeEnv, sanitizedProcessEnv } from "./spawnDiagnostics";
+import {
+  describeSpawnFailure,
+  sanitizeChildProcessEnv,
+  sanitizeEnv,
+  sanitizedProcessEnv,
+} from "./spawnDiagnostics";
 import type { SessionRuntimeLifecycle } from "./sessionRuntimeLifecycle";
 import { getIterm2StatusL2TerminalEnv, resolveTerminalColorEnv } from "./terminalEnv";
 
@@ -106,6 +111,20 @@ export interface SpawnThreadInput {
   nativePlugins?: readonly AgentNativePlugin[];
   /** Trusted app-thread identity used to scope built-in MCP calls. */
   mcpIdentity?: McpThreadIdentity;
+}
+
+export type McpLaunchIdentity = McpThreadIdentity & {
+  threadId: string;
+  launchId: string;
+};
+
+/** Authorization state published before a provider can make its first MCP call. */
+export interface McpLaunchAuthorization {
+  identity: McpLaunchIdentity;
+  adapter: AgentAdapter;
+  config: ThreadConfig;
+  launchConfig: ThreadConfig;
+  mcpLaunchSnapshot: McpLaunchSnapshot;
 }
 
 /**
@@ -158,8 +177,8 @@ export function workspaceLaunchConfig(
  * the built-in MCP flags come from the provider's saved settings
  * (`sharedSettings.agentSettings[kind]`) instead of the per-thread composer
  * flags. Crossagents remains off unless the provider explicitly supports
- * trusted routing. Pooled GUI runtimes use one provider-session credential;
- * terminal runtimes use their existing per-thread credential.
+ * trusted routing. Providers may use either a direct thread credential or a
+ * provider-native session credential, as declared by their adapter.
  */
 export function applyAgentSettingsMcpFlags(
   config: ThreadConfig,
@@ -181,6 +200,7 @@ export function applyAgentSettingsMcpFlags(
 export function usesProviderSessionCrossagentRouting(
   adapter:
     | {
+        kind?: AgentKind;
         capabilities: {
           presentationMode: ThreadPresentationMode;
           crossagentMcpRouting?: AgentAdapter["capabilities"]["crossagentMcpRouting"];
@@ -257,6 +277,9 @@ export interface SpawnPipelineContext {
   failStructuredSession(session: SessionRuntime, error: unknown): void;
   isCurrentSession(session: SessionRuntime): boolean;
   resolveAgentSettings(adapter: AgentAdapter): Record<string, boolean | string>;
+  beginMcpLaunchAuthorization(authorization: McpLaunchAuthorization): void;
+  activateMcpLaunchAuthorization(session: SessionRuntime): void;
+  revokeMcpLaunchAuthorization(identity: McpLaunchIdentity): void;
   emitOptimisticUserMessage(
     threadId: string,
     prompt: string,
@@ -402,8 +425,9 @@ export class SpawnPipeline {
     }
     await this.ctx.options.prepareSkillsForLaunch?.(payload.projectLocation, payload.agentKind);
 
-    const mcpIdentity = {
+    const mcpIdentity: McpLaunchIdentity = {
       threadId: payload.threadId,
+      launchId: randomUUID(),
       title: initialPrompt.split("\n", 1)[0]?.trim() ?? "",
     };
     // Every provider translator keys its output record by `server.name`, so a
@@ -441,255 +465,268 @@ export class SpawnPipeline {
       adapter,
       payload.threadId,
     );
-    const resolvedMcpServers = await this.resolveMcpServersForLaunch({
-      location: payload.projectLocation,
-      config: launchConfig,
-      mcpLaunchSnapshot,
-      identity: mcpIdentity,
-      crossagentThreadId: payload.threadId,
-      adapter,
-      presentationMode: requestedPresentation,
-    });
-    const structuredSession = await this.createStructuredSession(
-      adapter,
-      payload.threadId,
-      payload.agentKind,
-      payload.projectLocation,
-      launchConfig,
-      resolvedMcpServers,
-      mcpIdentity,
-      payload.sessionRef,
-      requestedPresentation,
-    );
-    if (await this.abortPendingStart(payload.threadId, structuredSession)) {
-      return { threadId: payload.threadId };
-    }
-
-    if (structuredSession?.activate) {
-      try {
-        await structuredSession.activate();
-      } catch (error) {
-        await structuredSession.dispose();
-        if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
-          return { threadId: payload.threadId };
-        }
-        throw error;
-      }
-    }
-    if (await this.abortPendingStart(payload.threadId, structuredSession)) {
-      return { threadId: payload.threadId };
-    }
-
-    let openedStructuredThreadId: string | undefined;
-    if (structuredSession?.openThread) {
-      try {
-        openedStructuredThreadId = await structuredSession.openThread(
-          launchConfig,
-          payload.sessionRef,
-        );
-      } catch (error) {
-        await structuredSession.dispose();
-        if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
-          return { threadId: payload.threadId };
-        }
-        throw error;
-      }
-    }
-    if (await this.abortPendingStart(payload.threadId, structuredSession)) {
-      return { threadId: payload.threadId };
-    }
-
-    if (!usesTerminalPresentation) {
-      if (!structuredSession) {
-        throw new Error(
-          `Agent ${payload.agentKind} does not support ${requestedPresentation} presentation.`,
-        );
-      }
-      const resolvedSessionRef =
-        payload.sessionRef ??
-        (openedStructuredThreadId ? createKnownSessionRef(openedStructuredThreadId) : undefined);
-      const startInterrupted = ctx.pendingStartInterrupts.delete(payload.threadId);
-      const session = this.spawnThread({
-        threadId: payload.threadId,
+    return await this.withMcpLaunchAuthorization(
+      {
+        identity: mcpIdentity,
         adapter,
-        agentKind: payload.agentKind,
-        projectLocation: payload.projectLocation,
         config: payload.config,
-        initialSize: payload.initialSize,
-        launchPrompt: "",
-        structuredSession,
-        ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
-        presentationMode: requestedPresentation,
-        initialStatus: optimisticUserMessageItemId && !startInterrupted ? "working" : "idle",
-        initialAttention: optimisticUserMessageItemId && !startInterrupted ? "working" : "none",
-        suppressInitialStructuredIdle:
-          optimisticUserMessageItemId !== undefined && !startInterrupted,
-        mcpLaunchSnapshot,
         launchConfig,
-        nativePlugins,
-        mcpIdentity,
-      });
-      if (
-        !startInterrupted &&
-        !payload.sessionRef &&
-        initialPrompt.length > 0 &&
-        structuredSession.startTurn
-      ) {
-        const startOptions = {
-          ...(optimisticUserMessageItemId
-            ? { userMessageItemId: optimisticUserMessageItemId }
-            : {}),
-          ...(inlineSkillInstructions ? { inlineInstructions: inlineSkillInstructions } : {}),
-        };
-        void structuredSession
-          .startTurn(
-            initialPrompt,
-            launchConfig,
-            effectiveSegments,
-            Object.keys(startOptions).length > 0 ? startOptions : undefined,
-          )
-          .catch((error) => {
-            if (ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-              return;
-            }
-            ctx.failStructuredSession(session, error);
-          });
-      }
-      return { threadId: payload.threadId };
-    }
-
-    if (
-      !payload.sessionRef &&
-      useStructuredFlow &&
-      initialPrompt.length > 0 &&
-      !shouldQueueInitialPrompt &&
-      structuredSession?.startTurn
-    ) {
-      void structuredSession
-        .startTurn(
-          initialPrompt,
-          launchConfig,
-          effectiveSegments,
-          inlineSkillInstructions ? { inlineInstructions: inlineSkillInstructions } : undefined,
-        )
-        .catch((error) => {
-          console.error("[supervisor] initial turn failed:", error);
-          const activeSession = ctx.sessions.get(payload.threadId);
-          if (!activeSession) {
-            return;
-          }
-          ctx.failStructuredSession(activeSession, error);
+        mcpLaunchSnapshot,
+      },
+      async () => {
+        const resolvedMcpServers = await this.resolveMcpServersForLaunch({
+          location: payload.projectLocation,
+          config: launchConfig,
+          mcpLaunchSnapshot,
+          identity: mcpIdentity,
+          crossagentThreadId: payload.threadId,
+          adapter,
+          presentationMode: requestedPresentation,
         });
-    }
-
-    if (shouldQueueInitialPrompt) {
-      await structuredSession?.ensureResumeArtifacts?.();
-    }
-
-    const deferToTerminal = adapter.shouldDeferPromptToTerminal?.(payload.config) ?? false;
-    // Use `initialPrompt` (the adapter-formatted version with `~/` shortening
-    // and WSL path rewriting) so attachments hand off cleanly as the launch
-    // arg instead of being staged for a deferred PTY-write.
-    const launchPrompt = useStructuredFlow || deferToTerminal ? "" : initialPrompt;
-    const launchOptionsWithMcp = this.composeLaunchOptions(
-      adapter,
-      structuredSession?.launchOptions,
-      resolvedMcpServers,
-    );
-    const argv = payload.sessionRef
-      ? adapter.buildResumeArgv(
+        const structuredSession = await this.createStructuredSession(
+          adapter,
+          payload.threadId,
+          payload.agentKind,
           payload.projectLocation,
           launchConfig,
-          launchPrompt,
+          resolvedMcpServers,
+          mcpIdentity,
           payload.sessionRef,
-          launchOptionsWithMcp,
-        )
-      : adapter.buildLaunchArgv(
-          payload.projectLocation,
-          launchConfig,
-          launchPrompt,
-          payload.sessionRef,
-          launchOptionsWithMcp,
+          requestedPresentation,
         );
+        if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+          return { threadId: payload.threadId };
+        }
 
-    // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
-    // (`PORACODE_HOOK_URL`, `PORACODE_HOOK_SECRET`, `PORACODE_THREAD_ID`,
-    // `PORACODE_AGENT_KIND`, `PORACODE_HOOK_PROTOCOL_VERSION`) flow through
-    // `spawnThread` → `agentEnv` so they end up in the PTY env on every
-    // platform (WSL, win32, posix). Failure to resolve plugin extras silently
-    // degrades to L2 — the supervisor must never block thread creation on
-    // the hook-plugin plumbing.
-    const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
-      payload.threadId,
-      payload.agentKind,
-      payload.projectLocation,
-      resolvedMcpServers,
-    );
-    if (cliHookExtras.extraArgs.length > 0) {
-      argv.args = mergeCliHookExtraArgs(
-        adapter,
-        argv.args,
-        cliHookExtras.extraArgs,
-        launchPrompt,
-        payload.sessionRef,
-      );
-    }
-    argv.args = await applyLaunchArgsConfigRewrite(
-      adapter,
-      argv.args,
-      payload.config,
-      payload.projectLocation,
-    );
-    if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
-      await primeProjectShellEnv(payload.projectLocation.path);
-    }
-    const command = resolveLaunchSpec(payload.projectLocation, argv);
+        if (structuredSession?.activate) {
+          try {
+            await structuredSession.activate();
+          } catch (error) {
+            await structuredSession.dispose();
+            if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
+              return { threadId: payload.threadId };
+            }
+            throw error;
+          }
+        }
+        if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+          return { threadId: payload.threadId };
+        }
 
-    const keepStructuredSession = structuredSession && useStructuredFlow;
-    if (structuredSession && !keepStructuredSession) {
-      await structuredSession.dispose();
-    }
-    if (ctx.pendingStartAborts.delete(payload.threadId)) {
-      ctx.pendingStartInterrupts.delete(payload.threadId);
-      if (structuredSession && keepStructuredSession) {
-        await structuredSession.dispose();
-      }
-      command.cleanup?.();
-      return { threadId: payload.threadId };
-    }
+        let openedStructuredThreadId: string | undefined;
+        if (structuredSession?.openThread) {
+          try {
+            openedStructuredThreadId = await structuredSession.openThread(
+              launchConfig,
+              payload.sessionRef,
+            );
+          } catch (error) {
+            await structuredSession.dispose();
+            if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
+              return { threadId: payload.threadId };
+            }
+            throw error;
+          }
+        }
+        if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+          return { threadId: payload.threadId };
+        }
 
-    const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
-    this.spawnThread({
-      threadId: payload.threadId,
-      adapter,
-      agentKind: payload.agentKind,
-      projectLocation: payload.projectLocation,
-      config: payload.config,
-      initialSize: payload.initialSize,
-      launchPrompt,
-      command,
-      ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
-      ...(keepStructuredSession ? { structuredSession } : {}),
-      ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
-      mcpLaunchSnapshot,
-      launchConfig,
-      mcpIdentity,
-      nativePlugins,
-      ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
-      presentationMode: requestedPresentation,
-      ...(deferToTerminal && !useStructuredFlow
-        ? (() => {
-            const preInputs = adapter.buildTerminalPreInputs?.(payload.config);
-            return {
-              ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
-              pendingTerminalPrompt: initialPrompt,
-              ...(effectiveSegments ? { pendingTerminalSegments: effectiveSegments } : {}),
+        if (!usesTerminalPresentation) {
+          if (!structuredSession) {
+            throw new Error(
+              `Agent ${payload.agentKind} does not support ${requestedPresentation} presentation.`,
+            );
+          }
+          const resolvedSessionRef =
+            payload.sessionRef ??
+            (openedStructuredThreadId
+              ? createKnownSessionRef(openedStructuredThreadId)
+              : undefined);
+          const startInterrupted = ctx.pendingStartInterrupts.delete(payload.threadId);
+          const session = this.spawnThread({
+            threadId: payload.threadId,
+            adapter,
+            agentKind: payload.agentKind,
+            projectLocation: payload.projectLocation,
+            config: payload.config,
+            initialSize: payload.initialSize,
+            launchPrompt: "",
+            structuredSession,
+            ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
+            presentationMode: requestedPresentation,
+            initialStatus: optimisticUserMessageItemId && !startInterrupted ? "working" : "idle",
+            initialAttention: optimisticUserMessageItemId && !startInterrupted ? "working" : "none",
+            suppressInitialStructuredIdle:
+              optimisticUserMessageItemId !== undefined && !startInterrupted,
+            mcpLaunchSnapshot,
+            launchConfig,
+            nativePlugins,
+            mcpIdentity,
+          });
+          if (
+            !startInterrupted &&
+            !payload.sessionRef &&
+            initialPrompt.length > 0 &&
+            structuredSession.startTurn
+          ) {
+            const startOptions = {
+              ...(optimisticUserMessageItemId
+                ? { userMessageItemId: optimisticUserMessageItemId }
+                : {}),
+              ...(inlineSkillInstructions ? { inlineInstructions: inlineSkillInstructions } : {}),
             };
-          })()
-        : {}),
-    });
+            void structuredSession
+              .startTurn(
+                initialPrompt,
+                launchConfig,
+                effectiveSegments,
+                Object.keys(startOptions).length > 0 ? startOptions : undefined,
+              )
+              .catch((error) => {
+                if (ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+                  return;
+                }
+                ctx.failStructuredSession(session, error);
+              });
+          }
+          return { threadId: payload.threadId };
+        }
 
-    return { threadId: payload.threadId };
+        if (
+          !payload.sessionRef &&
+          useStructuredFlow &&
+          initialPrompt.length > 0 &&
+          !shouldQueueInitialPrompt &&
+          structuredSession?.startTurn
+        ) {
+          void structuredSession
+            .startTurn(
+              initialPrompt,
+              launchConfig,
+              effectiveSegments,
+              inlineSkillInstructions ? { inlineInstructions: inlineSkillInstructions } : undefined,
+            )
+            .catch((error) => {
+              console.error("[supervisor] initial turn failed:", error);
+              const activeSession = ctx.sessions.get(payload.threadId);
+              if (!activeSession) {
+                return;
+              }
+              ctx.failStructuredSession(activeSession, error);
+            });
+        }
+
+        if (shouldQueueInitialPrompt) {
+          await structuredSession?.ensureResumeArtifacts?.();
+        }
+
+        const deferToTerminal = adapter.shouldDeferPromptToTerminal?.(payload.config) ?? false;
+        // Use `initialPrompt` (the adapter-formatted version with `~/` shortening
+        // and WSL path rewriting) so attachments hand off cleanly as the launch
+        // arg instead of being staged for a deferred PTY-write.
+        const launchPrompt = useStructuredFlow || deferToTerminal ? "" : initialPrompt;
+        const launchOptionsWithMcp = this.composeLaunchOptions(
+          adapter,
+          structuredSession?.launchOptions,
+          resolvedMcpServers,
+        );
+        const argv = payload.sessionRef
+          ? adapter.buildResumeArgv(
+              payload.projectLocation,
+              launchConfig,
+              launchPrompt,
+              payload.sessionRef,
+              launchOptionsWithMcp,
+            )
+          : adapter.buildLaunchArgv(
+              payload.projectLocation,
+              launchConfig,
+              launchPrompt,
+              payload.sessionRef,
+              launchOptionsWithMcp,
+            );
+
+        // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
+        // (`PORACODE_HOOK_URL`, `PORACODE_HOOK_SECRET`, `PORACODE_THREAD_ID`,
+        // `PORACODE_AGENT_KIND`, `PORACODE_HOOK_PROTOCOL_VERSION`) flow through
+        // `spawnThread` → `agentEnv` so they end up in the PTY env on every
+        // platform (WSL, win32, posix). Failure to resolve plugin extras silently
+        // degrades to L2 — the supervisor must never block thread creation on
+        // the hook-plugin plumbing.
+        const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
+          payload.threadId,
+          payload.agentKind,
+          payload.projectLocation,
+          resolvedMcpServers,
+        );
+        if (cliHookExtras.extraArgs.length > 0) {
+          argv.args = mergeCliHookExtraArgs(
+            adapter,
+            argv.args,
+            cliHookExtras.extraArgs,
+            launchPrompt,
+            payload.sessionRef,
+          );
+        }
+        argv.args = await applyLaunchArgsConfigRewrite(
+          adapter,
+          argv.args,
+          payload.config,
+          payload.projectLocation,
+        );
+        if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
+          await primeProjectShellEnv(payload.projectLocation.path);
+        }
+        const command = resolveLaunchSpec(payload.projectLocation, argv);
+
+        const keepStructuredSession = structuredSession && useStructuredFlow;
+        if (structuredSession && !keepStructuredSession) {
+          await structuredSession.dispose();
+        }
+        if (ctx.pendingStartAborts.delete(payload.threadId)) {
+          ctx.pendingStartInterrupts.delete(payload.threadId);
+          if (structuredSession && keepStructuredSession) {
+            await structuredSession.dispose();
+          }
+          command.cleanup?.();
+          return { threadId: payload.threadId };
+        }
+
+        const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
+        this.spawnThread({
+          threadId: payload.threadId,
+          adapter,
+          agentKind: payload.agentKind,
+          projectLocation: payload.projectLocation,
+          config: payload.config,
+          initialSize: payload.initialSize,
+          launchPrompt,
+          command,
+          ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
+          ...(keepStructuredSession ? { structuredSession } : {}),
+          ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
+          mcpLaunchSnapshot,
+          launchConfig,
+          mcpIdentity,
+          nativePlugins,
+          ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
+          presentationMode: requestedPresentation,
+          ...(deferToTerminal && !useStructuredFlow
+            ? (() => {
+                const preInputs = adapter.buildTerminalPreInputs?.(payload.config);
+                return {
+                  ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
+                  pendingTerminalPrompt: initialPrompt,
+                  ...(effectiveSegments ? { pendingTerminalSegments: effectiveSegments } : {}),
+                };
+              })()
+            : {}),
+        });
+
+        return { threadId: payload.threadId };
+      },
+    );
   }
 
   async restartThread(session: SessionRuntime, turn: QueuedStructuredTurn): Promise<void> {
@@ -698,40 +735,15 @@ export class SpawnPipeline {
     if (!session.sessionRef) {
       throw new Error("Session cannot be restarted without a known session reference.");
     }
+    const sessionRef = session.sessionRef;
     const mcpLaunchSnapshot = session.mcpLaunchSnapshot;
-
-    const isServerControlled = session.adapter.capabilities.liveInputMode === "server";
-    const usesTerminalPresentation =
-      (session.presentationMode ?? session.adapter.capabilities.presentationMode) === "terminal";
-    const useStructuredFlow = isServerControlled || !usesTerminalPresentation;
-    session.ignoreExit = true;
-    ctx.outputPipeline.clearSessionTimers(session);
-    // Subagent maps from the prior session would otherwise leak across resume:
-    // any unsubscribed buffers, lingering child→parent entries, and overlay
-    // subscriptions from the dead session are stale once the structured
-    // session is replaced. `closeThread` already does this on full teardown.
-    ctx.runtimeEventRouter.clearAllForThread(session.threadId);
-    await session.structuredSession?.dispose();
-    if (session.structuredSession) {
-      await sleep(150);
-    }
-    ctx.ptyLifecycle.kill(session);
-    if (!ctx.isCurrentSession(session)) {
-      return;
-    }
-
-    // Prime the user's interactive-shell env before respawning. See the same
-    // call in `startThreadInner` — must run before the structured-session
-    // spawn so the child inherits the project-pinned PATH, not launchd's.
-    if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
-      await primeProjectShellEnv(session.projectLocation.path);
-    }
-    await this.ctx.options.prepareSkillsForLaunch?.(session.projectLocation, session.agentKind);
-    if (!ctx.isCurrentSession(session)) {
-      return;
-    }
-
-    const mcpIdentity = session.mcpIdentity ?? { threadId: session.threadId };
+    const mcpIdentity: McpLaunchIdentity = {
+      ...session.mcpIdentity,
+      threadId: session.threadId,
+      // Replace authority before teardown begins. A bearer from the prior
+      // provider process must stop working while its replacement is starting.
+      launchId: randomUUID(),
+    };
     const launchConfig = this.resolveMcpLaunchConfig(
       workspaceLaunchConfig(
         session.projectLocation,
@@ -744,178 +756,224 @@ export class SpawnPipeline {
       session.adapter,
       session.threadId,
     );
-    const resolvedMcpServers = await this.resolveMcpServersForLaunch({
-      location: session.projectLocation,
-      config: launchConfig,
-      mcpLaunchSnapshot,
-      identity: mcpIdentity,
-      crossagentThreadId: session.threadId,
-      adapter: session.adapter,
-      ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
-    });
-    const structuredSession = await this.createStructuredSession(
-      session.adapter,
-      session.threadId,
-      session.agentKind,
-      session.projectLocation,
-      launchConfig,
-      resolvedMcpServers,
-      mcpIdentity,
-      session.sessionRef,
-      session.presentationMode,
-    );
-    if (!ctx.isCurrentSession(session)) {
-      await structuredSession?.dispose();
-      return;
-    }
 
-    if (structuredSession?.activate) {
-      try {
-        await structuredSession.activate();
-      } catch (error) {
-        await structuredSession.dispose();
-        throw error;
-      }
-    }
-    if (!ctx.isCurrentSession(session)) {
-      await structuredSession?.dispose();
-      return;
-    }
-
-    if (structuredSession?.openThread) {
-      try {
-        await structuredSession.openThread(launchConfig, session.sessionRef);
-      } catch (error) {
-        await structuredSession.dispose();
-        throw error;
-      }
-    }
-    if (!ctx.isCurrentSession(session)) {
-      await structuredSession?.dispose();
-      return;
-    }
-
-    if (!usesTerminalPresentation) {
-      if (!structuredSession) {
-        throw new Error(`Thread ${session.threadId} cannot restart without a structured session.`);
-      }
-      const restarted = this.spawnThread({
-        threadId: session.threadId,
-        agentKind: session.agentKind,
+    return await this.withMcpLaunchAuthorization(
+      {
+        identity: mcpIdentity,
         adapter: session.adapter,
-        projectLocation: session.projectLocation,
         config,
-        initialSize: session.terminalSize,
-        launchPrompt: "",
-        structuredSession,
-        sessionRef: session.sessionRef,
-        mcpLaunchSnapshot,
         launchConfig,
-        mcpIdentity,
-        ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
-        ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
-      });
-      if (prompt.trim().length > 0 && structuredSession.startTurn) {
-        // Retry/recovery callers preserve the id of a user message that was
-        // already broadcast before the old session stopped. Reuse it without
-        // emitting another turn.started + item pair. A missing id means this
-        // path owns the first canonical paint and must emit it now.
-        const optimisticItemId =
-          turn.userMessageItemId ??
-          ctx.emitOptimisticUserMessage(session.threadId, prompt, turn.segments);
-        const startOptions = {
-          userMessageItemId: optimisticItemId,
-          ...(turn.inlineInstructions ? { inlineInstructions: turn.inlineInstructions } : {}),
-        };
-        void structuredSession
-          .startTurn(prompt, launchConfig, turn.segments, startOptions)
-          .catch((error) => {
-            if (ctx.sessions.get(restarted.threadId)?.instanceId !== restarted.instanceId) {
-              return;
-            }
-            ctx.failStructuredSession(restarted, error);
+        mcpLaunchSnapshot,
+      },
+      async () => {
+        const isServerControlled = session.adapter.capabilities.liveInputMode === "server";
+        const usesTerminalPresentation =
+          (session.presentationMode ?? session.adapter.capabilities.presentationMode) ===
+          "terminal";
+        const useStructuredFlow = isServerControlled || !usesTerminalPresentation;
+        session.ignoreExit = true;
+        ctx.outputPipeline.clearSessionTimers(session);
+        // Subagent maps from the prior session would otherwise leak across resume:
+        // any unsubscribed buffers, lingering child→parent entries, and overlay
+        // subscriptions from the dead session are stale once the structured
+        // session is replaced. `closeThread` already does this on full teardown.
+        ctx.runtimeEventRouter.clearAllForThread(session.threadId);
+        await session.structuredSession?.dispose();
+        if (session.structuredSession) {
+          await sleep(150);
+        }
+        ctx.ptyLifecycle.kill(session);
+        if (!ctx.isCurrentSession(session)) {
+          return;
+        }
+
+        // Prime the user's interactive-shell env before respawning. See the same
+        // call in `startThreadInner` — must run before the structured-session
+        // spawn so the child inherits the project-pinned PATH, not launchd's.
+        if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
+          await primeProjectShellEnv(session.projectLocation.path);
+        }
+        await this.ctx.options.prepareSkillsForLaunch?.(session.projectLocation, session.agentKind);
+        if (!ctx.isCurrentSession(session)) {
+          return;
+        }
+
+        const resolvedMcpServers = await this.resolveMcpServersForLaunch({
+          location: session.projectLocation,
+          config: launchConfig,
+          mcpLaunchSnapshot,
+          identity: mcpIdentity,
+          crossagentThreadId: session.threadId,
+          adapter: session.adapter,
+          ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
+        });
+        const structuredSession = await this.createStructuredSession(
+          session.adapter,
+          session.threadId,
+          session.agentKind,
+          session.projectLocation,
+          launchConfig,
+          resolvedMcpServers,
+          mcpIdentity,
+          sessionRef,
+          session.presentationMode,
+        );
+        if (!ctx.isCurrentSession(session)) {
+          await structuredSession?.dispose();
+          return;
+        }
+
+        if (structuredSession?.activate) {
+          try {
+            await structuredSession.activate();
+          } catch (error) {
+            await structuredSession.dispose();
+            throw error;
+          }
+        }
+        if (!ctx.isCurrentSession(session)) {
+          await structuredSession?.dispose();
+          return;
+        }
+
+        if (structuredSession?.openThread) {
+          try {
+            await structuredSession.openThread(launchConfig, sessionRef);
+          } catch (error) {
+            await structuredSession.dispose();
+            throw error;
+          }
+        }
+        if (!ctx.isCurrentSession(session)) {
+          await structuredSession?.dispose();
+          return;
+        }
+
+        if (!usesTerminalPresentation) {
+          if (!structuredSession) {
+            throw new Error(
+              `Thread ${session.threadId} cannot restart without a structured session.`,
+            );
+          }
+          const restarted = this.spawnThread({
+            threadId: session.threadId,
+            agentKind: session.agentKind,
+            adapter: session.adapter,
+            projectLocation: session.projectLocation,
+            config,
+            initialSize: session.terminalSize,
+            launchPrompt: "",
+            structuredSession,
+            sessionRef,
+            mcpLaunchSnapshot,
+            launchConfig,
+            mcpIdentity,
+            ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
+            ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
           });
-      }
-      return;
-    }
+          if (prompt.trim().length > 0 && structuredSession.startTurn) {
+            // Retry/recovery callers preserve the id of a user message that was
+            // already broadcast before the old session stopped. Reuse it without
+            // emitting another turn.started + item pair. A missing id means this
+            // path owns the first canonical paint and must emit it now.
+            const optimisticItemId =
+              turn.userMessageItemId ??
+              ctx.emitOptimisticUserMessage(session.threadId, prompt, turn.segments);
+            const startOptions = {
+              userMessageItemId: optimisticItemId,
+              ...(turn.inlineInstructions ? { inlineInstructions: turn.inlineInstructions } : {}),
+            };
+            void structuredSession
+              .startTurn(prompt, launchConfig, turn.segments, startOptions)
+              .catch((error) => {
+                if (ctx.sessions.get(restarted.threadId)?.instanceId !== restarted.instanceId) {
+                  return;
+                }
+                ctx.failStructuredSession(restarted, error);
+              });
+          }
+          return;
+        }
 
-    const launchPrompt = useStructuredFlow ? "" : prompt;
-    const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
-      session.threadId,
-      session.agentKind,
-      session.projectLocation,
-      resolvedMcpServers,
-    );
-    if (!ctx.isCurrentSession(session)) {
-      await structuredSession?.dispose();
-      return;
-    }
-    const argv = session.adapter.buildResumeArgv(
-      session.projectLocation,
-      launchConfig,
-      launchPrompt,
-      session.sessionRef,
-      this.composeLaunchOptions(
-        session.adapter,
-        structuredSession?.launchOptions,
-        resolvedMcpServers,
-      ),
-    );
-    if (cliHookExtras.extraArgs.length > 0) {
-      argv.args = mergeCliHookExtraArgs(
-        session.adapter,
-        argv.args,
-        cliHookExtras.extraArgs,
-        launchPrompt,
-        session.sessionRef,
-      );
-    }
-    argv.args = await applyLaunchArgsConfigRewrite(
-      session.adapter,
-      argv.args,
-      config,
-      session.projectLocation,
-    );
-    if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
-      await primeProjectShellEnv(session.projectLocation.path);
-    }
-    if (!ctx.isCurrentSession(session)) {
-      await structuredSession?.dispose();
-      argv.cleanup?.();
-      return;
-    }
-    const command = resolveLaunchSpec(session.projectLocation, argv);
+        const launchPrompt = useStructuredFlow ? "" : prompt;
+        const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
+          session.threadId,
+          session.agentKind,
+          session.projectLocation,
+          resolvedMcpServers,
+        );
+        if (!ctx.isCurrentSession(session)) {
+          await structuredSession?.dispose();
+          return;
+        }
+        const argv = session.adapter.buildResumeArgv(
+          session.projectLocation,
+          launchConfig,
+          launchPrompt,
+          sessionRef,
+          this.composeLaunchOptions(
+            session.adapter,
+            structuredSession?.launchOptions,
+            resolvedMcpServers,
+          ),
+        );
+        if (cliHookExtras.extraArgs.length > 0) {
+          argv.args = mergeCliHookExtraArgs(
+            session.adapter,
+            argv.args,
+            cliHookExtras.extraArgs,
+            launchPrompt,
+            sessionRef,
+          );
+        }
+        argv.args = await applyLaunchArgsConfigRewrite(
+          session.adapter,
+          argv.args,
+          config,
+          session.projectLocation,
+        );
+        if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
+          await primeProjectShellEnv(session.projectLocation.path);
+        }
+        if (!ctx.isCurrentSession(session)) {
+          await structuredSession?.dispose();
+          argv.cleanup?.();
+          return;
+        }
+        const command = resolveLaunchSpec(session.projectLocation, argv);
 
-    const keepStructuredSession = structuredSession && useStructuredFlow;
-    if (structuredSession && !keepStructuredSession) {
-      await structuredSession.dispose();
-    }
-    if (!ctx.isCurrentSession(session)) {
-      if (structuredSession && keepStructuredSession) {
-        await structuredSession.dispose();
-      }
-      command.cleanup?.();
-      return;
-    }
+        const keepStructuredSession = structuredSession && useStructuredFlow;
+        if (structuredSession && !keepStructuredSession) {
+          await structuredSession.dispose();
+        }
+        if (!ctx.isCurrentSession(session)) {
+          if (structuredSession && keepStructuredSession) {
+            await structuredSession.dispose();
+          }
+          command.cleanup?.();
+          return;
+        }
 
-    this.spawnThread({
-      threadId: session.threadId,
-      agentKind: session.agentKind,
-      adapter: session.adapter,
-      projectLocation: session.projectLocation,
-      config,
-      initialSize: session.terminalSize,
-      launchPrompt,
-      command,
-      ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
-      ...(keepStructuredSession ? { structuredSession } : {}),
-      sessionRef: session.sessionRef,
-      mcpLaunchSnapshot,
-      launchConfig,
-      mcpIdentity,
-      ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
-      ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
-    });
+        this.spawnThread({
+          threadId: session.threadId,
+          agentKind: session.agentKind,
+          adapter: session.adapter,
+          projectLocation: session.projectLocation,
+          config,
+          initialSize: session.terminalSize,
+          launchPrompt,
+          command,
+          ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
+          ...(keepStructuredSession ? { structuredSession } : {}),
+          sessionRef,
+          mcpLaunchSnapshot,
+          launchConfig,
+          mcpIdentity,
+          ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
+          ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
+        });
+      },
+    );
   }
 
   spawnThread(input: SpawnThreadInput): SessionRuntime {
@@ -966,12 +1024,12 @@ export class SpawnPipeline {
     let pty;
     if (command) {
       ensureNodePtySpawnHelperExecutable();
-      const ptyEnv = {
+      const ptyEnv = sanitizeChildProcessEnv({
         ...sanitizedProcessEnv,
         ...(command.env ?? {}),
         ...agentEnv,
         ...terminalEnv,
-      };
+      });
       try {
         pty = spawn(command.command, command.args, {
           name: process.platform === "win32" ? "xterm-color" : terminalEnv.TERM,
@@ -1043,8 +1101,23 @@ export class SpawnPipeline {
     };
 
     ctx.sessionRuntimeLifecycle.attach(session);
+    ctx.activateMcpLaunchAuthorization(session);
 
     return session;
+  }
+
+  private async withMcpLaunchAuthorization<T>(
+    authorization: McpLaunchAuthorization,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    this.ctx.beginMcpLaunchAuthorization(authorization);
+    try {
+      return await operation();
+    } finally {
+      // Compare-and-revoke in the manager makes this a no-op after spawnThread
+      // promotes the exact launch to active authority.
+      this.ctx.revokeMcpLaunchAuthorization(authorization.identity);
+    }
   }
 
   /** Fold provider-neutral MCP descriptors into every launch path. */
@@ -1077,30 +1150,19 @@ export class SpawnPipeline {
     adapter?: AgentAdapter;
     presentationMode?: ThreadPresentationMode;
   }): Promise<ResolvedMcpServer[]> {
-    // Pipedream relays bind to the concrete app thread even when a provider-owned
-    // GUI runtime clears the general MCP identity in favor of its shared session.
+    // Pipedream leases always bind to the concrete app thread. A separate,
+    // stable directory key may pool only the relay transport for providers
+    // that reload their MCP configuration at the project-server boundary.
     const pipedreamIdentity = identity;
     const providerSessionCrossagents = usesProviderSessionCrossagentRouting(
       adapter,
       presentationMode,
       crossagentThreadId,
     );
-    let browserAppControlsIdentity = identity;
     if (adapter?.capabilities.mcpConfigSource === "agentSettings") {
-      // Provider-level MCP flags come from the provider's settings page. The
-      // provider-specific routing decision below keeps shared config stable.
+      // Provider-level MCP flags come from the provider's settings page.
       config = this.resolveMcpLaunchConfig(config, mcpLaunchSnapshot, adapter, crossagentThreadId);
-      if (
-        adapter.kind === "opencode" &&
-        adapter.capabilities.crossagentMcpRouting === "provider-session"
-      ) {
-        // OpenCode MCP configuration is directory-scoped even for terminal
-        // sessions. A per-thread credential would be overwritten by the next
-        // same-directory session, so Browser/App Controls route every call via
-        // the provider-owned session id injected by Y Space's trusted plugin.
-        browserAppControlsIdentity = undefined;
-      }
-      if (adapter.capabilities.crossagentMcpRouting !== "provider-session") {
+      if (adapter.capabilities.crossagentMcpRouting === undefined) {
         crossagentThreadId = undefined;
       }
     }
@@ -1108,7 +1170,7 @@ export class SpawnPipeline {
       location,
       config,
       mcpLaunchSnapshot,
-      browserAppControlsIdentity,
+      identity,
     );
     const crossagentMcp = crossagentThreadId
       ? await this.resolveCrossagentMcpForLaunch(
@@ -1128,7 +1190,7 @@ export class SpawnPipeline {
     const appControlsMcp = await this.resolveAppControlsMcpForLaunch(
       location,
       mcpLaunchSnapshot,
-      browserAppControlsIdentity,
+      identity,
     );
     const baseServers = composeResolvedMcpServers(
       mcpLaunchSnapshot,
@@ -1163,8 +1225,7 @@ export class SpawnPipeline {
       config,
       this.ctx.resolveAgentSettings(adapter),
       mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
-      adapter.capabilities.crossagentMcpRouting === "provider-session" &&
-        crossagentThreadId !== undefined,
+      adapter.capabilities.crossagentMcpRouting !== undefined && crossagentThreadId !== undefined,
     );
     return effectiveLaunchConfig(
       withProviderSettings,

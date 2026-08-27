@@ -5,6 +5,10 @@ import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import {
+  isPrivilegedChildEnvKey,
+  sanitizePrivilegedChildEnvironment,
+} from "@/supervisor/privilegedChildEnvironment";
+import {
   getPosixLoginShellArgs,
   getWindowsSystemCommand,
   getWslCommand,
@@ -578,7 +582,7 @@ function parseWindowsEnvProbe(stdout: string): Record<string, string> | undefine
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
     const env: Record<string, string> = {};
     for (const [key, value] of Object.entries(parsed)) {
-      if (PRIMED_ENV_SKIP.has(key)) continue;
+      if (PRIMED_ENV_SKIP.has(key) || isPrivilegedChildEnvKey(key)) continue;
       if (typeof value === "string") env[key] = value;
     }
     if (Object.keys(env).length === 0) return undefined;
@@ -699,7 +703,7 @@ export function parsePrimedEnvDump(lines: string[]): Record<string, string> {
     const match = PRIMED_ENV_VAR_RE.exec(line);
     if (match) {
       const [, key, value] = match;
-      if (PRIMED_ENV_SKIP.has(key!)) {
+      if (PRIMED_ENV_SKIP.has(key!) || isPrivilegedChildEnvKey(key!)) {
         currentKey = undefined;
         continue;
       }
@@ -852,7 +856,7 @@ export async function readCommandOutputAsync(
       shell: false,
       detached: ownedProcessGroup,
       ...(options?.cwd ? { cwd: options.cwd } : {}),
-      ...(options?.env ? { env: { ...process.env, ...options.env } } : {}),
+      env: sanitizePrivilegedChildEnvironment({ ...process.env, ...(options?.env ?? {}) }),
     });
 
     const finish = (ok: boolean) => {

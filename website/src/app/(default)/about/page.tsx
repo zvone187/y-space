@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowUpRight, Download, GitBranch, Globe, Mail } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Download, GitBranch, LifeBuoy, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
-import contact from "../../../../../branding/contact.json";
 import { BrandLockup, YSpaceIconTile } from "@/components/BrandMark";
 import {
   createAboutJsonLd,
   createPageMetadata,
   GITHUB_URL,
+  SECURITY_URL,
   SITE_DESCRIPTION,
+  SUPPORT_URL,
   stringifyJsonLd,
 } from "@/lib/seo";
 
@@ -21,12 +22,6 @@ export const metadata: Metadata = createPageMetadata({
 
 const OFFICIAL_LINKS = [
   {
-    label: "Official website",
-    value: "Y Space website",
-    href: "https://poracode.com",
-    icon: Globe,
-  },
-  {
     label: "Source repository",
     value: "zvone187/y-space",
     href: GITHUB_URL,
@@ -35,14 +30,20 @@ const OFFICIAL_LINKS = [
   {
     label: "Downloads",
     value: "macOS, Windows, and Linux",
-    href: "/download",
+    href: `${GITHUB_URL}/releases`,
     icon: Download,
   },
   {
     label: "Support",
-    value: contact.supportEmail,
-    href: `mailto:${contact.supportEmail}`,
-    icon: Mail,
+    value: "GitHub issue tracker",
+    href: SUPPORT_URL,
+    icon: LifeBuoy,
+  },
+  {
+    label: "Security",
+    value: "Security policy and private reporting",
+    href: SECURITY_URL,
+    icon: ShieldCheck,
   },
 ] as const;
 
@@ -118,8 +119,8 @@ export default function AboutPage() {
               </h2>
               <p>
                 Y Space is developed in public and distributed under the Apache License 2.0. The
-                desktop app is available for macOS, Windows, and Linux, with a hosted Y Space
-                companion for connecting to a desktop that you control.
+                desktop app is available for macOS, Windows, and Linux, with a self-hosted companion
+                served by the desktop for connecting to a machine that you control.
               </p>
             </section>
 
@@ -130,6 +131,17 @@ export default function AboutPage() {
               <p>
                 Y Space is the public product name for this AI coding agent software project. Its
                 source repository is zvone187/y-space on GitHub.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="mb-4 text-2xl font-semibold tracking-[-0.02em] text-moon">
+                Upstream foundation
+              </h2>
+              <p>
+                Y Space is based on the Apache-2.0-licensed SDSLeon/lightcode project created by
+                Serhii Vecherenko. Upstream authorship is preserved separately from the active Y
+                Space maintainers.
               </p>
             </section>
           </div>

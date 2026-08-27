@@ -21,7 +21,7 @@ export const APP_CONTROLS_MCP_TOKEN_ENV = "PORACODE_APP_CONTROLS_MCP_TOKEN";
 
 export function resolveAppControlsMcpHttpConfig(
   location: AppControlsMcpLocation,
-  identity?: McpThreadIdentity,
+  identity: McpThreadIdentity,
 ): AppControlsMcpHttpConfig | null {
   const env = readPrivilegedMcpEnvironment("app-controls");
   if (!env || location.kind === "wsl") return null;
@@ -36,6 +36,7 @@ export async function resolveAppControlsMcpHttpConfigForLaunch(
   hostAccess: WslHostAccessResolver | undefined,
   identity?: McpThreadIdentity,
 ): Promise<AppControlsMcpHttpConfig | undefined> {
+  if (!identity?.threadId) return undefined;
   if (location.kind !== "wsl") {
     return resolveAppControlsMcpHttpConfig(location, identity) ?? undefined;
   }

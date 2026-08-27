@@ -1,5 +1,11 @@
 import { Globe, Plus, X } from "lucide-react";
-import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useShallow } from "zustand/shallow";
 import { readBridge } from "@/renderer/bridge";
@@ -101,14 +107,16 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
   const activeTabId = useBrowserPanelStore((s) => s.activeTabId);
   const attentionTabId = useBrowserPanelStore((s) => s.attentionTabId);
   const [draggingTabId, setDraggingTabId] = useState<string | null>(null);
+  const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  const newTabRef = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState<{ group: BrowserTabGroupInfo; x: number; y: number } | null>(
     null,
   );
 
   // Thread-owned groups display the thread's LIVE task title (which updates as
   // AI title generation completes), falling back to the stored label. Keep this
-  // subscription above the empty-state return so the component always calls the
-  // same hooks when the first browser tab arrives.
+  // subscription independent of tab count so live group labels remain stable
+  // while the first browser tab is created or the last one is closed.
   const threadTitles = useAppStore(
     useShallow((s) => {
       const map: Record<string, string> = {};
@@ -121,10 +129,6 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
     }),
   );
 
-  if (tabs.length === 0) {
-    return null;
-  }
-
   const isHeader = variant === "header";
   const noDrag = isHeader ? "poracode-overlay-header__controls" : "";
   const containerClass = isHeader
@@ -136,6 +140,13 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
     : "flex items-center overflow-x-auto border-b border-border bg-[var(--content-background)] px-1 py-0.5";
 
   const groupById = new Map(groups.map((g) => [g.id, g]));
+  const visibleTabs = tabs.filter((tab) => {
+    const group = tab.groupId ? groupById.get(tab.groupId) : undefined;
+    return !group?.collapsed;
+  });
+  const focusableTabId = visibleTabs.some((tab) => tab.tabId === activeTabId)
+    ? activeTabId
+    : visibleTabs[0]?.tabId;
   const countByGroup = new Map<string, number>();
   for (const tab of tabs) {
     if (tab.groupId) countByGroup.set(tab.groupId, (countByGroup.get(tab.groupId) ?? 0) + 1);
@@ -144,24 +155,93 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
   const titleFor = (g: BrowserTabGroupInfo) =>
     (g.threadId ? threadTitles[g.threadId] : undefined) ?? g.title;
 
+  const activateTab = (tabId: string) => {
+    if (tabId === activeTabId) return;
+    readBridge()
+      .browserActivateTab({ tabId })
+      .catch(() => {});
+  };
+
+  const closeTab = (tabId: string, restoreKeyboardFocus: boolean) => {
+    const visibleIndex = visibleTabs.findIndex((candidate) => candidate.tabId === tabId);
+    const focusTarget =
+      visibleIndex >= 0
+        ? (visibleTabs[visibleIndex + 1] ?? visibleTabs[visibleIndex - 1])
+        : undefined;
+    readBridge()
+      .browserCloseTab({ tabId })
+      .then(async () => {
+        if (!restoreKeyboardFocus) return;
+        if (focusTarget && focusTarget.tabId !== activeTabId) {
+          await readBridge()
+            .browserActivateTab({ tabId: focusTarget.tabId })
+            .catch(() => {});
+        }
+        queueMicrotask(() => {
+          if (focusTarget) tabRefs.current.get(focusTarget.tabId)?.focus();
+          else newTabRef.current?.focus();
+        });
+      })
+      .catch(() => {});
+  };
+
+  const handleTabKeyDown = (event: ReactKeyboardEvent, tab: BrowserTabInfo) => {
+    const index = visibleTabs.findIndex((candidate) => candidate.tabId === tab.tabId);
+    if (index < 0) return;
+
+    if (
+      event.altKey &&
+      event.shiftKey &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight")
+    ) {
+      event.preventDefault();
+      const targetIndex = event.key === "ArrowLeft" ? index - 1 : index + 1;
+      const target = visibleTabs[targetIndex];
+      if (!target) return;
+      readBridge()
+        .browserMoveTab({
+          tabId: tab.tabId,
+          targetTabId: target.tabId,
+          position: event.key === "ArrowLeft" ? "before" : "after",
+        })
+        .catch(() => {});
+      return;
+    }
+
+    const hasModifier = event.altKey || event.ctrlKey || event.metaKey || event.shiftKey;
+    if (!hasModifier) {
+      let target: BrowserTabInfo | undefined;
+      if (event.key === "ArrowRight") target = visibleTabs[(index + 1) % visibleTabs.length];
+      else if (event.key === "ArrowLeft") {
+        target = visibleTabs[(index - 1 + visibleTabs.length) % visibleTabs.length];
+      } else if (event.key === "Home") target = visibleTabs[0];
+      else if (event.key === "End") target = visibleTabs.at(-1);
+      if (target) {
+        event.preventDefault();
+        tabRefs.current.get(target.tabId)?.focus();
+        activateTab(target.tabId);
+        return;
+      }
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      activateTab(tab.tabId);
+    }
+  };
+
   const renderTab = (
     tab: BrowserTabInfo,
     opts: { grouped: boolean; color?: string; marginClass: string },
   ) => {
     const active = tab.tabId === activeTabId;
     const attention = !active && tab.tabId === attentionTabId;
-    const activate = () => {
-      if (!active) {
-        readBridge()
-          .browserActivateTab({ tabId: tab.tabId })
-          .catch(() => {});
-      }
-    };
+    const displayTitle = tab.sensitiveIntegration
+      ? t`Connecting…`
+      : tab.title || tab.url || t`New tab`;
     return (
       <div
         key={tab.tabId}
-        role="button"
-        tabIndex={0}
         draggable
         className={`group flex w-40 min-w-[48px] shrink cursor-pointer items-center gap-1 px-2 text-left text-[12px] ${
           opts.grouped ? "rounded-t-md" : "rounded-md"
@@ -194,20 +274,29 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
             .browserMoveTab({ tabId: sourceTabId, targetTabId: tab.tabId, position })
             .catch(() => {});
         }}
-        onClick={activate}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            activate();
-          }
-        }}
-        title={tab.url}
       >
-        <TabFavicon
-          loading={tab.loading}
-          {...(tab.faviconUrl ? { faviconUrl: tab.faviconUrl } : {})}
-        />
-        <span className="flex-1 truncate">{tab.title || tab.url || t`New tab`}</span>
+        <button
+          ref={(element) => {
+            if (element) tabRefs.current.set(tab.tabId, element);
+            else tabRefs.current.delete(tab.tabId);
+          }}
+          type="button"
+          role="tab"
+          aria-label={displayTitle}
+          aria-selected={active}
+          aria-keyshortcuts="Alt+Shift+ArrowLeft Alt+Shift+ArrowRight"
+          tabIndex={tab.tabId === focusableTabId ? 0 : -1}
+          className="flex min-w-0 flex-1 items-center gap-1 self-stretch text-left outline-none"
+          onClick={() => activateTab(tab.tabId)}
+          onKeyDown={(event) => handleTabKeyDown(event, tab)}
+          title={tab.url}
+        >
+          <TabFavicon
+            loading={tab.loading}
+            {...(tab.faviconUrl ? { faviconUrl: tab.faviconUrl } : {})}
+          />
+          <span className="flex-1 truncate">{displayTitle}</span>
+        </button>
         <button
           type="button"
           aria-label={t`Close tab`}
@@ -215,17 +304,13 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
           title={t`Close tab`}
           onClick={(e) => {
             e.stopPropagation();
-            readBridge()
-              .browserCloseTab({ tabId: tab.tabId })
-              .catch(() => {});
+            closeTab(tab.tabId, true);
           }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
               e.stopPropagation();
-              readBridge()
-                .browserCloseTab({ tabId: tab.tabId })
-                .catch(() => {});
+              closeTab(tab.tabId, true);
             }
           }}
         >
@@ -286,9 +371,10 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
 
   return (
     <>
-      <div className={containerClass}>
+      <div role="tablist" aria-label={t`Browser tabs`} className={containerClass}>
         {nodes}
         <button
+          ref={newTabRef}
           type="button"
           aria-label={t`New tab`}
           title={t`New tab`}

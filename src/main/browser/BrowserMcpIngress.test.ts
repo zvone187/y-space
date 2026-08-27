@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
+import { createMcpLaunchContextToken, type McpLaunchContext } from "@/shared/mcpLaunchContext";
 import { BrowserMcpIngress } from "./BrowserMcpIngress";
 import type { BrowserPanelManager } from "./BrowserPanelManager";
 
@@ -12,9 +12,13 @@ afterEach(() => {
 
 describe("BrowserMcpIngress", () => {
   it("advertises browser instructions and API discovery on initialize", async () => {
-    ingress = new BrowserMcpIngress();
+    ingress = new BrowserMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+    });
     const info = await ingress.start();
-    const launchToken = createMcpLaunchContextToken(info.token, "browser");
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-initialize",
+    });
 
     const response = await fetch(`${info.url}/mcp`, {
       method: "POST",
@@ -45,20 +49,18 @@ describe("BrowserMcpIngress", () => {
     expect(body.result.instructions).toContain("@e refs");
   });
 
-  it("uses trusted OpenCode provider-session identity for agent-created tab ownership", async () => {
-    const resolveProviderSessionIdentity = vi.fn<
-      (providerSessionId: string) => Promise<{ threadId?: string; title?: string } | undefined>
-    >(async (providerSessionId) =>
-      providerSessionId === "session-browser"
-        ? { threadId: "thread-browser", title: "Browser caller" }
-        : undefined,
+  it("keeps signed tab ownership authoritative over a forged provider session id", async () => {
+    const resolveLaunchContextIdentity = vi.fn<
+      (context: McpLaunchContext) => Promise<McpLaunchContext["identity"] | undefined>
+    >(async (context) =>
+      context.identity.threadId === "thread-browser" ? context.identity : undefined,
     );
     const RoutedBrowserMcpIngress = BrowserMcpIngress as unknown as new (options: {
-      resolveProviderSessionIdentity(
-        providerSessionId: string,
+      resolveLaunchContextIdentity(
+        context: McpLaunchContext,
       ): Promise<{ threadId?: string; title?: string } | undefined>;
     }) => BrowserMcpIngress;
-    ingress = new RoutedBrowserMcpIngress({ resolveProviderSessionIdentity });
+    ingress = new RoutedBrowserMcpIngress({ resolveLaunchContextIdentity });
     const createTab = vi.fn<
       (
         payload: Record<string, unknown>,
@@ -88,7 +90,10 @@ describe("BrowserMcpIngress", () => {
         }) as unknown as BrowserPanelManager,
     );
     const info = await ingress.start();
-    const launchToken = createMcpLaunchContextToken(info.token, "browser");
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-browser",
+      title: "Browser caller",
+    });
 
     const response = await fetch(`${info.url}/mcp`, {
       method: "POST",
@@ -112,7 +117,11 @@ describe("BrowserMcpIngress", () => {
     const body = (await response.json()) as { result: { isError?: boolean } };
 
     expect(body.result.isError).toBeUndefined();
-    expect(resolveProviderSessionIdentity).toHaveBeenCalledWith("session-browser");
+    expect(resolveLaunchContextIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: { threadId: "thread-browser", title: "Browser caller" },
+      }),
+    );
     expect(createTab).toHaveBeenCalledWith(
       { url: "https://example.test", activate: true },
       {
@@ -124,7 +133,9 @@ describe("BrowserMcpIngress", () => {
   });
 
   it("routes MCP reload, get_url, and fill through the browser panel tab", async () => {
-    ingress = new BrowserMcpIngress();
+    ingress = new BrowserMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+    });
     const send = vi.fn<(method: string, params?: Record<string, unknown>) => Promise<unknown>>(
       async (method) => {
         if (method === "Runtime.evaluate") {
@@ -232,7 +243,9 @@ describe("BrowserMcpIngress", () => {
   });
 
   it("keeps implicit targets per thread and can find or focus existing tabs", async () => {
-    ingress = new BrowserMcpIngress();
+    ingress = new BrowserMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+    });
     const threadTab = {
       tabId: "tab-thread",
       snapshot: () => ({ url: "https://example.test/thread", title: "Thread workspace" }),

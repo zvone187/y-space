@@ -5,7 +5,11 @@
   "description": "A desktop workspace for AI coding agents with a shared embedded browser and integrations.",
   "homepage": "https://github.com/zvone187/y-space",
   "license": "Apache-2.0",
-  "author": "SDSLeon",
+  "author": "Y Space contributors",
+  "contributors": [
+    "SDSLeon",
+    "Serhii Vecherenko"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/zvone187/y-space"

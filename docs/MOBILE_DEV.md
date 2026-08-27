@@ -84,12 +84,11 @@ fixes both:
 
 ## Deep linking (Universal Links)
 
-Goal: one `https://poracode.com/pair` pairing link that opens the **installed
-app** if present, else redirects browser users to the hosted PWA at
-`https://app.poracode.com/pair`. The stable and nightly PWAs use separate
-origins (`app.poracode.com` and `app-nightly.poracode.com`) so their permissions,
-storage, caches, and service workers cannot affect the marketing site or each
-other.
+By default, the desktop mints a self-hosted `/pair` URL on its advertised local
+or HTTPS endpoint. A deployment that owns a public companion origin can set
+`PORACODE_REMOTE_ACCESS_PAIRING_APP_URL`; stable and nightly deployments should
+use separate origins so permissions, storage, caches, and service workers remain
+isolated.
 
 **Already wired (app side):**
 
@@ -98,9 +97,9 @@ other.
   `App.getLaunchUrl()`, warm via the `appUrlOpen` event — parses it with
   `parsePairingUrl`, and calls `pairDesktop`. Inert on the hosted PWA (there,
   boot-time launch params are handled by `capturePairingLaunch()`).
-- Native association host defaults to `poracode.com`
-  (`scripts/configure-mobile-native.mjs`), which writes `applinks:poracode.com`
-  into the iOS entitlement + the Android intent-filter on `cap:sync`/`cap:configure`.
+- Native association links are opt-in. Set `PORACODE_MOBILE_APP_HOST` before
+  `cap:sync`/`cap:configure` to write that host into the iOS entitlement and
+  Android intent filter.
 
 **To make links actually route into the app (ops — needs secrets + hosting):**
 
@@ -109,24 +108,17 @@ other.
    `scripts/finalize-mobile-build.mjs` emits a **non-empty** AASA/assetlinks into
    `dist/mobile/.well-known/` (AASA `appIDs = <team>.com.lightcodeapp.mobile`,
    components match `/pair*` and `/app*`).
-2. **Host** `/pair` and `/.well-known/apple-app-site-association` on
-   **poracode.com**. The marketing deployment redirects browser requests for
-   `/pair` and legacy `/app*` and `/pwa*` URLs to **app.poracode.com**; legacy
-   `/app-nightly*` URLs redirect to **app-nightly.poracode.com**. Both PWA
-   domains point at the separate mobile Vercel project (`vercel.json` →
-   `dist/mobile`) and serve their channel at `/`.
-3. **Desktop** — packaged builds default to `https://poracode.com`, so minted
-   QR/links are `https://poracode.com/pair?host=…#token=…`. Set
-   `PORACODE_REMOTE_ACCESS_PAIRING_APP_URL` only to override that host.
+2. **Host** `/pair` and `/.well-known/apple-app-site-association` on a domain
+   your deployment controls, and set `PORACODE_MOBILE_APP_HOST` to that host.
+3. **Desktop** — packaged builds mint the local/self-hosted `/pair` URL by
+   default. Set `PORACODE_REMOTE_ACCESS_PAIRING_APP_URL` only when your
+   deployment operates a public companion origin.
 4. Rebuild the app (`cap sync` + `pnpm run dev:ios`) so the entitlement + plugin
    ship. Universal-link routing **cannot be exercised in the simulator** until
    the app is built with the entitlement _and_ the AASA is served over https.
 
-**Gotcha — preserve the poracode.com pairing entry.** `buildPairingUrl`
-(`src/shared/remote/pairingUrl.ts`) intentionally mints
-`https://poracode.com/pair`. Existing native installs claim that universal link
-before the browser sees the redirect; browser users are redirected to
-`https://app.poracode.com/pair`.
+`buildPairingUrl` (`src/shared/remote/pairingUrl.ts`) retargets the desktop's
+local `/pair` URL only when the explicit pairing-app override is present.
 
 ## Troubleshooting
 

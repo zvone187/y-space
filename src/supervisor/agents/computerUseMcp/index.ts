@@ -1,5 +1,6 @@
 import type { ProjectLocation } from "@/shared/contracts";
-import { encodeThreadQuery, type McpThreadIdentity } from "@/shared/browserMcpThread";
+import type { McpThreadIdentity } from "@/shared/browserMcpThread";
+import { createMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
 import { readPrivilegedMcpEnvironment } from "@/supervisor/privilegedMcpEnvironment";
 
 export type ComputerUseMcpLocation =
@@ -28,7 +29,7 @@ export interface ComputerUseMcpHttpConfig {
 
 export function resolveComputerUseMcpHttpConfig(
   location: ComputerUseMcpLocation,
-  identity?: McpThreadIdentity,
+  identity: McpThreadIdentity,
 ): ComputerUseMcpHttpConfig | null {
   const env = readComputerUseMcpEnv();
   if (!env) return null;
@@ -37,11 +38,12 @@ export function resolveComputerUseMcpHttpConfig(
   // bridge. Mirror browserMcp and decline here — callers short-circuit WSL
   // unless a launch-time config is supplied.
   if (location.kind === "wsl") return null;
-  const mcpUrl = encodeThreadQuery(`${env.url.replace(/\/$/, "")}/mcp`, identity);
+  const mcpUrl = `${env.url.replace(/\/$/, "")}/mcp`;
+  const launchToken = createMcpLaunchContextToken(env.token, "computer-use", identity);
   return {
     url: mcpUrl,
-    token: env.token,
-    headers: { Authorization: `Bearer ${env.token}` },
+    token: launchToken,
+    headers: { Authorization: `Bearer ${launchToken}` },
   };
 }
 
@@ -50,6 +52,6 @@ export function resolveComputerUseMcpHttpConfigForLaunch(
   enabled: boolean,
   identity?: McpThreadIdentity,
 ): ComputerUseMcpHttpConfig | undefined {
-  if (!enabled) return undefined;
+  if (!enabled || !identity?.threadId) return undefined;
   return resolveComputerUseMcpHttpConfig(location, identity) ?? undefined;
 }

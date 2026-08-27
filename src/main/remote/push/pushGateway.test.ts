@@ -2,12 +2,36 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createPushGateway,
   createWebPushPublicKeyResolver,
+  resolvePushGatewayUrl,
   type CreatePushGatewayOptions,
 } from "./pushGateway";
 
 type GatewayFetch = NonNullable<CreatePushGatewayOptions["fetchImpl"]>;
 
 describe("push gateway client", () => {
+  it("has no implicit upstream gateway and fails closed when none is configured", async () => {
+    const previous = process.env.PORACODE_PUSH_GATEWAY_URL;
+    delete process.env.PORACODE_PUSH_GATEWAY_URL;
+    try {
+      expect(resolvePushGatewayUrl()).toBeNull();
+      const fetchImpl = vi.fn<GatewayFetch>();
+      const send = createPushGateway({ fetchImpl });
+
+      await expect(
+        send({ platform: "ios", pushType: "alert", token: "token", payload: {} }),
+      ).resolves.toMatchObject({
+        ok: false,
+        status: 0,
+        unregistered: false,
+        reason: "Push gateway is not configured.",
+      });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.PORACODE_PUSH_GATEWAY_URL;
+      else process.env.PORACODE_PUSH_GATEWAY_URL = previous;
+    }
+  });
+
   it("sends a Web Push subscription without a native token", async () => {
     let body: Record<string, unknown> = {};
     const send = createPushGateway({
