@@ -426,7 +426,9 @@
               <td>Pass</td>
               <td>
                 gpt-5.6-luna listed pages, edited Alpha, reused Gamma, ran its request, and captured
-                a screenshot.
+                a screenshot. A second packaged run visibly selected gpt-5.6-sol, reused the
+                existing Example Domain tab without changing the 10-tab inventory, read its exact
+                URL/title/H1, captured a Browser screenshot, and returned Idle.
               </td>
             </tr>
             <tr>
@@ -436,7 +438,9 @@
                 Both live CLI model checks passed. In the final package, ZAI GLM-4.5-Flash used only
                 Y Space Browser tools, listed all 9 tabs, opened or focused Example Domain without
                 external browser control, captured a 39,346-byte 1140×1646 screenshot, and returned
-                Idle. Active tab: <code>tab-3e5ee0a7-e49e-4224-ade6-3229ba824a63</code>.
+                Idle. A second packaged run visibly selected OpenCode GPT-5.6 Terra, created one
+                example.org peer from a 10-tab baseline, captured it, closed only that disposable
+                page, and returned to the same 10 tabs with the original example.com page active.
               </td>
             </tr>
             <tr>
@@ -516,6 +520,25 @@
             />
             <figcaption>
               OpenCode used only built-in Browser tools, listed 9 tabs, and focused Example Domain.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg"
+              alt="Codex GPT-5.6 Sol controlling the existing Y Space Example Domain browser tab"
+            />
+            <figcaption>
+              Codex 5.6 Sol reused the existing browser page, read URL/title/H1, and captured it.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
+              alt="OpenCode GPT-5.6 Terra creating and cleaning up a Y Space browser peer tab"
+            />
+            <figcaption>
+              OpenCode GPT-5.6 Terra created one browser peer, captured it, and restored the
+              original 10-tab inventory.
             </figcaption>
           </figure>
           <figure class="shot">

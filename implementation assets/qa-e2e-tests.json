@@ -76,14 +76,19 @@
       "id": "YS-E2E-003",
       "title": "Codex controls and reuses embedded browser pages",
       "status": "pass",
-      "model": "gpt-5.6-luna",
+      "models": ["gpt-5.6-luna", "gpt-5.6-sol"],
       "evidence": [
-        "Codex listed the exact Y Space browser-page inventory and active page.",
+        "Packaged Codex gpt-5.6-luna listed the exact Y Space browser-page inventory and active page.",
         "It found Alpha, activated it, filled and saved Controlled by Codex through Y Space, and observed the confirmation.",
         "It focused the existing Gamma URL without duplication, ran the request, observed Network request verified, and captured a Browser screenshot.",
+        "A second packaged task visibly selected Codex 5.6 Sol, searched the global browser inventory, and focused the existing https://example.com page without creating, duplicating, or closing a tab.",
+        "Codex gpt-5.6-sol reported the active tab ID, exact URL, Example Domain title, and Example Domain H1, and captured a Browser screenshot before returning to Idle.",
         "No external browser was used."
       ],
-      "screenshots": ["implementation assets/qa-screenshots/codex-browser-agent-pass.jpeg"]
+      "screenshots": [
+        "implementation assets/qa-screenshots/codex-browser-agent-pass.jpeg",
+        "implementation assets/qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg"
+      ]
     },
     {
       "id": "YS-E2E-004",
@@ -108,10 +113,13 @@
         "A final packaged in-app OpenCode task using ZAI GLM-4.5-Flash used only Y Space built-in Browser tools and listed all 9 global browser tabs.",
         "It created or focused https://example.com without external browser control and reported active tab tab-3e5ee0a7-e49e-4224-ade6-3229ba824a63 with title Example Domain.",
         "It captured a 39,346-byte 1140x1646 Browser screenshot and returned to Idle.",
+        "A second final packaged task visibly selected OpenCode GPT-5.6 Terra, started with 10 global browser tabs, reused the existing example.com page, created one example.org peer tab, and captured a Browser screenshot.",
+        "OpenCode GPT-5.6 Terra closed only its disposable example.org tab, reactivated the original example.com tab, verified the final count returned to 10, and reported the active tab ID/title before returning to Idle.",
         "Signed provider-session isolation and Browser/app-controls wiring pass automated tests."
       ],
       "screenshots": [
-        "implementation assets/qa-screenshots/final-opencode-browser-control-success.jpeg"
+        "implementation assets/qa-screenshots/final-opencode-browser-control-success.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
       ]
     },
     {
@@ -285,6 +293,21 @@
         "After clean quit, zero packaged Y Space or helper processes remained. Relaunch restored exactly the original 10 tabs and none of the 30 disposable tabs."
       ],
       "artifact": "implementation assets/browser-memory-soak.json"
+    },
+    {
+      "id": "YS-E2E-021",
+      "title": "Multiple live models control the packaged embedded browser",
+      "status": "pass_with_claude_external_blocker",
+      "evidence": [
+        "Codex gpt-5.6-luna and gpt-5.6-sol both completed packaged Browser-tool workflows against first-class global tabs.",
+        "OpenCode ZAI GLM-4.5-Flash and OpenCode GPT-5.6 Terra both completed packaged Browser-tool workflows; separate CLI smokes also passed for ZAI GLM-4.5-Flash and OpenCode GPT-5.6 Luna.",
+        "The Codex Sol and OpenCode Terra screenshots visibly identify the selected model in the packaged composer and show the returned browser evidence.",
+        "Claude Code remains the only provider without a live model run because its installed CLI is logged out; the safe Sonnet request stopped before inference."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
+      ]
     }
   ]
 }
