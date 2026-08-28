@@ -25,7 +25,7 @@ export const BUILT_IN_MCP_SERVER_NAMES: Record<BuiltInMcpServerId, string> = {
   browser: "browser",
   crossagents: "crossagents",
   "computer-use": "computer_use",
-  "app-controls": "poracode",
+  "app-controls": "y_space",
 };
 
 /** Tool catalogs advertised by each Y Space-owned MCP server. */

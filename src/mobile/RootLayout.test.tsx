@@ -101,7 +101,9 @@ vi.mock("@/renderer/views/MainView/parts/PullFromSourceDialog", () => ({
 }));
 
 vi.mock("@/renderer/deferredFeatures", () => ({
-  DeferredFileEditorPanel: () => <div data-testid="file-editor-panel" />,
+  DeferredFileEditorPanel: (props: { presentation: "desktop" | "mobile" }) => (
+    <div data-testid="file-editor-panel" data-presentation={props.presentation} />
+  ),
 }));
 
 vi.mock("./components", () => ({
@@ -412,6 +414,7 @@ describe("mobile RootLayout", () => {
 
     expect(screen.getByTestId("file-editor-panel")).toBeInTheDocument();
     expect(screen.getByTestId("file-editor-panel").parentElement).toHaveClass("m-detail");
+    expect(screen.getByTestId("file-editor-panel")).toHaveAttribute("data-presentation", "mobile");
   });
 
   it("places the home connection indicator after the brand before the More menu", () => {

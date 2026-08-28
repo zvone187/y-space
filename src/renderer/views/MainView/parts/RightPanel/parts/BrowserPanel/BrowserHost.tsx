@@ -12,6 +12,7 @@ import { useLingui } from "@lingui/react/macro";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useIsPanelTabVisible } from "@/renderer/state/panelDockSelectors";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 import { pushEscapeHandler } from "@/renderer/components/layout/overlayEscapeStack";
 import { BrowserPanel } from "./BrowserPanel";
 import {
@@ -53,18 +54,32 @@ export function BrowserHost() {
   const setBrowserOverlayMaximized = usePanelStore((s) => s.setBrowserOverlayMaximized);
   const setRightPanelTab = usePanelStore((s) => s.setRightPanelTab);
   const extracted = useBrowserPanelStore((s) => s.extracted);
-  const hasTabs = useBrowserPanelStore((s) => s.tabs.length > 0);
   const automationActive = useBrowserPanelStore((s) => s.automationActive);
+  const browserWorkspaceTabActive = useRightWorkspaceTabsStore((s) =>
+    s.tabs.some((tab) => tab.id === s.activeTabId && tab.kind === "browser-page"),
+  );
+  const hasResidentBrowserPages = useRightWorkspaceTabsStore((s) =>
+    s.tabs.some((tab) => tab.kind === "browser-page" && tab.resident),
+  );
+  const hasWorkspaceTabs = useRightWorkspaceTabsStore((s) => s.tabs.length > 0);
+  const workspaceHidden = useRightWorkspaceTabsStore((s) => s.hidden);
 
   // The browser is painted wherever its dock slot lives: the right panel's
   // active layer, a right-panel split section, or a bottom dock slot. Keying
   // this off `rightPanelTab` alone would drop a split/docked browser into
   // off-screen background mode, leaving an empty section behind.
-  const dockedVisible = useIsPanelTabVisible("browser");
+  const legacyDockedVisible = useIsPanelTabVisible("browser");
+  // Each page is now a first-class global workspace tab. The legacy dock slot
+  // still supplies geometry, but only the active global browser page may paint
+  // there; switching to a file/tool moves resident pages off-screen intact.
+  const dockedVisible = legacyDockedVisible && !workspaceHidden && browserWorkspaceTabActive;
+  // An empty workspace may still show Browser's create-first-page state. Once
+  // any global peer exists, only a selected Browser page may own the overlay.
+  const overlayVisible = browserOverlayOpen && (browserWorkspaceTabActive || !hasWorkspaceTabs);
 
   const mode: BrowserHostMode = extracted
     ? "hidden"
-    : browserOverlayOpen
+    : overlayVisible
       ? browserOverlayMaximized
         ? "fullscreen"
         : "drawer"
@@ -75,8 +90,15 @@ export function BrowserHost() {
           "background";
 
   const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const [isResizing, setIsResizing] = useState(false);
   useBrowserHostPositioning({ wrapperRef, mode, drawerWidth, dockedVisible });
+
+  useLayoutEffect(() => {
+    if (browserOverlayOpen && hasWorkspaceTabs && !browserWorkspaceTabActive) {
+      setBrowserOverlayOpen(false);
+    }
+  }, [browserOverlayOpen, browserWorkspaceTabActive, hasWorkspaceTabs, setBrowserOverlayOpen]);
 
   useLayoutEffect(() => {
     if (mode !== "drawer" && mode !== "fullscreen") return;
@@ -85,11 +107,32 @@ export function BrowserHost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, browserPanelOpen]);
 
-  // Extracted → the standalone window owns the browser. Background renders the
-  // webviews off-screen ONLY while the agent is actively automating (and there
-  // are tabs); when idle it unmounts to free resources.
+  useLayoutEffect(
+    () => () => {
+      resizeCleanupRef.current?.();
+      resizeCleanupRef.current = null;
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
+    if (mode === "drawer" || !resizeCleanupRef.current) return;
+    resizeCleanupRef.current();
+    resizeCleanupRef.current = null;
+    setIsResizing(false);
+  }, [mode]);
+
+  // Extracted → the standalone window owns the browser. Once the browser panel
+  // has been opened, resident pages remain mounted off-screen while a file/tool
+  // is selected; agent automation may mount those residents headlessly too.
+  // Restored metadata alone stays lazy so app startup does not create webviews.
   if (mode === "hidden") return null;
-  if (mode === "background" && (!hasTabs || !automationActive)) return null;
+  if (
+    mode === "background" &&
+    (!hasResidentBrowserPages || (!browserPanelOpen && !automationActive))
+  ) {
+    return null;
+  }
 
   function restoreOrCloseOverlay() {
     setBrowserOverlayMaximized(false);
@@ -99,25 +142,46 @@ export function BrowserHost() {
 
   function handleResizeStart(event: ReactMouseEvent<HTMLDivElement>) {
     event.preventDefault();
+    resizeCleanupRef.current?.();
     const startX = event.clientX;
     const startWidth = drawerWidth;
+    const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
     document.body.style.userSelect = "none";
     document.body.style.cursor = "ew-resize";
     setIsResizing(true);
+    let active = true;
     const onMove = (e: MouseEvent) => {
       // Handle is on the LEFT edge of a panel anchored to the RIGHT viewport
       // edge; dragging left (negative delta) grows the panel.
       setDrawerWidth(startWidth + (startX - e.clientX));
     };
-    const onUp = () => {
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-      setIsResizing(false);
+    const onUp = () => teardown(true);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") onUp();
+    };
+    const cleanupWithoutState = () => teardown(false);
+    const teardown = (updateState: boolean) => {
+      if (!active) return;
+      active = false;
+      document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("blur", onUp);
+      window.removeEventListener("pagehide", onUp);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (resizeCleanupRef.current === cleanupWithoutState) {
+        resizeCleanupRef.current = null;
+      }
+      if (updateState) setIsResizing(false);
     };
+    resizeCleanupRef.current = cleanupWithoutState;
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("blur", onUp);
+    window.addEventListener("pagehide", onUp);
+    document.addEventListener("visibilitychange", onVisibilityChange);
   }
 
   // Keyboard equivalent of dragging: the handle sits on the drawer's left
@@ -188,7 +252,14 @@ export function BrowserHost() {
           aria-hidden
         />
       ) : null}
-      <div ref={wrapperRef} className={wrapperClassName} style={wrapperStyle}>
+      <div
+        ref={wrapperRef}
+        data-y-space-browser-host=""
+        aria-hidden={mode === "background"}
+        inert={mode === "background"}
+        className={wrapperClassName}
+        style={wrapperStyle}
+      >
         {mode === "drawer" ? (
           <div
             role="separator"

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Input, Modal } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { LogIn, LogOut, RefreshCw, Search, Unplug } from "lucide-react";
+import { FileKey2, LogIn, LogOut, RefreshCw, Search, Unplug } from "lucide-react";
 import { readBridge } from "@/renderer/bridge";
 import { ToggleSwitch } from "@/renderer/components/common";
 import { useMcpServerOauth } from "@/renderer/components/mcp/useMcpServerOauth";
@@ -141,6 +141,32 @@ export function ConnectionsSettings() {
       setSnapshot(await readBridge().pipedreamGetSnapshot());
     });
 
+  const chooseEnvironmentFile = () =>
+    run("env-file", async () => {
+      const result = await readBridge().pipedreamChooseEnvFile({
+        dialogTitle: t`Choose Pipedream environment file`,
+      });
+      if (!result) return;
+      if (result.status === "invalid") {
+        if (result.reason === "unreadable") {
+          setError(t`The selected file could not be read.`);
+        } else if (result.reason === "too-large") {
+          setError(t`The selected file is too large.`);
+        } else {
+          setError(t`The selected file does not contain Pipedream credentials.`);
+        }
+        return;
+      }
+      setSnapshot(result.snapshot);
+      setNotice(t`Pipedream credentials loaded from the selected file.`);
+    });
+
+  const forgetEnvironmentFile = () =>
+    run("clear-env-file", async () => {
+      setSnapshot(await readBridge().pipedreamClearEnvFile());
+      setNotice(t`Saved environment file forgotten.`);
+    });
+
   const connect = snapshot?.connect;
   return (
     <SettingsPage
@@ -239,6 +265,35 @@ export function ConnectionsSettings() {
             <Trans>Pipedream Connect could not be initialized.</Trans>
           </p>
         ) : null}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--hairline)] px-3 py-2">
+          <p className="min-w-48 flex-1 text-xs text-muted">
+            <Trans>
+              Select a local environment file. Y Space stores only its location; credential values
+              stay outside renderer and agent processes.
+            </Trans>
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              isDisabled={busy !== null}
+              onPress={() => void forgetEnvironmentFile()}
+            >
+              <Trans>Forget environment file</Trans>
+            </Button>
+            <Button
+              variant="tertiary"
+              size="sm"
+              isPending={busy === "env-file"}
+              isDisabled={busy !== null}
+              onPress={() => void chooseEnvironmentFile()}
+            >
+              <FileKey2 className="size-3.5" />
+              <Trans>Choose environment file</Trans>
+            </Button>
+          </div>
+        </div>
 
         {connect?.state === "ready" ? (
           <>

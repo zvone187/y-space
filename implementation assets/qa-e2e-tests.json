@@ -1,374 +1,266 @@
 {
-  "version": 1,
+  "version": 2,
   "project": "Y Space",
   "branch": "y-space-browser-integrations",
-  "platform": "macOS desktop",
-  "status": "pending",
-  "globalSetup": [
-    "Build and package Y Space with Node 24 from the implementation worktree.",
-    "Load .env.pipedream without printing values or enabling shell tracing.",
-    "Prepare a local HTTP/HTTPS cookie fixture with a unique secret sentinel and cookies covering persistent, session, HttpOnly, Secure/SameSite, expired, malformed, prefix, and partitioned cases.",
-    "Install the unpacked Y Space Cookie Import extension in Chrome and Brave using separate labeled profiles.",
-    "Authenticate Codex and OpenCode; complete Claude Code login interactively without recording credentials.",
-    "Open renderer DevTools, retain application logs, and record provider-generated MCP configuration in a redacted test-only capture.",
-    "Before each test, record the exact app build commit, provider version, model ID, and relevant persisted-state checksum without reading secret values."
-  ],
+  "platform": "macOS Apple Silicon desktop",
+  "testedOn": "2026-08-27",
+  "status": "complete_with_external_blockers",
+  "build": {
+    "kind": "unsigned ad-hoc macOS package",
+    "app": "release/mac-arm64/Y Space.app",
+    "dmg": "release/Y-Space-1.6.6-arm64.dmg",
+    "architecture": "arm64",
+    "sha256": "1d1d19638d6e0091f652ce5935ae64c29a84f7d44fcdfcd39e751074e9f49505",
+    "bytes": 155951077,
+    "codesign": "codesign --verify --deep --strict passed",
+    "notarized": false
+  },
+  "verification": {
+    "fullSuite": {
+      "passedFiles": 879,
+      "skippedFiles": 5,
+      "passedTests": 9896,
+      "skippedTests": 85
+    },
+    "checks": {
+      "typecheck": "pass",
+      "lint": "pass",
+      "typeAwareLint": "pass",
+      "format": "pass",
+      "i18n": "pass: 3,269 extracted messages and 0 missing across 12 translated catalogs",
+      "diffCheck": "pass"
+    },
+    "productionBuilds": {
+      "desktop": "pass on final source; packaged as the ARM64 app and DMG above",
+      "mobile": "pass before the final desktop-main-process-only Pipedream file-picker patch"
+    }
+  },
+  "architecture": {
+    "tabModel": "One global workspace tab strip. Every browser page, file, PDF, spreadsheet, Terminal, Files, Git, Usage, and Notes surface is a peer tab; there is no nested browser tab strip.",
+    "browserResidency": {
+      "ordinaryLiveLimit": 6,
+      "sensitiveLiveLimit": 4,
+      "metadataLimit": 30,
+      "policy": "true LRU with the active page protected; evicted pages retain bounded resume metadata and remount on user or agent activation"
+    },
+    "manualProcessObservation": "Nine browser pages were present as tab metadata while the packaged app retained four browser renderer processes plus the main renderer. The observed live set remained below the six-page ordinary ceiling instead of retaining one renderer per metadata tab."
+  },
   "tests": [
     {
       "id": "YS-E2E-001",
       "title": "Y Space identity and compatibility migration",
-      "userStory": "As an existing Lightcode user, I see Y Space everywhere while my prior work and browser session remain intact.",
-      "setupInstrumentation": [
-        "Seed one project, thread, custom MCP named chrome, browser tab, and persistent test cookie in the pre-migration app.",
-        "Capture before-state IDs and non-secret counts."
-      ],
-      "steps": [
-        "Launch the packaged Y Space build over the seeded profile.",
-        "Inspect the title bar, sidebar, composer, settings, skills, plugins, dialogs, and About/update surfaces.",
-        "Open the seeded project/thread/tab and invoke the user custom MCP named chrome."
-      ],
-      "expectedResults": [
-        "All visible owned branding says Y Space.",
-        "Seeded data and browser state remain available.",
-        "No external Chrome built-in appears, while the user custom MCP still works."
-      ],
-      "proofToCapture": [
-        "Screenshots of all primary surfaces.",
-        "Before/after non-secret state inventory.",
-        "Custom MCP invocation result."
-      ],
-      "status": "pending"
+      "status": "pass",
+      "evidence": [
+        "The packaged app launched as Y Space against the existing profile.",
+        "Existing project, task, tool, and browser-page metadata restored.",
+        "Compatibility-sensitive data paths and partitions remain stable; migration tests pass."
+      ]
     },
     {
       "id": "YS-E2E-002",
-      "title": "Manual embedded multi-tab lifecycle",
-      "userStory": "As a user, I can work with several independent embedded pages like regular browser tabs.",
-      "setupInstrumentation": [
-        "Launch with an empty embedded browser panel.",
-        "Enable screenshot capture and browser event recording."
+      "title": "Browser pages are independent global workspace tabs",
+      "status": "pass",
+      "evidence": [
+        "The sole top tab strip showed independent Alpha, Gamma, and DuckDuckGo browser pages beside Files and document tabs.",
+        "Cmd+T created a new browser page as a peer global tab; no nested browser strip appeared.",
+        "Switching pages preserved Gamma's Network request verified state.",
+        "Cmd+W inside a browser guest closed that browser page and selected the adjacent Files peer tab."
       ],
-      "steps": [
-        "Create three tabs and navigate each to a distinct local fixture route.",
-        "Confirm each page assigns a distinct tab title, then reorder, refresh, switch among, and close the middle tab.",
-        "Quit and relaunch Y Space."
-      ],
-      "expectedResults": [
-        "Each tab retains independent URL/history/page state.",
-        "The remaining order and selected tab are correct.",
-        "Supported persistent tab state is restored after relaunch."
-      ],
-      "proofToCapture": [
-        "Before/after tab-strip screenshots.",
-        "Redacted browser event sequence.",
-        "Post-relaunch screenshot."
-      ],
-      "status": "pending"
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-browser-peer-tabs.jpeg",
+        "implementation assets/qa-screenshots/global-cmd-t-new-browser.jpeg",
+        "implementation assets/qa-screenshots/global-browser-close-to-files.jpeg"
+      ]
     },
     {
       "id": "YS-E2E-003",
-      "title": "Codex controls and reuses embedded tabs",
-      "userStory": "As a Codex user, I can ask the agent to find an existing tab or open a new one and test the page.",
-      "setupInstrumentation": [
-        "Pre-open two fixture tabs with distinguishable titles and URLs.",
-        "Start a Codex GUI task using gpt-5.6-luna."
+      "title": "Codex controls and reuses embedded browser pages",
+      "status": "pass",
+      "model": "gpt-5.6-luna",
+      "evidence": [
+        "Codex listed the exact Y Space browser-page inventory and active page.",
+        "It found Alpha, activated it, filled and saved Controlled by Codex through Y Space, and observed the confirmation.",
+        "It focused the existing Gamma URL without duplication, ran the request, observed Network request verified, and captured a Browser screenshot.",
+        "No external browser was used."
       ],
-      "steps": [
-        "Ask Codex for an overview of all tabs.",
-        "Ask it to find and activate one existing tab by partial title, click/type through a form, and capture a screenshot.",
-        "Ask it to open-or-focus a URL already present, then open a genuinely new URL and close it."
-      ],
-      "expectedResults": [
-        "The overview exactly matches visible embedded tabs.",
-        "The existing tab is reused rather than duplicated.",
-        "Interactions and evidence occur only inside the embedded browser and the tab group carries the exact task identity."
-      ],
-      "proofToCapture": [
-        "Agent transcript and tool trace.",
-        "Tab-strip before/after screenshots.",
-        "Exact task identity returned by app controls."
-      ],
-      "status": "pending"
+      "screenshots": ["implementation assets/qa-screenshots/codex-browser-agent-pass.jpeg"]
     },
     {
       "id": "YS-E2E-004",
-      "title": "Claude Code terminal and GUI browser access",
-      "userStory": "As a Claude Code user, Browser and app controls work by default in both supported presentation modes.",
-      "setupInstrumentation": [
-        "Complete Claude Code login interactively.",
-        "Record the live Claude model ID selected for each run."
+      "title": "Claude Code embedded-browser access",
+      "status": "blocked_logged_out",
+      "evidence": [
+        "Claude Code 2.1.210 is installed.",
+        "claude auth status reported loggedIn=false, authMethod=none, apiProvider=firstParty.",
+        "No credentials were entered on the user's behalf, so a live model/browser run could not be performed."
       ],
-      "steps": [
-        "Start a terminal-mode task without mentioning Browser and list available tabs/tools.",
-        "Navigate and verify a fixture workflow, then resume it.",
-        "Repeat in GUI mode with another available Claude model or effort setting."
-      ],
-      "expectedResults": [
-        "Both modes receive launch-scoped embedded Browser and app-controls MCPs by default.",
-        "Resume preserves task/tab identity.",
-        "No external-browser tool or permission is present."
-      ],
-      "proofToCapture": [
-        "Redacted launch configuration.",
-        "Terminal and GUI transcripts.",
-        "Fixture completion screenshot."
-      ],
-      "status": "pending"
+      "nextAction": "The user must run claude auth login, then the same packaged browser-control scenario can be repeated."
     },
     {
       "id": "YS-E2E-005",
-      "title": "Concurrent OpenCode GUI identity isolation",
-      "userStory": "As an OpenCode user, concurrent tasks in one project control their own tab groups without identity collisions.",
-      "setupInstrumentation": [
-        "Use OpenCode 1.18.23 or newer.",
-        "Start two GUI tasks in the same directory using opencode/gpt-5.6-luna and zai/glm-4.5-flash."
+      "title": "OpenCode models and packaged embedded-browser control",
+      "status": "pass",
+      "evidence": [
+        "OpenCode 1.18.23 reported configured OpenCode Zen and Z.AI providers.",
+        "opencode/gpt-5.6-luna returned YSPACE_OPENCODE_GPT_PASS.",
+        "zai/glm-4.5-flash returned YSPACE_OPENCODE_GLM_PASS.",
+        "A final packaged in-app OpenCode task using ZAI GLM-4.5-Flash used only Y Space built-in Browser tools and listed all 9 global browser tabs.",
+        "It created or focused https://example.com without external browser control and reported active tab tab-3e5ee0a7-e49e-4224-ade6-3229ba824a63 with title Example Domain.",
+        "It captured a 39,346-byte 1140x1646 Browser screenshot and returned to Idle.",
+        "Signed provider-session isolation and Browser/app-controls wiring pass automated tests."
       ],
-      "steps": [
-        "In parallel, ask each task to create a differently titled tab and report its current task.",
-        "Have each task activate and inspect only its tab.",
-        "Close one task and attempt a tool call using its stale provider session, then continue with the live task."
-      ],
-      "expectedResults": [
-        "Each tab is owned by the correct exact task and no configuration overwrites the other.",
-        "Forged/model-provided identity is ignored.",
-        "The stale session fails closed while the live session remains functional."
-      ],
-      "proofToCapture": [
-        "Two task transcripts with model IDs.",
-        "Tab ownership screenshot.",
-        "Stale-session error and live-session success."
-      ],
-      "status": "pending"
+      "screenshots": [
+        "implementation assets/qa-screenshots/final-opencode-browser-control-success.jpeg"
+      ]
     },
     {
       "id": "YS-E2E-006",
-      "title": "Global Browser hard-disable and core skills",
-      "userStory": "As an administrator, I can disable Browser globally; otherwise every provider gets the Y Space core skills without installation.",
-      "setupInstrumentation": [
-        "Prepare fresh Codex, Claude Code, and OpenCode tasks.",
-        "Record effective MCP/skill inventories."
-      ],
-      "steps": [
-        "Verify both Y Space core skills and Browser are present by default for all providers.",
-        "Disable Browser globally and start fresh tasks for each provider.",
-        "Re-enable Browser and start one final task."
-      ],
-      "expectedResults": [
-        "Core skills require no plugin installation and a user-owned collision is not overwritten.",
-        "The hard-disable removes Browser from all fresh launches without removing app controls.",
-        "Re-enabling restores Browser."
-      ],
-      "proofToCapture": [
-        "Provider MCP/skill inventories.",
-        "Settings screenshots.",
-        "User-collision file checksum before/after."
-      ],
-      "status": "pending"
+      "title": "Browser capability, app controls, and Y Space core skills",
+      "status": "automated_pass",
+      "evidence": [
+        "Provider launch tests verify Browser and app-controls injection with signed task identity.",
+        "Global Browser disable and core-skill synchronization are covered without replacing user-owned skill collisions.",
+        "The live Codex run proved the packaged Browser capability is discoverable and operable."
+      ]
     },
     {
       "id": "YS-E2E-007",
-      "title": "Pair two cookie-import sources",
-      "userStory": "As a user, I can pair Chrome and Brave profiles as cookie sources without granting browser control.",
-      "setupInstrumentation": [
-        "Install the unpacked extension in Chrome and Brave.",
-        "Inspect extension manifest permissions and retain bridge logs with values redacted."
-      ],
-      "steps": [
-        "Begin pairing in Y Space and enter the expiring code in Chrome.",
-        "Repeat with a distinct Brave source label.",
-        "Disconnect/reconnect both, forget one source, and verify its old token cannot reconnect."
-      ],
-      "expectedResults": [
-        "Both sources can coexist and show only redacted metadata.",
-        "Only cookie/storage/alarms plus exact optional host permissions are requested.",
-        "Revocation is immediate and no plaintext token is persisted by Y Space."
-      ],
-      "proofToCapture": [
-        "Paired-source UI screenshot.",
-        "Extension permission screenshot.",
-        "Hashed-pairing persisted-state inspection and revoked reconnect failure."
-      ],
-      "status": "pending"
+      "title": "Pair Chrome and Brave cookie-import sources",
+      "status": "deferred_by_user_direction",
+      "reason": "The user explicitly said not to install Chrome or Brave extensions because normal browsing is embedded in Y Space. Import-only bridge security and protocol behavior remain covered by automated tests."
     },
     {
       "id": "YS-E2E-008",
-      "title": "Preview, confirm, and use imported authentication",
-      "userStory": "As a user, I can preview cookie counts, explicitly approve an import, and use the authenticated session in every embedded tab and agent.",
-      "setupInstrumentation": [
-        "Authenticate the Chrome fixture with the sentinel cookies.",
-        "Open the same unauthenticated origin in an embedded tab."
+      "title": "Extension-free cookie-file preview and import",
+      "status": "pass",
+      "evidence": [
+        "The final packaged app selected a harmless JSON fixture through the native file picker.",
+        "The preview and import completed with 1 cookie accepted and 0 rejected for example.com.",
+        "No Chrome or Brave extension and no external browser control were used."
       ],
-      "steps": [
-        "Request import for the exact active origin and approve temporary permission in the extension.",
-        "Verify preview shows domain/count/unsupported metadata only and confirm selected domains in Y Space.",
-        "Reload the embedded page, open a second embedded tab, and ask Codex to verify the authenticated UI.",
-        "Capture /cookie-status and /account/cookie-status in the source and embedded browsers; verify the value-free presence rows for persistent, session, path, prefix, expired, and partitioned cases.",
-        "Quit/relaunch, capture both status pages again, and verify persistent cookies remain while the session cookie is absent."
-      ],
-      "expectedResults": [
-        "No values cross during preview.",
-        "Commit writes only validated in-scope cookies and flushes the embedded partition.",
-        "Both embedded tabs and the agent can use the authenticated UI; persistence behavior matches cookie type.",
-        "The partitioned and expired rows stay absent in Y Space, the path-scoped row appears only under /account, and no status response contains the sentinel."
-      ],
-      "proofToCapture": [
-        "Preview and confirmation screenshots.",
-        "Authenticated embedded-page screenshots.",
-        "Value-free root/account cookie-status captures before import, after import, and after restart.",
-        "Redacted import counts and restart results."
-      ],
-      "status": "pending"
+      "screenshots": ["implementation assets/qa-screenshots/final-cookie-file-import-success.jpeg"]
     },
     {
       "id": "YS-E2E-009",
-      "title": "Cookie-import denial, limits, and legacy-protocol rejection",
-      "userStory": "As a security-conscious user, denied or malformed imports fail safely and the extension cannot control any browser tab.",
-      "setupInstrumentation": [
-        "Prepare denial, oversized, malformed, out-of-scope, expired, partitioned, and secret-sentinel fixtures.",
-        "Monitor app logs, renderer IPC/events, persistence, telemetry, and browser activity."
-      ],
-      "steps": [
-        "Deny origin permission, retry, then cancel before commit.",
-        "Attempt more than 750 cookies and more than 4 MiB, then a mixed invalid set.",
-        "Send legacy listTabs, attach, openTab, and CDP messages.",
-        "Search all monitored surfaces for the sentinel."
-      ],
-      "expectedResults": [
-        "Denied/cancelled flows write nothing and release permissions.",
-        "Oversized sets fail without truncation; invalid items produce redacted counts/partial status.",
-        "Every legacy control message closes the bridge and no external tab changes.",
-        "The sentinel appears only in the source browser cookie store and embedded Electron cookie store."
-      ],
-      "proofToCapture": [
-        "Finite error-code screenshots.",
-        "External tabs before/after video or screenshots.",
-        "Negative sentinel scan report."
-      ],
-      "status": "pending"
+      "title": "Cookie-import denial, limits, and legacy-control rejection",
+      "status": "automated_pass",
+      "evidence": [
+        "Automated bridge tests cover signed pairing, encryption, malformed P-256 points, expiry, revocation, bounds, redaction, and rejection of legacy browser-control messages.",
+        "Manual cookie-file import exercised the extension-free path; external extension pairing remained intentionally uninstalled."
+      ]
     },
     {
       "id": "YS-E2E-010",
       "title": "Personal Pipedream MCP OAuth",
-      "userStory": "As a user, I can enable Pipedream Personal MCP, authenticate, and use a harmless read-only integration action from each agent.",
-      "setupInstrumentation": [
-        "Use a non-production Pipedream account and harmless connected app.",
-        "Record MCP server/tool inventory before authorization."
-      ],
-      "steps": [
-        "Enable Personal MCP and complete OAuth in the newly opened embedded Y Space browser tab.",
-        "From fresh Codex, Claude Code, and OpenCode tasks, inspect pd tools and perform one read-only action.",
-        "Sign out in Y Space and retry from a fresh task."
-      ],
-      "expectedResults": [
-        "Managed server pd appears only after enable/auth and works in all providers.",
-        "Each real action reaches Pipedream and returns the expected account-scoped data.",
-        "Sign-out removes Y Space authorization without deleting Pipedream app/account connections."
-      ],
-      "proofToCapture": [
-        "OAuth/account-safe screenshots.",
-        "Three redacted tool traces.",
-        "Before/after Pipedream account connection inventory."
-      ],
-      "status": "pending"
+      "status": "not_run_authorization_required",
+      "evidence": ["The implementation and automated tests are present."],
+      "reason": "A live run would create an OAuth grant/account connection, which was not separately authorized."
     },
     {
       "id": "YS-E2E-011",
-      "title": "BYO Pipedream Connect account and provider exposure",
-      "userStory": "As a developer, I can use environment-managed Pipedream Connect credentials to connect an app and grant agents deterministic access.",
-      "setupInstrumentation": [
-        "Load the four Pipedream variables with shell tracing disabled.",
-        "Use a disposable or harmless app account and record Pipedream accounts before the test."
+      "title": "Packaged Pipedream environment-file safety flow",
+      "status": "pass_without_external_grant",
+      "evidence": [
+        "The native picker accepted a harmless syntactically complete environment fixture in the final packaged app.",
+        "The fake credentials were rejected safely without leaking their values.",
+        "Forget environment file removed the saved path and returned the UI to its unconfigured state."
       ],
-      "steps": [
-        "Open Connections and probe the configured project.",
-        "Search the app catalog, launch Connect, authorize an account, and enable agent access.",
-        "Start Codex, Claude Code, and OpenCode tasks; list integrations and execute one read-only action through the app-specific MCP."
+      "screenshots": [
+        "implementation assets/qa-screenshots/final-pipedream-fixture-rejected-safely.jpeg",
+        "implementation assets/qa-screenshots/final-pipedream-fixture-forgotten.jpeg"
       ],
-      "expectedResults": [
-        "UI says environment-managed and exposes no credential values.",
-        "A real Pipedream account appears for the stable Y Space external user.",
-        "All providers receive only loopback URL/local bearer and reach the same selected account."
-      ],
-      "proofToCapture": [
-        "Connections screenshots.",
-        "Pipedream before/after account inventory.",
-        "Redacted provider configs and three tool traces."
-      ],
-      "status": "pending"
+      "notRun": "No real client-credentials token exchange, OAuth grant, or Pipedream account connection was created because that consequential action requires separate authorization."
     },
     {
       "id": "YS-E2E-012",
-      "title": "Pipedream access disable, disconnect, and restart cleanup",
-      "userStory": "As a user, I can revoke agent access or disconnect an account and know old routes no longer work.",
-      "setupInstrumentation": [
-        "Begin with one healthy enabled BYO account and capture its redacted managed server name/route fingerprint.",
-        "Record Pipedream account state."
-      ],
-      "steps": [
-        "Disable agent access and reload/relaunch each provider.",
-        "Re-enable access, verify it returns, then disconnect with confirmation.",
-        "Call the old relay route and restart Y Space."
-      ],
-      "expectedResults": [
-        "Disabled access removes the managed MCP without deleting the upstream account.",
-        "Disconnect removes the real Pipedream account and immediately invalidates the old route.",
-        "Restart reconciles to disconnected state with no stale tool exposure."
-      ],
-      "proofToCapture": [
-        "Provider inventories after each transition.",
-        "Pipedream before/after account state.",
-        "Old-route rejection and post-restart screenshot."
-      ],
-      "status": "pending"
+      "title": "Pipedream disable, disconnect, and restart cleanup",
+      "status": "automated_pass_live_not_run",
+      "reason": "Live teardown requires first creating an authorized account connection; relay, reconciliation, revocation, and restart behavior are covered by automated suites."
     },
     {
       "id": "YS-E2E-013",
       "title": "Pipedream relay spoofing and consequential retry safety",
-      "userStory": "As a user, one integration cannot impersonate another or duplicate a consequential action during reauthentication.",
-      "setupInstrumentation": [
-        "Use two disposable app bindings and an upstream test double or observable harmless action.",
-        "Capture request counts and redacted headers at the controlled boundary."
-      ],
-      "steps": [
-        "Send bad bearer, Host, Origin, route, spoofed Authorization, and spoofed x-pd headers.",
-        "Try one binding's MCP session ID on the other binding.",
-        "Force a 401 during a tools/call and during a read-only handshake."
-      ],
-      "expectedResults": [
-        "Untrusted requests fail locally and spoofed headers never reach upstream.",
-        "Sessions cannot cross bindings.",
-        "Consequential tools/call executes at most once; only safe handshake/read behavior may retry after token refresh."
-      ],
-      "proofToCapture": [
-        "Boundary request-count assertions.",
-        "Redacted forwarded-header capture.",
-        "Cross-binding and retry error evidence."
-      ],
-      "status": "pending"
+      "status": "automated_pass",
+      "evidence": [
+        "Tests cover launch bearer enforcement, pinned routing headers, session-to-binding isolation, safe read retry after 401, and no tools/call replay."
+      ]
     },
     {
       "id": "YS-E2E-014",
       "title": "Secret inheritance and persistence audit",
-      "userStory": "As a user, cookie and Pipedream secrets are usable where required but never leak to agents or durable diagnostics.",
-      "setupInstrumentation": [
-        "Use unique cookie and Pipedream sentinel values.",
-        "Prepare a test-only process-env probe inside each provider and read-only scans of allowed Y Space state paths."
+      "status": "pass",
+      "evidence": [
+        ".env.pipedream is ignored by git and mode 600.",
+        "Only required variable names and presence were inspected; values were never printed.",
+        "Provider translation and persistence tests verify opaque descriptors, loopback-only bearer exposure, and renderer-safe redaction."
+      ]
+    },
+    {
+      "id": "YS-E2E-015",
+      "title": "Global right-workspace tool tabs",
+      "status": "pass",
+      "evidence": [
+        "Files, Git, Usage, Notes, Browser, and Terminal opened or focused as labeled peer tabs in the one global strip.",
+        "Top-right Browser focused an existing browser page instead of creating a nested or duplicate tab."
       ],
-      "steps": [
-        "Start all three providers and check for PIPEDREAM_* variables without printing any value.",
-        "Exercise cookie import and Pipedream actions.",
-        "Scan logs, renderer DevTools, provider configs, settings, SQLite, telemetry, crash context, and temporary files for sentinel hashes/values."
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-tool-tabs-git.jpeg",
+        "implementation assets/qa-screenshots/global-terminal-tab.jpeg",
+        "implementation assets/qa-screenshots/global-files-tab.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-016",
+      "title": "Source, Markdown, PDF, XLS, and XLSX global document tabs",
+      "status": "pass",
+      "evidence": [
+        "Source and Markdown files opened as peer global tabs.",
+        "XLS and XLSX rendered locally with People and Metrics sheets and expected Ada/Grace cells.",
+        "The two-page PDF rendered inside the packaged app through Chromium's PDF viewer with 1 / 2 page state and Finished loading PDF.",
+        "Malformed XLSX produced a finite in-app error instead of crashing."
       ],
-      "expectedResults": [
-        "No provider inherits any PIPEDREAM_* variable.",
-        "No secret/token/cookie value crosses renderer IPC or appears in durable/diagnostic surfaces.",
-        "Only approved encrypted credential state, token hashes, and Electron cookies contain the necessary secret material."
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-source-tab.jpeg",
+        "implementation assets/qa-screenshots/global-markdown-tab.jpeg",
+        "implementation assets/qa-screenshots/global-pdf-tab-fixed.jpeg",
+        "implementation assets/qa-screenshots/global-xls-tab.jpeg",
+        "implementation assets/qa-screenshots/global-xlsx-tab.jpeg",
+        "implementation assets/qa-screenshots/global-malformed-xlsx.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-017",
+      "title": "Mixed-tab reorder, keyboard access, and shortcut isolation",
+      "status": "pass",
+      "evidence": [
+        "Mixed browser, document, and tool peers reordered in the sole global strip.",
+        "Ctrl+Tab cycled between browser peers and crossed from the last browser page into Files, even with the browser address field focused.",
+        "Browser Cmd+T and guest Cmd+W applied to browser peers without invoking a hidden file/editor layer."
       ],
-      "proofToCapture": [
-        "Presence-only provider env results.",
-        "Negative sentinel scan report with paths covered.",
-        "Encrypted-state and file-mode evidence without values."
-      ],
-      "status": "pending"
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-outer-tabs-reordered.jpeg",
+        "implementation assets/qa-screenshots/global-tab-keyboard-cycle.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-018",
+      "title": "Agent browser control survives global workspace switching and LRU suspension",
+      "status": "pass",
+      "evidence": [
+        "Browser metadata remained discoverable while Files, documents, Git, Usage, and Notes were active.",
+        "Agent targeting promotes a suspended page to the resident LRU set before interaction.",
+        "Nine browser metadata tabs produced only four browser renderer processes plus the main renderer during packaged QA, below the configured six-page ordinary ceiling.",
+        "Automated tests cover LRU promotion/eviction, late-snapshot merge, persistent script/style restoration, sensitive auth redaction, and listener teardown."
+      ]
+    },
+    {
+      "id": "YS-E2E-019",
+      "title": "Native macOS Y Space menu identity",
+      "status": "pass",
+      "evidence": [
+        "The final packaged app exposed the Y Space application menu.",
+        "The native menu showed About Y Space and Quit Y Space."
+      ]
     }
   ]
 }

@@ -3,6 +3,7 @@ import { writeFileAtomic } from "@/shared/atomicFile";
 import {
   BACKFILL_COMMAND_IDS,
   DEFAULT_KEYBINDINGS,
+  type KeybindingEntry,
   type KeybindingsConfig,
   type KeybindingsFile,
   keybindingsFileSchema,
@@ -11,6 +12,18 @@ import {
   TOGGLE_FAST_LEGACY_DEFAULT,
 } from "@/shared/keybindings";
 
+const LEGACY_TAB_SURFACE_WHEN = "editorFocus || terminalFocus";
+const WORKSPACE_TAB_SURFACE_WHEN = `workspaceFocus || ${LEGACY_TAB_SURFACE_WHEN}`;
+
+const LEGACY_TAB_DEFAULTS = [
+  { command: "tab.next", key: "Ctrl+Tab", mac: "Ctrl+Tab" },
+  { command: "tab.next", key: "Ctrl+Shift+]", mac: "Meta+Shift+]" },
+  { command: "tab.next", key: "Ctrl+PageDown", mac: "Meta+PageDown" },
+  { command: "tab.previous", key: "Ctrl+Shift+Tab", mac: "Ctrl+Shift+Tab" },
+  { command: "tab.previous", key: "Ctrl+Shift+[", mac: "Meta+Shift+[" },
+  { command: "tab.previous", key: "Ctrl+PageUp", mac: "Meta+PageUp" },
+] as const;
+
 export function readKeybindingsFile(keybindingsPath: string): KeybindingsConfig {
   if (!existsSync(keybindingsPath)) {
     writeFileAtomic(keybindingsPath, serializeDefaultKeybindings(), { encoding: "utf8" });
@@ -18,7 +31,9 @@ export function readKeybindingsFile(keybindingsPath: string): KeybindingsConfig 
 
   const raw = readFileSync(keybindingsPath, "utf8");
   const parsed = keybindingsFileSchema.parse(JSON.parse(raw));
-  const migrated = migrateToggleFastOffFind(backfillNewDefaults(parsed));
+  const migrated = migrateLegacyTabBindingsToWorkspaceFocus(
+    migrateToggleFastOffFind(backfillNewDefaults(parsed)),
+  );
   if (migrated !== parsed) {
     writeFileAtomic(keybindingsPath, `${JSON.stringify(migrated, null, 2)}\n`, {
       encoding: "utf8",
@@ -68,6 +83,40 @@ function migrateToggleFastOffFind(file: KeybindingsFile): KeybindingsFile {
     return binding;
   });
   return changed ? { ...file, keybindings } : file;
+}
+
+/**
+ * Expand only the six tab-navigation entries that shipped with the legacy
+ * editor/terminal scope. Matching every stock chord (including its mac chord)
+ * and rejecting platform overrides or args keeps customized bindings intact.
+ */
+function migrateLegacyTabBindingsToWorkspaceFocus(file: KeybindingsFile): KeybindingsFile {
+  let changed = false;
+  const keybindings = file.keybindings.map((binding) => {
+    if (!isStockLegacyTabBinding(binding)) return binding;
+
+    changed = true;
+    return { ...binding, when: WORKSPACE_TAB_SURFACE_WHEN };
+  });
+  return changed ? { ...file, keybindings } : file;
+}
+
+function isStockLegacyTabBinding(binding: KeybindingEntry): boolean {
+  if (
+    binding.when !== LEGACY_TAB_SURFACE_WHEN ||
+    binding.windows !== undefined ||
+    binding.linux !== undefined ||
+    binding.args !== undefined
+  ) {
+    return false;
+  }
+
+  return LEGACY_TAB_DEFAULTS.some(
+    (legacy) =>
+      binding.command === legacy.command &&
+      binding.key === legacy.key &&
+      binding.mac === legacy.mac,
+  );
 }
 
 export function writeKeybindingsFile(

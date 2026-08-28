@@ -183,9 +183,10 @@ function AttachmentChip(props: {
     </>
   );
 
+  const isSpreadsheet = /\.(?:xls|xlsx|csv|tsv)$/iu.test(att.path);
   const onPreview = att.isImage
     ? onPreviewImage
-    : isPdfPath(att.path, att.mimeType)
+    : isPdfPath(att.path, att.mimeType) || isSpreadsheet
       ? onPreviewPdf
       : undefined;
   if (onPreview) {

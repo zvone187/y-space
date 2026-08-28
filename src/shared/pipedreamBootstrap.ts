@@ -7,6 +7,8 @@ export const PIPEDREAM_ENV_KEYS = [
   "PIPEDREAM_ENVIRONMENT",
 ] as const;
 
+export const PIPEDREAM_ENV_FILE_MAX_BYTES = 1024 * 1024;
+
 export type PipedreamEnvKey = (typeof PIPEDREAM_ENV_KEYS)[number];
 export type PipedreamEnvironment = "development" | "production";
 
@@ -90,6 +92,19 @@ export function capturePipedreamBootstrapEnvFile(
     // Missing / unreadable is equivalent to an absent file; environment values
     // still work and are scrubbed by the canonical capture path below.
   }
+  const isolated: NodeJS.ProcessEnv = {};
+  for (const key of PIPEDREAM_ENV_KEYS) isolated[key] = env[key] ?? fileValues[key];
+  const captured = capturePipedreamBootstrapEnv(isolated);
+  for (const key of PIPEDREAM_ENV_KEYS) delete env[key];
+  return captured;
+}
+
+/** Captures supported values from already-read text without touching process.env by default. */
+export function capturePipedreamBootstrapEnvText(
+  content: string,
+  env: NodeJS.ProcessEnv = {},
+): PipedreamBootstrap {
+  const fileValues = parsePipedreamEnvFile(content);
   const isolated: NodeJS.ProcessEnv = {};
   for (const key of PIPEDREAM_ENV_KEYS) isolated[key] = env[key] ?? fileValues[key];
   const captured = capturePipedreamBootstrapEnv(isolated);

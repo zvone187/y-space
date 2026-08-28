@@ -336,8 +336,8 @@
             <h3>The design is locked</h3>
             <p>
               Y Space keeps compatibility-sensitive internals, makes the embedded multi-tab browser
-              core, removes agent-facing external browser control, adds import-only cookies, and
-              integrates both Pipedream modes.
+              core, and adds one global right-workspace tab strip for every tool and document. PDF,
+              CSV/TSV, XLS, and XLSX stay inside the app alongside source files.
             </p>
           </div>
           <div class="sticky bg-pink">
@@ -452,6 +452,15 @@
               exposes app/account bindings only through an authenticated loopback relay.
             </p>
           </div>
+          <div class="sticky bg-pink">
+            <h3>One global workspace</h3>
+            <p>
+              Files, Git, Usage, Notes, Browser, Terminal, transient plan/subagent surfaces, and
+              source/PDF/spreadsheet documents share one ordered outer strip. Browser page tabs
+              remain nested so their webviews and agent connection stay alive while other tabs are
+              selected.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -460,7 +469,7 @@
           <span class="pin"></span>
           <h2>Automated red-test evidence</h2>
         </div>
-        <div class="grid three">
+        <div class="grid four">
           <div class="sticky bg-pink">
             <h3>Cookie import · expected red</h3>
             <p>
@@ -506,15 +515,31 @@
               <li>Targeted formatting, lint, and diff checks pass.</li>
             </ul>
           </div>
+          <div class="sticky bg-pink">
+            <h3>Global workspace · expected red</h3>
+            <p>
+              <strong>5 Vitest suites / 0 tests collected</strong> because the deliberately named
+              global-tab store, accessible strip, file-opening action, PDF preview, and spreadsheet
+              preview modules do not exist yet. Each failure is an unresolved future implementation
+              import; the pre-existing baseline remains green.
+            </p>
+            <ul>
+              <li><code>rightWorkspaceTabs.test.ts</code></li>
+              <li><code>RightWorkspaceTabStrip.test.tsx</code></li>
+              <li><code>openWorkspaceFile.test.ts</code></li>
+              <li><code>PdfDocumentPreview.test.tsx</code></li>
+              <li><code>SpreadsheetPreview.test.tsx</code></li>
+            </ul>
+          </div>
         </div>
         <details open>
           <summary>Why these are valid red failures</summary>
           <div class="detail-body">
             The existing 9,477-test baseline is green. New provider tests execute against existing
-            code and fail on concrete behavior gaps. New cookie/Pipedream suites define future APIs
-            and fail because those production modules do not exist yet. Typecheck now reports only
-            those intentionally absent Pipedream modules; an unrelated exact-optional fixture issue
-            was corrected before readiness was declared.
+            code and fail on concrete behavior gaps. New cookie/Pipedream/global-workspace suites
+            define future APIs and fail because those production modules do not exist yet. Typecheck
+            now reports only intentionally absent production modules; unrelated fixture issues were
+            corrected before readiness was declared.
           </div>
         </details>
       </section>
@@ -570,8 +595,9 @@
           <div class="sticky bg-yellow">
             <h3>PC-30 · Click QA</h3>
             <p>
-              All 14 desktop E2E cases are manually executed, evidenced, and marked passed in the QA
-              artifact.
+              Every applicable desktop E2E case is manually executed and evidenced in the QA
+              artifact; explicitly deferred extension-install cases remain visible and are never
+              reported as passed.
             </p>
           </div>
           <div class="sticky bg-pink">
@@ -581,9 +607,17 @@
               any obsolete external-browser service.
             </p>
           </div>
+          <div class="sticky bg-purple">
+            <h3>PC-33–40 · Global workspace</h3>
+            <p>
+              Singleton tool tabs, in-app document tabs, bounded PDF/spreadsheet previews, mixed-tab
+              keyboard/reorder/close semantics, active-surface shortcut isolation, packaged desktop
+              proof, and explicit extension-QA deferral.
+            </p>
+          </div>
         </div>
         <details open>
-          <summary>Authoritative 32-item completion contract</summary>
+          <summary>Authoritative 40-item completion contract</summary>
           <div class="detail-body">
             The exact non-waivable criteria are in
             <a href="pass-criteria.md">implementation assets/pass-criteria.md</a>. A green unit test
@@ -598,14 +632,16 @@
           <h2 id="e2e-title">End-To-End Verification Plan</h2>
         </div>
         <p style="color: var(--muted); margin: -4px 0 16px">
-          These exact tests mirror <a href="qa-e2e-tests.json">qa-e2e-tests.json</a>. Every case is
-          pending until it is click-executed in the packaged macOS app with the named proof.
+          These exact tests mirror <a href="qa-e2e-tests.json">qa-e2e-tests.json</a>. Applicable
+          cases remain pending until click-executed in the packaged macOS app with the named proof;
+          YS-E2E-007–009 are explicitly deferred because no Chrome or Brave extension is to be
+          installed in this iteration.
         </p>
         <div class="e2e-grid">
           <article class="e2e-card">
             <div class="e2e-head">
               <h3>YS-E2E-001 · Y Space identity and compatibility migration</h3>
-              <span class="pill pending">Pending</span>
+              <span class="pill red">Deferred</span>
             </div>
             <h4>Setup / instrumentation</h4>
             <p>
@@ -725,12 +761,12 @@
           <article class="e2e-card">
             <div class="e2e-head">
               <h3>YS-E2E-007 · Pair two cookie-import sources</h3>
-              <span class="pill pending">Pending</span>
+              <span class="pill red">Deferred</span>
             </div>
             <h4>Setup / instrumentation</h4>
             <p>
-              Unpacked extension in Chrome and Brave, manifest inspection, and value-redacted bridge
-              logs.
+              Deferred by explicit user direction: do not install browser extensions. Automated
+              manifest, permission, protocol, and redaction suites remain required.
             </p>
             <h4>Steps</h4>
             <p>
@@ -745,12 +781,12 @@
           <article class="e2e-card">
             <div class="e2e-head">
               <h3>YS-E2E-008 · Preview, confirm, and use imported authentication</h3>
-              <span class="pill pending">Pending</span>
+              <span class="pill red">Deferred</span>
             </div>
             <h4>Setup / instrumentation</h4>
             <p>
-              Authenticated Chrome fixture with persistent/session/HttpOnly/Secure cookies and an
-              unauthenticated embedded tab.
+              Deferred by explicit user direction: no external browser extension installation or
+              authenticated external-browser fixture is part of this manual QA run.
             </p>
             <h4>Steps</h4>
             <p>
@@ -766,12 +802,12 @@
           <article class="e2e-card">
             <div class="e2e-head">
               <h3>YS-E2E-009 · Cookie denial, limits, and legacy rejection</h3>
-              <span class="pill pending">Pending</span>
+              <span class="pill red">Deferred</span>
             </div>
             <h4>Setup / instrumentation</h4>
             <p>
-              Denied, oversized, malformed, out-of-scope, partitioned, and secret-sentinel fixtures;
-              monitor logs, IPC/events, persistence, telemetry, and external tabs.
+              Manual extension execution is deferred; equivalent denied, oversized, malformed,
+              out-of-scope, partitioned, and secret-sentinel automated fixtures remain required.
             </p>
             <h4>Steps</h4>
             <p>
@@ -889,6 +925,79 @@
               Presence-only env results, negative sentinel report, and encrypted-state/file-mode
               evidence prove secrets exist only in approved memory/encrypted/Electron-cookie
               locations.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <div class="e2e-head">
+              <h3>YS-E2E-015 · Global right-workspace tool tabs</h3>
+              <span class="pill pending">Pending</span>
+            </div>
+            <h4>Setup / instrumentation</h4>
+            <p>Packaged app with Files, Git, Usage, Notes, Browser, and Terminal available.</p>
+            <h4>Steps</h4>
+            <p>
+              Open every tool, switch through them, reopen singleton tools, and close active and
+              inactive tabs.
+            </p>
+            <h4>Expected proof</h4>
+            <p>
+              Mixed tool-strip and close-selection screenshots prove one tab per tool, deterministic
+              focus, and preserved Browser/Notes/Git/Usage state.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <div class="e2e-head">
+              <h3>YS-E2E-016 · Source, PDF, XLS, and XLSX document tabs</h3>
+              <span class="pill pending">Pending</span>
+            </div>
+            <h4>Setup / instrumentation</h4>
+            <p>Two source files, PDF, XLS, two-sheet XLSX, and malformed workbook fixtures.</p>
+            <h4>Steps</h4>
+            <p>
+              Open, revisit, edit, dirty-close, switch sheets, scroll, and close every document.
+            </p>
+            <h4>Expected proof</h4>
+            <p>
+              Document-strip, PDF, spreadsheet, dirty-confirmation, and bounded-error screenshots
+              prove local in-app rendering with no external launch or network viewer.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <div class="e2e-head">
+              <h3>YS-E2E-017 · Mixed-tab reorder, keyboard access, and shortcut isolation</h3>
+              <span class="pill pending">Pending</span>
+            </div>
+            <h4>Setup / instrumentation</h4>
+            <p>
+              At least three tool tabs and three document tabs, including one dirty source file.
+            </p>
+            <h4>Steps</h4>
+            <p>
+              Mouse/keyboard reorder; use arrows, Home, End, overflow, shortcuts, and edge/middle
+              close.
+            </p>
+            <h4>Expected proof</h4>
+            <p>
+              Order, focus, accessibility-tree, and shortcut-isolation evidence proves a single
+              selected/tabbable tab and deterministic adjacent focus.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <div class="e2e-head">
+              <h3>YS-E2E-018 · Browser agent control survives global switching</h3>
+              <span class="pill pending">Pending</span>
+            </div>
+            <h4>Setup / instrumentation</h4>
+            <p>Alpha/Gamma Browser pages plus Files, Git, Notes, documents, and a Codex task.</p>
+            <h4>Steps</h4>
+            <p>
+              Switch away, ask Codex to find/interact/screenshot/open-or-focus, then return to
+              Browser.
+            </p>
+            <h4>Expected proof</h4>
+            <p>
+              Agent trace and nested/outer tab screenshots prove the Browser host stays mounted,
+              exact, reusable, and embedded while another outer tab is selected.
             </p>
           </article>
         </div>
@@ -1010,8 +1119,13 @@
                   >Architecture and implementation plan</a
                 >
               </li>
-              <li><a href="pass-criteria.md">32 explicit pass criteria</a></li>
-              <li><a href="qa-e2e-tests.json">14-case browser/desktop E2E QA plan</a></li>
+              <li><a href="pass-criteria.md">40 explicit pass criteria</a></li>
+              <li><a href="qa-e2e-tests.json">18-case browser/desktop E2E QA plan</a></li>
+              <li>
+                <a href="../plans/y-space-global-workspace-tabs-plan.html"
+                  >Global workspace tab implementation plan</a
+                >
+              </li>
               <li><a href="pre-implementation-report.html">This readiness report</a></li>
             </ul>
           </div>

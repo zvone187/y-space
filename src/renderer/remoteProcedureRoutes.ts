@@ -96,6 +96,7 @@ export const NON_ROUTER_PROJECT_PROCEDURES = {
   showNotification: "device-owned-notification",
   detectProjectIcon: "remote-mirrors-skip-file-icons",
   listProjectIconFiles: "remote-mirrors-skip-file-icons",
+  readProjectFilePreview: "local-project-preview-unavailable-remotely",
 } as const satisfies Partial<Record<IpcProcedureName, string>>;
 
 export type RemoteRoutableProcedureName = keyof typeof REMOTE_PROCEDURE_ROUTES;

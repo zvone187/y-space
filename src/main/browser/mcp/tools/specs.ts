@@ -24,7 +24,8 @@ const RAW_TOOLS: ToolSpec[] = [
   },
   {
     name: "list_tabs",
-    description: "List open tabs in the Y Space in-app browser panel.",
+    description:
+      "List every open Y Space browser page tab, including its stable tab id, URL, and title.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -41,7 +42,7 @@ const RAW_TOOLS: ToolSpec[] = [
   },
   {
     name: "new_tab",
-    description: "Open a new tab in the Y Space browser panel.",
+    description: "Open a new browser page as a first-class Y Space workspace tab.",
     inputSchema: {
       type: "object",
       properties: {

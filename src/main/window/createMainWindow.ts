@@ -3,7 +3,11 @@ import { BrowserWindow, screen, type RenderProcessGoneDetails } from "electron";
 import type { PoracodeChannel } from "@/shared/channel";
 import type { PoracodeWindowKind } from "@/shared/ipc";
 import type { RendererProcessGoneIntent } from "@/main/diagnostics/processGone";
-import { installSessionPermissions } from "../browser/permissions";
+import {
+  installNavigationGuards,
+  installSessionPermissions,
+  isNavigationUrlAllowed,
+} from "../browser/permissions";
 import { supportsNativeWindowMaterial, syncNativeThemeForMaterial } from "./windowMaterial";
 import {
   buildRendererAdditionalArguments,
@@ -144,6 +148,10 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Electron disables Chromium plugins by default. Its bundled PDF viewer
+      // is one of those plugins, so document-tab application/pdf embeds need
+      // this even though the containing renderer itself remains sandboxed.
+      plugins: true,
       webviewTag: true,
       additionalArguments: buildRendererAdditionalArguments({
         appVersion: options.appVersion,
@@ -168,10 +176,23 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
   // `webviewTag` is enabled for the in-app browser; the embedding renderer
   // controls each <webview>'s attributes, so enforce that no webview can
   // request a preload or Node access regardless of what markup is injected.
-  window.webContents.on("will-attach-webview", (_event, webPreferences) => {
+  window.webContents.on("will-attach-webview", (event, webPreferences, params) => {
     delete webPreferences.preload;
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
+    if (typeof params?.src === "string" && !isNavigationUrlAllowed(params.src)) {
+      event.preventDefault();
+    }
+  });
+  // A guest may execute its first document before the renderer's dom-ready IPC
+  // maps it to BrowserPanelManager. Install a main-process deny guard at the
+  // earliest attached-WebContents boundary so that gap cannot create an
+  // unmanaged popup or enter a blocked scheme. BrowserTab later replaces the
+  // popup handler with its tab-routing handler while retaining the same deny
+  // policy for unsafe navigation.
+  window.webContents.on("did-attach-webview", (_event, guestWebContents) => {
+    const removeGuards = installNavigationGuards(guestWebContents, () => {});
+    guestWebContents.once("destroyed", removeGuards);
   });
 
   window.once("ready-to-show", () => {

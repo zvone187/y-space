@@ -18,6 +18,7 @@ import type {
   PipedreamPrivilegedConnectLinkResult,
   PipedreamPrivilegedReply,
 } from "@/shared/pipedreamPrivilegedIpc";
+import { isPipedreamPrivilegedBootstrapMessage } from "@/shared/pipedreamPrivilegedIpc";
 
 function isSupervisorReply(
   message: unknown,
@@ -71,7 +72,7 @@ export interface SupervisorClientOptions {
   wslHelpersDir: string;
   /**
    * Directory containing the read-only skills shipped with the app
-   * (`skill-creator-poracode`, …). Forwarded to the supervisor via
+   * (`y-space-skill-creator`, …). Forwarded to the supervisor via
    * `PORACODE_BUNDLED_SKILLS_DIR` so the skills service can surface them.
    */
   bundledSkillsDir?: string;
@@ -357,6 +358,27 @@ export class SupervisorClient {
         );
       } catch (error) {
         fail(error);
+      }
+    });
+  }
+
+  /** Reconfigure the live supervisor without routing credentials through public procedure IPC. */
+  async configurePipedream(payload: PipedreamPrivilegedBootstrapPayload): Promise<void> {
+    await this.startedGate;
+    const child = this.child;
+    if (!child || !child.connected) throw new Error("Supervisor is not running.");
+    const message = { kind: "pipedream-privileged-bootstrap" as const, payload };
+    if (!isPipedreamPrivilegedBootstrapMessage(message)) {
+      throw new Error("Pipedream configuration is invalid.");
+    }
+    await new Promise<void>((resolve, reject) => {
+      try {
+        child.send(message, (error) => {
+          if (error) reject(new Error("Unable to configure Pipedream."));
+          else resolve();
+        });
+      } catch {
+        reject(new Error("Unable to configure Pipedream."));
       }
     });
   }

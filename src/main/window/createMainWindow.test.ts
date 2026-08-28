@@ -4,6 +4,9 @@ const installSessionPermissions = vi.hoisted(() => vi.fn<() => void>());
 const dbGetState = vi.hoisted(() => vi.fn<() => string | null>(() => null));
 const dbSetState = vi.hoisted(() => vi.fn<() => void>());
 const setUserAgent = vi.hoisted(() => vi.fn<(userAgent: string) => void>());
+const installNavigationGuards = vi.hoisted(() =>
+  vi.fn<() => () => void>(() => vi.fn<() => void>()),
+);
 
 let browserWindowOptions: Record<string, unknown> | null = null;
 let webContentsHandlers: Record<string, (...args: never[]) => void> = {};
@@ -59,6 +62,8 @@ vi.mock("../db", () => ({
 
 vi.mock("../browser/permissions", () => ({
   installSessionPermissions,
+  installNavigationGuards,
+  isNavigationUrlAllowed: (url: string) => !url.startsWith("javascript:"),
 }));
 
 describe("createMainWindow", () => {
@@ -69,7 +74,7 @@ describe("createMainWindow", () => {
     windowHandlers = {};
   });
 
-  it("applies the browser user agent to the window and sanitizes attached webviews", async () => {
+  it("enables the built-in PDF viewer and sanitizes attached webviews", async () => {
     const { createMainWindow } = await import("./createMainWindow");
     const userAgent =
       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
@@ -97,6 +102,7 @@ describe("createMainWindow", () => {
     expect((browserWindowOptions?.webPreferences as { webviewTag?: boolean })?.webviewTag).toBe(
       true,
     );
+    expect((browserWindowOptions?.webPreferences as { plugins?: boolean })?.plugins).toBe(true);
 
     const webPreferences = {
       preload: "/tmp/unsafe.cjs",
@@ -108,6 +114,41 @@ describe("createMainWindow", () => {
     expect(webPreferences.preload).toBeUndefined();
     expect(webPreferences.nodeIntegration).toBe(false);
     expect(webPreferences.contextIsolation).toBe(true);
+
+    const guestWebContents = { id: 99, once: vi.fn<() => void>() };
+    webContentsHandlers["did-attach-webview"]?.({} as never, guestWebContents as never);
+    expect(installNavigationGuards).toHaveBeenCalledWith(guestWebContents, expect.any(Function));
+  });
+
+  it("rejects a blocked initial webview source before attaching the guest", async () => {
+    const { createMainWindow } = await import("./createMainWindow");
+    createMainWindow({
+      title: "Poracode",
+      isDev: false,
+      channel: "stable",
+      preloadPath: "/tmp/preload.cjs",
+      rendererHtmlPath: "/tmp/index.html",
+      appVersion: "1.2.1",
+      posthogEnableDev: false,
+      posthogEnabled: false,
+      posthogHost: "",
+      posthogKey: "",
+      sentryEnabled: false,
+      windowChromeHeight: 32,
+      browserUserAgent: "Poracode",
+      appearance: "dark",
+      sidebarTranslucency: false,
+      onClosed: vi.fn<() => void>(),
+    });
+    const event = { preventDefault: vi.fn<() => void>() };
+
+    webContentsHandlers["will-attach-webview"]?.(
+      event as never,
+      {} as never,
+      { src: "javascript:alert(document.domain)" } as never,
+    );
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
   });
 
   it("supplies window-close intent only when the app does not prevent the close", async () => {

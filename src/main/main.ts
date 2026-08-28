@@ -130,6 +130,12 @@ import {
   capturePipedreamBootstrapEnvFile,
 } from "@/shared/pipedreamBootstrap";
 import { PipedreamMainService } from "./pipedream/PipedreamMainService";
+import {
+  applyPersistedPipedreamEnvFile,
+  clearPipedreamEnvFilePath,
+  writePipedreamEnvFilePath,
+} from "./pipedream/pipedreamEnvFileSettings";
+import { buildApplicationMenuTemplate } from "./applicationMenu";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const explicitPipedreamEnvFile = process.env.PIPEDREAM_ENV_FILE?.trim();
@@ -139,11 +145,15 @@ const developmentPipedreamEnvFile = isDev
       (path) => existsSync(path),
     )
   : undefined;
-const pipedreamBootstrap = explicitPipedreamEnvFile
+const launchPipedreamBootstrap = explicitPipedreamEnvFile
   ? capturePipedreamBootstrapEnvFile(explicitPipedreamEnvFile)
   : developmentPipedreamEnvFile
     ? capturePipedreamBootstrapEnvFile(developmentPipedreamEnvFile)
     : capturePipedreamBootstrapEnv();
+const hasExplicitPipedreamBootstrap =
+  Boolean(explicitPipedreamEnvFile || developmentPipedreamEnvFile) ||
+  launchPipedreamBootstrap.state !== "absent";
+let pipedreamBootstrap = launchPipedreamBootstrap;
 const channel = resolvePoracodeChannel();
 const baseDirOverride = process.env.PORACODE_BASE_DIR;
 const legacyBaseDirOverride = process.env.LIGHTCODE_BASE_DIR?.trim() || undefined;
@@ -694,10 +704,14 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
-      if (preserveLegacySafeStorageIdentity) app.setName(productNameFor(channel));
+      const brandedProductName = productNameFor(channel);
+      if (preserveLegacySafeStorageIdentity) app.setName(brandedProductName);
       repairLegacyMacAppPath(channel, { isPackaged: app.isPackaged });
       refreshMacDockIcon();
-      Menu.setApplicationMenu(null);
+      const applicationMenuTemplate = buildApplicationMenuTemplate(brandedProductName);
+      Menu.setApplicationMenu(
+        applicationMenuTemplate ? Menu.buildFromTemplate(applicationMenuTemplate) : null,
+      );
 
       installLocalFileProtocolHandler();
       installPickerProtocolHandler();
@@ -706,6 +720,9 @@ if (!hasSingleInstanceLock) {
       browserSession.setUserAgent(browserUserAgent);
 
       const paths = requirePoracodePaths();
+      if (!hasExplicitPipedreamBootstrap) {
+        pipedreamBootstrap = applyPersistedPipedreamEnvFile(paths.baseDir, pipedreamBootstrap);
+      }
       const browserCookieImportExtensionSourceDir = app.isPackaged
         ? join(process.resourcesPath, "chrome-extension")
         : join(process.cwd(), "chrome-extension");
@@ -793,6 +810,7 @@ if (!hasSingleInstanceLock) {
       let scheduleRunCoordinator: ScheduleRunCoordinator | null = null;
       let prWatchService: PrWatchService | null = null;
       let gitStateService: GitStateService | null = null;
+      const pipedreamExternalUserId = `y-space:${readOrCreateRemoteAccessIdentity(paths.baseDir).desktopId}`;
       const supervisorClient = new SupervisorClient({
         appVersion: app.getVersion(),
         isDev,
@@ -803,7 +821,7 @@ if (!hasSingleInstanceLock) {
         secretStorageKey,
         resolvePipedreamPrivilegedBootstrap: () => ({
           bootstrap: pipedreamBootstrap,
-          externalUserId: `y-space:${readOrCreateRemoteAccessIdentity(paths.baseDir).desktopId}`,
+          externalUserId: pipedreamExternalUserId,
         }),
         resolveExtraEnv: () => {
           const env: Record<string, string> = {};
@@ -876,6 +894,17 @@ if (!hasSingleInstanceLock) {
       });
       const pipedreamMainService = new PipedreamMainService({
         createConnectLink: (appSlug) => supervisorClient.createPipedreamConnectLink(appSlug),
+        persistEnvFilePath: (filePath) => writePipedreamEnvFilePath(paths.baseDir, filePath),
+        clearEnvFilePath: () => clearPipedreamEnvFilePath(paths.baseDir),
+        fallbackBootstrap: () => launchPipedreamBootstrap,
+        configureBootstrap: async (bootstrap) => {
+          pipedreamBootstrap = bootstrap;
+          await supervisorClient.configurePipedream({
+            bootstrap,
+            externalUserId: pipedreamExternalUserId,
+          });
+          return supervisorClient.call("pipedreamGetSnapshot", {});
+        },
         openConnectUrl: async (url) => {
           const manager = browserPanelManager;
           if (!manager) throw new Error("Embedded browser is not initialized.");

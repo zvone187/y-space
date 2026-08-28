@@ -88,6 +88,7 @@ export function FileEditorModal() {
                   </div>
                 )}
                 <FileEditorPane
+                  presentation="desktop"
                   showTabs={false}
                   onOpenFullscreen={() => setOverlayMode("fullscreen")}
                 />

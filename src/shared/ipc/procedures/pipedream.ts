@@ -1,7 +1,9 @@
 import type {
   PipedreamBeginConnectPayload,
   PipedreamBeginConnectResult,
+  PipedreamChooseEnvFilePayload,
   PipedreamDisconnectAccountPayload,
+  PipedreamEnvFileImportResult,
   PipedreamListAppsPayload,
   PipedreamListAppsResult,
   PipedreamSetAccountAgentAccessPayload,
@@ -9,6 +11,7 @@ import type {
 } from "../../contracts";
 import {
   pipedreamBeginConnectPayloadSchema,
+  pipedreamChooseEnvFilePayloadSchema,
   pipedreamDisconnectAccountPayloadSchema,
   pipedreamListAppsPayloadSchema,
   pipedreamSetAccountAgentAccessPayloadSchema,
@@ -34,6 +37,15 @@ export const pipedreamProcedures = {
     PipedreamBeginConnectResult,
     "main-local"
   >("pipedreamBeginConnect", "main-local", pipedreamBeginConnectPayloadSchema),
+  pipedreamChooseEnvFile: definePayloadProcedure<
+    PipedreamChooseEnvFilePayload,
+    PipedreamEnvFileImportResult | null,
+    "main-local"
+  >("pipedreamChooseEnvFile", "main-local", pipedreamChooseEnvFilePayloadSchema),
+  pipedreamClearEnvFile: defineNoArgProcedure<PipedreamSnapshot, "main-local">(
+    "pipedreamClearEnvFile",
+    "main-local",
+  ),
   pipedreamDisconnectAccount: definePayloadProcedure<
     PipedreamDisconnectAccountPayload,
     PipedreamSnapshot,

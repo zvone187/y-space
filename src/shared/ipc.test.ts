@@ -106,6 +106,8 @@ describe("ipcProcedureMap", () => {
       prWatchService: {} as never,
       pipedreamMainService: {
         beginConnect: vi.fn<() => Promise<never>>(),
+        importEnvironmentFile: vi.fn<() => Promise<never>>(),
+        clearEnvironmentFile: vi.fn<() => Promise<never>>(),
       } as never,
       browserCookieImportService: {} as never,
       cookieImportBridge: {} as never,

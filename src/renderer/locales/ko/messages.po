@@ -665,8 +665,12 @@ msgstr "@cursor/sdk가 설치되지 않았습니다."
 #~ msgstr "/skill-creator {destinationLabel}에 사용할 새 관리 스킬을 만드세요."
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
-msgstr "/skill-creator-poracode {destinationLabel}에 사용할 새 관리 스킬을 만드세요."
+#~ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
+#~ msgstr "/skill-creator-poracode {destinationLabel}에 사용할 새 관리 스킬을 만드세요."
+
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "/y-space-skill-creator Create a new managed skill for {destinationLabel}."
+msgstr "/y-space-skill-creator {destinationLabel}에 사용할 새 관리 스킬을 만드세요."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
@@ -1915,8 +1919,8 @@ msgid "Bring back to panel"
 msgstr "패널로 되돌리기"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Bring it back into this panel, or jump to the window it’s running in."
-msgstr "이 패널로 되돌리거나 실행 중인 창으로 이동하세요."
+#~ msgid "Bring it back into this panel, or jump to the window it’s running in."
+#~ msgstr "이 패널로 되돌리거나 실행 중인 창으로 이동하세요."
 
 #: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/threadContextMenus.tsx
@@ -2416,6 +2420,10 @@ msgstr "오리진은 최대 {MAX_TARGET_ORIGINS}개까지 선택할 수 있습�
 msgid "Choose cookie file"
 msgstr "쿠키 파일 선택"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose environment file"
+msgstr "환경 파일 선택"
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
 msgstr "{env}에 로그인하는 방법을 선택하세요."
@@ -2432,6 +2440,10 @@ msgstr "Y Space가 수동 병합과 자동 PR 병합을 수행하는 방법을 �
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Choose import destination"
 msgstr "가져오기 대상 선택"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose Pipedream environment file"
+msgstr "Pipedream 환경 파일 선택"
 
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Choose shells for the Terminal panel and Y Space's internal commands."
@@ -4467,6 +4479,11 @@ msgstr "실험 폐기"
 msgid "Discard experiment?"
 msgstr "실험을 폐기할까요?"
 
+#. placeholder {0}: tab.file.path
+#: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+msgid "Discard unsaved changes in {0}?"
+msgstr "{0}의 저장하지 않은 변경 사항을 버리시겠습니까?"
+
 #: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
@@ -4906,6 +4923,10 @@ msgstr "유효한 JSON을 입력하세요."
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Environment"
 msgstr "환경"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Environment files"
+#~ msgstr "환경 파일"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Environment variable name"
@@ -5484,6 +5505,10 @@ msgstr "수정됨"
 msgid "Flat list"
 msgstr "플랫 목록"
 
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
+msgid "Focus browser"
+msgstr "브라우저에 포커스"
+
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
 msgstr "브라우저 주소 표시줄에 포커스"
@@ -5493,8 +5518,8 @@ msgid "Focus the in-app browser address bar"
 msgstr "인앱 브라우저 주소 표시줄에 포커스"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Focus window"
-msgstr "창 활성화"
+#~ msgid "Focus window"
+#~ msgstr "창 활성화"
 
 #: src/renderer/components/thread/ChatPane/parts/items/InlineFolderPathChip.tsx
 msgid "Folder"
@@ -5553,6 +5578,10 @@ msgstr "삭제"
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget {0}"
 msgstr "{0} 삭제"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Forget environment file"
+msgstr "환경 파일 등록 해제"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5954,8 +5983,8 @@ msgid "Hide all"
 msgstr "모두 숨기기"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Hide browser"
-msgstr "브라우저 숨기기"
+#~ msgid "Hide browser"
+#~ msgstr "브라우저 숨기기"
 
 #: src/renderer/components/thread/ThreadView.tsx
 msgid "Hide canonical runtime item inspector"
@@ -7484,8 +7513,8 @@ msgstr "브라우저를 메인 창으로 다시 이동"
 
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
-msgid "Move browser to window"
-msgstr "브라우저를 창으로 이동"
+#~ msgid "Move browser to window"
+#~ msgstr "브라우저를 창으로 이동"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Move changes to a new worktree"
@@ -8515,6 +8544,10 @@ msgid "Open browser"
 msgstr "브라우저 열기"
 
 #: src/renderer/commands/registry.ts
+msgid "Open browser panel"
+msgstr "브라우저 패널 열기"
+
+#: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "브라우저 탭 열기"
 
@@ -8547,6 +8580,10 @@ msgstr "Crossagent 열기: {0}"
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
 msgstr "대화상자 열기"
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "Open document tab"
+msgstr "문서 탭 열기"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open experiment"
@@ -8599,8 +8636,8 @@ msgid "Open image preview"
 msgstr "이미지 미리보기 열기"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "Open in browser"
-msgstr "브라우저에서 열기"
+#~ msgid "Open in browser"
+#~ msgstr "브라우저에서 열기"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -8649,6 +8686,10 @@ msgstr "새 스레드를 전체 페이지 또는 병렬 패널로 엽니다."
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunList.tsx
 msgid "Open on GitHub"
 msgstr "GitHub에서 열기"
+
+#: src/renderer/commands/registry.ts
+msgid "Open or focus the browser workspace tab"
+msgstr "브라우저 작업 공간 탭 열기 또는 포커스"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Open over SSH"
@@ -9029,12 +9070,16 @@ msgstr "일시중지됨"
 #~ msgstr "일시 중지된 공급자는 재개할 때까지 Crossagents에서 건너뜁니다."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "PDF preview opens in a Y Space document tab."
+msgstr "PDF 미리 보기는 Y Space 문서 탭에서 열립니다."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "PDF preview opens in the browser panel."
 #~ msgstr "PDF 미리보기는 브라우저 패널에서 열립니다."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "PDF preview opens in the browser."
-msgstr "PDF 미리보기는 브라우저에서 열립니다."
+#~ msgid "PDF preview opens in the browser."
+#~ msgstr "PDF 미리보기는 브라우저에서 열립니다."
 
 #: src/renderer/views/ProfileOverlay/parts/ShareCard.tsx
 msgid "peak day"
@@ -9157,6 +9202,10 @@ msgstr "고정된 작업 경로"
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream Connect could not be initialized."
 msgstr "Pipedream Connect를 초기화하지 못했습니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Pipedream credentials loaded from the selected file."
+msgstr "선택한 파일에서 Pipedream 자격 증명을 불러왔습니다."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
@@ -10811,6 +10860,10 @@ msgstr "단축키 저장"
 msgid "Saved credentials are shared across all environments."
 msgstr "저장된 자격 증명은 모든 환경에서 공유됩니다."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Saved environment file forgotten."
+msgstr "저장된 환경 파일 등록을 해제했습니다."
+
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Saved shell"
 msgstr "저장된 셸"
@@ -11106,6 +11159,14 @@ msgstr "트리에서 파일을 선택하세요"
 msgid "Select a file to start editing."
 msgstr "편집을 시작하려면 파일을 선택하세요."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Select a local environment file. Y Space stores only its location; credential values stay in the main process."
+#~ msgstr "로컬 환경 파일을 선택하세요. Y Space는 파일 위치만 저장하며 자격 증명 값은 메인 프로세스에 유지됩니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Select a local environment file. Y Space stores only its location; credential values stay outside renderer and agent processes."
+msgstr "로컬 환경 파일을 선택하세요. Y Space는 파일 위치만 저장하며 자격 증명 값은 렌더러 및 에이전트 프로세스 외부에 유지됩니다."
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
 #~ msgstr "프로젝트로 가져오기 전에 프로젝트를 선택하세요."
@@ -11395,8 +11456,8 @@ msgid "Show opened links in"
 msgstr "열린 링크 표시"
 
 #: src/renderer/commands/registry.ts
-msgid "Show or hide the browser panel"
-msgstr "브라우저 패널을 표시하거나 숨깁니다."
+#~ msgid "Show or hide the browser panel"
+#~ msgstr "브라우저 패널을 표시하거나 숨깁니다."
 
 #: src/renderer/commands/registry.ts
 msgid "Show or hide the sidebar"
@@ -12535,9 +12596,21 @@ msgstr "원격 Y Space 서버가 페어링 자격 증명을 반환하지 않았�
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "디스크에 있는 저장소 위치입니다. 폴더를 옮겼다면 업데이트하세요."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file could not be read."
+msgstr "선택한 파일을 읽을 수 없습니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file does not contain Pipedream credentials."
+msgstr "선택한 파일에 Pipedream 자격 증명이 없습니다."
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "선택한 파일에 유효한 MCP 서버 구성이 없습니다."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file is too large."
+msgstr "선택한 파일이 너무 큽니다."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "The selected machine is unavailable. Reconnect it to manage archived threads."
@@ -12733,6 +12806,14 @@ msgstr "이 이름은 기본 제공 MCP 서버용으로 예약되어 있습니�
 #: src/mobile/views/DesktopsView.tsx
 #~ msgid "This page is served over HTTPS, so the browser blocks it from reaching a desktop on plain HTTP. Continue on the desktop's own address to finish pairing there."
 #~ msgstr "이 페이지는 HTTPS로 제공되므로 브라우저가 일반 HTTP 데스크톱 연결을 차단합니다. 데스크톱 자체 주소에서 계속해 거기서 페어링을 완료하세요."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF could not be loaded in the built-in preview."
+msgstr "이 PDF를 기본 제공 미리 보기에서 불러올 수 없습니다."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF is too large for the built-in preview."
+msgstr "이 PDF는 기본 제공 미리 보기에서 열기에는 너무 큽니다."
 
 #. placeholder {0}: deleteRun?.number
 #: src/renderer/views/GitHubActionsView/GitHubActionsView.tsx
@@ -12961,8 +13042,8 @@ msgid "To-dos"
 msgstr "할 일"
 
 #: src/renderer/commands/registry.ts
-msgid "Toggle browser panel"
-msgstr "브라우저 패널 표시 전환"
+#~ msgid "Toggle browser panel"
+#~ msgstr "브라우저 패널 표시 전환"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/standardGuiSlashCommands.ts

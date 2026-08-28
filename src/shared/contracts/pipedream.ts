@@ -93,6 +93,27 @@ export const pipedreamSnapshotSchema = z
   .strict();
 export type PipedreamSnapshot = z.infer<typeof pipedreamSnapshotSchema>;
 
+export const pipedreamChooseEnvFilePayloadSchema = z
+  .object({
+    dialogTitle: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export type PipedreamChooseEnvFilePayload = z.infer<typeof pipedreamChooseEnvFilePayloadSchema>;
+
+export const pipedreamEnvFileInvalidReasonSchema = z.enum([
+  "unreadable",
+  "too-large",
+  "no-supported-values",
+]);
+export type PipedreamEnvFileInvalidReason = z.infer<typeof pipedreamEnvFileInvalidReasonSchema>;
+
+/** Renderer-safe result: no selected path or credential value crosses IPC. */
+export const pipedreamEnvFileImportResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("configured"), snapshot: pipedreamSnapshotSchema }).strict(),
+  z.object({ status: z.literal("invalid"), reason: pipedreamEnvFileInvalidReasonSchema }).strict(),
+]);
+export type PipedreamEnvFileImportResult = z.infer<typeof pipedreamEnvFileImportResultSchema>;
+
 export const pipedreamListAppsPayloadSchema = z
   .object({
     query: z.string().trim().max(200).optional(),

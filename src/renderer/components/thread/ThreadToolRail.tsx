@@ -5,7 +5,7 @@ import { FileDiff, FolderOpen, NotebookPen, PanelRightOpen, TerminalSquare } fro
 import { useLingui } from "@lingui/react/macro";
 import { isHomeProjectId } from "@/shared/homeScope";
 import {
-  closeAllPanels,
+  closeGitPanel,
   openFilesPanel,
   openNotesPanel,
   showGitReviewPanel,
@@ -15,6 +15,8 @@ import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { usePanelVisibility } from "@/renderer/views/MainView/parts/AppShell/parts/usePanelVisibility";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import { rightWorkspaceToolTabId } from "@/renderer/state/rightWorkspaceTabs";
 import { floatingGlassSurfaceClass } from "@/renderer/components/layout/floatingGlass";
 import { useThreadToolRailDrag } from "./useThreadToolRailDrag";
 
@@ -61,7 +63,6 @@ export function ThreadToolRail(props: {
   const { t } = useLingui();
   const { projectId, worktreePath, paneCount } = props;
 
-  const rightPanelTab = usePanelStore((s) => s.rightPanelTab);
   const gitScoped = usePanelStore(
     (s) =>
       s.gitReviewAsPanel &&
@@ -81,6 +82,7 @@ export function ThreadToolRail(props: {
       (s.activeWorktreePath ?? undefined) === worktreePath,
   );
   const terminalOnRight = useSharedSettings((s) => s.terminalPosition === "right");
+  const activeWorkspaceTabId = useRightWorkspaceTabsStore((s) => s.activeTabId);
   const { sidePanelOpen } = usePanelVisibility();
 
   const paneAnchorRef = useRef<HTMLSpanElement>(null);
@@ -153,8 +155,10 @@ export function ThreadToolRail(props: {
   // Home-scope "projects" have no repository or file root, matching the tabs
   // the right panel itself hides for that scope.
   const isHomeScope = isHomeProjectId(projectId);
-  const gitActive = gitScoped && rightPanelTab === "git";
-  const terminalActive = terminalScoped && (!terminalOnRight || rightPanelTab === "terminal");
+  const gitActive = gitScoped && activeWorkspaceTabId === rightWorkspaceToolTabId("git");
+  const terminalActive =
+    terminalScoped &&
+    (!terminalOnRight || activeWorkspaceTabId === rightWorkspaceToolTabId("terminal"));
 
   const tools: RailTool[] = [
     ...(isHomeScope
@@ -167,7 +171,7 @@ export function ThreadToolRail(props: {
             active: gitActive,
             activate: () => {
               if (gitActive) {
-                closeAllPanels();
+                closeGitPanel();
                 return;
               }
               showGitReviewPanel(projectId, worktreePath);
@@ -177,7 +181,7 @@ export function ThreadToolRail(props: {
             id: "files",
             label: t`Files`,
             icon: FolderOpen,
-            active: filesScoped && rightPanelTab === "files",
+            active: filesScoped && activeWorkspaceTabId === rightWorkspaceToolTabId("files"),
             activate: () => openFilesPanel(projectId, worktreePath),
           },
         ]),
@@ -198,7 +202,7 @@ export function ThreadToolRail(props: {
       id: "notes",
       label: t`Notes`,
       icon: NotebookPen,
-      active: notesPanelOpen && rightPanelTab === "notes",
+      active: notesPanelOpen && activeWorkspaceTabId === rightWorkspaceToolTabId("notes"),
       activate: openNotesPanel,
     },
   ];

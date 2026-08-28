@@ -7,12 +7,13 @@ import {
   whenSharedSettingsHydrated,
 } from "@/renderer/state/sharedSettingsStore";
 import { useThreadOutputStore } from "@/renderer/state/threadOutputStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import { rightWorkspaceToolTabId } from "@/renderer/state/rightWorkspaceTabs";
 import {
   closeThreads,
   startShellWithToast,
   writeScriptToShellThenExitOnSuccess,
 } from "@/renderer/utils/shellUtils";
-import { closeAllPanels } from "./panelActions";
 
 const actionRunTokens = new Map<string, symbol>();
 
@@ -20,23 +21,21 @@ function applyTerminalPanel(
   projectId: string,
   worktreePath: string | undefined,
   options: { toggleCloseIfActive: boolean },
-): void {
+): boolean {
   const project = useAppStore.getState().projects.find((p) => p.id === projectId);
-  if (!project) return;
+  if (!project) return false;
 
   const store = useDevTerminalStore.getState();
   const isBottom = useSharedSettings.getState().terminalPosition === "bottom";
 
   if (options.toggleCloseIfActive) {
-    const rightPanelTab = usePanelStore.getState().rightPanelTab;
     const isSameTerminal =
       store.isOpen &&
       store.activeProjectId === projectId &&
       (store.activeWorktreePath ?? undefined) === worktreePath;
-    if (isSameTerminal && (isBottom || rightPanelTab === "terminal")) {
-      if (!isBottom) closeAllPanels();
+    if (isSameTerminal && isBottom) {
       store.closePanel();
-      return;
+      return true;
     }
   }
 
@@ -45,19 +44,23 @@ function applyTerminalPanel(
   } else {
     store.openPanel(projectId);
   }
-  if (!isBottom) usePanelStore.getState().setRightPanelTab("terminal");
+  if (!isBottom) {
+    usePanelStore.getState().setRightPanelTab("terminal");
+    useRightWorkspaceTabsStore.getState().openTool("terminal");
+  }
 
   const existingTab = store.tabs.find(
     (t) => t.projectId === projectId && (t.worktreePath ?? undefined) === worktreePath,
   );
   if (existingTab) {
     store.setActiveTab(existingTab.id);
-    return;
+    return true;
   }
 
   const label = worktreePath ? (worktreePath.split(/[/\\]/).pop() ?? project.name) : project.name;
   const tab = store.addTab(projectId, label, worktreePath);
   store.setActiveTab(tab.id);
+  return true;
 }
 
 export function openTerminal(projectId: string): void {
@@ -68,8 +71,14 @@ export function openWorktreeTerminal(projectId: string, worktreePath: string): v
   applyTerminalPanel(projectId, worktreePath, { toggleCloseIfActive: true });
 }
 
-export function showTerminalPanel(projectId: string, worktreePath?: string): void {
-  applyTerminalPanel(projectId, worktreePath, { toggleCloseIfActive: false });
+export function showTerminalPanel(projectId: string, worktreePath?: string): boolean {
+  return applyTerminalPanel(projectId, worktreePath, { toggleCloseIfActive: false });
+}
+
+/** Close only the Terminal singleton; adjacent global tools/documents survive. */
+export function closeTerminalPanel(): void {
+  useDevTerminalStore.getState().closePanel();
+  useRightWorkspaceTabsStore.getState().closeTab(rightWorkspaceToolTabId("terminal"));
 }
 
 export function runProjectAction(projectId: string, actionId: string, worktreePath?: string): void {
@@ -102,11 +111,7 @@ export function runProjectAction(projectId: string, actionId: string, worktreePa
   // true), which would open the panel for users who keep it hidden.
   void whenSharedSettingsHydrated().then(() => {
     if (!useSharedSettings.getState().autoShowTerminalPanel) return;
-    if (worktreePath) {
-      store.openWorktreePanel(projectId, worktreePath);
-    } else {
-      store.openPanel(projectId);
-    }
+    showTerminalPanel(projectId, worktreePath);
   });
 
   void startShellWithToast(

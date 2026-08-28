@@ -87,6 +87,9 @@ describe("BrowserMcpIngress", () => {
       () =>
         ({
           createTab,
+          touchAutomationSession: vi.fn<() => void>(),
+          recordAutomationTarget: vi.fn<() => void>(),
+          showAutomationCursor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
         }) as unknown as BrowserPanelManager,
     );
     const info = await ingress.start();
@@ -184,6 +187,9 @@ describe("BrowserMcpIngress", () => {
           ensureTabReady: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
           createTab: vi.fn<() => Promise<unknown>>().mockResolvedValue({ tabId: "tab-1" }),
           setAutomationSession: vi.fn<() => boolean>().mockReturnValue(true),
+          touchAutomationSession: vi.fn<() => void>(),
+          recordAutomationTarget: vi.fn<() => void>(),
+          showAutomationCursor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
           reload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
         }) as unknown as BrowserPanelManager,
     );
@@ -286,6 +292,9 @@ describe("BrowserMcpIngress", () => {
           getActiveTabForThread: () => threadTab,
           getTab: (tabId: string) => (tabId === "tab-thread" ? threadTab : visibleTab),
           ensureTabReady: vi.fn<() => Promise<void>>(async () => undefined),
+          touchAutomationSession: vi.fn<() => void>(),
+          recordAutomationTarget: vi.fn<() => void>(),
+          showAutomationCursor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
           setActiveTab,
           rememberTabForThread,
           createTab,

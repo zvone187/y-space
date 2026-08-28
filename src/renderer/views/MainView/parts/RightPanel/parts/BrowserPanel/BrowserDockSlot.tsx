@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { Trans } from "@lingui/react/macro";
-import { ExternalLink, PictureInPicture2 } from "lucide-react";
+import { PictureInPicture2 } from "lucide-react";
 import { useBrowserDockStore } from "@/renderer/state/browserDockStore";
 
 /**
@@ -9,11 +9,7 @@ import { useBrowserDockStore } from "@/renderer/state/browserDockStore";
  * should dock over (publishing the element to {@link useBrowserDockStore}), or
  * shows a placeholder while the browser lives in a separate window.
  */
-export function BrowserDockSlot(props: {
-  extracted: boolean;
-  onBringBack: () => void;
-  onFocusWindow: () => void;
-}) {
+export function BrowserDockSlot(props: { extracted: boolean; onBringBack: () => void }) {
   const setSlotEl = useBrowserDockStore((s) => s.setSlotEl);
   const slotRef = useCallback((el: HTMLDivElement | null) => setSlotEl(el), [setSlotEl]);
 
@@ -24,9 +20,6 @@ export function BrowserDockSlot(props: {
         <div className="text-sm font-medium text-foreground">
           <Trans>Browser is open in a separate window</Trans>
         </div>
-        <p className="max-w-[240px] text-xs text-muted">
-          <Trans>Bring it back into this panel, or jump to the window it’s running in.</Trans>
-        </p>
         <div className="mt-1 flex items-center gap-2">
           <button
             type="button"
@@ -35,14 +28,6 @@ export function BrowserDockSlot(props: {
           >
             <PictureInPicture2 className="size-3.5" aria-hidden />
             <Trans>Bring back to panel</Trans>
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-foreground/5"
-            onClick={props.onFocusWindow}
-          >
-            <ExternalLink className="size-3.5" aria-hidden />
-            <Trans>Focus window</Trans>
           </button>
         </div>
       </div>

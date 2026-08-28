@@ -1163,7 +1163,7 @@ describe("Poracode app control tools — app", () => {
     expect(result.renderer).toBe("headless");
     expect(result.projectCount).toBe(1);
     expect(result.threadCount).toBe(1);
-    expect(result.mcpServer.name).toBe("poracode");
+    expect(result.mcpServer.name).toBe("y_space");
   });
 
   it("notify_user reports non-delivery when no display is connected", async () => {
@@ -1965,7 +1965,7 @@ describe("Poracode app control tools — mcp servers", () => {
         "add_mcp_server",
         {
           server: {
-            name: "poracode",
+            name: "y_space",
             transport: { type: "stdio", command: "run", args: [], env: {} },
           },
         },

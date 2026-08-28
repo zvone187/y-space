@@ -4,7 +4,7 @@ import { usePanelStore, type RightPanelTab } from "@/renderer/state/panelStore";
 import { getCurrentProjectId } from "@/renderer/actions/currentProject";
 import { ProjectFilesPanel } from "@/renderer/views/FileEditorOverlay/parts/ProjectFilesPanel";
 import { BrowserDockSlot } from "../BrowserPanel/BrowserDockSlot";
-import { extractBrowserToWindow, injectBrowserToMain } from "../BrowserPanel/browserWindowActions";
+import { injectBrowserToMain } from "../BrowserPanel/browserWindowActions";
 import { NotesPanel } from "../NotesPanel/NotesPanel";
 import { UsagePanel } from "../UsagePanel/UsagePanel";
 import { GitReviewPanelContent } from "../GitReviewPanelContent";
@@ -35,13 +35,7 @@ export function BottomDockPanelContent(props: { tab: RightPanelTab }) {
       return notesProjectId ? <NotesPanel key={notesProjectId} projectId={notesProjectId} /> : null;
     }
     case "browser":
-      return (
-        <BrowserDockSlot
-          extracted={browserExtracted}
-          onBringBack={injectBrowserToMain}
-          onFocusWindow={extractBrowserToWindow}
-        />
-      );
+      return <BrowserDockSlot extracted={browserExtracted} onBringBack={injectBrowserToMain} />;
     case "git":
       return gitReviewContext ? (
         <GitReviewPanelContent

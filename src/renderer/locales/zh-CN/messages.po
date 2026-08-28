@@ -665,8 +665,12 @@ msgstr "@cursor/sdk 未安装。"
 #~ msgstr "/skill-creator 为 {destinationLabel} 创建一个新的托管技能。"
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
-msgstr "/skill-creator-poracode 为 {destinationLabel} 创建一个新的托管技能。"
+#~ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
+#~ msgstr "/skill-creator-poracode 为 {destinationLabel} 创建一个新的托管技能。"
+
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "/y-space-skill-creator Create a new managed skill for {destinationLabel}."
+msgstr "/y-space-skill-creator 为 {destinationLabel} 创建一个新的托管技能。"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
@@ -1915,8 +1919,8 @@ msgid "Bring back to panel"
 msgstr "移回面板"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Bring it back into this panel, or jump to the window it’s running in."
-msgstr "将其移回此面板，或跳转到正在运行它的窗口。"
+#~ msgid "Bring it back into this panel, or jump to the window it’s running in."
+#~ msgstr "将其移回此面板，或跳转到正在运行它的窗口。"
 
 #: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/threadContextMenus.tsx
@@ -2416,6 +2420,10 @@ msgstr "最多可选择 {MAX_TARGET_ORIGINS} 个源。"
 msgid "Choose cookie file"
 msgstr "选择 Cookie 文件"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose environment file"
+msgstr "选择环境文件"
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
 msgstr "选择登录 {env} 的方式。"
@@ -2432,6 +2440,10 @@ msgstr "选择 Y Space 执行手动合并和 PR 自动合并的方式。"
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Choose import destination"
 msgstr "选择导入目标"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose Pipedream environment file"
+msgstr "选择 Pipedream 环境文件"
 
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Choose shells for the Terminal panel and Y Space's internal commands."
@@ -4467,6 +4479,11 @@ msgstr "放弃实验"
 msgid "Discard experiment?"
 msgstr "放弃实验？"
 
+#. placeholder {0}: tab.file.path
+#: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+msgid "Discard unsaved changes in {0}?"
+msgstr "要放弃 {0} 中未保存的更改吗？"
+
 #: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
@@ -4906,6 +4923,10 @@ msgstr "请输入有效的 JSON。"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Environment"
 msgstr "环境"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Environment files"
+#~ msgstr "环境文件"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Environment variable name"
@@ -5484,6 +5505,10 @@ msgstr "已修复"
 msgid "Flat list"
 msgstr "扁平列表"
 
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
+msgid "Focus browser"
+msgstr "聚焦浏览器"
+
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
 msgstr "聚焦浏览器地址栏"
@@ -5493,8 +5518,8 @@ msgid "Focus the in-app browser address bar"
 msgstr "聚焦应用内浏览器地址栏"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Focus window"
-msgstr "切换到窗口"
+#~ msgid "Focus window"
+#~ msgstr "切换到窗口"
 
 #: src/renderer/components/thread/ChatPane/parts/items/InlineFolderPathChip.tsx
 msgid "Folder"
@@ -5553,6 +5578,10 @@ msgstr "移除"
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget {0}"
 msgstr "移除 {0}"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Forget environment file"
+msgstr "忘记环境文件"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5954,8 +5983,8 @@ msgid "Hide all"
 msgstr "全部隐藏"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Hide browser"
-msgstr "隐藏浏览器"
+#~ msgid "Hide browser"
+#~ msgstr "隐藏浏览器"
 
 #: src/renderer/components/thread/ThreadView.tsx
 msgid "Hide canonical runtime item inspector"
@@ -7483,8 +7512,8 @@ msgstr "将浏览器移回主窗口"
 
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
-msgid "Move browser to window"
-msgstr "将浏览器移到窗口"
+#~ msgid "Move browser to window"
+#~ msgstr "将浏览器移到窗口"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Move changes to a new worktree"
@@ -8514,6 +8543,10 @@ msgid "Open browser"
 msgstr "打开浏览器"
 
 #: src/renderer/commands/registry.ts
+msgid "Open browser panel"
+msgstr "打开浏览器面板"
+
+#: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "打开浏览器选项卡"
 
@@ -8546,6 +8579,10 @@ msgstr "打开 Crossagent：{0}"
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
 msgstr "打开对话框"
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "Open document tab"
+msgstr "打开文档标签页"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open experiment"
@@ -8598,8 +8635,8 @@ msgid "Open image preview"
 msgstr "打开图片预览"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "Open in browser"
-msgstr "在浏览器中打开"
+#~ msgid "Open in browser"
+#~ msgstr "在浏览器中打开"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -8648,6 +8685,10 @@ msgstr "以整页或并排面板的形式打开新线程。"
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunList.tsx
 msgid "Open on GitHub"
 msgstr "在 GitHub 上打开"
+
+#: src/renderer/commands/registry.ts
+msgid "Open or focus the browser workspace tab"
+msgstr "打开或聚焦浏览器工作区标签页"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Open over SSH"
@@ -9028,12 +9069,16 @@ msgstr "已暂停"
 #~ msgstr "Crossagents 会跳过已暂停的提供商，直到其恢复。"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "PDF preview opens in a Y Space document tab."
+msgstr "PDF 预览将在 Y Space 文档标签页中打开。"
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "PDF preview opens in the browser panel."
 #~ msgstr "PDF 预览会在浏览器面板中打开。"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "PDF preview opens in the browser."
-msgstr "PDF 预览会在浏览器中打开。"
+#~ msgid "PDF preview opens in the browser."
+#~ msgstr "PDF 预览会在浏览器中打开。"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareCard.tsx
 msgid "peak day"
@@ -9156,6 +9201,10 @@ msgstr "已固定的任务路由"
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream Connect could not be initialized."
 msgstr "无法初始化 Pipedream Connect。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Pipedream credentials loaded from the selected file."
+msgstr "已从所选文件加载 Pipedream 凭据。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
@@ -10810,6 +10859,10 @@ msgstr "保存快捷键"
 msgid "Saved credentials are shared across all environments."
 msgstr "保存的凭据在所有环境中共享。"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Saved environment file forgotten."
+msgstr "已忘记保存的环境文件。"
+
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Saved shell"
 msgstr "已保存的 shell"
@@ -11105,6 +11158,14 @@ msgstr "从树中选择一个文件"
 msgid "Select a file to start editing."
 msgstr "选择一个文件开始编辑。"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Select a local environment file. Y Space stores only its location; credential values stay in the main process."
+#~ msgstr "选择一个本地环境文件。Y Space 仅存储其位置；凭据值会保留在主进程中。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Select a local environment file. Y Space stores only its location; credential values stay outside renderer and agent processes."
+msgstr "选择一个本地环境文件。Y Space 仅存储其位置；凭据值会保留在渲染器和智能体进程之外。"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
 #~ msgstr "导入到项目之前，请先选择一个项目。"
@@ -11394,8 +11455,8 @@ msgid "Show opened links in"
 msgstr "打开链接的方式"
 
 #: src/renderer/commands/registry.ts
-msgid "Show or hide the browser panel"
-msgstr "显示或隐藏浏览器面板"
+#~ msgid "Show or hide the browser panel"
+#~ msgstr "显示或隐藏浏览器面板"
 
 #: src/renderer/commands/registry.ts
 msgid "Show or hide the sidebar"
@@ -12534,9 +12595,21 @@ msgstr "远程 Y Space 服务器未返回配对凭据。"
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "存储库在磁盘上的位置。如果您移动了该文件夹，请更新此位置。"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file could not be read."
+msgstr "无法读取所选文件。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file does not contain Pipedream credentials."
+msgstr "所选文件不包含 Pipedream 凭据。"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "所选文件不包含有效的 MCP 服务器配置。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file is too large."
+msgstr "所选文件过大。"
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "The selected machine is unavailable. Reconnect it to manage archived threads."
@@ -12732,6 +12805,14 @@ msgstr "此名称由内置 MCP 服务器保留。"
 #: src/mobile/views/DesktopsView.tsx
 #~ msgid "This page is served over HTTPS, so the browser blocks it from reaching a desktop on plain HTTP. Continue on the desktop's own address to finish pairing there."
 #~ msgstr "此页面通过 HTTPS 提供，因此浏览器会阻止它连接使用纯 HTTP 的桌面。请在桌面自身的地址上继续，在那里完成配对。"
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF could not be loaded in the built-in preview."
+msgstr "无法在内置预览中加载此 PDF。"
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF is too large for the built-in preview."
+msgstr "此 PDF 对内置预览来说过大。"
 
 #. placeholder {0}: deleteRun?.number
 #: src/renderer/views/GitHubActionsView/GitHubActionsView.tsx
@@ -12960,8 +13041,8 @@ msgid "To-dos"
 msgstr "待办事项"
 
 #: src/renderer/commands/registry.ts
-msgid "Toggle browser panel"
-msgstr "切换浏览器面板"
+#~ msgid "Toggle browser panel"
+#~ msgstr "切换浏览器面板"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/standardGuiSlashCommands.ts

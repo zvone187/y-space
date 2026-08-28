@@ -384,6 +384,15 @@ describe("resolvePathForFileOpen (worktree-relative traversal regression)", () =
     expect(resolvePathForFileOpen(mainRepoContext, "README.md")).toBe("README.md");
   });
 
+  it("canonicalizes safe relative aliases without collapsing traversal", () => {
+    expect(resolvePathForFileOpen(worktreeContext, "./src//nested\\app.ts")).toBe(
+      "src/nested/app.ts",
+    );
+    expect(resolvePathForFileOpen(worktreeContext, ".\\..\\sibling//file.txt")).toBe(
+      "/Users/me/code/main-repo/.git/worktrees/feature-x/../sibling/file.txt",
+    );
+  });
+
   it("leaves already-absolute paths unchanged", () => {
     expect(resolvePathForFileOpen(worktreeContext, "/etc/hosts")).toBe("/etc/hosts");
     expect(resolvePathForFileOpen(mainRepoContext, "/tmp/x.txt")).toBe("/tmp/x.txt");
@@ -391,6 +400,86 @@ describe("resolvePathForFileOpen (worktree-relative traversal regression)", () =
 
   it("returns raw path when no rootContext", () => {
     expect(resolvePathForFileOpen(null, "../foo")).toBe("../foo");
+  });
+});
+
+describe("fileEditorStore concurrent opens", () => {
+  const originalPoracode = window.poracode;
+
+  beforeEach(() => {
+    useFileEditorStore.setState({
+      rootContext: null,
+      overlayMode: null,
+      tabs: [],
+      activePath: null,
+      previewTab: null,
+      markdownPreviewPath: null,
+      buffers: {},
+      refreshToken: 0,
+      pendingReveal: null,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      writable: true,
+      value: originalPoracode,
+    });
+  });
+
+  it("dedupes the read while applying a later preview-to-permanent open and options", async () => {
+    let resolveRead:
+      | ((result: Awaited<ReturnType<PoracodeBridge["readProjectFile"]>>) => void)
+      | undefined;
+    const readProjectFile = vi.fn<PoracodeBridge["readProjectFile"]>(
+      () =>
+        new Promise((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      writable: true,
+      value: { readProjectFile },
+    });
+    useFileEditorStore.getState().setRootContext({
+      projectId: "p1",
+      projectName: "Project",
+      projectLocation: { kind: "posix", path: "/repo" },
+      rootLabel: "Project",
+    });
+
+    const preview = useFileEditorStore.getState().openFile("README.md", null, true);
+    const permanent = useFileEditorStore.getState().openFile("./README.md", null, false, {
+      lineNumber: 7,
+      markdownPreview: true,
+      gitDiff: { diff: "@@ pinned @@" },
+    });
+
+    expect(readProjectFile).toHaveBeenCalledTimes(1);
+    expect(useFileEditorStore.getState()).toMatchObject({
+      tabs: ["README.md"],
+      activePath: "README.md",
+      previewTab: null,
+      markdownPreviewPath: "README.md",
+      pendingReveal: { path: "README.md", lineNumber: 7 },
+    });
+
+    resolveRead?.({
+      path: "README.md",
+      status: "ready",
+      modifiedAtMs: 2,
+      content: "ready",
+      lineEnding: "lf",
+      hasBom: false,
+    });
+    await Promise.all([preview, permanent]);
+
+    expect(useFileEditorStore.getState().previewTab).toBeNull();
+    expect(useFileEditorStore.getState().buffers["README.md"]?.gitDiff).toEqual({
+      diff: "@@ pinned @@",
+    });
   });
 });
 

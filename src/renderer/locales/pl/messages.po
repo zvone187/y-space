@@ -665,8 +665,12 @@ msgstr "@cursor/sdk nie jest zainstalowany."
 #~ msgstr "/skill-creator Utwórz nową zarządzaną umiejętność dla {destinationLabel}."
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
-msgstr "/skill-creator-poracode Utwórz nową zarządzaną umiejętność dla {destinationLabel}."
+#~ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
+#~ msgstr "/skill-creator-poracode Utwórz nową zarządzaną umiejętność dla {destinationLabel}."
+
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "/y-space-skill-creator Create a new managed skill for {destinationLabel}."
+msgstr "/y-space-skill-creator Utwórz nową zarządzaną umiejętność dla {destinationLabel}."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
@@ -1915,8 +1919,8 @@ msgid "Bring back to panel"
 msgstr "Przywróć do panelu"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Bring it back into this panel, or jump to the window it’s running in."
-msgstr "Przywróć ją do tego panelu lub przejdź do okna, w którym działa."
+#~ msgid "Bring it back into this panel, or jump to the window it’s running in."
+#~ msgstr "Przywróć ją do tego panelu lub przejdź do okna, w którym działa."
 
 #: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/threadContextMenus.tsx
@@ -2416,6 +2420,10 @@ msgstr "Wybierz maksymalnie {MAX_TARGET_ORIGINS} adresów źródłowych."
 msgid "Choose cookie file"
 msgstr "Wybierz plik cookie"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose environment file"
+msgstr "Wybierz plik środowiskowy"
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
 msgstr "Wybierz sposób logowania się do {env}."
@@ -2432,6 +2440,10 @@ msgstr "Wybierz sposób wykonywania przez Y Space ręcznych i automatycznych sca
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Choose import destination"
 msgstr "Wybierz miejsce importu"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose Pipedream environment file"
+msgstr "Wybierz plik środowiskowy Pipedream"
 
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Choose shells for the Terminal panel and Y Space's internal commands."
@@ -4467,6 +4479,11 @@ msgstr "Odrzuć eksperyment"
 msgid "Discard experiment?"
 msgstr "Odrzucić eksperyment?"
 
+#. placeholder {0}: tab.file.path
+#: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+msgid "Discard unsaved changes in {0}?"
+msgstr "Odrzucić niezapisane zmiany w {0}?"
+
 #: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
@@ -4906,6 +4923,10 @@ msgstr "Wprowadź prawidłowy JSON."
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Environment"
 msgstr "Środowisko"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Environment files"
+#~ msgstr "Pliki środowiskowe"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Environment variable name"
@@ -5484,6 +5505,10 @@ msgstr "Naprawiono"
 msgid "Flat list"
 msgstr "Płaska lista"
 
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
+msgid "Focus browser"
+msgstr "Ustaw fokus na przeglądarce"
+
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
 msgstr "Przejdź do paska adresu przeglądarki"
@@ -5493,8 +5518,8 @@ msgid "Focus the in-app browser address bar"
 msgstr "Przejdź do paska adresu przeglądarki w aplikacji"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Focus window"
-msgstr "Przejdź do okna"
+#~ msgid "Focus window"
+#~ msgstr "Przejdź do okna"
 
 #: src/renderer/components/thread/ChatPane/parts/items/InlineFolderPathChip.tsx
 msgid "Folder"
@@ -5553,6 +5578,10 @@ msgstr "Usuń"
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget {0}"
 msgstr "Usuń {0}"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Forget environment file"
+msgstr "Zapomnij plik środowiskowy"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5954,8 +5983,8 @@ msgid "Hide all"
 msgstr "Ukryj wszystko"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Hide browser"
-msgstr "Ukryj przeglądarkę"
+#~ msgid "Hide browser"
+#~ msgstr "Ukryj przeglądarkę"
 
 #: src/renderer/components/thread/ThreadView.tsx
 msgid "Hide canonical runtime item inspector"
@@ -7484,8 +7513,8 @@ msgstr "Przenieś przeglądarkę z powrotem do głównego okna"
 
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
-msgid "Move browser to window"
-msgstr "Przenieś przeglądarkę do okna"
+#~ msgid "Move browser to window"
+#~ msgstr "Przenieś przeglądarkę do okna"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Move changes to a new worktree"
@@ -8515,6 +8544,10 @@ msgid "Open browser"
 msgstr "Otwórz przeglądarkę"
 
 #: src/renderer/commands/registry.ts
+msgid "Open browser panel"
+msgstr "Otwórz panel przeglądarki"
+
+#: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "Otwórz kartę przeglądarki"
 
@@ -8547,6 +8580,10 @@ msgstr "Otwórz Crossagenta: {0}"
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
 msgstr "Otwórz okno dialogowe"
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "Open document tab"
+msgstr "Otwórz kartę dokumentu"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open experiment"
@@ -8599,8 +8636,8 @@ msgid "Open image preview"
 msgstr "Otwórz podgląd obrazu"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "Open in browser"
-msgstr "Otwórz w przeglądarce"
+#~ msgid "Open in browser"
+#~ msgstr "Otwórz w przeglądarce"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -8649,6 +8686,10 @@ msgstr "Otwieraj nowe wątki jako całą stronę lub panel obok siebie."
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunList.tsx
 msgid "Open on GitHub"
 msgstr "Otwórz w GitHub"
+
+#: src/renderer/commands/registry.ts
+msgid "Open or focus the browser workspace tab"
+msgstr "Otwórz lub uaktywnij kartę obszaru roboczego przeglądarki"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Open over SSH"
@@ -9029,12 +9070,16 @@ msgstr "Wstrzymano"
 #~ msgstr "Wstrzymane dostawcy są pomijani przez Crossagents do momentu wznowienia."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "PDF preview opens in a Y Space document tab."
+msgstr "Podgląd PDF otwiera się na karcie dokumentu Y Space."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "PDF preview opens in the browser panel."
 #~ msgstr "Podgląd PDF otwiera się w panelu przeglądarki."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "PDF preview opens in the browser."
-msgstr "Podgląd PDF otwiera się w przeglądarce."
+#~ msgid "PDF preview opens in the browser."
+#~ msgstr "Podgląd PDF otwiera się w przeglądarce."
 
 #: src/renderer/views/ProfileOverlay/parts/ShareCard.tsx
 msgid "peak day"
@@ -9157,6 +9202,10 @@ msgstr "Przypięte trasy zadań"
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream Connect could not be initialized."
 msgstr "Nie udało się zainicjować Pipedream Connect."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Pipedream credentials loaded from the selected file."
+msgstr "Dane logowania Pipedream wczytano z wybranego pliku."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
@@ -10811,6 +10860,10 @@ msgstr "Zapisz skrót"
 msgid "Saved credentials are shared across all environments."
 msgstr "Zapisane poświadczenia są udostępniane we wszystkich środowiskach."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Saved environment file forgotten."
+msgstr "Zapomniano zapisany plik środowiskowy."
+
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Saved shell"
 msgstr "Zapisana powłoka"
@@ -11106,6 +11159,14 @@ msgstr "Wybierz plik z drzewa"
 msgid "Select a file to start editing."
 msgstr "Wybierz plik, aby rozpocząć edycję."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Select a local environment file. Y Space stores only its location; credential values stay in the main process."
+#~ msgstr "Wybierz lokalny plik środowiskowy. Y Space zapisuje tylko jego lokalizację; wartości danych logowania pozostają w procesie głównym."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Select a local environment file. Y Space stores only its location; credential values stay outside renderer and agent processes."
+msgstr "Wybierz lokalny plik środowiskowy. Y Space zapisuje tylko jego lokalizację; wartości danych logowania pozostają poza procesami renderera i agentów."
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
 #~ msgstr "Wybierz projekt przed importem do projektu."
@@ -11395,8 +11456,8 @@ msgid "Show opened links in"
 msgstr "Pokaż otwarte linki w"
 
 #: src/renderer/commands/registry.ts
-msgid "Show or hide the browser panel"
-msgstr "Pokaż lub ukryj panel przeglądarki"
+#~ msgid "Show or hide the browser panel"
+#~ msgstr "Pokaż lub ukryj panel przeglądarki"
 
 #: src/renderer/commands/registry.ts
 msgid "Show or hide the sidebar"
@@ -12535,9 +12596,21 @@ msgstr "Zdalny serwer Y Space nie zwrócił danych uwierzytelniających parowani
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "Lokalizacja repozytorium na dysku. Zaktualizuj ją, jeśli przeniesiono folder."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file could not be read."
+msgstr "Nie można odczytać wybranego pliku."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file does not contain Pipedream credentials."
+msgstr "Wybrany plik nie zawiera danych logowania Pipedream."
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "Wybrany plik nie zawiera prawidłowych konfiguracji serwerów MCP."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file is too large."
+msgstr "Wybrany plik jest zbyt duży."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "The selected machine is unavailable. Reconnect it to manage archived threads."
@@ -12733,6 +12806,14 @@ msgstr "Ta nazwa jest zastrzeżona przez wbudowany serwer MCP."
 #: src/mobile/views/DesktopsView.tsx
 #~ msgid "This page is served over HTTPS, so the browser blocks it from reaching a desktop on plain HTTP. Continue on the desktop's own address to finish pairing there."
 #~ msgstr "Ta strona jest serwowana przez HTTPS, więc przeglądarka blokuje dostęp do desktopa po zwykłym HTTP. Kontynuuj na własnym adresie desktopa, aby zakończyć tam parowanie."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF could not be loaded in the built-in preview."
+msgstr "Nie można wczytać tego pliku PDF we wbudowanym podglądzie."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF is too large for the built-in preview."
+msgstr "Ten plik PDF jest zbyt duży dla wbudowanego podglądu."
 
 #. placeholder {0}: deleteRun?.number
 #: src/renderer/views/GitHubActionsView/GitHubActionsView.tsx
@@ -12961,8 +13042,8 @@ msgid "To-dos"
 msgstr "Zadania"
 
 #: src/renderer/commands/registry.ts
-msgid "Toggle browser panel"
-msgstr "Przełącz panel przeglądarki"
+#~ msgid "Toggle browser panel"
+#~ msgstr "Przełącz panel przeglądarki"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/standardGuiSlashCommands.ts

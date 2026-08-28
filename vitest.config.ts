@@ -46,7 +46,7 @@ export default defineConfig({
         },
         test: {
           name: "node",
-          include: ["src/**/*.test.{ts,tsx}"],
+          include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
           exclude: ["src/renderer/**/*.test.{ts,tsx}", "src/mobile/**/*.test.tsx"],
           environment: "node",
         },

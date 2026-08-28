@@ -7,6 +7,7 @@ import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useFileEditorStore, type FileEditorRootContext } from "@/renderer/state/fileEditorStore";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { resolveAbsolutePath } from "@/renderer/utils/resolveAbsolutePath";
 
@@ -141,28 +142,7 @@ export function useProjectTree(props: {
     treeStore.toggleExpanded(path);
   }
 
-  function ensureActiveBufferCanChange(nextPath: string): boolean {
-    const store = useFileEditorStore.getState();
-    const activePath = store.activePath;
-    const activeBuffer = activePath ? store.buffers[activePath] : undefined;
-    if (
-      !activePath ||
-      activePath === nextPath ||
-      !activeBuffer ||
-      activeBuffer.status !== "ready" ||
-      !activeBuffer.isDirty
-    ) {
-      return true;
-    }
-    if (!window.confirm(`Discard unsaved changes in ${activePath}?`)) {
-      return false;
-    }
-    store.discardFileChanges(activePath);
-    return true;
-  }
-
   async function handleSelectFile(path: string) {
-    if (!ensureActiveBufferCanChange(path)) return;
     props.onSelectFile(path);
   }
 
@@ -200,6 +180,14 @@ export function useProjectTree(props: {
       nextName: trimmed,
     });
     useFileEditorStore.getState().renamePath(path, nextPath);
+    useRightWorkspaceTabsStore.getState().renameFilePath(
+      {
+        projectId: props.rootContext.projectId,
+        worktreePath: props.rootContext.worktreePath ?? "",
+      },
+      path,
+      nextPath,
+    );
     setDraft(null);
   }
 
@@ -214,6 +202,13 @@ export function useProjectTree(props: {
         if (!isMissingPathError(error)) throw error;
       });
     useFileEditorStore.getState().removePath(entry.path);
+    useRightWorkspaceTabsStore.getState().removeFilePath(
+      {
+        projectId: props.rootContext.projectId,
+        worktreePath: props.rootContext.worktreePath ?? "",
+      },
+      entry.path,
+    );
     if (entry.type === "directory") {
       useProjectTreeStore.getState().setDirectoryEntries({ [entry.path]: [] });
     }
@@ -230,6 +225,14 @@ export function useProjectTree(props: {
     if (!currentName) return;
     const nextPath = nextParentPath ? `${nextParentPath}/${currentName}` : currentName;
     useFileEditorStore.getState().renamePath(sourcePath, nextPath);
+    useRightWorkspaceTabsStore.getState().renameFilePath(
+      {
+        projectId: props.rootContext.projectId,
+        worktreePath: props.rootContext.worktreePath ?? "",
+      },
+      sourcePath,
+      nextPath,
+    );
   }
 
   function expandAncestors(path: string) {

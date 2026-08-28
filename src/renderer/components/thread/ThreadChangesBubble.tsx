@@ -3,7 +3,7 @@ import { Tooltip } from "@heroui/react";
 import { GitFork, GitPullRequest } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { getBasename } from "@/shared/pathUtils";
-import { closeAllPanels, showGitReviewPanel } from "@/renderer/actions/panelActions";
+import { closeGitPanel, showGitReviewPanel } from "@/renderer/actions/panelActions";
 import { DiffStat } from "@/renderer/components/common";
 import {
   floatingGlassActiveClass,
@@ -12,6 +12,8 @@ import {
 import { useGitStore } from "@/renderer/state/gitStore";
 import { resolvePrKey } from "@/renderer/state/gitSelectors";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import { rightWorkspaceToolTabId } from "@/renderer/state/rightWorkspaceTabs";
 import {
   aggregatePrChecksStatus,
   combineChecksStatus,
@@ -63,13 +65,16 @@ export function ThreadChangesBubble(props: {
     }),
   );
   // Active only when the docked Git panel is showing *this* thread's scope.
-  const isOpen = usePanelStore(
+  const isScoped = usePanelStore(
     (s) =>
-      s.rightPanelTab === "git" &&
       s.gitReviewAsPanel &&
       s.gitReviewContext?.projectId === props.projectId &&
       s.gitReviewContext?.worktreePath === props.worktreePath,
   );
+  const gitWorkspaceActive = useRightWorkspaceTabsStore(
+    (state) => state.activeTabId === rightWorkspaceToolTabId("git"),
+  );
+  const isOpen = isScoped && gitWorkspaceActive;
 
   const hasChanges = insertions > 0 || deletions > 0;
   const hasVisiblePr =
@@ -94,7 +99,7 @@ export function ThreadChangesBubble(props: {
       } ${isOpen ? floatingGlassActiveClass : "hover:border-border/30"}`}
       onClick={() => {
         if (isOpen) {
-          closeAllPanels();
+          closeGitPanel();
           return;
         }
         showGitReviewPanel(props.projectId, props.worktreePath);

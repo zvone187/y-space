@@ -6,6 +6,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { useThreadTodoDockStore } from "@/renderer/state/threadTodoDockStore";
 import { selectThreadTodoDockState } from "@/renderer/components/thread/threadTodoState";
 import { useFocusedThreadId } from "@/renderer/hooks/uiSelectors";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 
 /**
  * Whether the dev terminal panel is currently shown to the user. An explicitly
@@ -54,6 +55,8 @@ export function usePanelVisibility() {
   const browserPanelOpen = usePanelStore((s) => s.browserPanelOpen);
   const usagePanelOpen = usePanelStore((s) => s.usagePanelOpen);
   const notesPanelOpen = usePanelStore((s) => s.notesPanelOpen);
+  const workspaceHasTabs = useRightWorkspaceTabsStore((s) => s.tabs.length > 0);
+  const workspaceHidden = useRightWorkspaceTabsStore((s) => s.hidden);
   const bottomDocks = useBottomDockedTabs();
   const terminalPosition = useSharedSettings((s) => s.terminalPosition);
   const currentThreadId = useFocusedThreadId();
@@ -104,7 +107,8 @@ export function usePanelVisibility() {
       scopedSubAgentPanelOpen ||
       browserPanelOpen ||
       usagePanelOpen ||
-      notesPanelOpen
+      notesPanelOpen ||
+      workspaceHasTabs
     : bottomTerminalOpen || hasBottomDocks;
   // A bottom-docked tab must not keep the right aside open on its own — it is
   // already rendered in the bottom row.
@@ -117,8 +121,15 @@ export function usePanelVisibility() {
       scopedSubAgentPanelOpen ||
       (browserPanelOpen && !isDocked("browser")) ||
       (usagePanelOpen && !isDocked("usage")) ||
-      (notesPanelOpen && !isDocked("notes")));
-  const sidePanelOpen = isTerminalRight ? rightPanelOpen : sideGitPanelOpen;
+      (notesPanelOpen && !isDocked("notes")) ||
+      workspaceHasTabs);
+  const visibleRightPanelOpen = isTerminalRight && workspaceHidden ? false : rightPanelOpen;
+  const visibleGitPanelOpen = workspaceHidden ? false : sideGitPanelOpen;
+  const sidePanelOpen = isTerminalRight ? visibleRightPanelOpen : visibleGitPanelOpen;
 
-  return { rightPanelOpen, gitPanelOpen: sideGitPanelOpen, sidePanelOpen };
+  return {
+    rightPanelOpen: visibleRightPanelOpen,
+    gitPanelOpen: visibleGitPanelOpen,
+    sidePanelOpen,
+  };
 }

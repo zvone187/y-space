@@ -94,6 +94,7 @@ import {
 } from "./threadSlashCommands";
 import { useKeybindingStore } from "@/renderer/commands/keybindingStore";
 import { handleComposerControlShortcut } from "./threadComposerShortcuts";
+import { buildFileEditorContext } from "@/renderer/utils/gitHelpers";
 import { WorktreeModeSelect, type WorktreeMode } from "./WorktreeModeSelect";
 import {
   isCurrentCheckoutRef,
@@ -544,6 +545,11 @@ export function ThreadDraftComposerArea(props: {
     canTransferUncommitted && branchSelection?.transferUncommitted === true;
 
   const worktreeSelected = branchSelection?.isWorktree ?? props.worktreeMode;
+  const pdfRootContext = buildFileEditorContext(
+    props.project,
+    branchSelection?.worktreePath,
+    branchSelection?.branch,
+  );
   const worktreeMode: WorktreeMode = !worktreeSelected
     ? "none"
     : shouldTransferUncommitted
@@ -1139,7 +1145,7 @@ export function ThreadDraftComposerArea(props: {
               if (idx >= 0)
                 openAttachmentLightbox(imageAttachments, idx, attachmentImageUrlForPath);
             }}
-            onPreviewPdf={(att) => openPdfPreview(att.path)}
+            onPreviewPdf={(att) => openPdfPreview(att.path, pdfRootContext)}
             {...(attachmentImageUrlForPath ? { imageUrlForPath: attachmentImageUrlForPath } : {})}
             leading={
               mentionedMcpServers.length > 0 || showComputerUseChip ? (

@@ -89,6 +89,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "saveImageFile",
   "copyImageToClipboard",
   "readLocalImageFile",
+  "readProjectFilePreview",
   "createProjectDirectory",
   "remoteHttpRequest",
   "openExternal",
@@ -217,6 +218,8 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "deletePrWatch",
   "syncPrWatchAgent",
   "pipedreamBeginConnect",
+  "pipedreamChooseEnvFile",
+  "pipedreamClearEnvFile",
 ] as const satisfies readonly IpcProcedureName[];
 
 export type MainLocalProcedureName = (typeof MAIN_LOCAL_PROCEDURE_NAMES)[number];

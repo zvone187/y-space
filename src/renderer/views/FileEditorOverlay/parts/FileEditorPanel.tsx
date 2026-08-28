@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
-import { FileEditorPane } from "./FileEditorPane/FileEditorPane";
+import { FileEditorPane, type FileEditorPresentation } from "./FileEditorPane/FileEditorPane";
 
 /**
  * Inline panel overlay that covers the main content area (no modal, no backdrop).
  * Files are selected from the right sidebar's file tree.
  */
-export function FileEditorPanel() {
+export function FileEditorPanel(props: { presentation: FileEditorPresentation }) {
   const { t } = useLingui();
   const rootContext = useFileEditorStore((state) => state.rootContext);
   const overlayMode = useFileEditorStore((state) => state.overlayMode);
@@ -58,7 +58,12 @@ export function FileEditorPanel() {
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
-      <FileEditorPane showTabs headerNeedsTrafficLightPad onClose={requestClose} />
+      <FileEditorPane
+        presentation={props.presentation}
+        showTabs
+        headerNeedsTrafficLightPad
+        onClose={requestClose}
+      />
     </div>
   );
 }

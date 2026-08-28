@@ -1,84 +1,66 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { FileEditorRootContext } from "@/renderer/state/fileEditorStore";
 
-const browserCreateTab = vi.hoisted(() =>
-  vi
-    .fn<(payload: { url: string; activate: boolean; reveal?: boolean }) => Promise<void>>()
-    .mockResolvedValue(),
+const openWorkspaceFile = vi.hoisted(() =>
+  vi.fn<(input: unknown) => Promise<void>>(() => Promise.resolve()),
 );
 
-vi.mock("@/renderer/bridge", () => ({
-  readBridge: () => ({ browserCreateTab }),
-}));
+vi.mock("@/renderer/actions/openWorkspaceFile", () => ({ openWorkspaceFile }));
 
-import { openPdfPreview, resolvePdfHostPath } from "./openPdfPreview";
-
-describe("resolvePdfHostPath", () => {
-  it("joins relative paths for Windows projects", () => {
-    expect(
-      resolvePdfHostPath("docs/a.pdf", {
-        kind: "windows",
-        path: "C:\\repo",
-      }),
-    ).toBe("C:\\repo\\docs\\a.pdf");
-  });
-
-  it("maps WSL relative paths to UNC", () => {
-    expect(
-      resolvePdfHostPath("docs/a.pdf", {
-        kind: "wsl",
-        distro: "Ubuntu",
-        linuxPath: "/home/me/repo",
-        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\me\\repo",
-      }),
-    ).toBe("\\\\wsl.localhost\\Ubuntu\\home\\me\\repo\\docs\\a.pdf");
-  });
-
-  it("maps WSL linux absolute paths to UNC", () => {
-    expect(
-      resolvePdfHostPath("/home/me/repo/docs/a.pdf", {
-        kind: "wsl",
-        distro: "Ubuntu",
-        linuxPath: "/home/me/repo",
-        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\me\\repo",
-      }),
-    ).toBe("\\\\wsl.localhost\\Ubuntu\\home\\me\\repo\\docs\\a.pdf");
-  });
-
-  it("leaves host UNC paths unchanged for WSL projects", () => {
-    const unc = "\\\\wsl.localhost\\Ubuntu\\home\\me\\doc.pdf";
-    expect(
-      resolvePdfHostPath(unc, {
-        kind: "wsl",
-        distro: "Ubuntu",
-        linuxPath: "/home/me/repo",
-        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\me\\repo",
-      }),
-    ).toBe(unc);
-  });
-});
+import { openPdfPreview } from "./openPdfPreview";
 
 describe("openPdfPreview", () => {
+  const mainRoot = {
+    projectId: "p1",
+    projectName: "Y Space",
+    projectLocation: { kind: "posix", path: "/repo/y-space" },
+    rootLabel: "Y Space",
+  } satisfies FileEditorRootContext;
+
   beforeEach(() => {
-    browserCreateTab.mockClear();
+    openWorkspaceFile.mockClear();
   });
 
-  it("creates a browser tab with reveal so presentation matches link opens", () => {
-    openPdfPreview("C:\\Users\\me\\Biometric Reuse.pdf");
+  it("opens an attachment PDF in a global document tab, never a Browser page tab", () => {
+    openPdfPreview("/Users/me/Biometric Reuse.pdf", mainRoot);
 
-    expect(browserCreateTab).toHaveBeenCalledWith({
-      url: "file:///C:/Users/me/Biometric%20Reuse.pdf",
-      activate: true,
-      reveal: true,
-    });
+    expect(openWorkspaceFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "/Users/me/Biometric Reuse.pdf",
+        preview: false,
+        source: "chat",
+        rootContext: expect.objectContaining({ projectId: "p1" }),
+      }),
+    );
   });
 
-  it("resolves project-relative paths before opening", () => {
-    openPdfPreview("docs/a.pdf", { kind: "windows", path: "C:\\repo" });
+  it("keeps project-relative PDFs relative for the contained preview reader", () => {
+    openPdfPreview("docs/a.pdf", mainRoot);
 
-    expect(browserCreateTab).toHaveBeenCalledWith({
-      url: "file:///C:/repo/docs/a.pdf",
-      activate: true,
-      reveal: true,
-    });
+    expect(openWorkspaceFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "docs/a.pdf",
+        rootContext: expect.objectContaining({ projectId: "p1" }),
+      }),
+    );
+  });
+
+  it("uses the caller-owned split project/worktree instead of the focused project", () => {
+    const splitWorktreeRoot = {
+      projectId: "p2",
+      projectName: "Other Project",
+      projectLocation: { kind: "posix", path: "/repo/other-worktree" },
+      rootLabel: "feature/pdf-tabs",
+      worktreePath: "/repo/other-worktree",
+    } satisfies FileEditorRootContext;
+
+    openPdfPreview("docs/split.pdf", splitWorktreeRoot);
+
+    expect(openWorkspaceFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "docs/split.pdf",
+        rootContext: splitWorktreeRoot,
+      }),
+    );
   });
 });

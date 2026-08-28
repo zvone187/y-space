@@ -11,6 +11,7 @@ import { dirname, join, posix, resolve } from "node:path";
 import { homedir, tmpdir } from "node:os";
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import type { ProjectLocation } from "@/shared/contracts";
+import { PROJECT_FILE_PREVIEW_DEFAULT_MAX_BYTES } from "@/shared/contracts";
 import { ProjectTreeService } from "./projectTree";
 import type { WslBridgeClient } from "./wsl/bridge/client";
 
@@ -102,7 +103,7 @@ describe("ProjectTreeService", () => {
     }
   });
 
-  it("treats PDFs as binary without loading body bytes", async () => {
+  it("returns bounded project-relative PDF bytes for an embedded preview", async () => {
     const pdf = Buffer.from("%PDF-1.7\npreview\0bytes");
     writeFileSync(join(tempDir, "document.pdf"), pdf);
 
@@ -114,6 +115,24 @@ describe("ProjectTreeService", () => {
     expect(result).toMatchObject({
       path: "document.pdf",
       status: "binary",
+      contentBase64: pdf.toString("base64"),
+    });
+  });
+
+  it("rejects a project-relative PDF above the embedded-preview ceiling", async () => {
+    writeFileSync(
+      join(tempDir, "oversized.pdf"),
+      Buffer.alloc(PROJECT_FILE_PREVIEW_DEFAULT_MAX_BYTES + 1, 0x61),
+    );
+
+    const result = await service.readProjectFile({
+      projectLocation: location,
+      path: "oversized.pdf",
+    });
+
+    expect(result).toMatchObject({
+      path: "oversized.pdf",
+      status: "too_large",
     });
     expect(result).not.toHaveProperty("contentBase64");
   });
@@ -174,7 +193,7 @@ describe("ProjectTreeService", () => {
     }
   });
 
-  it("readExternalFile treats PDFs as binary without loading body bytes", async () => {
+  it("readExternalFile returns bounded PDF bytes for an in-app document preview", async () => {
     const externalDir = mkdtempSync(join(tmpdir(), "poracode-external-pdf-"));
     const outsidePath = join(externalDir, "outside.pdf");
     const pdf = Buffer.from("%PDF-1.7\nexternal\0bytes");
@@ -188,8 +207,8 @@ describe("ProjectTreeService", () => {
       expect(result).toMatchObject({
         path: outsidePath,
         status: "binary",
+        contentBase64: pdf.toString("base64"),
       });
-      expect(result).not.toHaveProperty("contentBase64");
     } finally {
       rmSync(externalDir, { recursive: true, force: true });
     }
@@ -351,6 +370,25 @@ describe("ProjectTreeService WSL external files", () => {
     service = new ProjectTreeService();
     bridge = new ContainmentBridgeClient();
     service.setWslClient(bridge as unknown as WslBridgeClient);
+  });
+
+  it("returns bounded project-relative PDF bytes through the WSL bridge", async () => {
+    const projectRoot = "/home/user/work/repo";
+    const path = `${projectRoot}/docs/manual.pdf`;
+    const pdf = Buffer.from("%PDF-1.7\nremote preview\n%%EOF");
+    bridge.files.set(path, { content: pdf, mtimeMs: 1500 });
+
+    const result = await service.readProjectFile({
+      projectLocation: makeWslLocation(projectRoot),
+      path: "docs/manual.pdf",
+    });
+
+    expect(result).toMatchObject({
+      path: "docs/manual.pdf",
+      status: "binary",
+      contentBase64: pdf.toString("base64"),
+    });
+    expect(bridge.reads.at(-1)).toEqual({ projectRoot, path });
   });
 
   it("readExternalFile reads a path outside the project root on WSL", async () => {

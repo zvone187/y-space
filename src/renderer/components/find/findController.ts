@@ -4,6 +4,7 @@ import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useFindFocusStore } from "@/renderer/state/findFocusStore";
 import { useGitFindStore } from "@/renderer/state/gitFindStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 import { useCommandPaletteStore } from "@/renderer/commands/commandPaletteStore";
 import { isEditorFocusElement, isTerminalFocusElement } from "@/renderer/commands/focusedSurface";
 import { openEditorFind } from "./editorFindBridge";
@@ -29,6 +30,28 @@ export function resolveFindTarget(): FindTarget | null {
     return scope;
   }
   if (element?.closest("[data-poracode-browser]")) return null;
+
+  if (element?.closest("[data-poracode-panel]")) {
+    const workspace = useRightWorkspaceTabsStore.getState();
+    const activeTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId);
+    if (activeTab?.kind === "file") return "editor";
+    if (activeTab?.kind === "browser-page") return null;
+    if (activeTab?.kind === "tool") {
+      switch (activeTab.tool) {
+        case "files":
+          return "tree";
+        case "git":
+          return "git";
+        case "terminal":
+          return "terminal";
+        case "usage":
+        case "notes":
+        case "plan":
+        case "subagent":
+          return null;
+      }
+    }
+  }
 
   const panel = usePanelStore.getState();
   // Blocking modals trap their own input — leave Ctrl+F to them.

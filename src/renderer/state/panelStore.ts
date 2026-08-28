@@ -6,6 +6,8 @@ import type {
   ThreadSortMode,
 } from "@/renderer/views/MainView/parts/Sidebar/parts/sortMode";
 import { useFileEditorStore } from "./fileEditorStore";
+import { rightWorkspaceToolTabId } from "./rightWorkspaceTabs";
+import { useRightWorkspaceTabsStore } from "./rightWorkspaceTabsStore";
 
 export interface GitReviewContext {
   projectId: string;
@@ -62,7 +64,6 @@ export const DOCKABLE_PANEL_TABS: ReadonlySet<RightPanelTab> = new Set([
   "git",
   "files",
   "terminal",
-  "browser",
   "usage",
   "notes",
 ]);
@@ -231,11 +232,28 @@ function loadInitialDrawerWidth(): number {
 const initialPersisted = readPersistedSlice<{
   gitReviewContext: GitReviewContext | null;
   browserOverlayDrawerWidth: number;
+  rightPanelSplit?: RightPanelSplit | null;
+  bottomPanelDocks?: BottomPanelDocks;
   rightPanelFollowsThread?: boolean;
   threadToolRailOffset?: number;
   threadSortMode?: ThreadSortMode;
   threadListLayout?: ThreadListLayout;
 }>(PERSIST_KEY);
+
+function sanitizeRightPanelSplit(
+  split: RightPanelSplit | null | undefined,
+): RightPanelSplit | null {
+  return split?.tab === "browser" ? null : (split ?? null);
+}
+
+function sanitizeBottomPanelDocks(docks: BottomPanelDocks | null | undefined): BottomPanelDocks {
+  const left = docks?.left === "browser" ? null : (docks?.left ?? null);
+  const rawRight = docks?.right === "browser" ? null : (docks?.right ?? null);
+  // A panel can only occupy one slot. Old/intermediate persisted shapes could
+  // contain a duplicate, so keep the left placement and release the right.
+  const right = rawRight !== null && rawRight === left ? null : rawRight;
+  return { left, right };
+}
 
 // Kept in sync with `ThreadSortMode`/`ThreadListLayout` manually — importing
 // the option tables would pull the icon module (lucide) into the store.
@@ -290,8 +308,8 @@ export const usePanelStore = create<PanelState>()((set) => ({
   subAgentPanelContext: null,
   subAgentPanelOpen: false,
   rightPanelTab: "git",
-  rightPanelSplit: null,
-  bottomPanelDocks: EMPTY_BOTTOM_PANEL_DOCKS,
+  rightPanelSplit: sanitizeRightPanelSplit(initialPersisted?.rightPanelSplit),
+  bottomPanelDocks: sanitizeBottomPanelDocks(initialPersisted?.bottomPanelDocks),
   rightPanelFollowsThread: initialPersisted?.rightPanelFollowsThread ?? false,
   threadToolRailOffset: sanitizeRailOffset(
     initialPersisted?.threadToolRailOffset ?? DEFAULT_THREAD_TOOL_RAIL_OFFSET,
@@ -324,6 +342,9 @@ export const usePanelStore = create<PanelState>()((set) => ({
         prev.originComposerId === ctx.originComposerId)
     ) {
       return;
+    }
+    if (ctx === null) {
+      useRightWorkspaceTabsStore.getState().closeTab(rightWorkspaceToolTabId("git"));
     }
     set((state) => ({
       gitReviewContext: ctx,
@@ -365,7 +386,10 @@ export const usePanelStore = create<PanelState>()((set) => ({
       }
       return { githubActionsContext: ctx };
     }),
-  setFilesPanelContext: (ctx) =>
+  setFilesPanelContext: (ctx) => {
+    if (ctx === null) {
+      useRightWorkspaceTabsStore.getState().closeTab(rightWorkspaceToolTabId("files"));
+    }
     set((state) => {
       const prev = state.filesPanelContext;
       if (
@@ -383,8 +407,12 @@ export const usePanelStore = create<PanelState>()((set) => ({
         filesPanelContext: ctx,
         ...(ctx === null ? releaseClosedTab(state, "files") : {}),
       };
-    }),
-  setSubAgentPanelContext: (ctx) =>
+    });
+  },
+  setSubAgentPanelContext: (ctx) => {
+    if (ctx === null) {
+      useRightWorkspaceTabsStore.getState().closeTab(rightWorkspaceToolTabId("subagent"));
+    }
     set((state) => {
       const prev = state.subAgentPanelContext;
       if (
@@ -398,7 +426,8 @@ export const usePanelStore = create<PanelState>()((set) => ({
         return ctx && !state.subAgentPanelOpen ? { subAgentPanelOpen: true } : {};
       }
       return { subAgentPanelContext: ctx, subAgentPanelOpen: ctx !== null };
-    }),
+    });
+  },
   setRightPanelTab: (tab) =>
     set((state) => {
       const reopenSubAgent =
@@ -411,34 +440,42 @@ export const usePanelStore = create<PanelState>()((set) => ({
     }),
   setRightPanelSplit: (split) =>
     set((state) => {
+      const sanitized = sanitizeRightPanelSplit(split);
       const prev = state.rightPanelSplit;
       if (
-        (prev === null && split === null) ||
+        (prev === null && sanitized === null) ||
         (prev !== null &&
-          split !== null &&
-          prev.tab === split.tab &&
-          prev.placement === split.placement)
+          sanitized !== null &&
+          prev.tab === sanitized.tab &&
+          prev.placement === sanitized.placement)
       ) {
         return {};
       }
-      return { rightPanelSplit: split };
+      return { rightPanelSplit: sanitized };
     }),
   setBottomPanelDock: (placement, tab) =>
     set((state) => {
+      const sanitizedDocks = sanitizeBottomPanelDocks(state.bottomPanelDocks);
+      const sanitizedTab = tab === "browser" ? null : tab;
       const other = placement === "left" ? "right" : "left";
       // A tab lives in exactly one place: dropping it in the opposite slot moves
       // it rather than rendering the same surface twice.
       const otherTab =
-        tab !== null && state.bottomPanelDocks[other] === tab
+        sanitizedTab !== null && sanitizedDocks[other] === sanitizedTab
           ? null
-          : state.bottomPanelDocks[other];
-      if (state.bottomPanelDocks[placement] === tab && state.bottomPanelDocks[other] === otherTab) {
+          : sanitizedDocks[other];
+      if (
+        sanitizedDocks[placement] === sanitizedTab &&
+        sanitizedDocks[other] === otherTab &&
+        state.bottomPanelDocks.left === sanitizedDocks.left &&
+        state.bottomPanelDocks.right === sanitizedDocks.right
+      ) {
         return {};
       }
       return {
         bottomPanelDocks: {
           ...EMPTY_BOTTOM_PANEL_DOCKS,
-          [placement]: tab,
+          [placement]: sanitizedTab,
           [other]: otherTab,
         },
       };
@@ -474,12 +511,13 @@ export const usePanelStore = create<PanelState>()((set) => ({
   // overlay, otherwise maximizing the browser and then hiding the right panel
   // would make the fullscreen page vanish. Callers that genuinely want to
   // dismiss both (e.g. the last tab closing) close the overlay explicitly.
-  setBrowserPanelOpen: (v) =>
+  setBrowserPanelOpen: (v) => {
     set((state) =>
       state.browserPanelOpen === v
         ? {}
         : { browserPanelOpen: v, ...(v ? {} : releaseClosedTab(state, "browser")) },
-    ),
+    );
+  },
   // NOTE: overlay state is intentionally independent of the right-panel
   // browser in both directions. Opening the overlay does NOT enable the
   // right-panel browser tab, and closing the overlay leaves the right panel in
@@ -502,36 +540,49 @@ export const usePanelStore = create<PanelState>()((set) => ({
       if (state.browserOverlayDrawerWidth === clamped) return {};
       return { browserOverlayDrawerWidth: clamped };
     }),
-  openBrowserPanel: () =>
+  openBrowserPanel: () => {
     set((state) =>
       state.browserPanelOpen && state.rightPanelTab === "browser"
         ? {}
         : { browserPanelOpen: true, rightPanelTab: "browser" as const },
-    ),
-  setUsagePanelOpen: (v) =>
+    );
+  },
+  setUsagePanelOpen: (v) => {
+    const workspace = useRightWorkspaceTabsStore.getState();
+    if (v) workspace.openTool("usage");
+    else workspace.closeTab(rightWorkspaceToolTabId("usage"));
     set((state) =>
       state.usagePanelOpen === v
         ? {}
         : { usagePanelOpen: v, ...(v ? {} : releaseClosedTab(state, "usage")) },
-    ),
-  openUsagePanel: () =>
+    );
+  },
+  openUsagePanel: () => {
+    useRightWorkspaceTabsStore.getState().openTool("usage");
     set((state) =>
       state.usagePanelOpen && state.rightPanelTab === "usage"
         ? {}
         : { usagePanelOpen: true, rightPanelTab: "usage" as const },
-    ),
-  setNotesPanelOpen: (v) =>
+    );
+  },
+  setNotesPanelOpen: (v) => {
+    const workspace = useRightWorkspaceTabsStore.getState();
+    if (v) workspace.openTool("notes");
+    else workspace.closeTab(rightWorkspaceToolTabId("notes"));
     set((state) =>
       state.notesPanelOpen === v
         ? {}
         : { notesPanelOpen: v, ...(v ? {} : releaseClosedTab(state, "notes")) },
-    ),
-  openNotesPanel: () =>
+    );
+  },
+  openNotesPanel: () => {
+    useRightWorkspaceTabsStore.getState().openTool("notes");
     set((state) =>
       state.notesPanelOpen && state.rightPanelTab === "notes"
         ? {}
         : { notesPanelOpen: true, rightPanelTab: "notes" as const },
-    ),
+    );
+  },
   setThreadSortMode: (mode) =>
     set((state) => (state.threadSortMode === mode ? {} : { threadSortMode: mode })),
   setThreadListLayout: (layout) =>
@@ -579,7 +630,7 @@ export const usePanelStore = create<PanelState>()((set) => ({
       const next = {
         ...(isDocked("git") ? {} : { gitReviewContext: null }),
         ...(isDocked("files") ? {} : { filesPanelContext: null }),
-        ...(isDocked("browser") ? {} : { browserPanelOpen: false }),
+        browserPanelOpen: false,
         ...(isDocked("usage") ? {} : { usagePanelOpen: false }),
         ...(isDocked("notes") ? {} : { notesPanelOpen: false }),
         subAgentPanelOpen: false,

@@ -175,6 +175,12 @@ jobs:
           # macOS Developer ID signing (base64-encoded .p12 + password).
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          # Artifacts from this reusable workflow are uploaded and published by
+          # the caller, even though electron-builder itself runs with
+          # `--publish never`. Keep release signing intent explicit and separate
+          # from electron-builder's upload mode so a missing certificate fails
+          # closed instead of producing an ad-hoc release.
+          YSPACE_MAC_REQUIRE_CERTIFICATE: "1"
           # macOS notarization via Apple ID + app-specific password.
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -192,6 +198,15 @@ jobs:
           fi
           for app in "${apps[@]}"; do
             codesign --verify --deep --strict --verbose=4 "$app"
+            signature_details="$(codesign --display --verbose=4 "$app" 2>&1)"
+            if grep -q '^Signature=adhoc$' <<<"$signature_details"; then
+              echo "::error file=$app::Release app is ad-hoc signed; a certificate identity is required."
+              exit 1
+            fi
+            if ! grep -q '^Authority=.' <<<"$signature_details"; then
+              echo "::error file=$app::Release app has no certificate authority; refusing to publish."
+              exit 1
+            fi
             main_executable="$app/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")"
             expected_arch="$(lipo -archs "$main_executable")"
             if [[ "$expected_arch" == *arm64* ]]; then

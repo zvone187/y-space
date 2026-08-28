@@ -22,6 +22,7 @@ import { openExternalWithFeedback } from "@/renderer/utils/openExternal";
 import { useLongPress } from "@/renderer/hooks/useLongPress";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useRemoteServersStore } from "@/renderer/state/remoteServersStore";
+import { buildFileEditorContext, resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { openUserMessageActions } from "../../userMessageActions";
@@ -65,9 +66,26 @@ export const UserMessage = memo(function UserMessage({
 }: UserMessageProps) {
   const { t } = useLingui();
   const actions = useChatPaneActions();
-  const remoteServerId = useAppStore(
-    (state) => state.threads.find((thread) => thread.id === threadId)?.remoteServerId,
+  const owningThread = useAppStore((state) =>
+    state.threads.find((thread) => thread.id === threadId),
   );
+  const owningProject = useAppStore((state) =>
+    state.projects.find((project) => project.id === owningThread?.projectId),
+  );
+  const pdfRootContext = owningProject
+    ? buildFileEditorContext(
+        owningProject,
+        owningThread?.worktreePath,
+        owningThread?.worktreePath
+          ? resolveWorktreeBranch(
+              owningProject.id,
+              owningThread.worktreePath,
+              owningThread.worktreeBranch,
+            )
+          : undefined,
+      )
+    : null;
+  const remoteServerId = owningThread?.remoteServerId;
   const imageUrlForPath = remoteServerId
     ? (path: string) => useRemoteServersStore.getState().localImageUrl(remoteServerId, path)
     : undefined;
@@ -272,7 +290,9 @@ export const UserMessage = memo(function UserMessage({
                 const idx = imageAttachments.findIndex((a) => a.id === att.id);
                 if (idx >= 0) openAttachmentLightbox(imageAttachments, idx, imageUrlForPath);
               }}
-              onPreviewPdf={(att) => openPdfPreview(att.path)}
+              onPreviewPdf={(att) => {
+                if (pdfRootContext) openPdfPreview(att.path, pdfRootContext);
+              }}
             />
           </div>
         ) : null}

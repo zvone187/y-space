@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, useRef } from "react";
-import { Lock, LockOpen, Maximize2, PanelRightClose, PictureInPicture2, X } from "lucide-react";
+import { Lock, LockOpen, Maximize2, PanelRightClose, X } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
 import { PanelDockDropZone } from "@/renderer/components/layout/PanelDock/PanelDockDropZone";
@@ -16,6 +16,8 @@ import {
   panelHeaderTabIconButtonClass,
 } from "@/renderer/components/layout/sidebarChrome";
 import { DOCKABLE_PANEL_TABS, type RightPanelTab } from "@/renderer/state/panelStore";
+import type { RightWorkspaceTab } from "@/renderer/state/rightWorkspaceTabs";
+import { RightWorkspaceTabStrip } from "./RightWorkspaceTabStrip";
 
 export type { RightPanelTab };
 
@@ -49,7 +51,6 @@ export function UnifiedRightPanel(props: {
   onExpandGitToOverlay?: () => void;
   onExpandFilesToOverlay?: () => void;
   onExpandBrowserToOverlay?: () => void;
-  onExtractBrowserToWindow?: () => void;
   onOpenGit?: () => void;
   onOpenTerminal?: () => void;
   onOpenFiles?: () => void;
@@ -67,6 +68,13 @@ export function UnifiedRightPanel(props: {
   onCloseSplit?: () => void;
   /** Tabs painted in the bottom row; their icons stay lit even though this panel skips them. */
   dockedTabs?: readonly RightPanelTab[];
+  /** Ordered global tabs for tools and documents in this workspace. */
+  workspaceTabs?: readonly RightWorkspaceTab[];
+  activeWorkspaceTabId?: string | null;
+  documentContent?: ReactNode;
+  onWorkspaceTabActivate?: (tabId: string) => void;
+  onWorkspaceTabClose?: (tabId: string) => void;
+  onWorkspaceTabReorder?: (tabId: string, toIndex: number) => void;
   onClose: () => void;
 }) {
   const {
@@ -98,7 +106,6 @@ export function UnifiedRightPanel(props: {
     onExpandGitToOverlay,
     onExpandFilesToOverlay,
     onExpandBrowserToOverlay,
-    onExtractBrowserToWindow,
     onOpenGit,
     onOpenTerminal,
     onOpenFiles,
@@ -112,6 +119,12 @@ export function UnifiedRightPanel(props: {
     splitPlacement = "bottom",
     onCloseSplit,
     dockedTabs = [],
+    workspaceTabs = [],
+    activeWorkspaceTabId = null,
+    documentContent,
+    onWorkspaceTabActivate,
+    onWorkspaceTabClose,
+    onWorkspaceTabReorder,
     onClose,
   } = props;
   const { t } = useLingui();
@@ -131,12 +144,16 @@ export function UnifiedRightPanel(props: {
     defaultPercent: 50,
     minPercent: 20,
   });
-  const hasSubagentModel = activeTab === "subagent" && subagentModel !== undefined;
-  const hasSubagentTitle = activeTab === "subagent" && subagentTitle !== undefined;
+  const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId);
+  const workspaceDocumentActive = activeWorkspaceTab?.kind === "file";
+  const hasSubagentModel =
+    !workspaceDocumentActive && activeTab === "subagent" && subagentModel !== undefined;
+  const hasSubagentTitle =
+    !workspaceDocumentActive && activeTab === "subagent" && subagentTitle !== undefined;
 
   /** Inline opacity/transition so animation is not dropped if Tailwind misses dynamic class strings. */
   const tabLayerStyle = (tab: RightPanelTab): CSSProperties => {
-    const on = activeTab === tab;
+    const on = !workspaceDocumentActive && activeTab === tab;
     return {
       opacity: on ? 1 : 0,
       zIndex: on ? 10 : 0,
@@ -223,16 +240,19 @@ export function UnifiedRightPanel(props: {
   ] as const;
 
   const splitEntry =
-    splitTab && splitTab !== activeTab
+    splitTab && (splitTab !== activeTab || workspaceDocumentActive)
       ? tabs.find((tab) => tab.id === splitTab && tab.visible && tab.content !== undefined)
       : undefined;
   /** Painted right now: the active layer, the split section, or a bottom dock slot. */
   const isTabOnScreen = (tab: RightPanelTab) =>
-    tab === activeTab || tab === splitEntry?.id || dockedTabs.includes(tab);
+    (!workspaceDocumentActive && tab === activeTab) ||
+    tab === splitEntry?.id ||
+    dockedTabs.includes(tab);
 
   return (
     <div
       data-poracode-panel=""
+      data-y-space-workspace=""
       className="flex h-full min-h-0 flex-col bg-[var(--content-background)]"
     >
       <div className={`poracode-overlay-header ${panelHeaderRowClass}`} data-active-tab={activeTab}>
@@ -246,7 +266,7 @@ export function UnifiedRightPanel(props: {
           />
         ) : null}
         {hasSubagentModel ? null : <div className="flex-1" />}
-        {activeTab === "git" && onExpandGitToOverlay && (
+        {!workspaceDocumentActive && activeTab === "git" && onExpandGitToOverlay && (
           <button
             type="button"
             className={`${dragCtl} ${panelHeaderIconButtonClass}`}
@@ -256,7 +276,7 @@ export function UnifiedRightPanel(props: {
             <Maximize2 className="size-3.5" />
           </button>
         )}
-        {activeTab === "files" && onExpandFilesToOverlay && (
+        {!workspaceDocumentActive && activeTab === "files" && onExpandFilesToOverlay && (
           <button
             type="button"
             className={`${dragCtl} ${panelHeaderIconButtonClass}`}
@@ -266,7 +286,7 @@ export function UnifiedRightPanel(props: {
             <Maximize2 className="size-3.5" />
           </button>
         )}
-        {activeTab === "browser" && onExpandBrowserToOverlay && (
+        {!workspaceDocumentActive && activeTab === "browser" && onExpandBrowserToOverlay && (
           <button
             type="button"
             className={`${dragCtl} ${panelHeaderIconButtonClass}`}
@@ -276,17 +296,7 @@ export function UnifiedRightPanel(props: {
             <Maximize2 className="size-3.5" />
           </button>
         )}
-        {activeTab === "browser" && onExtractBrowserToWindow && (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-            title={t`Move browser to window`}
-            onClick={onExtractBrowserToWindow}
-          >
-            <PictureInPicture2 className="size-3.5" />
-          </button>
-        )}
-        {activeTab === "usage" ? usageHeaderActions : null}
+        {!workspaceDocumentActive && activeTab === "usage" ? usageHeaderActions : null}
         <div className="mx-0.5 h-3 w-px bg-border" />
         {tabs.map((tab) => {
           if (!tab.visible) return null;
@@ -350,6 +360,15 @@ export function UnifiedRightPanel(props: {
           <PanelRightClose className="size-3.5" />
         </button>
       </div>
+      {workspaceTabs.length > 0 && onWorkspaceTabActivate && onWorkspaceTabClose ? (
+        <RightWorkspaceTabStrip
+          tabs={workspaceTabs}
+          activeTabId={activeWorkspaceTabId}
+          onActivate={onWorkspaceTabActivate}
+          onClose={onWorkspaceTabClose}
+          {...(onWorkspaceTabReorder ? { onReorder: onWorkspaceTabReorder } : {})}
+        />
+      ) : null}
       {hasSubagentTitle ? (
         <div className="poracode-right-panel-subagent-meta flex h-6 shrink-0 items-center gap-2 border-b border-[color:var(--border)] px-3">
           <div className="min-w-0 flex-1">{subagentTitle}</div>
@@ -375,17 +394,26 @@ export function UnifiedRightPanel(props: {
         {(() => {
           const layerStack = (
             <div className="relative min-h-0 flex-1 overflow-hidden">
-              {tabs.map((tab) =>
-                tab.visible && tab.id !== splitEntry?.id ? (
+              {tabs.map((tab) => {
+                if (!tab.visible || tab.id === splitEntry?.id) return null;
+                const layerActive = !workspaceDocumentActive && activeTab === tab.id;
+                return (
                   <div
                     key={tab.id}
                     className="absolute inset-0 flex min-h-0 flex-col overflow-hidden"
                     style={tabLayerStyle(tab.id)}
+                    aria-hidden={!layerActive}
+                    inert={!layerActive}
                   >
                     {tab.content}
                   </div>
-                ) : null,
-              )}
+                );
+              })}
+              {workspaceDocumentActive ? (
+                <div className="absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden">
+                  {documentContent}
+                </div>
+              ) : null}
             </div>
           );
 

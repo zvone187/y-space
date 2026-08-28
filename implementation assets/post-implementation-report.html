@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space — Post-Implementation Progress Report</title>
+    <title>Y Space — Final Implementation Report</title>
     <style>
       :root {
         --canvas: #f6f2e8;
@@ -26,7 +26,6 @@
           "Segoe UI",
           sans-serif;
       }
-
       * {
         box-sizing: border-box;
       }
@@ -57,18 +56,17 @@
         margin: 0;
       }
       h1 {
-        font-size: clamp(2rem, 5vw, 4.4rem);
-        letter-spacing: 0;
-        line-height: 0.96;
+        font-size: clamp(2.2rem, 6vw, 4.8rem);
+        line-height: 0.95;
       }
       h2 {
-        font-size: 1.1rem;
-        letter-spacing: 0;
+        font-size: 1.05rem;
+        letter-spacing: 0.04em;
         text-transform: uppercase;
       }
       a {
         color: #0f5f85;
-        font-weight: 750;
+        font-weight: 800;
         text-decoration: none;
       }
       code {
@@ -79,14 +77,16 @@
       }
       .hero,
       .card,
+      .sticky,
       details,
-      .sticky {
+      .shot {
         border: 2px solid var(--border);
         box-shadow: var(--shadow);
       }
       .hero,
       .card,
-      details {
+      details,
+      .shot {
         background: var(--paper);
         border-radius: 16px;
       }
@@ -96,7 +96,7 @@
       .hero p {
         color: var(--muted);
         margin-top: 12px;
-        max-width: 760px;
+        max-width: 780px;
       }
       .meta-stack,
       .grid {
@@ -124,29 +124,30 @@
       }
       .card strong {
         display: block;
-        font-size: 1.3rem;
-        line-height: 1.1;
+        font-size: 1.25rem;
+        line-height: 1.15;
         margin-top: 4px;
+        overflow-wrap: anywhere;
       }
       .tag,
       .pill {
         border: 2px solid var(--border);
         border-radius: 999px;
         display: inline-flex;
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         font-weight: 900;
         padding: 5px 9px;
         text-transform: uppercase;
       }
       .tag {
-        background: var(--yellow);
+        background: var(--green);
         margin-bottom: 12px;
       }
       .pill {
         margin: 0 6px 6px 0;
       }
       .board-section {
-        margin-top: 24px;
+        margin-top: 26px;
       }
       .section-title {
         align-items: center;
@@ -163,21 +164,21 @@
       }
       .sticky {
         border-radius: 3px;
-        min-height: 128px;
+        min-height: 138px;
         padding: 16px;
-        transform: rotate(-0.7deg);
+        transform: rotate(-0.45deg);
       }
       .sticky:nth-child(even) {
-        transform: rotate(0.7deg);
+        transform: rotate(0.45deg);
       }
       .sticky h3 {
-        font-size: 1.1rem;
+        font-size: 1.08rem;
         margin-bottom: 8px;
       }
       .sticky p,
       .sticky li {
         color: #334148;
-        font-size: 0.94rem;
+        font-size: 0.92rem;
       }
       .sticky ul {
         margin: 8px 0 0;
@@ -201,21 +202,7 @@
       summary {
         cursor: pointer;
         font-weight: 850;
-        list-style: none;
         padding: 14px 16px;
-      }
-      summary::-webkit-details-marker {
-        display: none;
-      }
-      summary:before {
-        content: "+";
-        display: inline-block;
-        font-weight: 900;
-        margin-right: 10px;
-        width: 14px;
-      }
-      details[open] summary:before {
-        content: "-";
       }
       .detail-body {
         border-top: 2px solid var(--border);
@@ -228,7 +215,7 @@
       }
       table {
         border-collapse: collapse;
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         margin-top: 10px;
         width: 100%;
       }
@@ -241,6 +228,21 @@
       }
       th {
         background: var(--blue);
+      }
+      .shot {
+        overflow: hidden;
+      }
+      .shot img {
+        display: block;
+        height: 260px;
+        object-fit: cover;
+        object-position: top;
+        width: 100%;
+      }
+      .shot figcaption {
+        color: var(--muted);
+        font-size: 0.86rem;
+        padding: 10px 12px;
       }
       @media (max-width: 900px) {
         header,
@@ -256,21 +258,27 @@
     <main>
       <header>
         <section class="hero" aria-labelledby="title">
-          <span class="tag">Post-Implementation Progress</span>
+          <span class="tag">Implementation complete</span>
           <h1 id="title">Y Space</h1>
           <p>
-            The implementation, security hardening, automated verification, PR, and unsigned Apple
-            Silicon package are complete. Final packaged-app click QA is blocked only by action-time
-            consent to run the unsigned build and create persistent browser/OAuth access.
+            Y Space now has one global workspace tab model. Each embedded browser page is its own
+            peer tab beside files, PDFs, spreadsheets, Terminal, Files, Git, Usage, and Notes. There
+            is no browser-within-browser tab strip.
           </p>
-          <p><a href="https://github.com/zvone187/y-space/pull/1">Open pull request #1</a></p>
+          <p>
+            <a href="https://github.com/zvone187/y-space/pull/1">Open pull request #1</a>
+          </p>
         </section>
         <aside class="meta-stack" aria-label="Report metadata">
-          <div class="card bg-yellow"><small>Status</small><strong>Blocked on consent</strong></div>
-          <div class="card bg-blue">
-            <small>Branch</small><strong>y-space-browser-integrations</strong>
+          <div class="card bg-green">
+            <small>Status</small><strong>Ready, with two external account gates</strong>
           </div>
-          <div class="card bg-green"><small>Head</small><strong>4e3d23b2</strong></div>
+          <div class="card bg-blue">
+            <small>Automated</small><strong>9,896 passed · 85 skipped</strong>
+          </div>
+          <div class="card bg-yellow">
+            <small>Browser residency</small><strong>6 ordinary · 4 sensitive</strong>
+          </div>
           <div class="card bg-purple"><small>Date</small><strong>2026-08-27</strong></div>
         </aside>
       </header>
@@ -278,269 +286,335 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Fast Answer</h2>
+          <h2>Outcome</h2>
         </div>
         <div class="grid three">
-          <div class="sticky bg-green">
-            <h3>Built</h3>
+          <article class="sticky bg-green">
+            <h3>One tab concept</h3>
             <p>
-              Y Space identity, embedded multi-tab Browser, import-only cookies, agent
-              skills/capabilities, Pipedream Personal/BYO, and provider isolation are implemented.
+              Browser pages, tools, source files, Markdown, PDF, XLS, and XLSX all participate in
+              the same draggable, keyboard-accessible top strip.
             </p>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>Verified</h3>
+          </article>
+          <article class="sticky bg-blue">
+            <h3>Agent-native browser</h3>
             <p>
-              9,712 tests pass; typecheck, lint, formatting, builds, DMG integrity, CI, live
-              Pipedream read probes, and Electron cookie transport are green.
+              Agents can list, find, activate, open-or-focus, inspect, screenshot, and interact with
+              any Y Space browser page by stable ID—even when another workspace tab is visible.
             </p>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>Decision needed</h3>
+          </article>
+          <article class="sticky bg-yellow">
+            <h3>Bounded memory</h3>
             <p>
-              Approve launching the unsigned local app, loading the unpacked extension in Chrome and
-              Brave, and creating Pipedream OAuth grants.
+              Browser metadata may reach 30 pages, but ordinary live webviews are true-LRU capped at
+              six. Sensitive authentication guests use a separate four-view ceiling.
             </p>
-          </div>
+          </article>
         </div>
       </section>
 
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Implementation</h2>
+          <h2>Browser lifecycle</h2>
         </div>
         <div class="grid four">
-          <div class="sticky bg-blue">
-            <h3>Y Space</h3>
+          <article class="sticky bg-blue">
+            <h3>Independent page</h3>
             <p>
-              Public surface and release artifacts rebranded while compatibility-sensitive app IDs,
-              data paths, and browser partition remain stable.
+              Every browser global tab owns one URL, history, title, page state, and agent target.
             </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Browser</h3>
+          </article>
+          <article class="sticky bg-green">
+            <h3>True LRU</h3>
             <p>
-              Independent tabs, groups, restoration, embedded HTTP(S) links, and signed task-scoped
-              Browser/App Controls for every provider.
+              User and agent activation promote the target. The active page is protected and the
+              least-recent inactive ordinary page is suspended first.
             </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>Cookies</h3>
+          </article>
+          <article class="sticky bg-purple">
+            <h3>Safe resume</h3>
             <p>
-              Chrome/Brave import extension with expiring pairing, metadata-only preview, two-step
-              confirmation, validation, revocation, and no tab control.
+              Bounded metadata restores pages on demand. Sensitive URLs stay memory-only and are
+              redacted to <code>about:blank</code> in persistence.
             </p>
-          </div>
-          <div class="sticky bg-purple">
-            <h3>Pipedream</h3>
+          </article>
+          <article class="sticky bg-pink">
+            <h3>Real teardown</h3>
             <p>
-              Personal MCP and BYO Connect use secret-isolated credentials, loopback relays,
-              binding-scoped sessions, and immediate access revocation.
+              Eviction and close unmount webviews, detach DOM/global listeners, suspend CDP
+              controllers, clear manager state, and ignore stale async callbacks.
             </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Checks and Evidence</h2>
-        </div>
-        <div class="grid two">
-          <div class="sticky bg-green">
-            <h3>Passed</h3>
-            <ul>
-              <li>Vitest: 855 files passed / 5 skipped; 9,712 tests passed / 85 skipped.</li>
-              <li>Provider lifecycle regressions: 96/96.</li>
-              <li>Cookie extension + fixture: 5/5.</li>
-              <li>Typecheck, lint, format, builds, Husky, and GitHub CI.</li>
-              <li>DMG checksum valid; executable and native modules are arm64.</li>
-            </ul>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>Still required</h3>
-            <ul>
-              <li>Run all 14 packaged macOS QA scenarios by real clicks.</li>
-              <li>Capture one or more screenshots per scenario.</li>
-              <li>Complete account-dependent Claude and Pipedream flows.</li>
-              <li>Replace six neutral website images with sanitized real captures.</li>
-              <li>Update this report and QA JSON to final pass/fail evidence.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Pass Criteria</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-green">
-            <h3>Automated gates</h3>
-            <p>
-              PC-29 is met. Strong automated evidence covers identity compatibility, browser
-              isolation, cookie security, relay security, and secret inheritance.
-            </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>Runtime gates</h3>
-            <p>
-              PC-01–28, PC-31, and PC-32 remain pending final desktop observation where the
-              criterion explicitly requires visible or live-account behavior.
-            </p>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>Manual gate</h3>
-            <p>
-              PC-30 is blocked: 0/14 click scenarios may honestly be marked passed until the
-              unsigned app is launched with consent.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Open the Cards</h2>
+          </article>
         </div>
         <details open>
-          <summary>Automated verification detail</summary>
+          <summary>Packaged process evidence</summary>
           <div class="detail-body">
-            <table>
-              <thead>
-                <tr>
-                  <th>Gate</th>
-                  <th>Status</th>
-                  <th>Evidence</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Full Node 24 suite</td>
-                  <td>Pass</td>
-                  <td>9,712 passed; 85 skipped; 0 failed.</td>
-                </tr>
-                <tr>
-                  <td>Static checks</td>
-                  <td>Pass</td>
-                  <td>Typecheck, basic/type-aware lint, format, and diff checks.</td>
-                </tr>
-                <tr>
-                  <td>Builds</td>
-                  <td>Pass</td>
-                  <td>Renderer, Electron, and Next.js production builds.</td>
-                </tr>
-                <tr>
-                  <td>Live Pipedream read probe</td>
-                  <td>Pass</td>
-                  <td>
-                    Environment completeness, token exchange, project lookup, and catalog lookup;
-                    values never printed.
-                  </td>
-                </tr>
-                <tr>
-                  <td>Electron cookie probe</td>
-                  <td>Pass</td>
-                  <td>Electron 43.1 set, stored lookup, and loopback request transmission.</td>
-                </tr>
-                <tr>
-                  <td>macOS package</td>
-                  <td>Pass</td>
-                  <td>
-                    Y-Space-1.6.6-arm64.dmg, valid checksum; app intentionally unsigned for local
-                    QA.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            Nine browser pages were present as global-tab metadata, but the packaged process list
+            contained only four browser renderer processes plus the main renderer. That observed
+            live set stayed below the six-page ordinary ceiling instead of retaining one renderer
+            per metadata tab.
           </div>
         </details>
-        <details>
-          <summary>Desktop QA matrix</summary>
-          <div class="detail-body">
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Manual packaged QA</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Flow</th>
+              <th>Result</th>
+              <th>Observed evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Global browser peers</td>
+              <td>Pass</td>
+              <td>
+                Alpha, Gamma, and DuckDuckGo appeared in the sole global strip; no nested strip.
+              </td>
+            </tr>
+            <tr>
+              <td>Browser create/switch/close</td>
+              <td>Pass</td>
+              <td>
+                Cmd+T created a peer browser tab; switching preserved state; guest Cmd+W selected
+                adjacent Files.
+              </td>
+            </tr>
+            <tr>
+              <td>Top-right tools</td>
+              <td>Pass</td>
+              <td>
+                Files, Git, Usage, Notes, Browser, and Terminal opened or focused peer global tabs.
+              </td>
+            </tr>
+            <tr>
+              <td>Documents</td>
+              <td>Pass</td>
+              <td>
+                Source, Markdown, PDF, XLS, XLSX, and malformed-workbook handling stayed inside Y
+                Space.
+              </td>
+            </tr>
+            <tr>
+              <td>Mixed-tab keyboard access</td>
+              <td>Pass</td>
+              <td>
+                Ctrl+Tab cycled between browser peers and crossed from the last browser into Files,
+                including while the browser address field was focused.
+              </td>
+            </tr>
+            <tr>
+              <td>Bounded browser residency</td>
+              <td>Pass</td>
+              <td>
+                Nine browser metadata tabs retained four browser renderers plus the main renderer;
+                ordinary, sensitive, and metadata ceilings are 6, 4, and 30.
+              </td>
+            </tr>
+            <tr>
+              <td>Codex browser control</td>
+              <td>Pass</td>
+              <td>
+                gpt-5.6-luna listed pages, edited Alpha, reused Gamma, ran its request, and captured
+                a screenshot.
+              </td>
+            </tr>
+            <tr>
+              <td>OpenCode models</td>
+              <td>Pass</td>
+              <td>
+                Both live CLI model checks passed. In the final package, ZAI GLM-4.5-Flash used only
+                Y Space Browser tools, listed all 9 tabs, opened or focused Example Domain without
+                external browser control, captured a 39,346-byte 1140×1646 screenshot, and returned
+                Idle. Active tab: <code>tab-3e5ee0a7-e49e-4224-ade6-3229ba824a63</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Cookie-file import</td>
+              <td>Pass</td>
+              <td>
+                The native picker imported the harmless example.com fixture with 1 cookie accepted
+                and 0 rejected. No browser extension or external browser was used.
+              </td>
+            </tr>
+            <tr>
+              <td>Pipedream environment picker</td>
+              <td>Safe local pass</td>
+              <td>
+                The packaged native picker accepted a harmless fixture, safely rejected its fake
+                credentials, and then forgot the saved path. No real grant was created.
+              </td>
+            </tr>
+            <tr>
+              <td>Native app menu</td>
+              <td>Pass</td>
+              <td>The macOS menu showed About Y Space and Quit Y Space.</td>
+            </tr>
+            <tr>
+              <td>Claude Code</td>
+              <td>External blocker</td>
+              <td>
+                2.1.210 is installed but logged out; user login is required for a live model run.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Visual evidence</h2>
+        </div>
+        <div class="grid three">
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-single-global-browser-tabs.jpeg"
+              alt="Browser pages shown as peer tabs in the global workspace strip"
+            />
+            <figcaption>
+              Final package: independent browser pages in the one global strip.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/global-xlsx-tab.jpeg"
+              alt="XLSX workbook rendered in a global Y Space tab"
+            />
+            <figcaption>Spreadsheet preview as a peer document tab.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/global-pdf-tab-fixed.jpeg"
+              alt="Two-page PDF rendered in the packaged Y Space application"
+            />
+            <figcaption>Two-page PDF rendered inside the packaged desktop app.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-opencode-browser-control-success.jpeg"
+              alt="Successful OpenCode GLM-4.5-Flash control of Y Space embedded browser tabs"
+            />
+            <figcaption>
+              OpenCode used only built-in Browser tools, listed 9 tabs, and focused Example Domain.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-cookie-file-import-success.jpeg"
+              alt="Successful extension-free cookie-file import in Y Space"
+            />
+            <figcaption>Harmless cookie fixture imported: 1 accepted, 0 rejected.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-pipedream-fixture-rejected-safely.jpeg"
+              alt="Pipedream harmless fixture rejected safely in packaged Y Space"
+            />
+            <figcaption>Fake Pipedream credentials rejected safely without disclosure.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-pipedream-fixture-forgotten.jpeg"
+              alt="Pipedream environment file forgotten in packaged Y Space"
+            />
+            <figcaption>
+              Saved environment-file path forgotten; state returned to unconfigured.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Verification</h2>
+        </div>
+        <div class="grid three">
+          <article class="sticky bg-green">
+            <h3>Automated</h3>
+            <ul>
+              <li>879 test files passed; 5 skipped</li>
+              <li>9,896 tests passed; 85 skipped</li>
+              <li>TypeScript typecheck passed</li>
+              <li>Lint and type-aware lint passed</li>
+              <li>Format, i18n, and diff checks passed</li>
+            </ul>
+          </article>
+          <article class="sticky bg-blue">
+            <h3>Package</h3>
+            <ul>
+              <li>Apple Silicon app and DMG built</li>
+              <li>Deep/strict code-sign verification passed</li>
+              <li>ARM64, unsigned/ad-hoc as authorized</li>
+              <li>DMG size: 155,951,077 bytes</li>
+              <li>Mobile build passed before the final desktop-main-only picker patch</li>
+            </ul>
+          </article>
+          <article class="sticky bg-purple">
+            <h3>DMG SHA-256</h3>
+            <p><code>1d1d19638d6e0091f652ce5935ae64c29a84f7d44fcdfcd39e751074e9f49505</code></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Security and integration boundaries</h2>
+        </div>
+        <div class="grid two">
+          <article class="sticky bg-yellow">
+            <h3>Cookie import</h3>
             <p>
-              All cases are defined in <a href="qa-e2e-tests.json">qa-e2e-tests.json</a> and
-              intentionally remain pending.
+              Extension-free file import passed in the final package with a harmless example.com
+              fixture: 1 accepted and 0 rejected. Encrypted pairing remains available, but no Chrome
+              or Brave extension was installed, as directed.
             </p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Cases</th>
-                  <th>Area</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>001–002</td>
-                  <td>Identity, compatibility, multi-tab lifecycle</td>
-                  <td>Blocked on app launch consent</td>
-                </tr>
-                <tr>
-                  <td>003–006</td>
-                  <td>Codex, Claude Code, OpenCode, global Browser/skills</td>
-                  <td>Blocked on app launch; Claude login may require handoff</td>
-                </tr>
-                <tr>
-                  <td>007–009</td>
-                  <td>Chrome/Brave pairing and cookie import</td>
-                  <td>Blocked on extension-install consent</td>
-                </tr>
-                <tr>
-                  <td>010–013</td>
-                  <td>Pipedream Personal, BYO, revocation, relay safety</td>
-                  <td>Blocked on OAuth-grant consent</td>
-                </tr>
-                <tr>
-                  <td>014</td>
-                  <td>Secret inheritance and persistence audit</td>
-                  <td>Pending live provider/account execution</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </details>
-        <details>
-          <summary>Decisions, caveats, and next action</summary>
+          </article>
+          <article class="sticky bg-pink">
+            <h3>Pipedream</h3>
+            <p>
+              The native environment-file path passed its packaged safety flow: a harmless fixture
+              was accepted, fake credentials were rejected without leakage, and the saved path was
+              forgotten. Live OAuth/account connection still awaits explicit authorization.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <details open>
+          <summary>External follow-ups—not implementation failures</summary>
           <div class="detail-body">
             <ul>
               <li>
-                Surface rebrand only; compatibility IDs and the existing Electron browser partition
-                remain unchanged.
+                Run <code>claude auth login</code> before a live Claude Code browser-control pass.
               </li>
               <li>
-                External browser automation is retired; Chrome and Brave are import-only cookie
-                sources.
+                Explicitly authorize a Pipedream OAuth/client-credentials flow before live account
+                testing.
               </li>
               <li>
-                Pipedream credentials remain environment-managed and are stripped from provider
-                children.
-              </li>
-              <li>
-                The selected Claude CLI is 2.1.210 while 2.1.246 is also installed. The normal Y
-                Space update action should refresh the selected install before Opus 5 QA.
-              </li>
-              <li>
-                Next action: obtain action-time consent, execute the full click matrix, fix any
-                observed defect, and replace this progress verdict with the final result.
+                The unsigned build may require macOS Gatekeeper confirmation on another machine.
               </li>
             </ul>
           </div>
         </details>
         <details>
-          <summary>Artifacts</summary>
+          <summary>Final artifacts</summary>
           <div class="detail-body">
             <ul>
+              <li><a href="../release/Y-Space-1.6.6-arm64.dmg">ARM64 Y Space DMG</a></li>
+              <li><a href="qa-e2e-tests.json">Structured QA evidence</a></li>
               <li><a href="https://github.com/zvone187/y-space/pull/1">Pull request #1</a></li>
-              <li><a href="qa-e2e-tests.json">Desktop QA source of truth</a></li>
-              <li><a href="pass-criteria.md">Pass criteria</a></li>
-              <li>
-                <a href="pre-implementation-report.html">Pre-implementation readiness report</a>
-              </li>
-              <li><a href="../release/Y-Space-1.6.6-arm64.dmg">Unsigned Apple Silicon DMG</a></li>
             </ul>
           </div>
         </details>

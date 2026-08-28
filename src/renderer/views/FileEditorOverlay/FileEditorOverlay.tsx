@@ -67,7 +67,7 @@ export function FileEditorOverlay(props: { onClose: () => void }) {
           </div>
         </div>
       }
-      content={<FileEditorPane showTabs />}
+      content={<FileEditorPane presentation="desktop" showTabs />}
     />
   );
 }

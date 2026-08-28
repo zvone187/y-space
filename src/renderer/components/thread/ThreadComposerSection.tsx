@@ -80,6 +80,7 @@ import {
   useSkillSlashCommands,
 } from "@/renderer/components/skills/useSkills";
 import { useDelayedPendingSteer } from "./useDelayedPendingSteer";
+import { buildFileEditorContext } from "@/renderer/utils/gitHelpers";
 
 type ThreadComposerSectionProps = {
   threadId: string;
@@ -487,6 +488,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const project = useAppStore((s) =>
     s.projects.find((candidate) => candidate.id === thread.projectId),
   );
+  const pdfRootContext = project
+    ? buildFileEditorContext(project, thread.worktreePath, branchName)
+    : null;
   const agentFallbackLabel = t`the agent`;
 
   useEffect(() => {
@@ -807,7 +811,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                           openAttachmentLightbox(imageAttachments, idx, attachmentImageUrlForPath);
                         }
                       }}
-                      onPreviewPdf={(att) => openPdfPreview(att.path)}
+                      onPreviewPdf={(att) => {
+                        if (pdfRootContext) openPdfPreview(att.path, pdfRootContext);
+                      }}
                       {...(attachmentImageUrlForPath
                         ? { imageUrlForPath: attachmentImageUrlForPath }
                         : {})}

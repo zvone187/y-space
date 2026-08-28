@@ -479,9 +479,9 @@ describe("AcpRegistrySettings", () => {
     render(<AcpRegistrySettings />);
 
     await screen.findByRole("heading", { name: "Agent Registry" });
-    const antigravityCard = screen
-      .getByText(/First-class Antigravity CLI integration/u)
-      .closest(".rounded-lg");
+    const antigravityCard = (
+      await screen.findByText(/First-class Antigravity CLI integration/u)
+    ).closest(".rounded-lg");
     expect(antigravityCard).toBeTruthy();
 
     fireEvent.click(

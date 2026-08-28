@@ -111,6 +111,22 @@ describe("createDbStorage", () => {
 
     expect(bridge.dbSyncAll).not.toHaveBeenCalled();
   });
+
+  it("uses a local fallback when the desktop bridge is absent", async () => {
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+    const storage = createDbStorage<{ open: boolean }>();
+    const value = { state: { open: true }, version: 1 };
+
+    await storage.setItem("poracode-browserless-test", value);
+
+    await expect(storage.getItem("poracode-browserless-test")).resolves.toEqual(value);
+    await storage.removeItem("poracode-browserless-test");
+    await expect(storage.getItem("poracode-browserless-test")).resolves.toBeNull();
+  });
 });
 
 describe("dbStorage persistence error reporting", () => {

@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import {
-  Check,
-  Copy,
-  Maximize2,
-  Minimize2,
-  PanelRightOpen,
-  PictureInPicture2,
-  X,
-} from "lucide-react";
+import { Check, Copy, Maximize2, Minimize2, PanelRightOpen, X } from "lucide-react";
 import { BROWSER_SESSION_PARTITION } from "@/shared/browserPartition";
+import { BROWSER_HOME_URL } from "@/shared/browserDefaults";
+import type { BrowserTabInfo } from "@/shared/ipc";
 import { isMac, readBridge } from "@/renderer/bridge";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import {
+  RIGHT_WORKSPACE_BROWSER_PAGE_RESIDENT_LIMIT,
+  type RightWorkspaceBrowserPageTab,
+} from "@/renderer/state/rightWorkspaceTabs";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import { openBrowserPanel } from "@/renderer/actions/panelActions";
 import {
   macosTrafficLightGutterClass,
   overlayHeaderStyle,
@@ -21,24 +21,90 @@ import {
 } from "@/renderer/components/layout/sidebarChrome";
 import { BrowserBookmarkBar } from "./parts/BrowserBookmarkBar";
 import { BrowserEmptyState } from "./parts/BrowserEmptyState";
-import { BrowserTabStrip } from "./parts/BrowserTabStrip";
 import { BrowserToolbar } from "./parts/BrowserToolbar";
-import { extractBrowserToWindow, injectBrowserToMain } from "./browserWindowActions";
+import { injectBrowserToMain } from "./browserWindowActions";
 import { useElementPicker } from "./hooks/useElementPicker";
 
-const DEFAULT_HOME = "https://duckduckgo.com";
+interface ExtractedBrowserLruState {
+  readonly sequence: number;
+  readonly lastActiveTabId: string | null;
+  readonly lastUsedByTabId: ReadonlyMap<string, number>;
+}
+
+interface ExtractedBrowserLruInput {
+  readonly tabs: readonly BrowserTabInfo[];
+  readonly activeTabId: string | null;
+}
+
+const INITIAL_EXTRACTED_BROWSER_LRU: ExtractedBrowserLruState = {
+  sequence: 0,
+  lastActiveTabId: null,
+  lastUsedByTabId: new Map(),
+};
+
+function reconcileExtractedBrowserLru(
+  state: ExtractedBrowserLruState,
+  input: ExtractedBrowserLruInput,
+): ExtractedBrowserLruState {
+  const liveTabIds = new Set(input.tabs.map((tab) => tab.tabId));
+  const normalizedActiveTabId =
+    input.activeTabId && liveTabIds.has(input.activeTabId) ? input.activeTabId : null;
+  const hasSameTabs =
+    liveTabIds.size === state.lastUsedByTabId.size &&
+    [...liveTabIds].every((tabId) => state.lastUsedByTabId.has(tabId));
+  if (hasSameTabs && normalizedActiveTabId === state.lastActiveTabId) return state;
+
+  let sequence = state.sequence;
+  const lastUsedByTabId = new Map<string, number>();
+  for (const tab of input.tabs) {
+    const existing = state.lastUsedByTabId.get(tab.tabId);
+    lastUsedByTabId.set(tab.tabId, existing ?? ++sequence);
+  }
+  if (normalizedActiveTabId && normalizedActiveTabId !== state.lastActiveTabId) {
+    lastUsedByTabId.set(normalizedActiveTabId, ++sequence);
+  }
+  return {
+    sequence,
+    lastActiveTabId: normalizedActiveTabId,
+    lastUsedByTabId,
+  };
+}
+
+function selectExtractedResidentBrowserTabs(
+  tabs: readonly BrowserTabInfo[],
+  activeTabId: string | null,
+  lru: ExtractedBrowserLruState,
+): readonly BrowserTabInfo[] {
+  const ordinaryCandidates = tabs
+    .map((tab, index) => ({
+      tab,
+      index,
+      lastUsed:
+        tab.tabId === activeTabId
+          ? Number.POSITIVE_INFINITY
+          : (lru.lastUsedByTabId.get(tab.tabId) ?? lru.sequence + index + 1),
+    }))
+    .filter(({ tab }) => !tab.sensitiveIntegration)
+    .sort((left, right) => right.lastUsed - left.lastUsed || right.index - left.index)
+    .slice(0, RIGHT_WORKSPACE_BROWSER_PAGE_RESIDENT_LIMIT);
+  const residentOrdinaryIds = new Set(ordinaryCandidates.map(({ tab }) => tab.tabId));
+  // Preserve backend order for stable keyed DOM placement. Sensitives live
+  // outside the ordinary cap and therefore remain mounted throughout OAuth.
+  return tabs.filter((tab) => tab.sensitiveIntegration || residentOrdinaryIds.has(tab.tabId));
+}
 
 export function BrowserPanel(props: { visible: boolean; surface?: "main" | "window" }) {
   const { t } = useLingui();
   const tabs = useBrowserPanelStore((s) => s.tabs);
   const activeTabId = useBrowserPanelStore((s) => s.activeTabId);
+  const workspaceTabs = useRightWorkspaceTabsStore((s) => s.tabs);
+  const activeWorkspaceTabId = useRightWorkspaceTabsStore((s) => s.activeTabId);
+  const openBrowserPage = useRightWorkspaceTabsStore((s) => s.openBrowserPage);
   const browserPanelOpen = usePanelStore((s) => s.browserPanelOpen);
   const browserOverlayOpen = usePanelStore((s) => s.browserOverlayOpen);
   const browserOverlayMaximized = usePanelStore((s) => s.browserOverlayMaximized);
-  const setBrowserPanelOpen = usePanelStore((s) => s.setBrowserPanelOpen);
   const setBrowserOverlayOpen = usePanelStore((s) => s.setBrowserOverlayOpen);
   const setBrowserOverlayMaximized = usePanelStore((s) => s.setBrowserOverlayMaximized);
-  const setRightPanelTab = usePanelStore((s) => s.setRightPanelTab);
   const isWindowSurface = props.surface === "window";
   const visible = props.visible || browserOverlayOpen || isWindowSurface;
   const [menuPreviewDataUrl, setMenuPreviewDataUrl] = useState<string | null>(null);
@@ -51,14 +117,72 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
     cancelPendingPick,
   } = useElementPicker();
   const everHadTabsRef = useRef(false);
-  const hasActiveTab = tabs.length > 0 && activeTabId !== null;
   const rootRef = useRef<HTMLDivElement>(null);
+  const [extractedBrowserLru, recordExtractedBrowserLru] = useReducer(
+    reconcileExtractedBrowserLru,
+    INITIAL_EXTRACTED_BROWSER_LRU,
+  );
+
+  useLayoutEffect(() => {
+    if (!isWindowSurface) return;
+    recordExtractedBrowserLru({ tabs, activeTabId });
+  }, [activeTabId, isWindowSurface, tabs]);
+
+  const activeWorkspaceBrowserTab = workspaceTabs.find(
+    (tab): tab is RightWorkspaceBrowserPageTab =>
+      tab.id === activeWorkspaceTabId && tab.kind === "browser-page",
+  );
+  const presentedBrowserTabId = activeWorkspaceBrowserTab?.browserTabId ?? activeTabId;
+  const metadataByBrowserTabId = new Map(tabs.map((tab) => [tab.tabId, tab]));
+  const mainResidentBrowserTabs = workspaceTabs.flatMap((tab) => {
+    if (tab.kind !== "browser-page" || !tab.resident) return [];
+    const metadata = metadataByBrowserTabId.get(tab.browserTabId);
+    return metadata ? [metadata] : [];
+  });
+  // The extracted renderer deliberately does not mirror the main window's
+  // global workspace store. Keep that surface functional without reintroducing
+  // a nested strip, using local observed activation recency for true LRU.
+  const residentBrowserTabs = isWindowSurface
+    ? selectExtractedResidentBrowserTabs(tabs, activeTabId, extractedBrowserLru)
+    : mainResidentBrowserTabs;
+  const hasActiveTab = residentBrowserTabs.some((tab) => tab.tabId === presentedBrowserTabId);
 
   const createTab = useCallback(() => {
     void readBridge()
-      .browserCreateTab({ url: DEFAULT_HOME, activate: true })
+      .browserCreateTab({ url: BROWSER_HOME_URL, activate: true })
+      .then((tab) => {
+        // The bridge result is authoritative browser metadata. Mirror it now so
+        // the new global page can paint without waiting for the broadcast state
+        // event, then make that page the selected first-class workspace tab.
+        const browser = useBrowserPanelStore.getState();
+        browser.upsertTab(tab);
+        browser.setActive(tab.tabId);
+        openBrowserPage({
+          browserTabId: tab.tabId,
+          url: tab.url,
+          title:
+            tab.title.trim() ||
+            (tab.sensitiveIntegration
+              ? "Secure connection"
+              : tab.url && tab.url !== "about:blank"
+                ? tab.url
+                : "New tab"),
+          ...(tab.sensitiveIntegration === undefined
+            ? {}
+            : { sensitiveIntegration: tab.sensitiveIntegration }),
+          ...(tab.groupId === undefined ? {} : { groupId: tab.groupId }),
+        });
+      })
       .catch(() => {});
-  }, []);
+  }, [openBrowserPage]);
+
+  useEffect(() => {
+    const browserTabId = activeWorkspaceBrowserTab?.browserTabId;
+    if (!browserTabId || browserTabId === activeTabId) return;
+    readBridge()
+      .browserActivateTab({ tabId: browserTabId })
+      .catch(() => {});
+  }, [activeTabId, activeWorkspaceBrowserTab?.browserTabId]);
 
   // Attached imperatively (rather than a JSX onKeyDown) because this container
   // is a plain grouping element, not a widget — the reload shortcut is a
@@ -112,20 +236,8 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
   const restoreToPanel = () => {
     setBrowserOverlayMaximized(false);
     setBrowserOverlayOpen(false);
-    setBrowserPanelOpen(true);
-    setRightPanelTab("browser");
+    openBrowserPanel();
   };
-  const extractButton = (
-    <button
-      type="button"
-      className={headerButtonClass}
-      title={t`Move browser to window`}
-      aria-label={t`Move browser to window`}
-      onClick={extractBrowserToWindow}
-    >
-      <PictureInPicture2 className="size-3.5" />
-    </button>
-  );
   return (
     <div
       ref={rootRef}
@@ -146,15 +258,11 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
           {isMac() && hasWindowHeader ? (
             <div className={macosTrafficLightGutterClass} aria-hidden />
           ) : null}
-          {hasWindowHeader ? (
-            <BrowserTabStrip variant="header" onCreateTab={createTab} />
-          ) : (
-            <div className="text-xs font-medium text-foreground">
-              <Trans>Browser</Trans>
-            </div>
-          )}
+          <div className="text-xs font-medium text-foreground">
+            <Trans>Browser</Trans>
+          </div>
           <BrowserDeviceCodeButton />
-          {hasWindowHeader ? null : <div className="flex-1" />}
+          <div className="flex-1" />
           {isWindowSurface ? (
             <button
               type="button"
@@ -166,18 +274,15 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
               <PanelRightOpen className="size-3.5" />
             </button>
           ) : browserPanelOpen ? (
-            <>
-              {extractButton}
-              <button
-                type="button"
-                className={headerButtonClass}
-                title={t`Minimize to panel`}
-                aria-label={t`Minimize browser to right panel`}
-                onClick={restoreToPanel}
-              >
-                <Minimize2 className="size-3.5" />
-              </button>
-            </>
+            <button
+              type="button"
+              className={headerButtonClass}
+              title={t`Minimize to panel`}
+              aria-label={t`Minimize browser to right panel`}
+              onClick={restoreToPanel}
+            >
+              <Minimize2 className="size-3.5" />
+            </button>
           ) : (
             <>
               {browserOverlayMaximized ? (
@@ -201,7 +306,6 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
                   <Maximize2 className="size-3.5" />
                 </button>
               )}
-              {extractButton}
               <button
                 type="button"
                 className={headerButtonClass}
@@ -231,15 +335,14 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
         onCancelPendingPick={cancelPendingPick}
         onMenuPreviewChange={setMenuPreviewDataUrl}
       />
-      {hasWindowHeader ? null : <BrowserTabStrip onCreateTab={createTab} />}
       <BrowserBookmarkBar />
       <div className="relative flex-1 overflow-hidden bg-[var(--content-background)]">
-        {tabs.map((tab) => (
+        {residentBrowserTabs.map((tab) => (
           <BrowserTabWebview
             key={tab.tabId}
             tabId={tab.tabId}
             initialSrc={tab.url}
-            visible={visible && !menuPreviewDataUrl && tab.tabId === activeTabId}
+            visible={visible && !menuPreviewDataUrl && tab.tabId === presentedBrowserTabId}
           />
         ))}
         {menuPreviewDataUrl ? (
@@ -386,7 +489,19 @@ function BrowserTabWebview(props: { tabId: string; initialSrc: string; visible: 
       // element attribute is serialized as a string.
       allowpopups={"true" as unknown as boolean}
       className="absolute inset-0 size-full"
-      style={{ display: props.visible ? "flex" : "none" }}
+      aria-hidden={!props.visible}
+      inert={!props.visible}
+      // A resident background guest must keep a nonzero layout surface: agent
+      // screenshots and synthesized input can otherwise hit a blank Chromium
+      // surface after another global tab is selected. The six-page residency
+      // budget bounds these painted guests; opacity/pointer/z-order keep every
+      // non-selected page completely hidden from user interaction.
+      style={{
+        display: "flex",
+        opacity: props.visible ? 1 : 0,
+        pointerEvents: props.visible ? "auto" : "none",
+        zIndex: props.visible ? 1 : 0,
+      }}
     />
   );
 }

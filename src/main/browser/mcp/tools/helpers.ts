@@ -24,22 +24,30 @@ export async function resolveTabId(
   ctx: ToolContext,
   payload: Record<string, unknown>,
 ): Promise<string> {
+  const sessionId = ctx.threadId ?? "unscoped";
   const requested = typeof payload.tabId === "string" ? payload.tabId : null;
   if (requested) {
     if (!ctx.manager.getTab(requested)) throw new Error(`unknown tab ${requested}`);
+    ctx.manager.recordAutomationTarget(sessionId, requested);
     // Marks agent activity + revives the tab if it was unmounted while idle.
     await ctx.manager.ensureTabReady(requested);
     if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, requested);
+    await ctx.manager.showAutomationCursor(sessionId, requested);
     return requested;
   }
   const active = ctx.threadId
     ? ctx.manager.getActiveTabForThread(ctx.threadId)
     : ctx.manager.getActiveTab();
   if (active) {
+    ctx.manager.recordAutomationTarget(sessionId, active.tabId);
     await ctx.manager.ensureTabReady(active.tabId);
+    await ctx.manager.showAutomationCursor(sessionId, active.tabId);
     return active.tabId;
   }
+  ctx.manager.touchAutomationSession(sessionId);
   const info = await ctx.manager.createTab({ activate: true }, agentTabOpts(ctx));
+  ctx.manager.recordAutomationTarget(sessionId, info.tabId);
+  await ctx.manager.showAutomationCursor(sessionId, info.tabId);
   return info.tabId;
 }
 

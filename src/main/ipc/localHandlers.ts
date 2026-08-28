@@ -96,6 +96,7 @@ import {
 } from "../legacyDataMigration";
 import type { PipedreamMainService } from "../pipedream/PipedreamMainService";
 import type { BrowserCookieImportService, CookieImportBridgeServer } from "../browser/cookieImport";
+import { readProjectFilePreview } from "./readProjectFilePreview";
 
 interface CreateLocalIpcHandlersOptions {
   getMainWindow(): BrowserWindow | null;
@@ -274,6 +275,16 @@ export function createLocalIpcHandlers(
       return result.filePath;
     },
     pipedreamBeginConnect: (payload) => options.pipedreamMainService.beginConnect(payload),
+    pipedreamChooseEnvFile: async ({ dialogTitle }) => {
+      const result = await dialog.showOpenDialog(options.getMainWindow()!, {
+        title: dialogTitle,
+        properties: ["openFile", "showHiddenFiles"],
+      });
+      const filePath = result.filePaths[0];
+      if (result.canceled || !filePath) return null;
+      return options.pipedreamMainService.importEnvironmentFile(filePath);
+    },
+    pipedreamClearEnvFile: () => options.pipedreamMainService.clearEnvironmentFile(),
     browserCookieImportOpenExtensionFolder: async () => {
       const error = await shell.openPath(options.browserCookieImportExtensionDir);
       if (error) throw new Error("Unable to open the Y Space Cookie Import extension folder.");
@@ -327,6 +338,7 @@ export function createLocalIpcHandlers(
       return true;
     },
     readLocalImageFile: ({ url }) => readLocalImageFile(url),
+    readProjectFilePreview,
     createProjectDirectory: (payload) => createProjectDirectory(payload),
     // Desktop-as-client: proxy a remote Poracode server request through the
     // main process (no browser CORS). Restricted to http(s) and a bounded

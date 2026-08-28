@@ -1,12 +1,13 @@
 import type { ProjectLocation, Thread } from "@/shared/contracts";
+import { BROWSER_HOME_URL } from "@/shared/browserDefaults";
+import type { BrowserTabInfo } from "@/shared/ipc";
 import { toast } from "@heroui/react";
 import { friendlyError } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
-import { hasDirtyEditorBuffers } from "@/renderer/state/fileEditorSelectors";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
-import { isTabBottomDocked } from "@/renderer/state/panelDockSelectors";
 import {
   DOCKABLE_PANEL_TABS,
   usePanelStore,
@@ -16,6 +17,11 @@ import {
 import { remoteOwner } from "@/renderer/state/remoteProjection";
 import { useRemoteServersStore } from "@/renderer/state/remoteServersStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import {
+  rightWorkspaceToolTabId,
+  type RightWorkspaceBrowserPage,
+} from "@/renderer/state/rightWorkspaceTabs";
 import {
   useThreadTodoDockStore,
   type ThreadTodoDockPlacement,
@@ -24,6 +30,7 @@ import { buildFileEditorContext, resolveWorktreeBranch } from "@/renderer/utils/
 import { closeThreads } from "@/renderer/utils/shellUtils";
 import { resolveActivePaneId } from "./currentProject";
 import { showTerminalPanel } from "./terminalActions";
+import { fileEditorRootsMatch, switchFileEditorRoot } from "./fileEditorRootActions";
 
 function panelContextMatchesThread(
   projectId: string,
@@ -34,6 +41,25 @@ function panelContextMatchesThread(
   if (ctxProjectId !== projectId) return false;
   if (worktreePath) return ctxWorktreePath === worktreePath;
   return ctxWorktreePath === undefined;
+}
+
+function toWorkspaceBrowserPage(tab: BrowserTabInfo): RightWorkspaceBrowserPage {
+  return {
+    browserTabId: tab.tabId,
+    url: tab.url,
+    title: tab.sensitiveIntegration ? "Connecting…" : tab.title || tab.url || "New tab",
+    ...(tab.sensitiveIntegration ? { sensitiveIntegration: true } : {}),
+    ...(tab.groupId ? { groupId: tab.groupId } : {}),
+  };
+}
+
+function focusWorkspaceBrowserPage(tab: BrowserTabInfo): void {
+  const workspace = useRightWorkspaceTabsStore.getState();
+  const exists = workspace.tabs.some(
+    (candidate) => candidate.kind === "browser-page" && candidate.browserTabId === tab.tabId,
+  );
+  if (exists) workspace.selectBrowserPage(tab.tabId);
+  else workspace.openBrowserPage(toWorkspaceBrowserPage(tab));
 }
 
 /** Clear git, files, file editor, and worktree dev-terminal tabs for this thread's project/worktree. */
@@ -106,53 +132,74 @@ export function openWorkspaceSettings(): void {
   usePanelStore.getState().openSettingsSection("workspaces");
 }
 
-/** Open the docked usage panel, or close all right-side panels if it is already active. */
+/** Open or focus the singleton Usage workspace tab. */
 export function openUsagePanel(): void {
   const panelStore = usePanelStore.getState();
-  // A docked Usage is not what the right panel is showing, so closing it here
-  // would be a no-op the user can see; bring it back instead.
-  if (
-    panelStore.usagePanelOpen &&
-    panelStore.rightPanelTab === "usage" &&
-    !isTabBottomDocked("usage")
-  ) {
-    closeAllPanels();
-    return;
-  }
   undockPanelTab("usage");
   panelStore.openUsagePanel();
 }
 
-/** Open the docked notes panel, or close all right-side panels if it is already active. */
+/** Open or focus the singleton Notes workspace tab. */
 export function openNotesPanel(): void {
   const panelStore = usePanelStore.getState();
-  if (
-    panelStore.notesPanelOpen &&
-    panelStore.rightPanelTab === "notes" &&
-    !isTabBottomDocked("notes")
-  ) {
-    closeAllPanels();
-    return;
-  }
   undockPanelTab("notes");
   panelStore.openNotesPanel();
 }
 
-/**
- * Toggle the docked browser panel: reveal it (switching the right panel to the
- * browser tab) when it's hidden, or hide it when it's already the active right
- * panel. Backs both the `browser.toggle` command and the sidebar Globe button,
- * keeping the two entry points in lockstep.
- */
-export function toggleBrowserPanel(): void {
+/** Open or focus the active first-class Browser page and clear legacy docking. */
+export function openBrowserPanel(): void {
   const panelStore = usePanelStore.getState();
-  if (panelStore.browserPanelOpen && panelStore.rightPanelTab === "browser") {
-    panelStore.setBrowserPanelOpen(false);
-  } else {
-    undockPanelTab("browser");
-    panelStore.setBrowserPanelOpen(true);
-    panelStore.setRightPanelTab("browser");
+  undockPanelTab("browser");
+  panelStore.openBrowserPanel();
+
+  const browser = useBrowserPanelStore.getState();
+  const managerPage =
+    browser.tabs.find((tab) => tab.tabId === browser.activeTabId) ?? browser.tabs[0];
+  if (managerPage) {
+    focusWorkspaceBrowserPage(managerPage);
+    if (browser.activeTabId !== managerPage.tabId) {
+      void readBridge()
+        .browserActivateTab({ tabId: managerPage.tabId })
+        .catch(() => {});
+    }
+    return;
   }
+
+  const workspace = useRightWorkspaceTabsStore.getState();
+  const existingPage = workspace.tabs.find(
+    (tab): tab is Extract<(typeof workspace.tabs)[number], { kind: "browser-page" }> =>
+      tab.kind === "browser-page",
+  );
+  if (existingPage) {
+    workspace.selectBrowserPage(existingPage.browserTabId);
+    void readBridge()
+      .browserActivateTab({ tabId: existingPage.browserTabId })
+      .catch(() => {});
+    return;
+  }
+
+  // The bridge emits browser state before this promise resolves, allowing the
+  // headless host to attach the new webview. Only apply the eventual focus if
+  // the user has not selected another global tab while creation was pending.
+  const activeTabIdAtRequest = workspace.activeTabId;
+  void readBridge()
+    .browserCreateTab({ url: BROWSER_HOME_URL, activate: true })
+    .then((created) => {
+      const currentWorkspace = useRightWorkspaceTabsStore.getState();
+      if (
+        !usePanelStore.getState().browserPanelOpen ||
+        currentWorkspace.activeTabId !== activeTabIdAtRequest
+      ) {
+        return;
+      }
+      focusWorkspaceBrowserPage(created);
+    })
+    .catch(() => {});
+}
+
+/** Command binding entry point; Browser launch is intentionally idempotent. */
+export function toggleBrowserPanel(): void {
+  openBrowserPanel();
 }
 
 export function openProjectSettings(projectId: string): void {
@@ -171,6 +218,9 @@ export function moveThreadTodoDock(threadId: string, placement: ThreadTodoDockPl
   useThreadTodoDockStore.getState().setPlacement(threadId, placement);
   if (placement === "right") {
     usePanelStore.getState().setRightPanelTab("plan");
+    useRightWorkspaceTabsStore.getState().openTool("plan");
+  } else {
+    useRightWorkspaceTabsStore.getState().closeTab(rightWorkspaceToolTabId("plan"));
   }
 }
 
@@ -189,6 +239,14 @@ export function closeAllPanels(): void {
   if (useSharedSettings.getState().terminalPosition !== "bottom") {
     usePanelStore.getState().clearBottomPanelDocks();
   }
+  // These legacy callers mean "close panel surfaces". Global document tabs
+  // are independent workspace state and must survive a Git/terminal/overlay
+  // dismissal. Remove tool tabs only; the explicit workspace close control is
+  // responsible for discarding document tabs after its dirty-buffer prompt.
+  const workspace = useRightWorkspaceTabsStore.getState();
+  for (const tab of workspace.tabs) {
+    if (tab.kind === "tool") workspace.closeTab(tab.id);
+  }
   usePanelStore.getState().closeAllPanels();
 }
 
@@ -205,21 +263,21 @@ export function showSubAgentPanel(
     ...(projectLocation ? { projectLocation } : {}),
   });
   panelStore.setRightPanelTab("subagent");
+  useRightWorkspaceTabsStore.getState().openTool("subagent");
 }
 
 /** Dismiss every panel that can occupy the right edge — used by the overlay backdrop. */
 export function dismissRightOverlay(): void {
-  closeAllPanels();
-  useDevTerminalStore.getState().closePanel();
+  useRightWorkspaceTabsStore.getState().hide();
 }
 
 function applyFilesPanel(
   projectId: string,
   worktreePath: string | undefined,
   options: { toggleCloseIfActive: boolean },
-): void {
+): boolean {
   const project = useAppStore.getState().projects.find((item) => item.id === projectId);
-  if (!project) return;
+  if (!project) return false;
 
   const context = buildFileEditorContext(
     project,
@@ -229,53 +287,28 @@ function applyFilesPanel(
 
   const fileEditor = useFileEditorStore.getState();
   const currentRoot = fileEditor.rootContext;
-  const isSameContext =
-    currentRoot?.projectId === context.projectId &&
-    currentRoot?.worktreePath === context.worktreePath;
+  const isSameContext = fileEditorRootsMatch(currentRoot, context);
 
-  if (
-    !isSameContext &&
-    hasDirtyEditorBuffers() &&
-    !window.confirm("Discard unsaved editor changes?")
-  ) {
-    return;
-  }
-
-  if (!isSameContext) {
-    fileEditor.setRootContext(context);
-  }
+  if (!isSameContext && !switchFileEditorRoot(context)) return false;
 
   const panelStore = usePanelStore.getState();
 
   if (options.toggleCloseIfActive) {
-    const filesPanelContext = panelStore.filesPanelContext;
-    const rightPanelTab = panelStore.rightPanelTab;
-    if (
-      isSameContext &&
-      filesPanelContext?.projectId === context.projectId &&
-      filesPanelContext?.worktreePath === context.worktreePath &&
-      rightPanelTab === "files" &&
-      // A docked Files renders elsewhere, so `rightPanelTab` saying "files"
-      // does not mean the user is looking at it here — toggling would close
-      // nothing they can see. Pull it back into this panel instead.
-      !isTabBottomDocked("files")
-    ) {
-      closeAllPanels();
-      return;
-    }
     undockPanelTab("files");
   }
 
   panelStore.setFilesPanelContext(context);
   panelStore.setRightPanelTab("files");
+  useRightWorkspaceTabsStore.getState().openTool("files");
+  return true;
 }
 
 export function openFilesPanel(projectId: string, worktreePath?: string): void {
   applyFilesPanel(projectId, worktreePath, { toggleCloseIfActive: true });
 }
 
-export function showFilesPanel(projectId: string, worktreePath?: string): void {
-  applyFilesPanel(projectId, worktreePath, { toggleCloseIfActive: false });
+export function showFilesPanel(projectId: string, worktreePath?: string): boolean {
+  return applyFilesPanel(projectId, worktreePath, { toggleCloseIfActive: false });
 }
 
 export function openGitReview(
@@ -283,39 +316,17 @@ export function openGitReview(
   worktreePath?: string,
   originComposerId?: string,
 ): void {
-  const mode = useSharedSettings.getState().gitReviewMode;
+  undockPanelTab("git");
   const panelStore = usePanelStore.getState();
-  const gitReviewContext = panelStore.gitReviewContext;
-  const gitPanelOpen = !!gitReviewContext && panelStore.gitReviewAsPanel;
-  const rightPanelTab = panelStore.rightPanelTab;
-  const nextContext = {
+  panelStore.setGitReviewContext({
     projectId,
     ...(worktreePath ? { worktreePath } : {}),
     ...(originComposerId ? { originComposerId } : {}),
-  };
-
-  if (mode === "panel") {
-    const isSameContext =
-      gitPanelOpen &&
-      gitReviewContext?.projectId === projectId &&
-      gitReviewContext?.worktreePath === worktreePath;
-
-    // See `applyFilesPanel`: a docked Git is not what this panel is showing.
-    if (isSameContext && rightPanelTab === "git" && !isTabBottomDocked("git")) {
-      closeAllPanels();
-      return;
-    }
-  }
-
-  panelStore.setGitReviewContext(nextContext);
-  if (mode === "panel") {
-    undockPanelTab("git");
-    panelStore.setGitReviewAsPanel(true);
-    panelStore.setRightPanelTab("git");
-  } else {
-    panelStore.setGitReviewAsPanel(false);
-    panelStore.setGitOverlayOpen(true);
-  }
+  });
+  panelStore.setGitReviewAsPanel(true);
+  panelStore.setGitOverlayOpen(false);
+  panelStore.setRightPanelTab("git");
+  useRightWorkspaceTabsStore.getState().openTool("git");
 }
 
 export function showGitReviewPanel(projectId: string, worktreePath?: string): void {
@@ -324,6 +335,7 @@ export function showGitReviewPanel(projectId: string, worktreePath?: string): vo
   panelStore.setGitReviewAsPanel(true);
   panelStore.setGitOverlayOpen(false);
   panelStore.setRightPanelTab("git");
+  useRightWorkspaceTabsStore.getState().openTool("git");
 }
 
 export function openGitOverlay(): void {
@@ -355,49 +367,46 @@ function resolveCurrentThreadScope(): { projectId: string; worktreePath?: string
  * The `show*` actions activate the tab they open; a drag-and-drop dock must
  * leave the active tab alone, so the pre-call tab is restored afterwards.
  */
-function ensurePanelTabContent(tab: RightPanelTab): void {
+function ensurePanelTabContent(tab: RightPanelTab): boolean {
   const panelStore = usePanelStore.getState();
   const previousTab = panelStore.rightPanelTab;
   switch (tab) {
     case "usage":
       panelStore.setUsagePanelOpen(true);
-      return;
+      return true;
     case "notes":
       panelStore.setNotesPanelOpen(true);
-      return;
-    case "browser":
-      panelStore.setBrowserPanelOpen(true);
-      return;
+      return true;
     case "git": {
       if (panelStore.gitReviewContext) {
         panelStore.setGitReviewAsPanel(true);
         panelStore.setGitOverlayOpen(false);
-        return;
+        return true;
       }
       const scope = resolveCurrentThreadScope();
-      if (!scope) return;
+      if (!scope) return false;
       showGitReviewPanel(scope.projectId, scope.worktreePath);
       usePanelStore.getState().setRightPanelTab(previousTab);
-      return;
+      return true;
     }
     case "files": {
-      if (panelStore.filesPanelContext) return;
+      if (panelStore.filesPanelContext) return true;
       const scope = resolveCurrentThreadScope();
-      if (!scope) return;
-      showFilesPanel(scope.projectId, scope.worktreePath);
+      if (!scope) return false;
+      if (!showFilesPanel(scope.projectId, scope.worktreePath)) return false;
       usePanelStore.getState().setRightPanelTab(previousTab);
-      return;
+      return true;
     }
     case "terminal": {
-      if (useDevTerminalStore.getState().isOpen) return;
+      if (useDevTerminalStore.getState().isOpen) return true;
       const scope = resolveCurrentThreadScope();
-      if (!scope) return;
-      showTerminalPanel(scope.projectId, scope.worktreePath);
+      if (!scope) return false;
+      if (!showTerminalPanel(scope.projectId, scope.worktreePath)) return false;
       usePanelStore.getState().setRightPanelTab(previousTab);
-      return;
+      return true;
     }
     default:
-      return;
+      return false;
   }
 }
 
@@ -411,9 +420,25 @@ export function undockPanelTab(tab: RightPanelTab): void {
 /** Apply a drag-and-drop dock of a right-panel tab icon onto a dock zone. */
 export function dockPanelTab(tab: RightPanelTab, target: PanelDockTarget): void {
   if (!DOCKABLE_PANEL_TABS.has(tab)) return;
+  if (tab === "browser" || tab === "ports" || tab === "plan" || tab === "subagent") return;
+  const workspace = useRightWorkspaceTabsStore.getState();
+  const workspaceTabId = rightWorkspaceToolTabId(tab);
+  const previouslyActiveWorkspaceTabId = workspace.activeTabId;
+  const closeDockedWorkspaceTab = () => {
+    const current = useRightWorkspaceTabsStore.getState();
+    current.closeTab(workspaceTabId);
+    if (
+      previouslyActiveWorkspaceTabId &&
+      previouslyActiveWorkspaceTabId !== workspaceTabId &&
+      current.tabs.some((candidate) => candidate.id === previouslyActiveWorkspaceTabId)
+    ) {
+      current.activateTab(previouslyActiveWorkspaceTabId);
+    }
+  };
   if (target.zone === "bottom-panel") {
     // The terminal already owns the middle of the bottom row.
     if (tab === "terminal") return;
+    if (!ensurePanelTabContent(tab)) return;
     const terminalStore = useDevTerminalStore.getState();
     const { left, right } = usePanelStore.getState().bottomPanelDocks;
     // Terminal can sit beside one dock (`left | terminal` or `terminal | right`),
@@ -423,21 +448,22 @@ export function dockPanelTab(tab: RightPanelTab, target: PanelDockTarget): void 
       const oppositeOccupied = target.placement === "left" ? right !== null : left !== null;
       if (oppositeOccupied) terminalStore.closePanel();
     }
-    ensurePanelTabContent(tab);
     const panelStore = usePanelStore.getState();
     if (panelStore.rightPanelSplit?.tab === tab) panelStore.setRightPanelSplit(null);
     panelStore.setBottomPanelDock(target.placement, tab);
+    closeDockedWorkspaceTab();
     return;
   }
-  ensurePanelTabContent(tab);
+  if (!ensurePanelTabContent(tab)) return;
   const panelStore = usePanelStore.getState();
   panelStore.clearBottomPanelDockTab(tab);
   // The active tab cannot split with itself — pulling it back out is enough.
-  if (panelStore.rightPanelTab === tab) {
+  if (panelStore.rightPanelTab === tab && previouslyActiveWorkspaceTabId === workspaceTabId) {
     panelStore.setRightPanelSplit(null);
     return;
   }
   panelStore.setRightPanelSplit({ tab, placement: target.placement });
+  closeDockedWorkspaceTab();
 }
 
 export function closeGitPanel(): void {

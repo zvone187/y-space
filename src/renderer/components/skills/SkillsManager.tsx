@@ -209,7 +209,7 @@ export function SkillsManager(props: {
             : t`the Windows user`;
     newThreadFromText(
       project.id,
-      t`/skill-creator-poracode Create a new managed skill for ${destinationLabel}.`,
+      t`/y-space-skill-creator Create a new managed skill for ${destinationLabel}.`,
       { bindLeadingSkill: true },
     );
     usePanelStore.getState().closeSettings();

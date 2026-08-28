@@ -48,3 +48,14 @@ The implementation is complete only when every criterion below is satisfied. A c
 - PC-30: Every test in `implementation assets/qa-e2e-tests.json` is manually click-executed in the packaged macOS desktop app, has captured proof, and is marked passed.
 - PC-31: A known sentinel placed in cookie and Pipedream test secrets is absent from logs, renderer DevTools, provider configs, persisted files, telemetry payloads, and crash data.
 - PC-32: The app survives quit/relaunch with threads, tabs, persistent cookies, pairings, enabled integrations, and provider settings intact, and no obsolete external-browser service starts.
+
+## Global right-workspace tabs
+
+- PC-33: The right workspace has one visible, ordered, keyboard-accessible outer tab strip containing every available right-side tool—Files, Git, Usage, Notes, Browser, Terminal when applicable, plan/subagent surfaces when present—and every open document.
+- PC-34: Opening an already-open singleton tool focuses its existing outer tab without duplicating or remounting it; switching Browser → document → Git/Notes/Usage → Browser preserves the exact embedded Browser pages, Notes draft, Git state, and Usage lifecycle.
+- PC-35: Ordinary file opens from the project tree, chat/file links, Git surfaces, and the file-open command create or focus a document tab in the right workspace instead of launching a modal or external app. Reopening the same file focuses it, preview replacement and pin/edit semantics remain deterministic, and dirty close can be cancelled.
+- PC-36: PDF, CSV, TSV, XLS, and XLSX files render entirely inside Y Space document tabs. PDF Blob URLs are revoked, spreadsheets are parsed locally without macro/formula execution or network viewers, and malformed, encrypted, remote-unavailable, or oversized inputs show bounded safe errors.
+- PC-37: Mixed tool/document tabs can be selected, reordered, and closed with mouse and keyboard; exactly one tab is selected and tabbable, Home/End/arrow navigation works, overflow remains reachable, and closing the active tab focuses the deterministic adjacent tab.
+- PC-38: Hidden/inactive workspace surfaces cannot intercept close/save/find/reload shortcuts, one surface cannot be duplicated between the outer strip/split/bottom dock, and closing the final visible outer tab hides the workspace without destroying independent Browser persistence.
+- PC-39: The packaged macOS build is click-tested by opening Files, Git, Notes, Usage, Browser, two source files, a PDF, an XLS, and an XLSX; captured proof shows mixed-tab switching, reorder, close, dirty protection, in-app rendering, and Browser agent control after returning to Browser.
+- PC-40: Chrome/Brave extension installation is excluded from the current manual QA by explicit user direction. Related cases remain visibly deferred rather than being reported as passed; their automated security/contract coverage must still pass.

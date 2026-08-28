@@ -4,7 +4,9 @@ import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import type {
   PipedreamBeginConnectPayload,
   PipedreamBeginConnectResult,
+  PipedreamChooseEnvFilePayload,
   PipedreamDisconnectAccountPayload,
+  PipedreamEnvFileImportResult,
   PipedreamListAppsPayload,
   PipedreamListAppsResult,
   PipedreamSetAccountAgentAccessPayload,
@@ -19,6 +21,11 @@ const bridgeMock = vi.hoisted(() => ({
   pipedreamRefreshAccounts: vi.fn<() => Promise<PipedreamSnapshot>>(),
   pipedreamBeginConnect:
     vi.fn<(payload: PipedreamBeginConnectPayload) => Promise<PipedreamBeginConnectResult>>(),
+  pipedreamChooseEnvFile:
+    vi.fn<
+      (payload: PipedreamChooseEnvFilePayload) => Promise<PipedreamEnvFileImportResult | null>
+    >(),
+  pipedreamClearEnvFile: vi.fn<() => Promise<PipedreamSnapshot>>(),
   pipedreamDisconnectAccount:
     vi.fn<(payload: PipedreamDisconnectAccountPayload) => Promise<PipedreamSnapshot>>(),
   pipedreamSetAccountAgentAccess:
@@ -81,6 +88,14 @@ describe("ConnectionsSettings", () => {
       opened: true,
       expiresAt: "2026-08-27T12:10:00.000Z",
     });
+    bridgeMock.pipedreamChooseEnvFile.mockResolvedValue({
+      status: "configured",
+      snapshot: SNAPSHOT,
+    });
+    bridgeMock.pipedreamClearEnvFile.mockResolvedValue({
+      personalMcp: { enabled: true, authenticated: true, serverName: "pd" },
+      connect: { state: "absent" },
+    });
     bridgeMock.pipedreamSetAccountAgentAccess.mockResolvedValue({
       ...SNAPSHOT,
       connect: {
@@ -136,6 +151,54 @@ describe("ConnectionsSettings", () => {
     expect(document.body.textContent).not.toMatch(
       /client[_-]?secret|access[_-]?token|connect[_-]?token/i,
     );
+  });
+
+  it("chooses a Pipedream env file through main and applies the redacted snapshot", async () => {
+    const notConfigured: PipedreamSnapshot = {
+      personalMcp: { enabled: false, authenticated: false, serverName: "pd" },
+      connect: { state: "absent" },
+    };
+    bridgeMock.pipedreamGetSnapshot.mockResolvedValue(notConfigured);
+    render(<ConnectionsSettings />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Choose environment file" }));
+
+    await waitFor(() =>
+      expect(bridgeMock.pipedreamChooseEnvFile).toHaveBeenCalledExactlyOnceWith({
+        dialogTitle: "Choose Pipedream environment file",
+      }),
+    );
+    expect(await screen.findByText("Pipedream Connect")).toBeInTheDocument();
+    expect(
+      screen.getByText("Pipedream credentials loaded from the selected file."),
+    ).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(
+      /client[_-]?secret|envFilePath|\/private\/config/i,
+    );
+  });
+
+  it("surfaces a safe validation error for a file without Pipedream values", async () => {
+    bridgeMock.pipedreamChooseEnvFile.mockResolvedValue({
+      status: "invalid",
+      reason: "no-supported-values",
+    });
+    render(<ConnectionsSettings />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Choose environment file" }));
+
+    expect(
+      await screen.findByText("The selected file does not contain Pipedream credentials."),
+    ).toBeInTheDocument();
+  });
+
+  it("forgets persisted env-file metadata and applies the fallback snapshot", async () => {
+    render(<ConnectionsSettings />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Forget environment file" }));
+
+    await waitFor(() => expect(bridgeMock.pipedreamClearEnvFile).toHaveBeenCalledOnce());
+    expect(await screen.findByText("Not configured")).toBeInTheDocument();
+    expect(screen.getByText("Saved environment file forgotten.")).toBeInTheDocument();
   });
 
   it("connects an app, toggles agent access, refreshes, and disconnects through safe bridge calls", async () => {

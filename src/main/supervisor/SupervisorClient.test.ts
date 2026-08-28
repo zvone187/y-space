@@ -232,4 +232,34 @@ describe("SupervisorClient lifecycle", () => {
       expect.any(Function),
     );
   });
+
+  it("reloads Pipedream credentials over privileged IPC without adding them to provider env", async () => {
+    const { client, child } = makeClient();
+    child.send.mockImplementation((_message, callback) => {
+      callback?.();
+      return true;
+    });
+    const payload = {
+      bootstrap: {
+        state: "ready" as const,
+        source: "environment" as const,
+        credentials: {
+          clientId: "runtime-client-id",
+          clientSecret: "runtime-client-secret",
+          projectId: "proj_Runtime123",
+          environment: "development" as const,
+        },
+      },
+      externalUserId: "y-space:runtime-install",
+    };
+
+    await client.configurePipedream(payload);
+
+    expect(child.send).toHaveBeenCalledExactlyOnceWith(
+      { kind: "pipedream-privileged-bootstrap", payload },
+      expect.any(Function),
+    );
+    const forkOptions = forkMock.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv };
+    expect(JSON.stringify(forkOptions.env)).not.toContain("runtime-client-secret");
+  });
 });

@@ -1,21 +1,21 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { toast } from "@heroui/react";
 import { isHomeProjectId } from "@/shared/homeScope";
+import { readBridge } from "@/renderer/bridge";
 import {
   productSurfaceView,
   useProductViewTracking,
 } from "@/renderer/analytics/useProductViewTracking";
 import { BrowserDockSlot } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot";
-import {
-  extractBrowserToWindow,
-  injectBrowserToMain,
-} from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/browserWindowActions";
+import { injectBrowserToMain } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/browserWindowActions";
 import { DevTerminalPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/DevTerminalPanel";
 import {
   UnifiedRightPanel,
   type RightPanelTab,
 } from "@/renderer/components/layout/UnifiedRightPanel";
 import { ProjectFilesPanel } from "@/renderer/views/FileEditorOverlay/parts/ProjectFilesPanel";
+import { WorkspaceDocumentPanel } from "@/renderer/components/files/WorkspaceDocumentPanel";
 import { NotesPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesPanel";
 import { UsagePanel } from "@/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel";
 import { UsagePanelHeaderActions } from "@/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsagePanelHeaderActions";
@@ -29,19 +29,29 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { useFileEditorStore, type FileEditorRootContext } from "@/renderer/state/fileEditorStore";
-import { usePanelStore, type GitReviewContext } from "@/renderer/state/panelStore";
+import {
+  selectAnyObstructingOverlayOpen,
+  usePanelStore,
+  type GitReviewContext,
+} from "@/renderer/state/panelStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import {
+  adjacentRightWorkspaceTabId,
+  rightWorkspaceToolTabId,
+} from "@/renderer/state/rightWorkspaceTabs";
 import { useThreadTodoDockStore } from "@/renderer/state/threadTodoDockStore";
 import { watchRemoteTerminal } from "@/renderer/state/remoteTerminalFeed";
 import { prefetchVisibleGitPanelPrData } from "@/renderer/state/gitRefresh";
 import {
-  closeAllPanels,
   moveThreadTodoDock,
+  openBrowserPanel,
   showFilesPanel,
   showGitReviewPanel,
   undockPanelTab,
 } from "@/renderer/actions/panelActions";
 import { showTerminalPanel } from "@/renderer/actions/terminalActions";
 import { getCurrentProjectId } from "@/renderer/actions/currentProject";
+import { WORKSPACE_TAB_CYCLE_EVENT } from "@/renderer/commands/workspaceTabCycle";
 import { selectFocusedThreadId, useFocusedThreadId } from "@/renderer/hooks/uiSelectors";
 import { syncRightPanelTabToFocusedThread } from "@/renderer/hooks/useRightPanelThreadLock";
 import { formatProjectScopeLabel } from "@/renderer/utils/projectScopeLabel";
@@ -101,7 +111,14 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
   const setBrowserOverlayMaximized = usePanelStore((s) => s.setBrowserOverlayMaximized);
   const setGitReviewContext = usePanelStore((s) => s.setGitReviewContext);
   const setGitOverlayOpen = usePanelStore((s) => s.setGitOverlayOpen);
-  const setFileEditorOverlayMode = useFileEditorStore((s) => s.setOverlayMode);
+  const editorTabs = useFileEditorStore((s) => s.tabs);
+  const editorPreviewTab = useFileEditorStore((s) => s.previewTab);
+  const workspaceTabs = useRightWorkspaceTabsStore((s) => s.tabs);
+  const activeWorkspaceTabId = useRightWorkspaceTabsStore((s) => s.activeTabId);
+  const activeWorkspaceTab = workspaceTabs.find((tab) => tab.id === activeWorkspaceTabId);
+  const restorableBrowserTabId = workspaceTabs.find(
+    (tab) => tab.kind === "browser-page",
+  )?.browserTabId;
   const terminalOpen = useDevTerminalStore((s) => s.isOpen);
   const terminalProjectId = useDevTerminalStore((s) => s.activeProjectId);
   const terminalWorktreePath = useDevTerminalStore((s) => s.activeWorktreePath);
@@ -187,7 +204,6 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
     // "browser"), so it must honor its open flag even when no plan is present —
     // otherwise the panel stays open on an empty browser layer.
     if (requestedTab === "browser") return browserPanelOpen;
-    if (!planInCurrentThread) return true;
     if (requestedTab === "terminal") return terminalOpen;
     if (requestedTab === "files") return filesPanelOpen;
     if (requestedTab === "git") return gitPanelOpen;
@@ -204,10 +220,76 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
     if (usagePanelOpen && !isBottomDocked("usage")) return "usage";
     if (notesPanelOpen && !isBottomDocked("notes")) return "notes";
     if (props.includeTerminal && terminalOpen) return "terminal";
+    if (restorableBrowserTabId && !isBottomDocked("browser")) return "browser";
     return "git";
   }
 
   const activeTab = requestedTabIsAvailable() ? requestedTab : fallbackActiveTab();
+  const activateBrowserPage = useCallback(
+    (browserTabId: string) => {
+      if (browserExtracted) injectBrowserToMain();
+      useBrowserPanelStore.getState().setActive(browserTabId);
+      setBrowserPanelOpen(true);
+      setRightPanelTab("browser");
+      void readBridge()
+        .browserActivateTab({ tabId: browserTabId })
+        .catch(() => {});
+    },
+    [browserExtracted, setBrowserPanelOpen, setRightPanelTab],
+  );
+  useLayoutEffect(() => {
+    if (!props.visible || activeWorkspaceTabId !== null) return;
+    const workspace = useRightWorkspaceTabsStore.getState();
+    if (activeTab === "browser") {
+      const browser = useBrowserPanelStore.getState();
+      const browserTabId =
+        browser.activeTabId ??
+        workspace.tabs.find((tab) => tab.kind === "browser-page")?.browserTabId;
+      if (browserTabId) {
+        workspace.selectBrowserPage(browserTabId);
+        activateBrowserPage(browserTabId);
+      }
+      return;
+    }
+    if (activeTab !== "ports") workspace.openTool(activeTab);
+  }, [activateBrowserPage, activeTab, activeWorkspaceTabId, props.visible, workspaceTabs]);
+
+  useEffect(() => {
+    if (!props.visible) return;
+    const workspace = useRightWorkspaceTabsStore.getState();
+    if (planInCurrentThread) workspace.ensureTool("plan");
+    if (subAgentInCurrentThread) workspace.ensureTool("subagent");
+  }, [planInCurrentThread, props.visible, subAgentInCurrentThread]);
+
+  useEffect(() => {
+    if (activeWorkspaceTab?.kind !== "file") return;
+    useFileEditorStore.getState().setActivePath(activeWorkspaceTab.file.path);
+  }, [activeWorkspaceTab]);
+
+  useEffect(() => {
+    if (activeWorkspaceTab?.kind === "browser-page") {
+      if (rightPanelTab !== "browser") setRightPanelTab("browser");
+      return;
+    }
+    if (activeWorkspaceTab?.kind === "tool" && activeWorkspaceTab.tool !== rightPanelTab) {
+      setRightPanelTab(activeWorkspaceTab.tool);
+    }
+  }, [activeWorkspaceTab, rightPanelTab, setRightPanelTab]);
+
+  useEffect(() => {
+    const workspace = useRightWorkspaceTabsStore.getState();
+    for (const tab of workspaceTabs) {
+      if (
+        tab.kind === "file" &&
+        tab.preview &&
+        editorTabs.includes(tab.file.path) &&
+        editorPreviewTab !== tab.file.path
+      ) {
+        workspace.pinPreview(tab.id);
+      }
+    }
+  }, [editorPreviewTab, editorTabs, workspaceTabs]);
+
   useEffect(() => {
     if (!props.visible) return;
     let refreshTimer: number | undefined;
@@ -263,6 +345,14 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
   }
 
   function activeProjectScope(): PanelProjectScope | null {
+    if (activeWorkspaceTab?.kind === "file") {
+      return {
+        projectId: activeWorkspaceTab.file.projectId,
+        ...(activeWorkspaceTab.file.worktreePath
+          ? { worktreePath: activeWorkspaceTab.file.worktreePath }
+          : {}),
+      };
+    }
     if (activeTab === "terminal") return terminalScope ?? filesScope ?? gitScope;
     if (activeTab === "files") return filesScope ?? gitScope ?? terminalScope;
     if (activeTab === "git") return gitScope ?? filesScope ?? terminalScope;
@@ -277,6 +367,7 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
   const notesProjectId = currentProjectId ?? resolveNextProjectScope()?.projectId;
 
   function resolveProjectName(): string | undefined {
+    if (activeWorkspaceTab?.kind === "file") return activeWorkspaceTab.title;
     switch (activeTab) {
       case "browser":
         return t`Browser`;
@@ -314,6 +405,9 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
   function pressTab(tab: RightPanelTab, open: () => void) {
     undockPanelTab(tab);
     open();
+    if (tab !== "ports" && tab !== "browser") {
+      useRightWorkspaceTabsStore.getState().openTool(tab);
+    }
   }
 
   function handleOpenGit() {
@@ -334,16 +428,152 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
     showTerminalPanel(scope.projectId, scope.worktreePath);
   }
 
-  function handleClose() {
-    if (props.includeTerminal) {
-      useDevTerminalStore.getState().closePanel();
+  function activateWorkspaceTab(tabId: string) {
+    const workspace = useRightWorkspaceTabsStore.getState();
+    const tab = workspace.tabs.find((candidate) => candidate.id === tabId);
+    if (!tab) return;
+    if (tab.kind !== "browser-page") setBrowserOverlayOpen(false);
+    workspace.activateTab(tabId);
+
+    if (tab.kind === "file") {
+      useFileEditorStore.getState().setActivePath(tab.file.path);
+      return;
     }
-    closeAllPanels();
+
+    if (tab.kind === "browser-page") {
+      activateBrowserPage(tab.browserTabId);
+      return;
+    }
+
+    switch (tab.tool) {
+      case "files":
+        pressTab("files", handleOpenFiles);
+        return;
+      case "git":
+        pressTab("git", handleOpenGit);
+        return;
+      case "terminal":
+        pressTab("terminal", handleOpenTerminal);
+        return;
+      case "usage":
+        pressTab("usage", () => {
+          setUsagePanelOpen(true);
+          setRightPanelTab("usage");
+        });
+        return;
+      case "notes":
+        pressTab("notes", () => {
+          setNotesPanelOpen(true);
+          setRightPanelTab("notes");
+        });
+        return;
+      case "plan":
+        if (renderPlanContent) setRightPanelTab("plan");
+        return;
+      case "subagent":
+        if (renderSubAgentContent) setRightPanelTab("subagent");
+        return;
+    }
+  }
+
+  const activateWorkspaceTabFromEffect = useEffectEvent((tabId: string) => {
+    activateWorkspaceTab(tabId);
+  });
+
+  function closeWorkspaceTab(tabId: string) {
+    const workspace = useRightWorkspaceTabsStore.getState();
+    const tab = workspace.tabs.find((candidate) => candidate.id === tabId);
+    if (!tab) return;
+
+    if (tab.kind === "file") {
+      const editor = useFileEditorStore.getState();
+      const buffer = editor.buffers[tab.file.path];
+      if (
+        buffer?.status === "ready" &&
+        buffer.isDirty &&
+        !window.confirm(t`Discard unsaved changes in ${tab.file.path}?`)
+      ) {
+        return;
+      }
+      editor.closeTab(tab.file.path);
+      workspace.closeTab(tabId);
+    } else if (tab.kind === "browser-page") {
+      // Remove the global entry immediately so React unmounts the webview and
+      // its DOM listeners; the manager close then destroys CDP/network/dialog
+      // state and its authoritative state event confirms the removal.
+      workspace.closeBrowserPage(tab.browserTabId);
+      void readBridge()
+        .browserCloseTab({ tabId: tab.browserTabId })
+        .catch(() => {});
+      if (
+        !useRightWorkspaceTabsStore
+          .getState()
+          .tabs.some((candidate) => candidate.kind === "browser-page")
+      ) {
+        setBrowserPanelOpen(false);
+      }
+    } else {
+      workspace.closeTab(tabId);
+      switch (tab.tool) {
+        case "files":
+          usePanelStore.getState().setFilesPanelContext(null);
+          break;
+        case "git":
+          usePanelStore.getState().setGitReviewContext(null);
+          break;
+        case "usage":
+          setUsagePanelOpen(false);
+          break;
+        case "notes":
+          setNotesPanelOpen(false);
+          break;
+        case "terminal":
+          useDevTerminalStore.getState().closePanel();
+          break;
+        case "plan":
+          if (currentThreadId) moveThreadTodoDock(currentThreadId, "composer");
+          break;
+        case "subagent":
+          usePanelStore.getState().setSubAgentPanelContext(null);
+          break;
+      }
+    }
+
+    const nextActiveId = useRightWorkspaceTabsStore.getState().activeTabId;
+    if (nextActiveId) activateWorkspaceTab(nextActiveId);
+  }
+
+  useEffect(() => {
+    if (!props.visible) return undefined;
+    const handleCycle = (event: Event) => {
+      const direction =
+        event instanceof CustomEvent && event.detail?.direction === "previous"
+          ? "previous"
+          : "next";
+      const workspace = useRightWorkspaceTabsStore.getState();
+      const nextTabId = adjacentRightWorkspaceTabId(
+        workspace.tabs,
+        workspace.activeTabId,
+        direction,
+      );
+      if (!nextTabId) return;
+      activateWorkspaceTab(nextTabId);
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLElement>('[data-y-space-workspace] [role="tab"][aria-selected="true"]')
+          ?.focus();
+      });
+    };
+    window.addEventListener(WORKSPACE_TAB_CYCLE_EVENT, handleCycle);
+    return () => window.removeEventListener(WORKSPACE_TAB_CYCLE_EVENT, handleCycle);
+  });
+
+  function handleClose() {
+    useRightWorkspaceTabsStore.getState().hide();
   }
 
   function handleCloseSubAgent() {
-    usePanelStore.getState().setSubAgentPanelContext(null);
-    handleClose();
+    closeWorkspaceTab(rightWorkspaceToolTabId("subagent"));
   }
 
   // A bottom-docked tab renders in the bottom row; keep it out of this panel so
@@ -358,14 +588,95 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
   const renderPlanContent = planInCurrentThread;
   const renderSubAgentContent = subAgentInCurrentThread;
 
+  useEffect(() => {
+    const workspace = useRightWorkspaceTabsStore.getState();
+    const staleIds = workspace.tabs
+      .filter(
+        (tab) =>
+          tab.kind === "tool" &&
+          ((tab.tool === "terminal" && !terminalOpen) ||
+            (tab.tool === "plan" && !renderPlanContent) ||
+            (tab.tool === "subagent" && !renderSubAgentContent)),
+      )
+      .map((tab) => tab.id);
+    if (staleIds.length === 0) return;
+    const activeWasClosed = staleIds.includes(workspace.activeTabId ?? "");
+    for (const tabId of staleIds) workspace.closeTab(tabId);
+    const nextWorkspace = useRightWorkspaceTabsStore.getState();
+    const nextTab = nextWorkspace.tabs.find((tab) => tab.id === nextWorkspace.activeTabId);
+    if (!activeWasClosed || !nextTab) return;
+    activateWorkspaceTabFromEffect(nextTab.id);
+  }, [renderPlanContent, renderSubAgentContent, setRightPanelTab, terminalOpen]);
+
+  useEffect(() => {
+    if (!props.visible) return undefined;
+    const handleWorkspaceShortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        (!event.metaKey && !event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey
+      ) {
+        return;
+      }
+      const target = event.target;
+      const insideBrowserHost =
+        target instanceof Element && target.closest("[data-y-space-browser-host]") !== null;
+      const insideWorkspace =
+        target instanceof Element &&
+        (target.closest("[data-poracode-panel]") !== null || insideBrowserHost);
+      if (
+        !insideWorkspace ||
+        (insideBrowserHost && activeWorkspaceTab?.kind !== "browser-page") ||
+        selectAnyObstructingOverlayOpen() ||
+        usePanelStore.getState().browserOverlayOpen
+      ) {
+        return;
+      }
+      const workspace = useRightWorkspaceTabsStore.getState();
+      const tabId = workspace.activeTabId;
+      if (!tabId) return;
+      const selectedWorkspaceTab = workspace.tabs.find((tab) => tab.id === tabId);
+      if (event.key.toLowerCase() === "s" && selectedWorkspaceTab?.kind === "file") {
+        event.preventDefault();
+        void useFileEditorStore
+          .getState()
+          .saveFile(selectedWorkspaceTab.file.path)
+          .catch((error) => toast.danger(error instanceof Error ? error.message : String(error)));
+        return;
+      }
+      if (event.key.toLowerCase() !== "w") return;
+      event.preventDefault();
+      closeWorkspaceTab(tabId);
+    };
+    window.addEventListener("keydown", handleWorkspaceShortcut);
+    return () => window.removeEventListener("keydown", handleWorkspaceShortcut);
+  });
+
   return (
     <UnifiedRightPanel
       activeTab={activeTab}
       onTabChange={(tab) => {
         if (tab === "subagent" && !renderSubAgentContent) return;
         if (tab === "plan" && !renderPlanContent) return;
+        if (tab === "browser") {
+          pressTab("browser", openBrowserPanel);
+          return;
+        }
         pressTab(tab, () => setRightPanelTab(tab));
       }}
+      workspaceTabs={workspaceTabs}
+      activeWorkspaceTabId={activeWorkspaceTabId}
+      documentContent={
+        activeWorkspaceTab?.kind === "file" ? (
+          <WorkspaceDocumentPanel key={activeWorkspaceTab.id} tab={activeWorkspaceTab} />
+        ) : undefined
+      }
+      onWorkspaceTabActivate={activateWorkspaceTab}
+      onWorkspaceTabClose={closeWorkspaceTab}
+      onWorkspaceTabReorder={(tabId, toIndex) =>
+        useRightWorkspaceTabsStore.getState().reorderTab(tabId, toIndex)
+      }
       {...(renderTerminalContent
         ? {
             terminalContent: (
@@ -397,11 +708,7 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
       }
       browserContent={
         renderBrowserContent ? (
-          <BrowserDockSlot
-            extracted={browserExtracted}
-            onBringBack={injectBrowserToMain}
-            onFocusWindow={extractBrowserToWindow}
-          />
+          <BrowserDockSlot extracted={browserExtracted} onBringBack={injectBrowserToMain} />
         ) : undefined
       }
       usageContent={renderUsageContent ? <UsagePanel /> : undefined}
@@ -475,12 +782,10 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
         : {})}
       projectName={projectName}
       onExpandGitToOverlay={() => setGitOverlayOpen(true)}
-      onExpandFilesToOverlay={() => setFileEditorOverlayMode("fullscreen")}
       onExpandBrowserToOverlay={() => {
         setBrowserOverlayMaximized(true);
         setBrowserOverlayOpen(true);
       }}
-      onExtractBrowserToWindow={extractBrowserToWindow}
       onOpenGit={() => pressTab("git", handleOpenGit)}
       onOpenFiles={() => pressTab("files", handleOpenFiles)}
       {...(props.includeTerminal
@@ -489,11 +794,9 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
       onOpenBrowser={() =>
         pressTab("browser", () => {
           if (browserExtracted) {
-            extractBrowserToWindow();
-            return;
+            injectBrowserToMain();
           }
-          setBrowserPanelOpen(true);
-          setRightPanelTab("browser");
+          openBrowserPanel();
         })
       }
       onOpenUsage={() =>

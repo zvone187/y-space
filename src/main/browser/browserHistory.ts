@@ -1,8 +1,13 @@
 import { dbGetState, dbSetState } from "../db";
 import { stripScheme } from "@/shared/url";
+import { truncateUtf8, utf8ByteLength } from "./boundedText";
 
 const HISTORY_KEY = "browser-history-v1";
 const MAX_ENTRIES = 2000;
+const MAX_HISTORY_URL_BYTES = 64 * 1024;
+const MAX_HISTORY_TITLE_BYTES = 8 * 1024;
+export const MAX_BROWSER_HISTORY_TOTAL_BYTES = 4 * 1024 * 1024;
+const MAX_BROWSER_HISTORY_PERSISTED_BYTES = 8 * 1024 * 1024;
 const PERSIST_DEBOUNCE_MS = 1000;
 const SUGGEST_TIMEOUT_MS = 2500;
 
@@ -29,33 +34,50 @@ export class BrowserHistoryStore {
     try {
       const raw = dbGetState(HISTORY_KEY);
       if (!raw) return;
+      if (Buffer.byteLength(raw, "utf8") > MAX_BROWSER_HISTORY_PERSISTED_BYTES) return;
       const arr = JSON.parse(raw) as BrowserHistoryEntry[];
       if (!Array.isArray(arr)) return;
       for (const e of arr) {
         if (e && typeof e.url === "string" && typeof e.title === "string") {
-          this.entries.set(e.url, {
-            url: e.url,
-            title: e.title,
-            visitCount: typeof e.visitCount === "number" ? e.visitCount : 1,
-            lastVisitedAt: typeof e.lastVisitedAt === "number" ? e.lastVisitedAt : 0,
+          const url = truncateUtf8(e.url, MAX_HISTORY_URL_BYTES);
+          if (!/^https?:\/\//i.test(url)) continue;
+          this.entries.set(url, {
+            url,
+            title: truncateUtf8(e.title || url, MAX_HISTORY_TITLE_BYTES),
+            visitCount:
+              typeof e.visitCount === "number" && Number.isFinite(e.visitCount)
+                ? Math.max(1, Math.floor(e.visitCount))
+                : 1,
+            lastVisitedAt:
+              typeof e.lastVisitedAt === "number" && Number.isFinite(e.lastVisitedAt)
+                ? e.lastVisitedAt
+                : 0,
           });
         }
       }
+      this.prune();
     } catch {}
   }
 
   record(url: string, title: string, now: number): void {
     if (!/^https?:\/\//i.test(url)) return;
     this.load();
-    const existing = this.entries.get(url);
+    const boundedUrl = truncateUtf8(url, MAX_HISTORY_URL_BYTES);
+    const boundedTitle = truncateUtf8(title || boundedUrl, MAX_HISTORY_TITLE_BYTES);
+    const existing = this.entries.get(boundedUrl);
     if (existing) {
       existing.visitCount += 1;
       existing.lastVisitedAt = now;
-      if (title) existing.title = title;
+      if (title) existing.title = boundedTitle;
     } else {
-      this.entries.set(url, { url, title: title || url, visitCount: 1, lastVisitedAt: now });
-      this.prune();
+      this.entries.set(boundedUrl, {
+        url: boundedUrl,
+        title: boundedTitle,
+        visitCount: 1,
+        lastVisitedAt: now,
+      });
     }
+    this.prune();
     this.schedulePersist();
   }
 
@@ -96,12 +118,16 @@ export class BrowserHistoryStore {
   }
 
   private prune(): void {
-    if (this.entries.size <= MAX_ENTRIES) return;
     const sorted = [...this.entries.values()].sort((a, b) => a.lastVisitedAt - b.lastVisitedAt);
-    const removeCount = this.entries.size - MAX_ENTRIES;
-    for (let i = 0; i < removeCount; i++) {
-      const victim = sorted[i];
-      if (victim) this.entries.delete(victim.url);
+    let totalBytes = sorted.reduce((total, entry) => total + historyEntryBytes(entry), 0);
+    let index = 0;
+    while (
+      index < sorted.length &&
+      (this.entries.size > MAX_ENTRIES || totalBytes > MAX_BROWSER_HISTORY_TOTAL_BYTES)
+    ) {
+      const victim = sorted[index++];
+      if (!victim || !this.entries.delete(victim.url)) continue;
+      totalBytes = Math.max(0, totalBytes - historyEntryBytes(victim));
     }
   }
 
@@ -114,6 +140,10 @@ export class BrowserHistoryStore {
       } catch {}
     }, PERSIST_DEBOUNCE_MS);
   }
+}
+
+function historyEntryBytes(entry: BrowserHistoryEntry): number {
+  return utf8ByteLength(entry.url, entry.title);
 }
 
 /**

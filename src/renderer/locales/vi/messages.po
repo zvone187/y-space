@@ -665,8 +665,12 @@ msgstr "@cursor/sdk chưa được cài đặt."
 #~ msgstr "/skill-creator Tạo một skill được quản lý mới cho {destinationLabel}."
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
-msgstr "/skill-creator-poracode Tạo một skill được quản lý mới cho {destinationLabel}."
+#~ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
+#~ msgstr "/skill-creator-poracode Tạo một skill được quản lý mới cho {destinationLabel}."
+
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "/y-space-skill-creator Create a new managed skill for {destinationLabel}."
+msgstr "/y-space-skill-creator Tạo một skill được quản lý mới cho {destinationLabel}."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
@@ -1915,8 +1919,8 @@ msgid "Bring back to panel"
 msgstr "Đưa về bảng điều khiển"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Bring it back into this panel, or jump to the window it’s running in."
-msgstr "Đưa trở lại bảng điều khiển này, hoặc chuyển đến cửa sổ đang chạy."
+#~ msgid "Bring it back into this panel, or jump to the window it’s running in."
+#~ msgstr "Đưa trở lại bảng điều khiển này, hoặc chuyển đến cửa sổ đang chạy."
 
 #: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/threadContextMenus.tsx
@@ -2416,6 +2420,10 @@ msgstr "Chỉ chọn tối đa {MAX_TARGET_ORIGINS} origin."
 msgid "Choose cookie file"
 msgstr "Chọn tệp cookie"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose environment file"
+msgstr "Chọn tệp môi trường"
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
 msgstr "Chọn cách đăng nhập cho {env}."
@@ -2432,6 +2440,10 @@ msgstr "Chọn cách Y Space thực hiện hợp nhất thủ công và tự đ�
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Choose import destination"
 msgstr "Chọn đích nhập"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose Pipedream environment file"
+msgstr "Chọn tệp môi trường Pipedream"
 
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Choose shells for the Terminal panel and Y Space's internal commands."
@@ -4467,6 +4479,11 @@ msgstr "Hủy bỏ thử nghiệm"
 msgid "Discard experiment?"
 msgstr "Hủy bỏ thử nghiệm?"
 
+#. placeholder {0}: tab.file.path
+#: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+msgid "Discard unsaved changes in {0}?"
+msgstr "Hủy các thay đổi chưa lưu trong {0}?"
+
 #: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
@@ -4906,6 +4923,10 @@ msgstr "Nhập JSON hợp lệ."
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Environment"
 msgstr "Môi trường"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Environment files"
+#~ msgstr "Tệp môi trường"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Environment variable name"
@@ -5484,6 +5505,10 @@ msgstr "Đã sửa"
 msgid "Flat list"
 msgstr "Danh sách phẳng"
 
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
+msgid "Focus browser"
+msgstr "Chuyển tiêu điểm đến trình duyệt"
+
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
 msgstr "Tập trung vào thanh địa chỉ trình duyệt"
@@ -5493,8 +5518,8 @@ msgid "Focus the in-app browser address bar"
 msgstr "Tập trung vào thanh địa chỉ của trình duyệt tích hợp"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Focus window"
-msgstr "Chuyển đến cửa sổ"
+#~ msgid "Focus window"
+#~ msgstr "Chuyển đến cửa sổ"
 
 #: src/renderer/components/thread/ChatPane/parts/items/InlineFolderPathChip.tsx
 msgid "Folder"
@@ -5553,6 +5578,10 @@ msgstr "Xóa"
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Forget {0}"
 msgstr "Xóa {0}"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Forget environment file"
+msgstr "Quên tệp môi trường"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5954,8 +5983,8 @@ msgid "Hide all"
 msgstr "Ẩn tất cả"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Hide browser"
-msgstr "Ẩn trình duyệt"
+#~ msgid "Hide browser"
+#~ msgstr "Ẩn trình duyệt"
 
 #: src/renderer/components/thread/ThreadView.tsx
 msgid "Hide canonical runtime item inspector"
@@ -7484,8 +7513,8 @@ msgstr "Chuyển trình duyệt về cửa sổ chính"
 
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
-msgid "Move browser to window"
-msgstr "Chuyển trình duyệt sang cửa sổ"
+#~ msgid "Move browser to window"
+#~ msgstr "Chuyển trình duyệt sang cửa sổ"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Move changes to a new worktree"
@@ -8515,6 +8544,10 @@ msgid "Open browser"
 msgstr "Mở trình duyệt"
 
 #: src/renderer/commands/registry.ts
+msgid "Open browser panel"
+msgstr "Mở bảng trình duyệt"
+
+#: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "Mở tab trình duyệt"
 
@@ -8547,6 +8580,10 @@ msgstr "Mở Crossagent: {0}"
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
 msgstr "Mở hộp thoại"
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "Open document tab"
+msgstr "Mở thẻ tài liệu"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open experiment"
@@ -8599,8 +8636,8 @@ msgid "Open image preview"
 msgstr "Mở xem trước hình ảnh"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "Open in browser"
-msgstr "Mở trong trình duyệt"
+#~ msgid "Open in browser"
+#~ msgstr "Mở trong trình duyệt"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -8649,6 +8686,10 @@ msgstr "Mở luồng mới dưới dạng toàn trang hoặc bảng cạnh nhau.
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunList.tsx
 msgid "Open on GitHub"
 msgstr "Mở trên GitHub"
+
+#: src/renderer/commands/registry.ts
+msgid "Open or focus the browser workspace tab"
+msgstr "Mở hoặc chuyển tiêu điểm đến thẻ không gian làm việc của trình duyệt"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Open over SSH"
@@ -9029,12 +9070,16 @@ msgstr "Đã tạm dừng"
 #~ msgstr "Các nhà cung cấp đã tạm dừng sẽ được Crossagents bỏ qua cho đến khi được tiếp tục."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "PDF preview opens in a Y Space document tab."
+msgstr "Bản xem trước PDF mở trong một thẻ tài liệu Y Space."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "PDF preview opens in the browser panel."
 #~ msgstr "Xem trước PDF mở trong bảng trình duyệt."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "PDF preview opens in the browser."
-msgstr "Xem trước PDF mở trong trình duyệt."
+#~ msgid "PDF preview opens in the browser."
+#~ msgstr "Xem trước PDF mở trong trình duyệt."
 
 #: src/renderer/views/ProfileOverlay/parts/ShareCard.tsx
 msgid "peak day"
@@ -9157,6 +9202,10 @@ msgstr "Tuyến tác vụ đã ghim"
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream Connect could not be initialized."
 msgstr "Không thể khởi tạo Pipedream Connect."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Pipedream credentials loaded from the selected file."
+msgstr "Đã tải thông tin xác thực Pipedream từ tệp đã chọn."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
@@ -10811,6 +10860,10 @@ msgstr "Lưu phím tắt"
 msgid "Saved credentials are shared across all environments."
 msgstr "Thông tin đăng nhập đã lưu được chia sẻ trên tất cả các môi trường."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Saved environment file forgotten."
+msgstr "Đã quên tệp môi trường đã lưu."
+
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Saved shell"
 msgstr "Shell đã lưu"
@@ -11106,6 +11159,14 @@ msgstr "Chọn một tập tin từ cây"
 msgid "Select a file to start editing."
 msgstr "Chọn một tập tin để bắt đầu chỉnh sửa."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Select a local environment file. Y Space stores only its location; credential values stay in the main process."
+#~ msgstr "Chọn một tệp môi trường cục bộ. Y Space chỉ lưu vị trí của tệp; các giá trị thông tin xác thực vẫn nằm trong tiến trình chính."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Select a local environment file. Y Space stores only its location; credential values stay outside renderer and agent processes."
+msgstr "Chọn một tệp môi trường cục bộ. Y Space chỉ lưu vị trí của tệp; các giá trị thông tin xác thực nằm ngoài tiến trình kết xuất và tiến trình tác nhân."
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
 #~ msgstr "Chọn một dự án trước khi nhập vào dự án."
@@ -11395,8 +11456,8 @@ msgid "Show opened links in"
 msgstr "Hiển thị các liên kết đã mở trong"
 
 #: src/renderer/commands/registry.ts
-msgid "Show or hide the browser panel"
-msgstr "Hiển thị hoặc ẩn bảng điều khiển trình duyệt"
+#~ msgid "Show or hide the browser panel"
+#~ msgstr "Hiển thị hoặc ẩn bảng điều khiển trình duyệt"
 
 #: src/renderer/commands/registry.ts
 msgid "Show or hide the sidebar"
@@ -12535,9 +12596,21 @@ msgstr "Máy chủ Y Space từ xa không trả về thông tin xác thực ghé
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "Vị trí của kho lưu trữ trên đĩa. Hãy cập nhật nếu bạn đã di chuyển thư mục."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file could not be read."
+msgstr "Không thể đọc tệp đã chọn."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file does not contain Pipedream credentials."
+msgstr "Tệp đã chọn không chứa thông tin xác thực Pipedream."
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "Tệp đã chọn không chứa cấu hình máy chủ MCP hợp lệ."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file is too large."
+msgstr "Tệp đã chọn quá lớn."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "The selected machine is unavailable. Reconnect it to manage archived threads."
@@ -12733,6 +12806,14 @@ msgstr "Tên này được dành riêng cho máy chủ MCP tích hợp sẵn."
 #: src/mobile/views/DesktopsView.tsx
 #~ msgid "This page is served over HTTPS, so the browser blocks it from reaching a desktop on plain HTTP. Continue on the desktop's own address to finish pairing there."
 #~ msgstr "Trang này được phục vụ qua HTTPS, nên trình duyệt chặn việc kết nối tới desktop dùng HTTP thuần. Hãy tiếp tục trên địa chỉ riêng của desktop để hoàn tất ghép đôi ở đó."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF could not be loaded in the built-in preview."
+msgstr "Không thể tải tệp PDF này trong bản xem trước tích hợp."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF is too large for the built-in preview."
+msgstr "Tệp PDF này quá lớn đối với bản xem trước tích hợp."
 
 #. placeholder {0}: deleteRun?.number
 #: src/renderer/views/GitHubActionsView/GitHubActionsView.tsx
@@ -12961,8 +13042,8 @@ msgid "To-dos"
 msgstr "Việc cần làm"
 
 #: src/renderer/commands/registry.ts
-msgid "Toggle browser panel"
-msgstr "Bật/tắt bảng điều khiển trình duyệt"
+#~ msgid "Toggle browser panel"
+#~ msgstr "Bật/tắt bảng điều khiển trình duyệt"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/standardGuiSlashCommands.ts

@@ -1,7 +1,7 @@
 import type { Project } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { readBridge } from "@/renderer/bridge";
-import { closeAllPanels } from "@/renderer/actions/panelActions";
+import { closeTerminalPanel, showTerminalPanel } from "@/renderer/actions/terminalActions";
 import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { getProjectActiveWorktreePaths } from "@/renderer/state/gitRefresh";
 import { useGitStore } from "@/renderer/state/gitStore";
@@ -91,7 +91,7 @@ function startWorktreeSetupScript(
   const openTerminalPanel = options.openTerminalPanel !== false;
   const autoShow = openTerminalPanel && useSharedSettings.getState().autoShowTerminalPanel;
   const panelAlreadyOpen = store.isOpen;
-  if (autoShow) store.openWorktreePanel(project.id, worktreePath);
+  if (autoShow) showTerminalPanel(project.id, worktreePath);
   if (openTerminalPanel) store.setActiveTab(tab.id);
 
   // Visible tabs mount an XTerm surface that starts the PTY. Start it eagerly
@@ -146,6 +146,5 @@ function removeWorktreeSetupTab(tab: DevTerminalTab): void {
       (item) => item.projectId === tab.projectId && item.worktreePath === tab.worktreePath,
     );
   if (remaining.length > 0) return;
-  if (useSharedSettings.getState().terminalPosition !== "bottom") closeAllPanels();
-  useDevTerminalStore.getState().closePanel();
+  closeTerminalPanel();
 }

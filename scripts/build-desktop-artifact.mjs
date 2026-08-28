@@ -26,12 +26,16 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveMacSigningPolicy } from "./mac-signing-policy.mjs";
 import { scanRuntimeExternals } from "./runtime-externals.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const requireFromHere = createRequire(import.meta.url);
 const channelTable = requireFromHere("./electron-builder.shared.cjs");
+const { ADHOC_FALLBACK_ENV, findMacAppBundles, verifyMacAppBundle } = requireFromHere(
+  "../build/mac-signing.cjs",
+);
 const { restoreMacUpdaterManifests, snapshotMacUpdaterManifests } = requireFromHere(
   "./mac-updater-manifest.cjs",
 );
@@ -315,6 +319,7 @@ async function main() {
   const skipBuild = Boolean(args["skip-build"]);
   const checkRuntimeDeps = Boolean(args["check-runtime-deps"]);
   const publish = args.publish ?? "never";
+  const macSigningPolicy = resolveMacSigningPolicy(process.env, publish);
   const outputDir = resolve(repoRoot, args["output-dir"] ?? "release");
   const keepStage = Boolean(args["keep-stage"]);
 
@@ -356,7 +361,7 @@ async function main() {
     const initialMacArtifactKind = macArtifactKindFor(platform, target);
     writeFileSync(
       join(stageRoot, "electron-builder.yml"),
-      buildElectronBuilderConfig(initialMacArtifactKind),
+      buildElectronBuilderConfig(initialMacArtifactKind, macSigningPolicy),
     );
 
     // 6. Install prod + stage devdeps with a genuinely flat npm layout.
@@ -447,7 +452,7 @@ async function main() {
       if (platform === "mac") {
         writeFileSync(
           join(stageRoot, "electron-builder.yml"),
-          buildElectronBuilderConfig(macArtifactKind),
+          buildElectronBuilderConfig(macArtifactKind, macSigningPolicy),
         );
       }
       const electronBuilderArgs = [PLATFORM_FLAG[platform]];
@@ -457,7 +462,13 @@ async function main() {
         electronBuilderArgs.push(`--${arch}`);
       }
       electronBuilderArgs.push("--publish", publish);
-      run(electronBuilderBin, electronBuilderArgs, { cwd: stageRoot });
+      run(electronBuilderBin, electronBuilderArgs, {
+        cwd: stageRoot,
+        env: {
+          ...process.env,
+          [ADHOC_FALLBACK_ENV]: macSigningPolicy.allowAdhocFallback ? "1" : "0",
+        },
+      });
     };
 
     if (platform === "mac" && !target) {
@@ -475,6 +486,19 @@ async function main() {
       restoreMacUpdaterManifests(join(stageRoot, "release"), updaterManifests);
     } else {
       runElectronBuilder(target);
+    }
+
+    if (platform === "mac") {
+      const appBundles = findMacAppBundles(join(stageRoot, "release"));
+      if (appBundles.length === 0) {
+        throw new Error("macOS packaging produced no .app bundle to verify");
+      }
+      for (const appBundle of appBundles) {
+        verifyMacAppBundle(appBundle, {
+          requireCertificate: macSigningPolicy.requireCertificate,
+        });
+        console.log(`[stage] verified macOS code signature: ${appBundle}`);
+      }
     }
 
     // 8. Copy artifacts back to release/.
@@ -496,7 +520,10 @@ function macArtifactKindFor(platform, target) {
   return platform === "mac" && target === "zip" ? "updater" : "branded";
 }
 
-function buildElectronBuilderConfig(macArtifactKind = "branded") {
+function buildElectronBuilderConfig(
+  macArtifactKind = "branded",
+  macSigningPolicy = resolveMacSigningPolicy(process.env, "never"),
+) {
   // Generate the staged electron-builder config with a drastically simplified
   // `files:` block — the stage's node_modules contains only the runtime
   // externals we listed, so we can include all of node_modules without dragging
@@ -514,6 +541,8 @@ function buildElectronBuilderConfig(macArtifactKind = "branded") {
   const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
   const macEntitlements = "build/entitlements.mac.plist";
   const macEntitlementsInherit = "build/entitlements.mac.plist";
+  const macSigningIdentity = macSigningPolicy.identity;
+  const macIdentityLine = macSigningIdentity ? `\n  identity: "${macSigningIdentity}"` : "";
   const packagedDistFilesYaml = PACKAGED_DIST_FILES.map((glob) =>
     glob.startsWith("!") ? `  - "${glob}"` : `  - ${glob}`,
   ).join("\n");
@@ -613,7 +642,7 @@ linux:
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:
-  executableName: ${macExecutableName}
+  executableName: ${macExecutableName}${macIdentityLine}
   target:
     - target: dmg
       arch:
@@ -632,7 +661,8 @@ mac:
     NSMicrophoneUsageDescription: Y Space uses the microphone for local voice input in the composer.
   entitlements: ${macEntitlements}
   entitlementsInherit: ${macEntitlementsInherit}
-  notarize: true
+  forceCodeSigning: ${macSigningPolicy.forceCodeSigning}
+  notarize: ${macSigningPolicy.notarize}
 
 npmRebuild: false
 `;

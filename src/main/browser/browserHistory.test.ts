@@ -49,6 +49,40 @@ describe("BrowserHistoryStore", () => {
     h.clear();
     expect(h.query("a", 5)).toHaveLength(0);
   });
+
+  it("bounds persisted URL/title fields and aggregate UTF-8 bytes", async () => {
+    vi.useFakeTimers();
+    try {
+      const { MAX_BROWSER_HISTORY_TOTAL_BYTES } = await import("./browserHistory");
+      const h = new BrowserHistoryStore();
+      for (let index = 0; index < 200; index += 1) {
+        h.record(
+          `https://example.test/${index}?payload=${"🚀".repeat(40_000)}`,
+          `Title ${index} ${"🚀".repeat(10_000)}`,
+          index,
+        );
+      }
+
+      await vi.runAllTimersAsync();
+      const persisted = state.get("browser-history-v1") ?? "";
+      const entries = JSON.parse(persisted) as Array<{ url: string; title: string }>;
+      const retainedBytes = entries.reduce(
+        (total, entry) =>
+          total + Buffer.byteLength(entry.url, "utf8") + Buffer.byteLength(entry.title, "utf8"),
+        0,
+      );
+
+      expect(retainedBytes).toBeLessThanOrEqual(MAX_BROWSER_HISTORY_TOTAL_BYTES);
+      expect(entries.every((entry) => Buffer.byteLength(entry.url, "utf8") <= 64 * 1024)).toBe(
+        true,
+      );
+      expect(entries.every((entry) => Buffer.byteLength(entry.title, "utf8") <= 8 * 1024)).toBe(
+        true,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("fetchSearchSuggestions", () => {

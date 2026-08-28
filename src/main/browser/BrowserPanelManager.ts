@@ -9,28 +9,57 @@ import {
   type BrowserTabInfo,
 } from "@/shared/ipc";
 import type { UsageLoginConfirmationAction, UsageLoginDeviceCode } from "@/shared/contracts";
+import { BROWSER_HOME_URL } from "@/shared/browserDefaults";
 import type { PoracodePaths } from "@/shared/poracodePaths";
 import type { BrowserLinkPresentationMode } from "@/shared/settings";
 import { dbGetState, dbSetState } from "../db";
 import { readSharedSettingsFile } from "../sharedSettingsFile";
 import { saveClipboardImageFile } from "../attachments/localFiles";
 import { BrowserLoginCaptureCoordinator } from "./BrowserLoginCaptureCoordinator";
-import { BrowserTab, type BrowserTabSnapshot, resolveWebContentsById } from "./BrowserTab";
+import {
+  BrowserTab,
+  BROWSER_TAB_ATTACH_TIMEOUT_MS,
+  MAX_BROWSER_URL_BYTES,
+  type BrowserTabSnapshot,
+  resolveWebContentsById,
+} from "./BrowserTab";
 import { BrowserTabGroups } from "./BrowserTabGroups";
 import { BrowserHistoryStore, fetchSearchSuggestions } from "./browserHistory";
 import { BrowserBookmarkStore, type BrowserBookmark } from "./browserBookmarks";
+import { truncateUtf8 } from "./boundedText";
+import { setCursorOverlayVisible } from "./cursorOverlay";
+import { isNavigationUrlAllowed } from "./permissions";
 import { PICKER_COMMIT_ORIGIN, onPickerCommit } from "./picker/pickerProtocol";
 import { buildPickerScript } from "./picker/pickerScript";
 
 const PERSIST_KEY = "browser-panel-tabs-v1";
 const PERSIST_DEBOUNCE_MS = 750;
-const ATTACH_TIMEOUT_MS = 8000;
+/** Lightweight metadata may outlive a suspended webview, but it is still
+ * bounded so a runaway agent cannot grow persisted tabs without limit. */
+export const MAX_BROWSER_TABS = 30;
+/** Sensitive OAuth guests are pinned outside the ordinary residency budget;
+ * cap them separately so abandoned connect flows cannot grow live Chromium
+ * guests without bound. Four still permits a parent flow plus popup chain. */
+export const MAX_SENSITIVE_BROWSER_TABS = 4;
 // How long the browser stays "active" (webviews kept mounted for headless work)
 // after the last agent tool call, before the renderer unmounts them.
 const AUTOMATION_GRACE_MS = 45_000;
+/** Explicit browser.enable sessions are leased so a crashed agent cannot keep
+ * Chromium guests resident for the rest of the desktop app's lifetime. Every
+ * page-targeting call refreshes this lease. */
+export const AUTOMATION_SESSION_LEASE_MS = 120_000;
+/** Per-thread implicit targets are convenience metadata, not an unbounded task
+ * registry. Keep a generous LRU ceiling above the browser tab metadata cap. */
+export const MAX_REMEMBERED_AGENT_TARGETS = 128;
 const INTERNAL_BROWSER_PROTOCOLS = new Set(["http:", "https:"]);
 const SYSTEM_BROWSER_PROTOCOLS = new Set(["mailto:"]);
 const REDACTED_INTEGRATION_URL = "about:blank";
+const MAX_PICKER_SELECTOR_BYTES = 8 * 1024;
+const MAX_PICKER_URL_BYTES = MAX_BROWSER_URL_BYTES;
+const MAX_PICKER_TITLE_BYTES = 8 * 1024;
+const MAX_PICKER_COORDINATE = 1_000_000;
+const MAX_PICKER_CLIP_DIMENSION = 4096;
+const MAX_PICKER_CLIP_PIXELS = 16 * 1024 * 1024;
 
 interface PersistedTabsState {
   tabs: Array<{ url: string; title: string; groupId?: string }>;
@@ -70,8 +99,13 @@ interface CreateTabOptions {
 }
 
 interface SensitiveIntegrationTabState {
-  privateUrl: string | null;
-  navigationStarted: boolean;
+  /** Latest safe resume point, retained only in main-process memory. */
+  privateResumeUrl: string;
+}
+
+interface AutomationSessionState {
+  readonly tabIds: Set<string>;
+  leaseTimer: ReturnType<typeof setTimeout>;
 }
 
 export class BrowserPanelManager {
@@ -94,7 +128,7 @@ export class BrowserPanelManager {
   private readonly sensitiveIntegrationTabs = new Map<string, SensitiveIntegrationTabState>();
   private restored = false;
   private automationActive = false;
-  private readonly automationSessions = new Set<string>();
+  private readonly automationSessions = new Map<string, AutomationSessionState>();
   /** Per-agent implicit tab target; intentionally independent of the visible UI tab. */
   private readonly activeAgentTabByThread = new Map<string, string>();
   private automationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -202,6 +236,7 @@ export class BrowserPanelManager {
   }
 
   dispose(): void {
+    if (this.pendingPicker) this.cancelPicker();
     this.unsubscribePicker?.();
     this.unsubscribePicker = null;
     if (this.persistTimer) {
@@ -213,6 +248,9 @@ export class BrowserPanelManager {
       clearTimeout(this.automationTimer);
       this.automationTimer = null;
     }
+    for (const session of this.automationSessions.values()) {
+      clearTimeout(session.leaseTimer);
+    }
     this.automationSessions.clear();
     this.automationActive = false;
     this.clearPickerShortcut();
@@ -222,6 +260,7 @@ export class BrowserPanelManager {
     }
     this.tabs = [];
     this.activeTabId = null;
+    this.activeAgentTabByThread.clear();
     this.hosts.clear();
   }
 
@@ -315,28 +354,103 @@ export class BrowserPanelManager {
     }
     this.automationTimer = setTimeout(() => {
       this.automationTimer = null;
-      this.automationActive = false;
-      this.emit({ type: "automation-active", active: false });
+      this.deactivateAutomation();
     }, AUTOMATION_GRACE_MS);
   }
 
   setAutomationSession(sessionId: string, active: boolean): boolean {
     if (active) {
-      this.automationSessions.add(sessionId);
+      const existing = this.automationSessions.get(sessionId);
+      if (existing) {
+        clearTimeout(existing.leaseTimer);
+        existing.leaseTimer = this.createAutomationSessionLease(sessionId);
+      } else {
+        this.automationSessions.set(sessionId, {
+          tabIds: new Set(),
+          leaseTimer: this.createAutomationSessionLease(sessionId),
+        });
+      }
       this.markAutomationActivity();
       return false;
     }
 
-    this.automationSessions.delete(sessionId);
+    return this.releaseAutomationSession(sessionId);
+  }
+
+  touchAutomationSession(sessionId: string): void {
+    const session = this.automationSessions.get(sessionId);
+    if (!session) return;
+    clearTimeout(session.leaseTimer);
+    session.leaseTimer = this.createAutomationSessionLease(sessionId);
+    this.markAutomationActivity();
+  }
+
+  /** Refresh the explicit session lease and claim a target before any mount or
+   * attachment await. This ordering prevents a near-expiry lease from tearing
+   * down the very guest the in-flight tool call is waiting to drive. */
+  recordAutomationTarget(sessionId: string, tabId: string): void {
+    const session = this.automationSessions.get(sessionId);
+    if (!session) return;
+    this.touchAutomationSession(sessionId);
+    session.tabIds.add(tabId);
+  }
+
+  /** Track and reveal presence on every tab an explicit agent session touches.
+   * Session release hides only tabs no other session still owns, then the final
+   * release performs a defensive all-tab sweep. */
+  async showAutomationCursor(sessionId: string, tabId: string): Promise<void> {
+    if (!this.automationSessions.has(sessionId)) return;
+    this.recordAutomationTarget(sessionId, tabId);
+    await this.setAutomationCursorVisible(tabId, true);
+  }
+
+  private createAutomationSessionLease(sessionId: string): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      this.releaseAutomationSession(sessionId);
+    }, AUTOMATION_SESSION_LEASE_MS);
+  }
+
+  private releaseAutomationSession(sessionId: string): boolean {
+    const released = this.automationSessions.get(sessionId);
+    if (released) {
+      clearTimeout(released.leaseTimer);
+      this.automationSessions.delete(sessionId);
+      for (const tabId of released.tabIds) {
+        const stillOwned = [...this.automationSessions.values()].some((session) =>
+          session.tabIds.has(tabId),
+        );
+        if (!stillOwned) void this.setAutomationCursorVisible(tabId, false);
+      }
+    }
     if (this.automationSessions.size > 0) return false;
-    if (!this.automationActive) return true;
+    this.deactivateAutomation();
+    return true;
+  }
+
+  private deactivateAutomation(): void {
     if (this.automationTimer) {
       clearTimeout(this.automationTimer);
       this.automationTimer = null;
     }
+    const wasActive = this.automationActive;
     this.automationActive = false;
-    this.emit({ type: "automation-active", active: false });
-    return true;
+    void this.hideAllAutomationCursors();
+    if (wasActive) this.emit({ type: "automation-active", active: false });
+  }
+
+  private async hideAllAutomationCursors(): Promise<void> {
+    await Promise.all(this.tabs.map((tab) => this.setAutomationCursorVisible(tab.tabId, false)));
+  }
+
+  private async setAutomationCursorVisible(tabId: string, visible: boolean): Promise<void> {
+    const tab = this.findTab(tabId);
+    if (!tab || !tab.isAttached()) return;
+    try {
+      await tab.cdp.attach();
+      await setCursorOverlayVisible(tab.cdp, visible);
+    } catch {
+      // Presence is visual best-effort and must never block browser teardown.
+    }
   }
 
   /**
@@ -347,16 +461,21 @@ export class BrowserPanelManager {
   async ensureTabReady(tabId: string): Promise<void> {
     this.markAutomationActivity();
     const tab = this.findTab(tabId);
-    if (!tab || tab.isAttached()) return;
+    if (!tab) return;
+    // Promote every explicit agent target, including an already-attached
+    // background page. Besides refreshing LRU recency, this guarantees that a
+    // suspended page is mounted before `whenAttached()` is awaited.
+    this.emit({ type: "ensure-browser-page-resident", tabId });
+    // A replacement guest becomes physically attached before BrowserTab has
+    // restored its target-scoped CDP registrations. Await readiness even for
+    // that already-mounted guest so automation cannot race a navigation ahead
+    // of persistent scripts/styles being reinstalled.
     await this.awaitAttach(tab);
   }
 
-  /** Wait for a tab's `<webview>` to mount + attach, capped at ATTACH_TIMEOUT_MS. */
-  private awaitAttach(tab: BrowserTab): Promise<void> {
-    return Promise.race([
-      tab.whenAttached(),
-      new Promise<void>((resolve) => setTimeout(resolve, ATTACH_TIMEOUT_MS)),
-    ]);
+  /** Wait for a tab's `<webview>` to mount + attach with a cancellable timeout. */
+  private async awaitAttach(tab: BrowserTab): Promise<void> {
+    await tab.whenAttached(BROWSER_TAB_ATTACH_TIMEOUT_MS);
   }
 
   private hasHostWindow(): boolean {
@@ -517,15 +636,16 @@ export class BrowserPanelManager {
     for (const host of this.hosts) {
       if (host.webContents === wc) return;
     }
-    tab.attach(wc);
+    const attached = tab.attach(wc);
+    if (!attached) return;
     const sensitive = this.sensitiveIntegrationTabs.get(tabId);
-    if (sensitive && !sensitive.navigationStarted && sensitive.privateUrl) {
-      const privateUrl = sensitive.privateUrl;
-      sensitive.navigationStarted = true;
-      sensitive.privateUrl = null;
-      void tab.loadURL(privateUrl).catch(() => {
-        // Keep the one-use URL redacted even when navigation fails. The user
-        // can safely close the blank integration tab and try again.
+    if (sensitive) {
+      // A sensitive renderer always mounts about:blank. Main alone remembers
+      // the latest HTTP(S) auth location and resumes it on a genuinely new guest
+      // (extraction/injection, host teardown, or another suspension/remount).
+      void tab.loadURL(sensitive.privateResumeUrl).catch(() => {
+        // Keep the URL private and available for a later replacement guest even
+        // when this navigation fails. The renderer continues to see about:blank.
       });
     }
   }
@@ -558,20 +678,34 @@ export class BrowserPanelManager {
     opts: CreateTabOptions,
     sensitiveInitialUrl?: string,
   ): Promise<BrowserTabInfo> {
+    const initialUrl = sensitiveInitialUrl ?? payload.url;
+    if (initialUrl && Buffer.byteLength(initialUrl, "utf8") > MAX_BROWSER_URL_BYTES) {
+      throw new Error(`Navigation URL limit is ${MAX_BROWSER_URL_BYTES} bytes`);
+    }
+    if (payload.url && !isNavigationUrlAllowed(payload.url)) {
+      throw new Error(`Navigation blocked: ${payload.url}`);
+    }
+    const ordinaryTabCount = this.tabs.reduce(
+      (count, tab) => count + (this.sensitiveIntegrationTabs.has(tab.tabId) ? 0 : 1),
+      0,
+    );
+    if (sensitiveInitialUrl && this.sensitiveIntegrationTabs.size >= MAX_SENSITIVE_BROWSER_TABS) {
+      throw new Error(
+        `Sensitive browser tab limit reached (${MAX_SENSITIVE_BROWSER_TABS}); close a connection page before opening another.`,
+      );
+    }
+    if (!sensitiveInitialUrl && ordinaryTabCount >= MAX_BROWSER_TABS) {
+      throw new Error(
+        `Browser tab limit reached (${MAX_BROWSER_TABS}); close a tab before opening another.`,
+      );
+    }
     // Creating a tab is agent activity (mounts the headless host). Restore
     // passes markActivity:false so reopening the app doesn't wake dormant tabs.
     if (opts.markActivity !== false) this.markAutomationActivity();
-    // Same presentation path as openLink / openExternal: emit open-panel so
-    // useBrowserSync places the browser in panel or overlay (and above the
-    // file editor when that is open).
-    if (payload.reveal) {
-      this.revealForUserOpen();
-    }
     const tabId = `tab-${randomUUID()}`;
     if (sensitiveInitialUrl) {
       this.sensitiveIntegrationTabs.set(tabId, {
-        privateUrl: sensitiveInitialUrl,
-        navigationStarted: false,
+        privateResumeUrl: sensitiveInitialUrl,
       });
     }
     const tab = new BrowserTab({
@@ -591,6 +725,15 @@ export class BrowserPanelManager {
           : this.openLink(popupUrl);
         void popup.catch(() => {});
       },
+      onClose: (id) => {
+        void this.closeTab(id).catch(() => {});
+      },
+      onNewTab: () => {
+        void this.createTab({ url: BROWSER_HOME_URL, activate: true }).catch(() => {});
+      },
+      onCycle: (id, direction) => {
+        this.emit({ type: "workspace-tab-cycle", tabId: id, direction });
+      },
     });
     this.tabs.push(tab);
     // Agent-created tabs auto-join a group (parity with the external extension)
@@ -599,13 +742,20 @@ export class BrowserPanelManager {
     // the shared "Y Space" group.
     if (opts.agent) {
       this.tabGroups.assignAgentTab(this.tabs, tabId, opts.threadId, opts.threadTitle);
-      if (opts.threadId) this.activeAgentTabByThread.set(opts.threadId, tabId);
+      if (opts.threadId) this.rememberAgentTarget(opts.threadId, tabId);
     }
     const shouldActivate = payload.activate !== false;
     if (shouldActivate || this.activeTabId === null) {
       this.activeTabId = tabId;
     }
     this.emitState();
+    // Publish the new page before asking the renderer to reveal it. This lets
+    // the global workspace projection create the peer tab first, so the reveal
+    // event can select that exact page without a transient singleton Browser
+    // tab or a race against a later state event.
+    if (payload.reveal) {
+      this.revealForUserOpen();
+    }
     this.schedulePersist();
     // Wait for the renderer to mount the <webview> and attach its webContents
     // so callers (e.g. MCP) can immediately use cdp / dialogs / network.
@@ -631,7 +781,12 @@ export class BrowserPanelManager {
   }
 
   private onTabUpdate(tab: BrowserTab, snapshot: BrowserTabSnapshot): void {
-    if (this.sensitiveIntegrationTabs.has(tab.tabId)) {
+    const sensitive = this.sensitiveIntegrationTabs.get(tab.tabId);
+    if (sensitive) {
+      // Capture redirects before public redaction so a replacement guest can
+      // resume the current auth page. Never copy this URL into IPC or persistence.
+      const privateResumeUrl = parseInternalBrowserUrl(snapshot.url);
+      if (privateResumeUrl) sensitive.privateResumeUrl = privateResumeUrl.toString();
       this.emit({
         type: "tab-updated",
         tab: { ...this.publicSnapshot(tab, snapshot), sensitiveIntegration: true },
@@ -675,10 +830,14 @@ export class BrowserPanelManager {
   async closeTab(tabId: string): Promise<void> {
     const idx = this.tabs.findIndex((t) => t.tabId === tabId);
     if (idx < 0) return;
+    if (this.pendingPicker?.tabId === tabId) this.cancelPicker();
     const [tab] = this.tabs.splice(idx, 1);
     if (!tab) return;
     for (const [threadId, activeTabId] of this.activeAgentTabByThread) {
       if (activeTabId === tabId) this.activeAgentTabByThread.delete(threadId);
+    }
+    for (const session of this.automationSessions.values()) {
+      session.tabIds.delete(tabId);
     }
     try {
       await tab.destroy();
@@ -872,7 +1031,10 @@ export class BrowserPanelManager {
     const remembered = this.activeAgentTabByThread.get(threadId);
     if (remembered) {
       const tab = this.findTab(remembered);
-      if (tab && !this.sensitiveIntegrationTabs.has(remembered)) return tab;
+      if (tab && !this.sensitiveIntegrationTabs.has(remembered)) {
+        this.rememberAgentTarget(threadId, remembered);
+        return tab;
+      }
       this.activeAgentTabByThread.delete(threadId);
     }
     const ownedIds = this.tabGroups.tabIdsForThread(threadId);
@@ -880,15 +1042,25 @@ export class BrowserPanelManager {
     if (!fallbackId) return null;
     const fallback = this.findTab(fallbackId);
     if (!fallback || this.sensitiveIntegrationTabs.has(fallbackId)) return null;
-    this.activeAgentTabByThread.set(threadId, fallbackId);
+    this.rememberAgentTarget(threadId, fallbackId);
     return fallback;
   }
 
   /** Remember an explicit agent selection for later tabId-omitted calls. */
   rememberTabForThread(threadId: string, tabId: string): boolean {
     if (!this.findTab(tabId) || this.sensitiveIntegrationTabs.has(tabId)) return false;
-    this.activeAgentTabByThread.set(threadId, tabId);
+    this.rememberAgentTarget(threadId, tabId);
     return true;
+  }
+
+  private rememberAgentTarget(threadId: string, tabId: string): void {
+    this.activeAgentTabByThread.delete(threadId);
+    while (this.activeAgentTabByThread.size >= MAX_REMEMBERED_AGENT_TARGETS) {
+      const oldestThreadId = this.activeAgentTabByThread.keys().next().value;
+      if (typeof oldestThreadId !== "string") break;
+      this.activeAgentTabByThread.delete(oldestThreadId);
+    }
+    this.activeAgentTabByThread.set(threadId, tabId);
   }
 
   getTab(tabId: string): BrowserTab | null {
@@ -900,7 +1072,10 @@ export class BrowserPanelManager {
     threadId: string;
     tabId: string;
   }): Promise<BrowserStartPickerResult> {
-    const tab = this.findTab(payload.tabId);
+    // getTab deliberately excludes sensitive OAuth/Connect guests. The picker
+    // returns screenshots and a source URL to a task attachment, so allowing it
+    // here would bypass the rest of the sensitive-tab redaction boundary.
+    const tab = this.getTab(payload.tabId);
     if (!tab) {
       return { ok: false, error: `No browser tab: ${payload.tabId}` };
     }
@@ -922,7 +1097,6 @@ export class BrowserPanelManager {
       const script = buildPickerScript(payload.tabId, PICKER_COMMIT_ORIGIN);
       wc.executeJavaScript(script, false)
         .then((pickerPayload: unknown) => {
-          if (!isPickerPayload(pickerPayload)) return;
           void this.onPickerCommit({ tabId: payload.tabId, payload: pickerPayload });
         })
         .catch((err) => {
@@ -952,13 +1126,19 @@ export class BrowserPanelManager {
     this.emit({ type: "picker-cancelled" });
   }
 
-  private async onPickerCommit(commit: { tabId: string; payload: PickerPayload }): Promise<void> {
+  private async onPickerCommit(commit: { tabId: string; payload: unknown }): Promise<void> {
     const pending = this.pendingPicker;
     if (!pending || pending.tabId !== commit.tabId) return;
     this.clearPickerShortcut();
     this.pendingPicker = null;
 
-    if (commit.payload.kind === "cancelled") {
+    const pickerPayload = normalizePickerPayload(commit.payload);
+    if (!pickerPayload) {
+      pending.resolve({ ok: false, error: "Invalid picker response" });
+      return;
+    }
+
+    if (pickerPayload.kind === "cancelled") {
       pending.resolve({ ok: true, cancelled: true });
       this.emit({ type: "picker-cancelled" });
       return;
@@ -966,10 +1146,8 @@ export class BrowserPanelManager {
 
     try {
       const result = await this.captureElement(pending.threadId, commit.tabId, {
-        selector: commit.payload.selector,
-        rect: commit.payload.rect,
-        url: commit.payload.url,
-        title: commit.payload.title,
+        selector: pickerPayload.selector,
+        rect: pickerPayload.rect,
       });
       pending.resolve(result);
     } catch (err) {
@@ -983,8 +1161,6 @@ export class BrowserPanelManager {
     pick: {
       selector: string;
       rect: { x: number; y: number; width: number; height: number };
-      url: string;
-      title: string;
     },
   ): Promise<BrowserStartPickerResult> {
     const tab = this.findTab(tabId);
@@ -995,13 +1171,8 @@ export class BrowserPanelManager {
     // `webContents.capturePage` — no scrolling, no CDP off-surface path, and
     // no visible flicker. `pick.rect` is viewport-relative as captured by the
     // picker script.
-    const rect = pick.rect;
-    const clip = {
-      x: Math.max(0, Math.floor(rect.x)),
-      y: Math.max(0, Math.floor(rect.y)),
-      width: Math.max(1, Math.ceil(rect.width)),
-      height: Math.max(1, Math.ceil(rect.height)),
-    };
+    const clip = normalizePickerClip(pick.rect);
+    if (!clip) throw new Error("Invalid picker response");
     const bytes = await tab.capturePng(clip);
 
     const data = new Uint8Array(bytes);
@@ -1016,9 +1187,9 @@ export class BrowserPanelManager {
       attachmentPath: path,
       attachmentName: baseName,
       mimeType: "image/png",
-      selector: pick.selector,
-      sourceUrl: pick.url,
-      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      selector: truncateUtf8(pick.selector, MAX_PICKER_SELECTOR_BYTES),
+      sourceUrl: authoritativeTabUrl(tab),
+      rect: clip,
     };
   }
 }
@@ -1037,17 +1208,60 @@ function isEscapeKeyDown(input: Electron.Input): boolean {
   return input.key === "Escape" || input.key === "Esc" || input.code === "Escape";
 }
 
-function isPickerPayload(value: unknown): value is PickerPayload {
-  if (!value || typeof value !== "object") return false;
+function normalizePickerPayload(value: unknown): PickerPayload | null {
+  if (!value || typeof value !== "object") return null;
   const kind = (value as { kind?: unknown }).kind;
-  if (kind === "cancelled") return true;
-  if (kind !== "picked") return false;
-  const payload = value as { selector?: unknown; rect?: unknown; url?: unknown; title?: unknown };
-  return (
-    typeof payload.selector === "string" &&
-    typeof payload.url === "string" &&
-    typeof payload.title === "string" &&
-    typeof payload.rect === "object" &&
-    payload.rect !== null
-  );
+  if (kind === "cancelled") return { kind: "cancelled" };
+  if (kind !== "picked") return null;
+  const payload = value as {
+    selector?: unknown;
+    rect?: unknown;
+    dpr?: unknown;
+    url?: unknown;
+    title?: unknown;
+  };
+  if (
+    typeof payload.selector !== "string" ||
+    typeof payload.url !== "string" ||
+    typeof payload.title !== "string" ||
+    typeof payload.dpr !== "number" ||
+    !Number.isFinite(payload.dpr) ||
+    payload.dpr <= 0 ||
+    !normalizePickerClip(payload.rect)
+  ) {
+    return null;
+  }
+  const rect = payload.rect as { x: number; y: number; width: number; height: number };
+  return {
+    kind: "picked",
+    selector: truncateUtf8(payload.selector, MAX_PICKER_SELECTOR_BYTES),
+    rect,
+    dpr: Math.min(16, payload.dpr),
+    url: truncateUtf8(payload.url, MAX_PICKER_URL_BYTES),
+    title: truncateUtf8(payload.title, MAX_PICKER_TITLE_BYTES),
+  };
+}
+
+function normalizePickerClip(value: unknown): Electron.Rectangle | null {
+  if (!value || typeof value !== "object") return null;
+  const rect = value as { x?: unknown; y?: unknown; width?: unknown; height?: unknown };
+  if (![rect.x, rect.y, rect.width, rect.height].every(isFiniteNumber)) return null;
+  const x = Math.max(0, Math.min(MAX_PICKER_COORDINATE, Math.floor(rect.x as number)));
+  const y = Math.max(0, Math.min(MAX_PICKER_COORDINATE, Math.floor(rect.y as number)));
+  const width = Math.max(1, Math.min(MAX_PICKER_CLIP_DIMENSION, Math.ceil(rect.width as number)));
+  let height = Math.max(1, Math.min(MAX_PICKER_CLIP_DIMENSION, Math.ceil(rect.height as number)));
+  height = Math.min(height, Math.max(1, Math.floor(MAX_PICKER_CLIP_PIXELS / width)));
+  return { x, y, width, height };
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function authoritativeTabUrl(tab: BrowserTab): string {
+  try {
+    return truncateUtf8(tab.webContents.getURL() || tab.snapshot().url, MAX_PICKER_URL_BYTES);
+  } catch {
+    return truncateUtf8(tab.snapshot().url, MAX_PICKER_URL_BYTES);
+  }
 }

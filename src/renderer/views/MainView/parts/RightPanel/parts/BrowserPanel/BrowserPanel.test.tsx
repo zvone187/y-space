@@ -1,8 +1,10 @@
 import { act, fireEvent } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { BrowserTabInfo } from "@/shared/ipc";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 import { BrowserPanel } from "./BrowserPanel";
 
 const bridge = vi.hoisted(() => ({
@@ -29,10 +31,6 @@ vi.mock("./parts/BrowserToolbar", () => ({
   BrowserToolbar: () => <div data-testid="browser-toolbar" />,
 }));
 
-vi.mock("./parts/BrowserTabStrip", () => ({
-  BrowserTabStrip: () => <div data-testid="browser-tab-strip" />,
-}));
-
 vi.mock("@/renderer/bridge", () => ({
   isMac: () => false,
   isWindows: () => false,
@@ -46,9 +44,36 @@ vi.mock("@/renderer/bridge", () => ({
   }),
 }));
 
+function setBrowserTabs(tabs: BrowserTabInfo[], activeTabId: string | null) {
+  useBrowserPanelStore.setState({ tabs, activeTabId });
+  type WorkspaceTabs = ReturnType<typeof useRightWorkspaceTabsStore.getState>["tabs"];
+  const browserPages = tabs.map((tab, index) => ({
+    id: `browser:${tab.tabId}`,
+    kind: "browser-page",
+    browserTabId: tab.tabId,
+    title: tab.title,
+    url: tab.url,
+    resident: true,
+    closable: true,
+    lastActivatedSequence: index + 1,
+    ...(tab.sensitiveIntegration === undefined
+      ? {}
+      : { sensitiveIntegration: tab.sensitiveIntegration }),
+    ...(tab.groupId === undefined ? {} : { groupId: tab.groupId }),
+  })) as unknown as WorkspaceTabs;
+  useRightWorkspaceTabsStore.setState({
+    tabs: browserPages,
+    activeTabId: activeTabId ? `browser:${activeTabId}` : null,
+    previewTabId: null,
+    browserPageActivationSequence: tabs.length,
+    hidden: false,
+  });
+}
+
 describe("BrowserPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useRightWorkspaceTabsStore.getState().reset();
     useBrowserPanelStore.setState({
       tabs: [],
       groups: [],
@@ -72,9 +97,9 @@ describe("BrowserPanel", () => {
     expect(getByText("No browser tab open")).toBeTruthy();
   });
 
-  it("renders a <webview> per tab and hides inactive ones", () => {
-    useBrowserPanelStore.setState({
-      tabs: [
+  it("keeps resident page surfaces laid out while hiding inactive ones", () => {
+    setBrowserTabs(
+      [
         {
           tabId: "tab-1",
           url: "https://example.com/",
@@ -92,15 +117,187 @@ describe("BrowserPanel", () => {
           canGoForward: false,
         },
       ],
-      activeTabId: "tab-1",
-    });
+      "tab-1",
+    );
     const { container } = render(<BrowserPanel visible />);
     const webviews = container.querySelectorAll("webview");
     expect(webviews).toHaveLength(2);
     expect(webviews[0]?.getAttribute("partition")).toBe("persist:lightcode-browser");
     expect(webviews[0]?.getAttribute("allowpopups")).toBe("true");
     expect((webviews[0] as HTMLElement).style.display).toBe("flex");
-    expect((webviews[1] as HTMLElement).style.display).toBe("none");
+    expect((webviews[0] as HTMLElement).style.opacity).toBe("1");
+    expect((webviews[1] as HTMLElement).style.display).toBe("flex");
+    expect((webviews[1] as HTMLElement).style.opacity).toBe("0");
+    expect((webviews[1] as HTMLElement).style.pointerEvents).toBe("none");
+  });
+
+  it("never renders a nested browser tablist on panel, overlay, or window surfaces", () => {
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-1",
+          url: "https://example.com/",
+          title: "Example",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      "tab-1",
+    );
+    const view = render(<BrowserPanel visible />);
+
+    expect(view.queryByRole("tablist", { name: "Browser tabs" })).not.toBeInTheDocument();
+
+    act(() => {
+      usePanelStore.setState({ browserOverlayOpen: true, browserOverlayMaximized: true });
+    });
+    expect(view.queryByRole("tablist", { name: "Browser tabs" })).not.toBeInTheDocument();
+
+    view.rerender(<BrowserPanel visible surface="window" />);
+    expect(view.queryByRole("tablist", { name: "Browser tabs" })).not.toBeInTheDocument();
+  });
+
+  it("renders the active page in the extracted window without a second tab strip", () => {
+    useBrowserPanelStore.setState({
+      tabs: [
+        {
+          tabId: "tab-window",
+          url: "https://window.example/",
+          title: "Window page",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      activeTabId: "tab-window",
+    });
+    useRightWorkspaceTabsStore.getState().reset();
+
+    const view = render(<BrowserPanel visible surface="window" />);
+
+    expect(view.container.querySelector('webview[data-tab-id="tab-window"]')).toBeInTheDocument();
+    expect(view.queryByRole("tablist", { name: "Browser tabs" })).not.toBeInTheDocument();
+  });
+
+  it("keeps extracted pages resident by true activation LRU while protecting active and sensitive pages", () => {
+    const ordinaryTabs = Array.from({ length: 8 }, (_entry, index) => ({
+      tabId: `tab-${index + 1}`,
+      url: `https://example.com/${index + 1}`,
+      title: `Page ${index + 1}`,
+      loading: false,
+      canGoBack: false,
+      canGoForward: false,
+    }));
+    const sensitiveTab = {
+      tabId: "tab-auth",
+      url: "about:blank",
+      title: "Secure connection",
+      loading: false,
+      canGoBack: false,
+      canGoForward: false,
+      sensitiveIntegration: true as const,
+    };
+    useBrowserPanelStore.setState({
+      tabs: [...ordinaryTabs, sensitiveTab],
+      activeTabId: "tab-8",
+    });
+    useRightWorkspaceTabsStore.getState().reset();
+    const view = render(<BrowserPanel visible surface="window" />);
+    const mountedTabIds = () =>
+      [...view.container.querySelectorAll("webview")]
+        .map((webview) => webview.getAttribute("data-tab-id"))
+        .sort();
+
+    expect(mountedTabIds()).toEqual([
+      "tab-3",
+      "tab-4",
+      "tab-5",
+      "tab-6",
+      "tab-7",
+      "tab-8",
+      "tab-auth",
+    ]);
+
+    act(() => useBrowserPanelStore.getState().setActive("tab-1"));
+    act(() => useBrowserPanelStore.getState().setActive("tab-2"));
+    act(() => useBrowserPanelStore.getState().setActive("tab-4"));
+
+    expect(mountedTabIds()).toEqual([
+      "tab-1",
+      "tab-2",
+      "tab-4",
+      "tab-6",
+      "tab-7",
+      "tab-8",
+      "tab-auth",
+    ]);
+    expect(
+      view.container.querySelector<HTMLElement>('webview[data-tab-id="tab-4"]')?.style.opacity,
+    ).toBe("1");
+
+    // Backend reordering must not reset activation recency or fall back to the
+    // first six metadata entries.
+    act(() => {
+      useBrowserPanelStore.setState({ tabs: [sensitiveTab, ...ordinaryTabs].reverse() });
+    });
+    expect(mountedTabIds()).toEqual([
+      "tab-1",
+      "tab-2",
+      "tab-4",
+      "tab-6",
+      "tab-7",
+      "tab-8",
+      "tab-auth",
+    ]);
+
+    act(() => useBrowserPanelStore.getState().setActive("tab-3"));
+    expect(mountedTabIds()).toEqual([
+      "tab-1",
+      "tab-2",
+      "tab-3",
+      "tab-4",
+      "tab-7",
+      "tab-8",
+      "tab-auth",
+    ]);
+  });
+
+  it("mounts only global browser pages marked resident", () => {
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-1",
+          url: "https://example.com/",
+          title: "Example",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+        {
+          tabId: "tab-2",
+          url: "https://example.org/",
+          title: "Suspended",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      "tab-1",
+    );
+    useRightWorkspaceTabsStore.setState((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.kind === "browser-page" && tab.browserTabId === "tab-2"
+          ? { ...tab, resident: false }
+          : tab,
+      ),
+    }));
+
+    const { container } = render(<BrowserPanel visible />);
+
+    expect(container.querySelectorAll("webview")).toHaveLength(1);
+    expect(container.querySelector('webview[data-tab-id="tab-1"]')).toBeInTheDocument();
+    expect(container.querySelector('webview[data-tab-id="tab-2"]')).not.toBeInTheDocument();
   });
 
   it("updates tab group membership from browser state", () => {
@@ -133,8 +330,8 @@ describe("BrowserPanel", () => {
   });
 
   it("keeps the same webview mounted when browser panel goes fullscreen", () => {
-    useBrowserPanelStore.setState({
-      tabs: [
+    setBrowserTabs(
+      [
         {
           tabId: "tab-1",
           url: "https://example.com/",
@@ -144,8 +341,8 @@ describe("BrowserPanel", () => {
           canGoForward: false,
         },
       ],
-      activeTabId: "tab-1",
-    });
+      "tab-1",
+    );
     usePanelStore.setState({
       browserPanelOpen: true,
       browserOverlayOpen: false,
@@ -165,8 +362,8 @@ describe("BrowserPanel", () => {
   });
 
   it("attaches the right-panel webview contents to the browser tab", () => {
-    useBrowserPanelStore.setState({
-      tabs: [
+    setBrowserTabs(
+      [
         {
           tabId: "tab-1",
           url: "https://example.com/",
@@ -176,8 +373,8 @@ describe("BrowserPanel", () => {
           canGoForward: false,
         },
       ],
-      activeTabId: "tab-1",
-    });
+      "tab-1",
+    );
     const { container } = render(<BrowserPanel visible />);
     const webview = container.querySelector("webview") as HTMLElement & {
       getWebContentsId(): number;
@@ -193,8 +390,8 @@ describe("BrowserPanel", () => {
   });
 
   it("reattaches a mounted webview when it becomes visible again", () => {
-    useBrowserPanelStore.setState({
-      tabs: [
+    setBrowserTabs(
+      [
         {
           tabId: "tab-1",
           url: "https://example.com/",
@@ -204,8 +401,8 @@ describe("BrowserPanel", () => {
           canGoForward: false,
         },
       ],
-      activeTabId: "tab-1",
-    });
+      "tab-1",
+    );
     const { container, rerender } = render(<BrowserPanel visible={false} />);
     const webview = container.querySelector("webview") as HTMLElement & {
       getWebContentsId(): number;
@@ -222,8 +419,8 @@ describe("BrowserPanel", () => {
   });
 
   it("routes browser panel reload shortcuts to the active tab", () => {
-    useBrowserPanelStore.setState({
-      tabs: [
+    setBrowserTabs(
+      [
         {
           tabId: "tab-1",
           url: "https://example.com/",
@@ -233,8 +430,8 @@ describe("BrowserPanel", () => {
           canGoForward: false,
         },
       ],
-      activeTabId: "tab-1",
-    });
+      "tab-1",
+    );
     const { container } = render(<BrowserPanel visible />);
     const panel = container.firstElementChild as HTMLElement;
 
@@ -251,16 +448,15 @@ describe("BrowserPanel", () => {
     expect(bridge.browserHardReload).toHaveBeenCalledTimes(2);
   });
 
-  it("moves the overlay browser to a separate window", () => {
+  it("does not offer moving the overlay browser to a separate window", () => {
     usePanelStore.setState({
       browserOverlayOpen: true,
       browserOverlayMaximized: true,
     });
-    const { getByTitle } = render(<BrowserPanel visible />);
+    const { queryByTitle } = render(<BrowserPanel visible />);
 
-    fireEvent.click(getByTitle("Move browser to window"));
-
-    expect(bridge.browserExtractToWindow).toHaveBeenCalledOnce();
+    expect(queryByTitle("Move browser to window")).not.toBeInTheDocument();
+    expect(bridge.browserExtractToWindow).not.toHaveBeenCalled();
   });
 
   it("moves the separate browser window back into the main window", () => {
