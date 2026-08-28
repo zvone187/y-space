@@ -1,10 +1,6 @@
 import { accessSync, constants as fsConstants, existsSync, statSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
-import {
-  COMPUTER_USE_MCP_TOKEN_ENV,
-  COMPUTER_USE_MCP_URL_ENV,
-} from "@/supervisor/agents/computerUseMcp";
-import { CHROME_MCP_TOKEN_ENV, CHROME_MCP_URL_ENV } from "@/supervisor/agents/chromeMcp";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 
 export function describeSpawnFailure(
   kind: "shell" | "agent",
@@ -71,28 +67,13 @@ export function sanitizeEnv(source: NodeJS.ProcessEnv): Record<string, string> {
   return out;
 }
 
-// The computer-use and external-Chrome MCP endpoints control the host's real
-// desktop/browser. Their URL + token arrive in the supervisor's process.env
-// purely so the orchestrator can resolve per-thread launch config. They must not
-// cascade into every spawned PTY or shell, which would make opt-in cosmetic.
-// Keep process.env intact for resolution, but strip the secrets from the shared
-// child-process base env; provider adapters inject them only for opted-in launches.
-const SCOPED_LAUNCH_ONLY_ENV_KEYS = [
-  COMPUTER_USE_MCP_URL_ENV,
-  COMPUTER_USE_MCP_TOKEN_ENV,
-  CHROME_MCP_URL_ENV,
-  CHROME_MCP_TOKEN_ENV,
-] as const;
-
 // process.env is effectively static after supervisor boot — sanitize once
 // instead of re-scanning ~150–300 entries on every startShell call.
-export const sanitizedProcessEnv = ((): Record<string, string> => {
-  const env = sanitizeEnv(process.env);
-  for (const key of SCOPED_LAUNCH_ONLY_ENV_KEYS) {
-    delete env[key];
-  }
-  return env;
-})();
+export function sanitizeChildProcessEnv(source: NodeJS.ProcessEnv): Record<string, string> {
+  return sanitizePrivilegedChildEnvironment(source);
+}
+
+export const sanitizedProcessEnv = sanitizeChildProcessEnv(process.env);
 
 function measureEnvBytes(env: Record<string, string>): number {
   let total = 0;

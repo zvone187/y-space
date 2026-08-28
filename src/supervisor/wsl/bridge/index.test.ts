@@ -202,7 +202,7 @@ describe("WslBridgeServer", () => {
     await manager.dispose();
   });
 
-  it("forwards Browser MCP upstream env into the in-WSL bridge", async () => {
+  it("forwards only the Browser MCP URL, never the root credential, into WSL", async () => {
     const oldUrl = process.env.PORACODE_BROWSER_MCP_URL;
     const oldToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
     process.env.PORACODE_BROWSER_MCP_URL = "http://127.0.0.1:65093";
@@ -222,8 +222,8 @@ describe("WslBridgeServer", () => {
 
       expect(capturedEnv).toMatchObject({
         PORACODE_BROWSER_MCP_URL: "http://127.0.0.1:65093",
-        PORACODE_BROWSER_MCP_TOKEN: "browser-token",
       });
+      expect(capturedEnv).not.toHaveProperty("PORACODE_BROWSER_MCP_TOKEN");
     } finally {
       if (oldUrl === undefined) {
         delete process.env.PORACODE_BROWSER_MCP_URL;

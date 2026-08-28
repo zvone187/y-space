@@ -9,8 +9,8 @@ import { useGitSummariesStore } from "../gitSummaries";
 import type { RemoteDesktopSession } from "../useRemoteDesktop";
 import { DesktopWorkspacePanel } from "./DesktopWorkspacePanel";
 
-const { openFileInEditor, showTerminalPanel } = vi.hoisted(() => ({
-  openFileInEditor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+const { openFileInMobileEditor, showTerminalPanel } = vi.hoisted(() => ({
+  openFileInMobileEditor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   showTerminalPanel: vi.fn<(projectId: string, worktreePath?: string) => void>(),
 }));
 
@@ -28,7 +28,7 @@ vi.mock("@/renderer/utils/gitHelpers", async () => {
   );
   return {
     ...actual,
-    openFileInEditor,
+    openFileInMobileEditor,
   };
 });
 
@@ -126,7 +126,7 @@ function renderPanel() {
 
 describe("DesktopWorkspacePanel", () => {
   beforeEach(() => {
-    openFileInEditor.mockClear();
+    openFileInMobileEditor.mockClear();
     showTerminalPanel.mockClear();
     localStorage.clear();
     useDesktopPanelStore.setState({
@@ -221,7 +221,7 @@ describe("DesktopWorkspacePanel", () => {
     const { rerender } = renderPanel();
 
     await waitFor(() => {
-      expect(openFileInEditor).toHaveBeenCalledWith(
+      expect(openFileInMobileEditor).toHaveBeenCalledWith(
         project,
         undefined,
         undefined,
@@ -237,7 +237,7 @@ describe("DesktopWorkspacePanel", () => {
         currentThreadId={thread.id}
       />,
     );
-    expect(openFileInEditor).toHaveBeenCalledTimes(1);
+    expect(openFileInMobileEditor).toHaveBeenCalledTimes(1);
   });
 
   it("shows a temporary subagent tab beside the parent thread", () => {

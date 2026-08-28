@@ -1,6 +1,6 @@
 import { msg } from "@lingui/core/macro";
 import type { MessageDescriptor } from "@lingui/core";
-import { AppWindow, Globe, Users, type LucideIcon } from "lucide-react";
+import { Globe, Users, type LucideIcon } from "lucide-react";
 import { resolveComposerMcpScope } from "@/shared/contracts";
 import type {
   AgentCapability,
@@ -23,7 +23,7 @@ import type {
 export type { ComposerMcpScope };
 
 /** `ThreadConfig` keys that hold the per-thread enable flag for each MCP. */
-export type ComposerMcpConfigKey = "browserMcp" | "crossagentMcp" | "chromeMcp";
+export type ComposerMcpConfigKey = "browserMcp" | "crossagentMcp";
 
 /**
  * Resolve an adapter-declared per-presentation scope pair to the active
@@ -54,7 +54,7 @@ export function providerMcpSettingEnabled(
 }
 
 export interface ComposerMcpServerDescriptor {
-  id: "browser" | "crossagents" | "chrome";
+  id: "browser" | "crossagents";
   configKey: ComposerMcpConfigKey;
   icon: LucideIcon;
   /** Menu row + chip label. */
@@ -95,24 +95,9 @@ export const crossagentMcpServer: ComposerMcpServerDescriptor = {
     resolveMcpScope(capabilities.mcpScope, presentationMode),
 };
 
-export const chromeMcpServer: ComposerMcpServerDescriptor = {
-  id: "chrome",
-  configKey: "chromeMcp",
-  icon: AppWindow,
-  label: msg`Chrome`,
-  enabledTitle: msg`Chrome MCP enabled for this thread`,
-  disableLabel: msg`Disable Chrome MCP`,
-  isAvailable: (projectLocation) => projectLocation?.kind !== "wsl",
-  getScope: (capabilities, presentationMode, projectLocation) =>
-    !chromeMcpServer.isAvailable(projectLocation)
-      ? "none"
-      : resolveMcpScope(capabilities.mcpScope, presentationMode),
-};
-
 export const composerMcpServers: readonly ComposerMcpServerDescriptor[] = [
   browserMcpServer,
   crossagentMcpServer,
-  chromeMcpServer,
 ];
 
 /**

@@ -1,7 +1,7 @@
 {
   "name": "poracode-status",
   "version": "1.0.1",
-  "description": "Forward Command Code lifecycle events (PreToolUse/PostToolUse/Stop) to Poracode for sidebar status detection.",
-  "author": "Poracode",
+  "description": "Forward Command Code lifecycle events (PreToolUse/PostToolUse/Stop) to Y Space for sidebar status detection.",
+  "author": "Y Space",
   "license": "Apache-2.0"
 }

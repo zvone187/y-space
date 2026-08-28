@@ -156,15 +156,20 @@ export type BrowserEvent =
   | { type: "state"; state: BrowserState }
   | { type: "tab-updated"; tab: BrowserTabInfo }
   | { type: "tab-attention"; tabId: string }
+  | { type: "workspace-tab-cycle"; tabId: string; direction: "next" | "previous" }
   | { type: "open-panel"; mode?: BrowserLinkPresentationMode }
   | { type: "usage-login-confirmation"; request: UsageLoginConfirmationRequest }
   | { type: "usage-login-confirmation-closed"; requestId: string }
   | { type: "usage-login-device-code"; deviceCode: UsageLoginDeviceCode }
   | { type: "usage-login-device-code-cleared"; providerId: string }
   | { type: "picker-cancelled" }
+  // A browser page can be suspended by the renderer's bounded resident-page
+  // policy. Agent work against an explicit page asks the renderer to promote
+  // that page before the manager waits for a fresh webContents attachment.
+  | { type: "ensure-browser-page-resident"; tabId: string }
   // Headless agent activity: while active the renderer keeps the browser's
-  // <webview>s mounted off-screen (so tabs can be driven with the panel closed);
-  // when it goes idle the renderer unmounts them to free resources.
+  // bounded resident set mounted off-screen so tabs can be driven with the
+  // panel closed; when it goes idle inactive pages may be suspended.
   | { type: "automation-active"; active: boolean };
 
 /** Emitted by the main process when a native app surface requests opening a thread. */

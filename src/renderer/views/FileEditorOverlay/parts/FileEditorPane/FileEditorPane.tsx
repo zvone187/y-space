@@ -4,7 +4,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { MarkdownPreview } from "../MarkdownPreview";
 import { Editor, type BeforeMount, type Monaco, type OnMount } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
-import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import { useFileEditorStore, type FileEditorRootContext } from "@/renderer/state/fileEditorStore";
 import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import {
   useActiveBufferContent,
@@ -25,8 +25,11 @@ import { useGitDiffContribution } from "./parts/gitDiff/useGitDiffContribution";
 import { setActiveFindEditor } from "@/renderer/components/find/editorFindBridge";
 import { openPdfPreview } from "@/renderer/components/pdf";
 import { isPdfPath } from "@/shared/promptContent";
+import { MobilePdfPreview } from "./MobilePdfPreview";
 
 export { getLanguageFromPath } from "./parts/langMap";
+
+export type FileEditorPresentation = "desktop" | "mobile";
 
 const EDITOR_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
   fontSize: 13,
@@ -51,16 +54,17 @@ const EDITOR_OPTIONS: MonacoEditor.IStandaloneEditorConstructionOptions = {
 };
 
 export function FileEditorPane(props: {
+  presentation: FileEditorPresentation;
   showTabs: boolean;
   headerNeedsTrafficLightPad?: boolean;
+  handleGlobalShortcuts?: boolean;
   onOpenFullscreen?: () => void;
   onClose?: () => void;
 }) {
   const { t } = useLingui();
   const activePath = useFileEditorStore((state) => state.activePath);
-  const rootProjectLocation = useFileEditorStore(
-    (state) => state.rootContext?.projectLocation ?? null,
-  );
+  const rootContext = useFileEditorStore((state) => state.rootContext);
+  const rootProjectLocation = rootContext?.projectLocation ?? null;
   const isDirty = useIsActiveBufferDirty();
   const bufferStatus = useActiveBufferStatus();
   const markdownPreviewPath = useFileEditorStore((state) => state.markdownPreviewPath);
@@ -99,6 +103,7 @@ export function FileEditorPane(props: {
   }
 
   useEffect(() => {
+    if (props.handleGlobalShortcuts === false) return undefined;
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "w") {
         const path = useFileEditorStore.getState().activePath;
@@ -166,8 +171,10 @@ export function FileEditorPane(props: {
           ) : null}
 
           <EditorBody
+            presentation={props.presentation}
             activePath={activePath}
             projectLocation={rootProjectLocation}
+            rootContext={rootContext}
             bufferStatus={bufferStatus}
             monacoTheme={monacoTheme}
             onMonacoReady={setMonacoInstance}
@@ -246,8 +253,10 @@ function TabStripHeader(props: {
 }
 
 function EditorBody(props: {
+  presentation: FileEditorPresentation;
   activePath: string;
   projectLocation: ProjectLocation | null;
+  rootContext: FileEditorRootContext | null;
   bufferStatus: NonNullable<ReturnType<typeof useActiveBufferStatus>>;
   monacoTheme: string;
   onMonacoReady: (monaco: Monaco) => void;
@@ -271,6 +280,10 @@ function EditorBody(props: {
     if (!path) return null;
     const buffer = state.buffers[path];
     return buffer?.status === "ready" ? (buffer.gitDiff ?? null) : null;
+  });
+  const pdfContentBase64 = useFileEditorStore((state) => {
+    const buffer = state.buffers[activePath];
+    return buffer?.binaryContentBase64;
   });
   const isPdf = isPdfPath(activePath);
 
@@ -324,7 +337,15 @@ function EditorBody(props: {
   return (
     <div className="min-h-0 flex-1 overflow-hidden">
       {isPdf ? (
-        <PdfBrowserPlaceholder path={activePath} projectLocation={projectLocation} />
+        props.presentation === "mobile" ? (
+          <MobilePdfPreview
+            path={activePath}
+            status={bufferStatus}
+            {...(pdfContentBase64 ? { contentBase64: pdfContentBase64 } : {})}
+          />
+        ) : (
+          <PdfBrowserPlaceholder path={activePath} rootContext={props.rootContext} />
+        )
       ) : bufferStatus === "ready" && showPreview && isMarkdown ? (
         <MarkdownPreview content={content ?? ""} />
       ) : bufferStatus === "ready" ? (
@@ -360,25 +381,26 @@ function EditorBody(props: {
   );
 }
 
-function PdfBrowserPlaceholder(props: { path: string; projectLocation: ProjectLocation | null }) {
+function PdfBrowserPlaceholder(props: { path: string; rootContext: FileEditorRootContext | null }) {
   const { t } = useLingui();
-  const location = props.projectLocation ?? undefined;
 
   useEffect(() => {
-    openPdfPreview(props.path, location);
-  }, [props.path, location]);
+    if (props.rootContext) openPdfPreview(props.path, props.rootContext);
+  }, [props.path, props.rootContext]);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center text-sm text-muted">
       <p>
-        <Trans>PDF preview opens in the browser.</Trans>
+        <Trans>PDF preview opens in a Y Space document tab.</Trans>
       </p>
       <button
         type="button"
         className="rounded-md border border-[color:var(--border)] px-3 py-1.5 text-foreground transition-colors hover:bg-[var(--row-hover)]"
-        onClick={() => openPdfPreview(props.path, location)}
+        onClick={() => {
+          if (props.rootContext) openPdfPreview(props.path, props.rootContext);
+        }}
       >
-        {t`Open in browser`}
+        {t`Open document tab`}
       </button>
     </div>
   );

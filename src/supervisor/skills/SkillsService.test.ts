@@ -343,7 +343,7 @@ describe("SkillsService", () => {
     expect(bundled).toMatchObject({
       providerId: "poracode-built-in",
       providerGroupId: "poracode",
-      providerGroupLabel: "Poracode",
+      providerGroupLabel: "Y Space",
       providerGroupOrder: -1,
       origin: "built-in",
       mutable: false,
@@ -568,15 +568,14 @@ describe("SkillsService", () => {
     ).toEqual([]);
   });
 
-  it("filters plugin skills whose companion apps cannot run in WSL projects", async () => {
-    const chrome = await writePluginPackage(root, "chrome-tools", ["chrome-control"]);
+  it("filters plugin skills whose companion app cannot run in WSL projects", async () => {
     const computerUse = await writePluginPackage(root, "computer-use", ["computer-use"]);
-    const installedPlugins = [chrome.plugin, computerUse.plugin].reduce(installPlugin, {});
+    const installedPlugins = [computerUse.plugin].reduce(installPlugin, {});
     const bundledService = new SkillsService({
       adapters,
       homeDirectory: () => home,
       readInstalledPlugins: () => installedPlugins,
-      readPlugins: () => [chrome.plugin, computerUse.plugin],
+      readPlugins: () => [computerUse.plugin],
       hostPlatform: "win32",
     });
     const wslProject = {
@@ -589,14 +588,6 @@ describe("SkillsService", () => {
     expect(
       await bundledService.filterPluginSkillSegments(
         [
-          {
-            kind: "skill",
-            name: "chrome-control",
-            path: join(chrome.skillsDir, "chrome-control", "SKILL.md"),
-            invocation: "/chrome-control",
-            provider: "Chrome Tools",
-            scope: "global",
-          },
           {
             kind: "skill",
             name: "computer-use",
@@ -1206,7 +1197,7 @@ describe("SkillsService", () => {
             name: "skill-creator",
             path: `${bundledDir.replaceAll("\\", "/")}/skill-creator/SKILL.md`,
             invocation: "/skill-creator",
-            provider: "Poracode built-ins",
+            provider: "Y Space built-ins",
             scope: "global",
           },
         ],
@@ -1290,7 +1281,7 @@ describe("SkillsService", () => {
       name: "skill-creator",
       path: `${bundledDir.replaceAll("\\", "/")}/skill-creator/SKILL.md`,
       invocation: "/skill-creator",
-      provider: "Poracode built-ins",
+      provider: "Y Space built-ins",
       scope: "global" as const,
     };
 

@@ -54,8 +54,8 @@ function makePlugin(
 }
 
 const BROWSER_TOOLS = makePlugin("browser-tools", { skills: { "browser-control": {} } });
-const CHROME_TOOLS = makePlugin("chrome-tools", {
-  skills: { "chrome-control": {} },
+const NATIVE_ONLY_TOOLS = makePlugin("native-only-tools", {
+  skills: { "native-control": {} },
   projectKinds: ["windows", "posix"],
 });
 const COMPUTER_USE = makePlugin("computer-use", {
@@ -176,13 +176,13 @@ describe("plugin catalog", () => {
   it("gates plugins on host platform and project kind", () => {
     expect(isPluginSupportedForProject(COMPUTER_USE, "linux", undefined)).toBe(false);
     expect(isPluginSupportedForProject(COMPUTER_USE, "win32", undefined)).toBe(true);
-    expect(isPluginSupportedForProject(CHROME_TOOLS, "win32", WSL_PROJECT)).toBe(false);
+    expect(isPluginSupportedForProject(NATIVE_ONLY_TOOLS, "win32", WSL_PROJECT)).toBe(false);
     expect(isPluginSupportedForProject(BROWSER_TOOLS, "win32", WSL_PROJECT)).toBe(true);
   });
 
   it("offers a skill only where its plugin is supported", () => {
     expect(
-      isPluginSkillSupportedForLaunch(CHROME_TOOLS, {
+      isPluginSkillSupportedForLaunch(NATIVE_ONLY_TOOLS, {
         hostPlatform: "win32",
         projectLocation: WSL_PROJECT,
       }),

@@ -1,48 +1,49 @@
 import type { Metadata } from "next";
-import { ArrowLeft, ArrowUpRight, Download, GitBranch, Globe, Mail } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Download, GitBranch, LifeBuoy, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
-import contact from "../../../../../branding/contact.json";
-import { BrandLockup, PoraIconTile } from "@/components/BrandMark";
+import { BrandLockup, YSpaceIconTile } from "@/components/BrandMark";
 import {
   createAboutJsonLd,
   createPageMetadata,
   GITHUB_URL,
+  SECURITY_URL,
   SITE_DESCRIPTION,
+  SUPPORT_URL,
   stringifyJsonLd,
 } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "About Poracode — Open-source AI coding agent desktop app",
+  title: "About Y Space — Open-source AI coding agent desktop app",
   description:
-    "Learn what Poracode is: an open-source desktop workspace for Claude Code, Codex, Gemini, Cursor, OpenCode, and ACP coding agents.",
+    "Learn what Y Space is: an open-source desktop workspace for Claude Code, Codex, Gemini, Cursor, OpenCode, and ACP coding agents.",
   path: "/about",
 });
 
 const OFFICIAL_LINKS = [
   {
-    label: "Official website",
-    value: "poracode.com",
-    href: "https://poracode.com",
-    icon: Globe,
-  },
-  {
     label: "Source repository",
-    value: "SDSLeon/lightcode",
+    value: "zvone187/y-space",
     href: GITHUB_URL,
     icon: GitBranch,
   },
   {
     label: "Downloads",
     value: "macOS, Windows, and Linux",
-    href: "/download",
+    href: `${GITHUB_URL}/releases`,
     icon: Download,
   },
   {
     label: "Support",
-    value: contact.supportEmail,
-    href: `mailto:${contact.supportEmail}`,
-    icon: Mail,
+    value: "GitHub issue tracker",
+    href: SUPPORT_URL,
+    icon: LifeBuoy,
+  },
+  {
+    label: "Security",
+    value: "Security policy and private reporting",
+    href: SECURITY_URL,
+    icon: ShieldCheck,
   },
 ] as const;
 
@@ -76,12 +77,12 @@ export default function AboutPage() {
 
       <main className="relative z-10 mx-auto max-w-4xl px-5 pb-24 pt-12 sm:px-8 md:pt-20">
         <header className="border-b border-white/[0.08] pb-14">
-          <PoraIconTile className="mb-8 h-14 w-14" />
+          <YSpaceIconTile className="mb-8 h-14 w-14" />
           <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-accent">
             Official project profile
           </p>
           <h1 className="max-w-3xl text-4xl font-bold tracking-[-0.035em] sm:text-5xl md:text-6xl">
-            About Poracode
+            About Y Space
           </h1>
           <p className="mt-7 max-w-3xl text-xl leading-9 text-dim">{SITE_DESCRIPTION}</p>
         </header>
@@ -90,10 +91,10 @@ export default function AboutPage() {
           <div className="space-y-12 text-[16px] leading-8 text-dim">
             <section>
               <h2 className="mb-4 text-2xl font-semibold tracking-[-0.02em] text-moon">
-                What Poracode is
+                What Y Space is
               </h2>
               <p>
-                Poracode is an open-source developer tool for working with AI coding agents from a
+                Y Space is an open-source developer tool for working with AI coding agents from a
                 single desktop workspace. It brings terminal-native agents and structured chat
                 workflows together with the files, Git changes, browser previews, worktrees, and
                 pull requests involved in a real coding session.
@@ -117,9 +118,9 @@ export default function AboutPage() {
                 Open source and cross-platform
               </h2>
               <p>
-                Poracode is developed in public and distributed under the Apache License 2.0. The
-                desktop app is available for macOS, Windows, and Linux, with a hosted companion at
-                app.poracode.com for connecting to a Poracode desktop that you control.
+                Y Space is developed in public and distributed under the Apache License 2.0. The
+                desktop app is available for macOS, Windows, and Linux, with a self-hosted companion
+                served by the desktop for connecting to a machine that you control.
               </p>
             </section>
 
@@ -128,14 +129,24 @@ export default function AboutPage() {
                 The official identity
               </h2>
               <p>
-                Poracode, Pora.code, and poracode.com refer to this AI coding agent software
-                project. The canonical website is poracode.com, and the canonical source repository
-                is SDSLeon/lightcode on GitHub.
+                Y Space is the public product name for this AI coding agent software project. Its
+                source repository is zvone187/y-space on GitHub.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="mb-4 text-2xl font-semibold tracking-[-0.02em] text-moon">
+                Upstream foundation
+              </h2>
+              <p>
+                Y Space is based on the Apache-2.0-licensed SDSLeon/lightcode project created by
+                Serhii Vecherenko. Upstream authorship is preserved separately from the active Y
+                Space maintainers.
               </p>
             </section>
           </div>
 
-          <aside aria-label="Official Poracode links" className="md:pt-1">
+          <aside aria-label="Official Y Space links" className="md:pt-1">
             <div className="sticky top-8 overflow-hidden rounded-2xl border border-white/[0.08] bg-tile/80">
               <div className="border-b border-white/[0.07] px-5 py-4">
                 <BrandLockup />

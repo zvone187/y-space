@@ -42,6 +42,7 @@ import { supportsUsableFastMode } from "./threadDraftViewHelpers";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
+import { buildFileEditorContext, resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
 
 type Phase = "select" | "extracting" | "error";
 type PendingSubmission = { prompt: string; segments?: PromptSegment[] };
@@ -263,6 +264,18 @@ export function ContinueInProviderDialog(props: {
   const [pendingSubmission, setPendingSubmission] = useState<PendingSubmission | null>(null);
   const mentionRef = useRef<MentionInputHandle>(null);
   const attachments = useAttachments();
+  const owningProject = useAppStore((state) =>
+    state.projects.find((project) => project.id === thread.projectId),
+  );
+  const pdfRootContext = owningProject
+    ? buildFileEditorContext(
+        owningProject,
+        thread.worktreePath,
+        thread.worktreePath
+          ? resolveWorktreeBranch(thread.projectId, thread.worktreePath, thread.worktreeBranch)
+          : undefined,
+      )
+    : null;
 
   const sourceAgent = installedAgents.find((a) => a.kind === thread.agentKind);
   const selectedAgent = otherAgents.find((a) => a.kind === selectedKind);
@@ -586,7 +599,9 @@ export function ContinueInProviderDialog(props: {
                             const idx = imageAttachments.findIndex((a) => a.id === att.id);
                             if (idx >= 0) openAttachmentLightbox(imageAttachments, idx);
                           }}
-                          onPreviewPdf={(att) => openPdfPreview(att.path)}
+                          onPreviewPdf={(att) => {
+                            if (pdfRootContext) openPdfPreview(att.path, pdfRootContext);
+                          }}
                         />
                       }
                       inputContent={

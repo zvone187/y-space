@@ -9,7 +9,6 @@ export { ComposerAddMenu, type ComposerMcpMenuItem } from "./ComposerAddMenu";
 export { getComputerUseScope } from "./computerUseScope";
 export {
   browserMcpServer,
-  chromeMcpServer,
   composerMcpServers,
   COMPUTER_USE_MCP_ID,
   mcpTogglePatch,

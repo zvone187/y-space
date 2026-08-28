@@ -60,17 +60,15 @@ export const opencodeDefaultCapabilities: AgentCapability = {
   bypassPermissions: { approvalPolicy: "yolo" },
   // MCP is provider-level for OpenCode: the composer shows the effective set
   // read-only, while changes stay on the provider settings page.
-  // built-in server flags come from the OpenCode settings page
-  // (`agentSettings.opencode`) at launch. OpenCode applies that set to each
-  // project directory inside the shared runtime server instead of hosting
-  // per-thread MCP credentials.
+  // Built-in server flags come from the OpenCode settings page
+  // (`agentSettings.opencode`) at launch. Each GUI task gets an isolated
+  // `opencode serve` process and its own signed thread credentials.
   mcpScope: { terminal: "none", gui: "none" },
   mcpConfigSource: "agentSettings",
-  agentSettingsDefaults: { crossagentMcp: true },
-  // The installed OpenCode plugin injects the trusted provider session id
-  // into Crossagents calls, allowing every directory/session in the pooled
-  // server to share one MCP credential without losing parent-thread routing.
-  crossagentMcpRouting: "provider-session",
+  agentSettingsDefaults: { browserMcp: true, crossagentMcp: true },
+  // Crossagents is bound directly to the owning Y Space task. This avoids a
+  // shared project credential becoming authority for sibling OpenCode tasks.
+  crossagentMcpRouting: "thread-token",
   settingDefs: [],
 };
 

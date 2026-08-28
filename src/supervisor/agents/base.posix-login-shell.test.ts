@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectLocation } from "@/shared/contracts";
+import { posixPrivilegedEnvironmentUnsetPrefix } from "@/supervisor/privilegedChildEnvironment";
 
 const execFileAsyncMock = vi.hoisted(() =>
   vi.fn<(...args: unknown[]) => Promise<{ stdout: string; stderr?: string }>>(),
@@ -41,6 +42,7 @@ import {
 
 const expectedShellArgs = (script: string) =>
   process.platform === "darwin" ? ["-l", "-i", "-c", script] : ["-l", "-c", script];
+const securedScript = (script: string) => `${posixPrivilegedEnvironmentUnsetPrefix()}${script}`;
 
 const posixProject: ProjectLocation = {
   kind: "posix",
@@ -89,7 +91,7 @@ describe.skipIf(process.platform === "win32")("POSIX login shell wrappers", () =
   it("wraps native launches in the user's login shell when the binary is unresolved", () => {
     expect(buildAgentCommand(posixProject, "claude", ["--version"])).toEqual({
       command: "/bin/zsh",
-      args: expectedShellArgs("exec 'claude' '--version'"),
+      args: expectedShellArgs(securedScript("exec 'claude' '--version'")),
       cwd: "/Users/demo/project",
     });
   });
@@ -146,7 +148,7 @@ describe.skipIf(process.platform === "win32")("POSIX login shell wrappers", () =
       }),
     ).toEqual({
       command: "/bin/zsh",
-      args: expectedShellArgs("exec 'opencode' '--version'"),
+      args: expectedShellArgs(securedScript("exec 'opencode' '--version'")),
       cwd: "/Users/demo/project",
       env: {
         PATH: "/opt/homebrew/bin:/usr/bin:/bin",

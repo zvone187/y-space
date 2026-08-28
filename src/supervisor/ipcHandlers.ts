@@ -24,6 +24,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
   const externalMcpDiscovery = runtime.externalMcpDiscoveryService;
   const skills = runtime.skillsService;
   const pluginRegistry = runtime.pluginRegistry;
+  const pipedream = runtime.pipedreamService;
   const listPlugins = () => ({
     plugins: pluginRegistry.listPlugins(),
     userPluginsDir: pluginRegistry.ensureUserPluginsDir(),
@@ -52,6 +53,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     logoutAcpAgent: (payload) => registry.logoutAcpAgent(payload),
     getThreadSnapshots: () => threads.getThreadSnapshots(),
     getTerminalShellSnapshots: () => threads.getTerminalShellSnapshots(),
+    resolveMcpCallerIdentity: (payload) => threads.resolveMcpCallerIdentity(payload) ?? null,
     getAvailableWindowsShells: () => runtime.getAvailableWindowsShells(),
     startThread: (payload) => threads.startThread(payload),
     sendThreadInput: (payload) => threads.sendThreadInput(payload),
@@ -339,5 +341,10 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
       pluginRegistry.refresh();
       return listPlugins();
     },
+    pipedreamGetSnapshot: () => pipedream.getSnapshot(),
+    pipedreamListApps: (payload) => pipedream.listApps(payload),
+    pipedreamRefreshAccounts: () => pipedream.refreshAccounts(),
+    pipedreamDisconnectAccount: (payload) => pipedream.disconnectAccount(payload),
+    pipedreamSetAccountAgentAccess: (payload) => pipedream.setAccountAgentAccess(payload),
   });
 }

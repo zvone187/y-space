@@ -28,7 +28,17 @@ const bridge = vi.hoisted(() => ({
     authenticatedUrls: [],
   })),
   beginMcpServerOauth: vi.fn<(payload: McpOauthBeginPayload) => Promise<McpOauthBeginResult>>(),
+  openExternal: vi.fn<PoracodeBridge["openExternal"]>(async () => undefined),
   openExternalNative: vi.fn<PoracodeBridge["openExternalNative"]>(async () => undefined),
+  browserCreateSensitiveTab: vi.fn<PoracodeBridge["browserCreateSensitiveTab"]>(async () => ({
+    tabId: "oauth-tab",
+    url: "about:blank",
+    title: "Connecting…",
+    loading: true,
+    canGoBack: false,
+    canGoForward: false,
+  })),
+  browserCloseTab: vi.fn<PoracodeBridge["browserCloseTab"]>(async () => undefined),
   waitMcpServerOauth: vi.fn<PoracodeBridge["waitMcpServerOauth"]>(async () => ({
     status: "authorized",
   })),
@@ -145,7 +155,10 @@ describe("McpServersManager", () => {
     bridge.probeMcpServer.mockReturnValue(new Promise(() => undefined));
     bridge.getMcpOauthStatus.mockReset().mockResolvedValue({ authenticatedUrls: [] });
     bridge.beginMcpServerOauth.mockReset().mockResolvedValue({ status: "authorized" });
+    bridge.openExternal.mockClear();
     bridge.openExternalNative.mockClear();
+    bridge.browserCreateSensitiveTab.mockClear();
+    bridge.browserCloseTab.mockClear();
     bridge.waitMcpServerOauth.mockClear();
     bridge.clearMcpServerOauth.mockClear();
     useRemoteServersStore.setState({ servers: [], runtime: {} });
@@ -165,7 +178,7 @@ describe("McpServersManager", () => {
     expect(screen.getByRole("button", { name: "Edit memory" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete memory" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Delete Browser" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "46 tools" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "48 tools" })).toBeInTheDocument();
   });
 
   it("identifies plugin-managed built-ins without exposing edit or delete controls", () => {
@@ -321,7 +334,7 @@ describe("McpServersManager", () => {
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent("Authentication required");
       expect(screen.getByRole("status")).toHaveTextContent(
-        "This server requires authentication before Poracode can check it.",
+        "This server requires authentication before Y Space can check it.",
       );
     });
     expect(screen.queryByText("0 tools")).not.toBeInTheDocument();
@@ -372,6 +385,69 @@ describe("McpServersManager", () => {
       }),
     );
     expect(bridge.getMcpOauthStatus).toHaveBeenCalledWith({ projectLocation });
+  });
+
+  it("keeps MCP OAuth authorization inside the embedded Y Space browser", async () => {
+    const remoteServer: McpServer = {
+      ...server,
+      transport: { type: "http", url: "https://mcp.pipedream.net/v2", headers: {} },
+    };
+    bridge.probeMcpServer.mockResolvedValue({
+      status: "auth-required",
+      toolCount: 0,
+      latencyMs: 8,
+      environment: { runtime: "host", projectScoped: false },
+      error: { code: "auth-required", message: "Authentication required", authScheme: "oauth" },
+    });
+    bridge.beginMcpServerOauth.mockResolvedValue({
+      status: "redirect",
+      flowId: "oauth-flow",
+      authorizationUrl:
+        "https://pipedream.com/oauth/authorize?state=private-state&code_challenge=challenge",
+    });
+
+    render(managerElement({ userServers: [remoteServer] }));
+    fireEvent.click(await screen.findByRole("button", { name: "Authenticate" }));
+
+    await waitFor(() =>
+      expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+        url: "https://pipedream.com/oauth/authorize?state=private-state&code_challenge=challenge",
+        activate: true,
+        reveal: true,
+      }),
+    );
+    await waitFor(() =>
+      expect(bridge.browserCloseTab).toHaveBeenCalledWith({ tabId: "oauth-tab" }),
+    );
+    expect(bridge.openExternal).not.toHaveBeenCalled();
+    expect(bridge.openExternalNative).not.toHaveBeenCalled();
+  });
+
+  it("closes the sensitive MCP OAuth tab when waiting for authorization fails", async () => {
+    const remoteServer: McpServer = {
+      ...server,
+      transport: { type: "http", url: "https://mcp.example.test", headers: {} },
+    };
+    bridge.probeMcpServer.mockResolvedValue({
+      status: "auth-required",
+      toolCount: 0,
+      latencyMs: 8,
+      environment: { runtime: "host", projectScoped: false },
+      error: { code: "auth-required", message: "Authentication required", authScheme: "oauth" },
+    });
+    bridge.beginMcpServerOauth.mockResolvedValue({
+      status: "redirect",
+      flowId: "oauth-flow",
+      authorizationUrl: "https://oauth.example.test/authorize?state=private",
+    });
+    bridge.waitMcpServerOauth.mockRejectedValueOnce(new Error("callback failed"));
+
+    render(managerElement({ userServers: [remoteServer] }));
+    fireEvent.click(await screen.findByRole("button", { name: "Authenticate" }));
+
+    await waitFor(() =>
+      expect(bridge.browserCloseTab).toHaveBeenCalledWith({ tabId: "oauth-tab" }),
+    );
   });
 
   it("shows a localized unavailable error without a fake zero tool count", async () => {

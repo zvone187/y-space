@@ -8,6 +8,28 @@ const bridge = vi.hoisted(() => ({
   onSupervisorEvent: vi.fn<(handler: (event: SupervisorEvent) => void) => () => void>(),
   openExternal: vi.fn<(url: string) => Promise<void>>(),
   openExternalNative: vi.fn<(url: string) => Promise<void>>(),
+  browserCreateSensitiveTab: vi.fn<
+    (input: { url: string; activate?: boolean; reveal?: boolean }) => Promise<{
+      tabId: string;
+      url: string;
+      title: string;
+      loading: boolean;
+      canGoBack: boolean;
+      canGoForward: boolean;
+      devToolsOpen: boolean;
+    }>
+  >(async () => ({
+    tabId: "oauth-tab",
+    url: "about:blank",
+    title: "Private sign-in",
+    loading: false,
+    canGoBack: false,
+    canGoForward: false,
+    devToolsOpen: false,
+  })),
+  browserCloseTab: vi.fn<(input: { tabId: string }) => Promise<{ closed: boolean }>>(async () => ({
+    closed: true,
+  })),
 }));
 
 const supervisorHandlers = vi.hoisted(() => [] as Array<(event: SupervisorEvent) => void>);
@@ -126,6 +148,8 @@ describe("runAgentLoginCommand", () => {
     bridge.closeThread.mockReset().mockResolvedValue(undefined);
     bridge.openExternal.mockReset().mockResolvedValue(undefined);
     bridge.openExternalNative.mockReset().mockResolvedValue(undefined);
+    bridge.browserCreateSensitiveTab.mockClear();
+    bridge.browserCloseTab.mockClear();
     bridge.onSupervisorEvent.mockReset().mockImplementation((handler) => {
       supervisorHandlers.push(handler);
       return () => {
@@ -143,7 +167,7 @@ describe("runAgentLoginCommand", () => {
       .mockImplementation((payload) => bridge.startShell(payload));
   });
 
-  it("opens hard-wrapped WSL auth URLs in the native browser", () => {
+  it("opens hard-wrapped WSL auth URLs in the embedded browser", () => {
     runAgentLoginCommand({
       label: "Grok",
       command: "grok login",
@@ -166,7 +190,7 @@ describe("runAgentLoginCommand", () => {
       outputLength: 0,
     });
     vi.advanceTimersByTime(250);
-    expect(bridge.openExternalNative).not.toHaveBeenCalled();
+    expect(bridge.browserCreateSensitiveTab).not.toHaveBeenCalled();
 
     emit({
       type: "thread-output",
@@ -176,9 +200,11 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).toHaveBeenCalledWith(
-      "https://auth.x.ai/oauth2/authorize?response_type=code&client_id=grok-build&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fcallback",
-    );
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url: "https://auth.x.ai/oauth2/authorize?response_type=code&client_id=grok-build&redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fcallback",
+      activate: true,
+      reveal: true,
+    });
   });
 
   it("opens complete long WSL auth URLs after suppressing the agent browser", () => {
@@ -204,7 +230,11 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).toHaveBeenCalledWith(url);
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url,
+      activate: true,
+      reveal: true,
+    });
   });
 
   it("sets profile env via PowerShell assignments on native Windows, not a POSIX prefix", () => {
@@ -218,7 +248,7 @@ describe("runAgentLoginCommand", () => {
     const script = writeScriptToShellMock.mock.calls[0]?.[1] ?? "";
     // PowerShell can't run `KEY=value command`; it must assign $env: first.
     expect(script).toContain(
-      "Clear-Host; $env:CLAUDE_CONFIG_DIR = 'C:\\Users\\sdsle\\.poracode\\claude-profiles\\home'; claude auth login",
+      "Clear-Host; $env:CLAUDE_CONFIG_DIR = 'C:\\Users\\sdsle\\.poracode\\claude-profiles\\home'; $env:BROWSER = 'true'; claude auth login",
     );
     expect(script).not.toContain("CLAUDE_CONFIG_DIR=C:");
     expect(startShellWithCurrentSettingsMock).toHaveBeenCalledWith(
@@ -244,7 +274,7 @@ describe("runAgentLoginCommand", () => {
     );
   });
 
-  it("does not intercept login URLs on native Windows so the CLI's own browser opener wins", () => {
+  it("suppresses native Windows browser launch and opens login URLs in Y Space", () => {
     runAgentLoginCommand({
       label: "Grok",
       command: "grok login",
@@ -255,8 +285,9 @@ describe("runAgentLoginCommand", () => {
     const url =
       "https://auth.x.ai/oauth2/authorize?response_type=code&client_id=b1a00492-073a-47ea-816f-4c329264a828&redirect_uri=http%3A%2F%2F127.0.0.1%3A37155%2Fcallback&scope=openid%20profile%20email%20offline_access%20grok-cli%3Aaccess%20api%3Aaccess&code_challenge=XZGsVbiV8w8TRiC3gHnWDKL8TsuK2tFNeVR9md4tA34&code_challenge_method=S256&state=019e5e1e-040a-78c1-bbd6-1585cd381488&nonce=019e5e1e-040a-78c1-bbd6-159774c2afa3";
 
-    // BROWSER override is WSL-only; Clear-Host runs as-is on native Windows.
-    expect(writeScriptToShellMock.mock.calls[0]?.[1] ?? "").toContain("Clear-Host; grok login");
+    expect(writeScriptToShellMock.mock.calls[0]?.[1] ?? "").toContain(
+      "Clear-Host; $env:BROWSER = 'true'; grok login",
+    );
 
     emit({
       type: "thread-output",
@@ -266,7 +297,69 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).not.toHaveBeenCalled();
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url,
+      activate: true,
+      reveal: true,
+    });
+  });
+
+  it("suppresses the native macOS browser and routes Claude login into Y Space", () => {
+    runAgentLoginCommand({
+      label: "Claude Code",
+      command: "claude auth login",
+      project: posixProject,
+    });
+
+    const shellId = loginTerminalStore.open.mock.calls[0]?.[0].shellId;
+    const url =
+      "https://claude.ai/oauth/authorize?response_type=code&client_id=claude-code&redirect_uri=http%3A%2F%2Flocalhost%3A54545%2Fcallback&state=test-state";
+
+    expect(unwrapBashScript(writeScriptToShellMock.mock.calls[0]?.[1] ?? "")).toContain(
+      "clear; BROWSER='/usr/bin/true' claude auth login",
+    );
+
+    emit({
+      type: "thread-output",
+      threadId: shellId!,
+      data: `If your browser did not open, visit: ${url}\n`,
+      outputLength: 0,
+    });
+    vi.advanceTimersByTime(250);
+
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url,
+      activate: true,
+      reveal: true,
+    });
+  });
+
+  it("closes the private embedded auth tab when the login command completes", async () => {
+    runAgentLoginCommand({
+      label: "Claude Code",
+      command: "claude auth login",
+      project: posixProject,
+    });
+
+    const shellId = loginTerminalStore.open.mock.calls[0]?.[0].shellId;
+    const script = writeScriptToShellMock.mock.calls[0]?.[1] ?? "";
+    const token = /poracode-login-complete=([^:]+):/u.exec(script)?.[1];
+    const url =
+      "https://claude.ai/oauth/authorize?response_type=code&client_id=claude-code&redirect_uri=http%3A%2F%2Flocalhost%3A54545%2Fcallback&state=test-state";
+
+    emit({ type: "thread-output", threadId: shellId!, data: `${url}\n`, outputLength: 0 });
+    vi.advanceTimersByTime(250);
+    await Promise.resolve();
+
+    emit({
+      type: "thread-output",
+      threadId: shellId!,
+      data: `\u001B]777;poracode-login-complete=${token}:0\u0007`,
+      outputLength: 0,
+    });
+    await Promise.resolve();
+
+    expect(bridge.browserCloseTab).toHaveBeenCalledWith({ tabId: "oauth-tab" });
   });
 
   it("does not append following prompt text to xAI device auth URLs", () => {
@@ -290,9 +383,11 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).toHaveBeenCalledWith(
-      "https://accounts.x.ai/oauth2/device?user_code=E9YP-N7CQ",
-    );
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url: "https://accounts.x.ai/oauth2/device?user_code=E9YP-N7CQ",
+      activate: true,
+      reveal: true,
+    });
   });
 
   it("normalizes Codex device auth URLs when auto-opening from WSL output", () => {
@@ -312,7 +407,11 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).toHaveBeenCalledWith("https://auth.openai.com/codex/device");
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url: "https://auth.openai.com/codex/device",
+      activate: true,
+      reveal: true,
+    });
   });
 
   it("does not auto-open Codex's local callback server URL", () => {
@@ -334,8 +433,12 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).toHaveBeenCalledTimes(1);
-    expect(bridge.openExternalNative).toHaveBeenCalledWith(authUrl);
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledTimes(1);
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url: authUrl,
+      activate: true,
+      reveal: true,
+    });
   });
 
   it("opens Cursor WSL browser login URLs", () => {
@@ -358,7 +461,11 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).toHaveBeenCalledWith(url);
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url,
+      activate: true,
+      reveal: true,
+    });
   });
 
   it("keeps Kimi WSL login to one native browser launch", () => {
@@ -389,11 +496,15 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).toHaveBeenCalledTimes(1);
-    expect(bridge.openExternalNative).toHaveBeenCalledWith(url);
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledTimes(1);
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url,
+      activate: true,
+      reveal: true,
+    });
   });
 
-  it("does not auto-open Gemini WSL login links", () => {
+  it("suppresses Gemini's external opener without opening unrelated documentation links", () => {
     runAgentLoginCommand({
       label: "Gemini",
       command: "gemini /auth",
@@ -413,7 +524,23 @@ describe("runAgentLoginCommand", () => {
     });
     vi.advanceTimersByTime(250);
 
-    expect(bridge.openExternalNative).not.toHaveBeenCalled();
+    expect(bridge.browserCreateSensitiveTab).not.toHaveBeenCalled();
+
+    const authUrl =
+      "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=gemini-cli&redirect_uri=http%3A%2F%2Flocalhost%3A8085%2Fcallback&state=gemini-state";
+    emit({
+      type: "thread-output",
+      threadId: shellId!,
+      data: `${authUrl}\n`,
+      outputLength: 0,
+    });
+    vi.advanceTimersByTime(250);
+
+    expect(bridge.browserCreateSensitiveTab).toHaveBeenCalledWith({
+      url: authUrl,
+      activate: true,
+      reveal: true,
+    });
   });
 
   it("marks the login overlay as failed when the command exits unsuccessfully", () => {

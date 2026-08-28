@@ -80,7 +80,6 @@ describe("posthog product analytics properties", () => {
           model: "private-model-name",
           approvalPolicy: "on-request",
           browserMcp: true,
-          chromeMcp: true,
           computerUse: true,
           crossagentMcp: true,
           effort: "high",
@@ -113,7 +112,6 @@ describe("posthog product analytics properties", () => {
     expect(properties).toEqual({
       attachment_segment_count: 0,
       browser_mcp: true,
-      chrome_mcp: true,
       computer_use: true,
       crossagent_mcp: true,
       effort: "high",

@@ -44,7 +44,7 @@ describe("AboutSettings Lightcode data import", () => {
     render(<AboutSettings />);
 
     fireEvent.click(screen.getByRole("button", { name: "Import again" }));
-    expect(screen.getByRole("alertdialog", { name: "Import Lightcode data again?" })).toBeVisible();
+    expect(screen.getByRole("alertdialog", { name: "Import legacy data again?" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Import and restart" }));
 
     await waitFor(() => expect(bridgeMock.requestLegacyDataMigration).toHaveBeenCalledOnce());
@@ -71,5 +71,11 @@ describe("AboutSettings Lightcode data import", () => {
     bridgeMock.isDev = true;
     rerender(<AboutSettings />);
     expect(screen.queryByRole("button", { name: "Import again" })).not.toBeInTheDocument();
+  });
+
+  it("credits Y Space contributors and the Apache-2.0 license", () => {
+    render(<AboutSettings />);
+
+    expect(screen.getByText(/Y Space contributors\. Licensed under Apache-2\.0\./)).toBeVisible();
   });
 });

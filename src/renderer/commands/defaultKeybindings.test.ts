@@ -6,6 +6,7 @@ import {
 } from "@/shared/keybindings";
 import { getCurrentProjectId } from "@/renderer/actions/currentProject";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 import { bindingForPlatform, canonicalizeKeybinding, type PlatformName } from "./keybindingMatcher";
 import { buildCommandRegistry, buildWhenContext } from "./registry";
 import { evaluateWhenClause } from "./when";
@@ -42,6 +43,7 @@ describe("default keybindings", () => {
       view: { kind: "home" },
       focusedPaneId: null,
     }));
+    useRightWorkspaceTabsStore.getState().reset();
   });
 
   it("reference registered commands", () => {
@@ -173,9 +175,8 @@ describe("default keybindings", () => {
     expect(evaluateWhenClause(newTab, { browserFocus: false })).toBe(false);
     expect(evaluateWhenClause(newTab, { composerFocus: true })).toBe(false);
 
-    // Next/previous chat switch from anywhere in the chat shell — including while
-    // composing — but yield to the editor, terminal, and in-app browser, where
-    // these chords carry a local meaning.
+    // Next/previous chat switch from the chat shell, but yield to every surface
+    // nested inside the global right workspace.
     for (const id of ["thread.next", "thread.previous"] as const) {
       const when = bindings[id]?.when;
       expect(evaluateWhenClause(when, { hasThread: true })).toBe(true);
@@ -185,15 +186,18 @@ describe("default keybindings", () => {
       expect(evaluateWhenClause(when, { hasThread: true, editorFocus: true })).toBe(false);
       expect(evaluateWhenClause(when, { hasThread: true, terminalFocus: true })).toBe(false);
       expect(evaluateWhenClause(when, { hasThread: true, browserFocus: true })).toBe(false);
+      expect(evaluateWhenClause(when, { hasThread: true, workspaceFocus: true })).toBe(false);
       expect(evaluateWhenClause(when, { hasThread: false })).toBe(false);
     }
 
-    // Next/previous tab switch only while the editor or terminal holds focus —
-    // the exact complement of next/previous chat, which yields those surfaces.
+    // Next/previous tab switch owns mixed outer tabs throughout the workspace;
+    // standalone/bottom editor and terminal surfaces keep their inner cycling.
     for (const id of ["tab.next", "tab.previous"] as const) {
       const when = bindings[id]?.when;
       expect(evaluateWhenClause(when, { editorFocus: true })).toBe(true);
       expect(evaluateWhenClause(when, { terminalFocus: true })).toBe(true);
+      expect(evaluateWhenClause(when, { workspaceFocus: true })).toBe(true);
+      expect(evaluateWhenClause(when, { browserFocus: true, workspaceFocus: true })).toBe(true);
       expect(evaluateWhenClause(when, {})).toBe(false);
       expect(evaluateWhenClause(when, { composerFocus: true })).toBe(false);
       expect(evaluateWhenClause(when, { browserFocus: true })).toBe(false);
@@ -233,5 +237,28 @@ describe("default keybindings", () => {
     expect(context.hasProject).toBe(true);
     expect(starCommand).toBeDefined();
     expect(evaluateWhenClause(starCommand?.when, context)).toBe(true);
+  });
+
+  it("treats the body-portaled Browser host as part of the global workspace", () => {
+    useRightWorkspaceTabsStore.getState().openBrowserPage({
+      browserTabId: "browser-page",
+      url: "https://example.test",
+      title: "Example",
+    });
+    const browser = document.createElement("div");
+    browser.dataset.poracodeBrowser = "";
+    const input = document.createElement("input");
+    browser.append(input);
+    document.body.append(browser);
+    input.focus();
+
+    const context = buildWhenContext(input);
+    const nextTab = buildCommandRegistry().find((command) => command.id === "tab.next");
+    const nextThread = buildCommandRegistry().find((command) => command.id === "thread.next");
+
+    expect(context).toMatchObject({ browserFocus: true, workspaceFocus: true });
+    expect(evaluateWhenClause(nextTab?.when, context)).toBe(true);
+    expect(evaluateWhenClause(nextThread?.when, { ...context, hasThread: true })).toBe(false);
+    browser.remove();
   });
 });

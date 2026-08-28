@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Ask a question or start a discussion
-    url: https://github.com/SDSLeon/lightcode/discussions
+    url: https://github.com/zvone187/y-space/discussions
     about: Use Discussions for questions, ideas, and open-ended topics.
-  - name: Poracode website
-    url: https://poracode.com
-    about: Learn more about Poracode.
+  - name: Y Space website
+    url: https://github.com/zvone187/y-space
+    about: Learn more about Y Space.

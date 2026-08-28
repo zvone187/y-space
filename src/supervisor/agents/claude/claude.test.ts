@@ -121,6 +121,36 @@ describe("createClaudeAdapter structured sessions", () => {
     expect(adapter.capabilities.presentationModes).toEqual(["terminal", "gui"]);
   });
 
+  it("declares terminal MCP as launch-scoped and forwards launch MCP config", () => {
+    const adapter = createClaudeAdapter();
+    expect(adapter.capabilities.mcpScope?.terminal).toBe("launch");
+
+    const launch = adapter.buildLaunchArgv(projectLocation, config, "test the app", undefined, {
+      mcpServers: [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:43210/mcp?thread=thread-1",
+            headers: { Authorization: "Bearer browser-token" },
+          },
+        },
+      ],
+    });
+    const configIndex = launch.args.indexOf("--mcp-config");
+    expect(configIndex).toBeGreaterThanOrEqual(0);
+    expect(JSON.parse(launch.args[configIndex + 1] ?? "{}")).toMatchObject({
+      mcpServers: {
+        browser: {
+          type: "http",
+          url: "http://127.0.0.1:43210/mcp?thread=thread-1",
+        },
+      },
+    });
+  });
+
   it("creates a structured SDK session only for GUI presentation", async () => {
     const adapter = createClaudeAdapter();
 

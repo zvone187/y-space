@@ -13,12 +13,12 @@ export function resolvePoracodeChannel(): PoracodeChannel {
 }
 
 export function productNameFor(channel: PoracodeChannel): string {
-  return channel === "nightly" ? "Poracode Nightly" : "Poracode";
+  return channel === "nightly" ? "Y Space Nightly" : "Y Space";
 }
 
 export function appIdFor(channel: PoracodeChannel): string {
-  // Keep the pre-rebrand install identity so Poracode upgrades the existing
-  // Lightcode app and retains OS-owned credentials, permissions, and metadata.
+  // Keep the original install identity so Y Space upgrades existing Lightcode
+  // and Poracode installs while retaining OS-owned credentials and permissions.
   return channel === "nightly" ? "com.lightcode.app.nightly" : "com.lightcode.app";
 }
 
@@ -31,5 +31,5 @@ export function updaterChannelFor(channel: PoracodeChannel): string | undefined 
 }
 
 export function artifactPrefixFor(channel: PoracodeChannel): string {
-  return channel === "nightly" ? "Poracode-Nightly" : "Poracode";
+  return channel === "nightly" ? "Y-Space-Nightly" : "Y-Space";
 }

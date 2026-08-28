@@ -2,6 +2,10 @@ import { existsSync, readFileSync, watch as fsWatch } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { toWslUncPath } from "@/shared/wsl";
+import {
+  posixPrivilegedEnvironmentUnsetPrefix,
+  sanitizePrivilegedChildEnvironment,
+} from "@/supervisor/privilegedChildEnvironment";
 import type {
   AgentProviderMetadata,
   AgentStatus,
@@ -321,7 +325,7 @@ function buildPosixCommand(cwd: string, command: string, args: string[]): Comman
   }
 
   const shell = process.env.SHELL || "/bin/bash";
-  const script = `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
+  const script = `${posixPrivilegedEnvironmentUnsetPrefix()}exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
   return {
     command: shell,
     args: getPosixLoginShellArgs(script),
@@ -354,8 +358,10 @@ export function buildAgentCommand(
     // version manager and break things like `npx` (e.g. fnm shims that exec a
     // node not on PATH).
     const execCommand = resolvedExecPath ?? command;
-    const exports = buildPosixExportPrefix(env);
-    const script = `${exports}exec ${[execCommand, ...args].map(quotePosixShellArg).join(" ")}`;
+    const exports = buildPosixExportPrefix(
+      env ? sanitizePrivilegedChildEnvironment(env) : undefined,
+    );
+    const script = `${posixPrivilegedEnvironmentUnsetPrefix()}${exports}exec ${[execCommand, ...args].map(quotePosixShellArg).join(" ")}`;
     // `--exec` (not `--`) is required: `--` routes the command line through the
     // user's default WSL shell, which re-parses the already-quoted script. Any
     // `$(`, backtick, or unbalanced quote inside `args` (e.g. a diff embedded

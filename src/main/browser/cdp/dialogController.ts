@@ -34,16 +34,41 @@ export class DialogController {
   private waiters: Array<(opening: DialogOpening) => void> = [];
   private unsub: (() => void) | null = null;
   private cdp: CdpClient | null = null;
+  private enablePromise: Promise<void> | null = null;
+  private bindingGeneration = 0;
   private enabled = false;
 
   async enable(cdp: CdpClient): Promise<void> {
-    if (this.enabled) return;
-    this.enabled = true;
+    if (this.enabled && this.cdp === cdp) return;
+    if (this.cdp === cdp && this.enablePromise) {
+      await this.enablePromise;
+      return;
+    }
+
+    this.releaseTransport();
+    const bindingGeneration = this.bindingGeneration;
     this.cdp = cdp;
+    const enabling = this.enableOnClient(cdp, bindingGeneration);
+    this.enablePromise = enabling;
+    try {
+      await enabling;
+    } catch (error) {
+      if (this.cdp === cdp && this.bindingGeneration === bindingGeneration) {
+        this.releaseTransport();
+      }
+      throw error;
+    } finally {
+      if (this.enablePromise === enabling) this.enablePromise = null;
+    }
+  }
+
+  private async enableOnClient(cdp: CdpClient, bindingGeneration: number): Promise<void> {
     await cdp.send("Page.enable");
+    if (this.cdp !== cdp || this.bindingGeneration !== bindingGeneration) return;
     this.unsub = cdp.on("Page.javascriptDialogOpening", (params) => {
       void this.onOpening(params as DialogOpening);
     });
+    this.enabled = true;
   }
 
   private async onOpening(opening: DialogOpening): Promise<void> {
@@ -137,15 +162,26 @@ export class DialogController {
     }
   }
 
-  dispose(): void {
+  private releaseTransport(): void {
+    this.bindingGeneration += 1;
     try {
       this.unsub?.();
     } catch {}
     this.unsub = null;
     this.cdp = null;
+    this.enablePromise = null;
+    this.enabled = false;
+  }
+
+  /** Drop a suspended webview's CDP binding while preserving bounded dialog state. */
+  suspend(): void {
+    this.releaseTransport();
+  }
+
+  dispose(): void {
+    this.releaseTransport();
     this.history = [];
     this.nextDisposition = null;
     this.waiters = [];
-    this.enabled = false;
   }
 }

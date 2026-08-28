@@ -1,4 +1,4 @@
-import { watch } from "node:fs";
+import { existsSync, watch } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
@@ -41,11 +41,15 @@ import {
 import {
   BrowserMcpIngress,
   BrowserPanelManager,
-  ChromeBridgeServer,
-  ChromeMcpIngress,
   installPickerProtocolHandler,
   registerPickerProtocolScheme,
 } from "./browser";
+import {
+  BrowserCookieImportService,
+  CookieImportBridgeServer,
+  createFileBackedCookieImportPairingStore,
+  installCookieImportExtension,
+} from "./browser/cookieImport";
 import { buildBrowserUserAgent } from "./browser/userAgent";
 import { startUsageLoginCookieMirror } from "./usageLogin/UsageLoginCookieMirror";
 import {
@@ -75,6 +79,7 @@ import {
   upsertCrossagentRoutingOverride,
 } from "@/shared/crossagentRanking";
 import { getAppName } from "@/shared/appName";
+import type { McpLaunchContext } from "@/shared/mcpLaunchContext";
 import { productNameFor, resolvePoracodeChannel } from "@/shared/channel";
 import {
   IPC_EVENT_CHANNELS,
@@ -120,8 +125,35 @@ import {
   type PrWatchService,
 } from "./prWatch";
 import { shouldUseMockKeychain } from "./mockKeychain";
+import {
+  capturePipedreamBootstrapEnv,
+  capturePipedreamBootstrapEnvFile,
+} from "@/shared/pipedreamBootstrap";
+import { PipedreamMainService } from "./pipedream/PipedreamMainService";
+import {
+  applyPersistedPipedreamEnvFile,
+  clearPipedreamEnvFilePath,
+  writePipedreamEnvFilePath,
+} from "./pipedream/pipedreamEnvFileSettings";
+import { buildApplicationMenuTemplate } from "./applicationMenu";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const explicitPipedreamEnvFile = process.env.PIPEDREAM_ENV_FILE?.trim();
+delete process.env.PIPEDREAM_ENV_FILE;
+const developmentPipedreamEnvFile = isDev
+  ? [join(process.cwd(), ".env.pipedream"), join(process.cwd(), "..", ".env.pipedream")].find(
+      (path) => existsSync(path),
+    )
+  : undefined;
+const launchPipedreamBootstrap = explicitPipedreamEnvFile
+  ? capturePipedreamBootstrapEnvFile(explicitPipedreamEnvFile)
+  : developmentPipedreamEnvFile
+    ? capturePipedreamBootstrapEnvFile(developmentPipedreamEnvFile)
+    : capturePipedreamBootstrapEnv();
+const hasExplicitPipedreamBootstrap =
+  Boolean(explicitPipedreamEnvFile || developmentPipedreamEnvFile) ||
+  launchPipedreamBootstrap.state !== "absent";
+let pipedreamBootstrap = launchPipedreamBootstrap;
 const channel = resolvePoracodeChannel();
 const baseDirOverride = process.env.PORACODE_BASE_DIR;
 const legacyBaseDirOverride = process.env.LIGHTCODE_BASE_DIR?.trim() || undefined;
@@ -163,7 +195,14 @@ if (process.platform === "linux") {
   app.commandLine.appendSwitch("enable-features", "GlobalShortcutsPortal");
 }
 
-const browserUserAgent = buildBrowserUserAgent(app.userAgentFallback);
+const browserUserAgent = buildBrowserUserAgent(app.userAgentFallback, {
+  // `app.name` is intentionally still the pre-rebrand identity here on
+  // packaged macOS/Linux builds so Chromium can initialize safeStorage with
+  // existing Keychain/libsecret entries. Only the browser UA is rebranded.
+  currentProductName: app.name,
+  brandedProductName: productNameFor(channel),
+  appVersion: app.getVersion(),
+});
 app.userAgentFallback = browserUserAgent;
 
 if (baseDirOverride) {
@@ -224,8 +263,6 @@ let browserMcpIngress: BrowserMcpIngress | null = null;
 let computerUseMcpIngress: ComputerUseMcpIngress | null = null;
 let appControlsMcpIngress: AppControlsMcpIngress | null = null;
 let computerUseDesktopOverlay: ComputerUseDesktopOverlay | null = null;
-let chromeBridgeServer: ChromeBridgeServer | null = null;
-let chromeMcpIngress: ChromeMcpIngress | null = null;
 let browserExtractWindow: BrowserWindow | null = null;
 // Retained module-scope so the native Tray icon stays reachable from GC.
 let tray: TrayHandle | null = null;
@@ -300,12 +337,8 @@ function primeBrowserAllowFlags(settings?: SharedSettings): void {
     allowEval = false;
     allowDataAccess = false;
   }
-  // The embedded browser and the external Chrome bridge share the same
-  // eval / data-access gates from browser settings.
   browserMcpIngress?.setAllowEval(allowEval);
   browserMcpIngress?.setAllowDataAccess(allowDataAccess);
-  chromeMcpIngress?.setAllowEval(allowEval);
-  chromeMcpIngress?.setAllowDataAccess(allowDataAccess);
 }
 
 // setLoginItemSettings writes the HKCU Run registry key on Windows; skip it
@@ -616,7 +649,7 @@ const sleepInhibitor = createSleepInhibitor();
 
 function requirePoracodePaths(): PoracodePaths {
   if (!poracodePaths) {
-    throw new Error("Poracode paths are not initialized.");
+    throw new Error("Y Space paths are not initialized.");
   }
   return poracodePaths;
 }
@@ -671,10 +704,14 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
-      if (preserveLegacySafeStorageIdentity) app.setName(productNameFor(channel));
+      const brandedProductName = productNameFor(channel);
+      if (preserveLegacySafeStorageIdentity) app.setName(brandedProductName);
       repairLegacyMacAppPath(channel, { isPackaged: app.isPackaged });
       refreshMacDockIcon();
-      Menu.setApplicationMenu(null);
+      const applicationMenuTemplate = buildApplicationMenuTemplate(brandedProductName);
+      Menu.setApplicationMenu(
+        applicationMenuTemplate ? Menu.buildFromTemplate(applicationMenuTemplate) : null,
+      );
 
       installLocalFileProtocolHandler();
       installPickerProtocolHandler();
@@ -683,6 +720,34 @@ if (!hasSingleInstanceLock) {
       browserSession.setUserAgent(browserUserAgent);
 
       const paths = requirePoracodePaths();
+      if (!hasExplicitPipedreamBootstrap) {
+        pipedreamBootstrap = applyPersistedPipedreamEnvFile(paths.baseDir, pipedreamBootstrap);
+      }
+      const browserCookieImportExtensionSourceDir = app.isPackaged
+        ? join(process.resourcesPath, "chrome-extension")
+        : join(process.cwd(), "chrome-extension");
+      const browserCookieImportExtensionDir = app.isPackaged
+        ? installCookieImportExtension({
+            sourceDir: browserCookieImportExtensionSourceDir,
+            baseDir: paths.baseDir,
+          })
+        : browserCookieImportExtensionSourceDir;
+      const cookieImportPairingStore = createFileBackedCookieImportPairingStore(paths.baseDir);
+      const cookieImportBridge = new CookieImportBridgeServer({
+        pairingStore: cookieImportPairingStore,
+      });
+      const browserCookieImportService = new BrowserCookieImportService({
+        session: browserSession,
+        bridge: cookieImportBridge,
+        listSources: () => cookieImportBridge.listSources(),
+        // Renderer state is pulled through typed IPC. Keeping this callback
+        // empty ensures raw cookie payloads never enter a renderer event.
+        emit: () => undefined,
+      });
+      const cookieImportBridgeReady = cookieImportBridge.start().catch((error: unknown) => {
+        console.error("[y-space] cookie import bridge failed to start:", error);
+        return null;
+      });
       // Re-seal an already-signed-in provider's cookie whenever the live jar
       // refreshes it, so providers with session-scoped auth cookies (Alibaba's
       // console) don't age out of the one snapshot taken at sign-in.
@@ -745,6 +810,7 @@ if (!hasSingleInstanceLock) {
       let scheduleRunCoordinator: ScheduleRunCoordinator | null = null;
       let prWatchService: PrWatchService | null = null;
       let gitStateService: GitStateService | null = null;
+      const pipedreamExternalUserId = `y-space:${readOrCreateRemoteAccessIdentity(paths.baseDir).desktopId}`;
       const supervisorClient = new SupervisorClient({
         appVersion: app.getVersion(),
         isDev,
@@ -753,17 +819,16 @@ if (!hasSingleInstanceLock) {
         bundledSkillsDir,
         bundledPluginsDir,
         secretStorageKey,
+        resolvePipedreamPrivilegedBootstrap: () => ({
+          bootstrap: pipedreamBootstrap,
+          externalUserId: pipedreamExternalUserId,
+        }),
         resolveExtraEnv: () => {
           const env: Record<string, string> = {};
           const browserInfo = browserMcpIngress?.getInfo();
           if (browserInfo) {
             env.PORACODE_BROWSER_MCP_URL = browserInfo.url;
             env.PORACODE_BROWSER_MCP_TOKEN = browserInfo.token;
-          }
-          const chromeInfo = chromeMcpIngress?.getInfo();
-          if (chromeInfo) {
-            env.PORACODE_CHROME_MCP_URL = chromeInfo.url;
-            env.PORACODE_CHROME_MCP_TOKEN = chromeInfo.token;
           }
           const computerUseInfo = computerUseMcpIngress?.getInfo();
           if (computerUseInfo) {
@@ -827,6 +892,35 @@ if (!hasSingleInstanceLock) {
           updatePowerSaveBlocker();
         },
       });
+      const pipedreamMainService = new PipedreamMainService({
+        createConnectLink: (appSlug) => supervisorClient.createPipedreamConnectLink(appSlug),
+        persistEnvFilePath: (filePath) => writePipedreamEnvFilePath(paths.baseDir, filePath),
+        clearEnvFilePath: () => clearPipedreamEnvFilePath(paths.baseDir),
+        fallbackBootstrap: () => launchPipedreamBootstrap,
+        configureBootstrap: async (bootstrap) => {
+          pipedreamBootstrap = bootstrap;
+          await supervisorClient.configurePipedream({
+            bootstrap,
+            externalUserId: pipedreamExternalUserId,
+          });
+          return supervisorClient.call("pipedreamGetSnapshot", {});
+        },
+        openConnectUrl: async (url) => {
+          const manager = browserPanelManager;
+          if (!manager) throw new Error("Embedded browser is not initialized.");
+          await manager.createSensitiveIntegrationTab({ url, activate: true, reveal: true });
+          showAndFocusWindow(ensureMainWindow());
+        },
+      });
+      const resolveLaunchContextIdentity =
+        (serverId: "browser" | "computer-use" | "app-controls") =>
+        async (context: McpLaunchContext) =>
+          (await supervisorClient.call("resolveMcpCallerIdentity", {
+            routing: "thread",
+            threadId: context.identity.threadId!,
+            ...(context.identity.launchId ? { launchId: context.identity.launchId } : {}),
+            serverId,
+          })) ?? undefined;
       const scheduleCoordinator = new ScheduleRunCoordinator({
         startThread: (payload) => supervisorClient.call("startThread", payload),
         getAgentStatuses: (wslDistros) => supervisorClient.call("getAgentStatuses", { wslDistros }),
@@ -942,6 +1036,7 @@ if (!hasSingleInstanceLock) {
         getProjects: dbGetProjects,
         getProject: dbGetProject,
         getProjectNotes: dbGetProjectNotes,
+        resolveLaunchContextIdentity: resolveLaunchContextIdentity("app-controls"),
         ...sharedAppControlsDeps,
         settings: {
           read: () => readSharedSettingsFile(requirePoracodePaths().settingsPath),
@@ -1008,31 +1103,18 @@ if (!hasSingleInstanceLock) {
         isExtracted: () => browserExtractWindow !== null && !browserExtractWindow.isDestroyed(),
         focusExtractedWindow: focusBrowserExtractWindow,
       });
-      browserMcpIngress = new BrowserMcpIngress();
-      browserMcpIngress.setManagerAccessor(() => browserPanelManager);
-      // External-Chrome control: a localhost WS bridge the companion extension
-      // connects to, plus a `chrome` MCP ingress agents reach the same way as the
-      // embedded `browser` server. They live side by side.
-      chromeBridgeServer = new ChromeBridgeServer({
-        pairingFilePath: join(paths.baseDir, "chrome-bridge.json"),
+      browserMcpIngress = new BrowserMcpIngress({
+        resolveLaunchContextIdentity: resolveLaunchContextIdentity("browser"),
       });
-      chromeMcpIngress = new ChromeMcpIngress();
-      chromeMcpIngress.setConnectionAccessor(() => chromeBridgeServer?.getConnection() ?? null);
+      browserMcpIngress.setManagerAccessor(() => browserPanelManager);
       primeBrowserAllowFlags(initialSettings);
       const mcpInfoReady = browserMcpIngress.start().catch((err) => {
         console.error("[poracode] browser MCP ingress failed to start:", err);
         return null;
       });
-      const chromeMcpReady = chromeMcpIngress.start().catch((err) => {
-        console.error("[poracode] chrome MCP ingress failed to start:", err);
-        return null;
-      });
       const appControlsMcpReady = appControlsMcpIngress.start().catch((err) => {
         console.error("[poracode] app controls MCP ingress failed to start:", err);
         return null;
-      });
-      chromeBridgeServer.start().catch((err) => {
-        console.error("[poracode] chrome bridge server failed to start:", err);
       });
       // Computer-use drives the host desktop and is only supported on macOS and
       // Windows (matches createComputerUseDriver). On other platforms the ingress
@@ -1056,6 +1138,7 @@ if (!hasSingleInstanceLock) {
           },
         });
         computerUseMcpIngress = new ComputerUseMcpIngress({
+          resolveLaunchContextIdentity: resolveLaunchContextIdentity("computer-use"),
           onActivity: (event) => computerUseDesktopOverlay?.setActivity(event),
         });
         computerUseMcpInfoReady = computerUseMcpIngress.start().catch((err) => {
@@ -1149,6 +1232,10 @@ if (!hasSingleInstanceLock) {
           },
           scheduleService,
           prWatchService,
+          pipedreamMainService,
+          browserCookieImportService,
+          cookieImportBridge,
+          browserCookieImportExtensionDir,
         }),
         callSupervisor: (name, payload) => supervisorClient.call(name, payload),
       });
@@ -1222,7 +1309,7 @@ if (!hasSingleInstanceLock) {
 
       await Promise.all([
         mcpInfoReady,
-        chromeMcpReady,
+        cookieImportBridgeReady,
         computerUseMcpInfoReady,
         appControlsMcpReady,
       ]);
@@ -1292,10 +1379,7 @@ if (!hasSingleInstanceLock) {
         appControlsMcpIngress = null;
         computerUseDesktopOverlay?.dispose();
         computerUseDesktopOverlay = null;
-        chromeMcpIngress?.dispose();
-        chromeMcpIngress = null;
-        chromeBridgeServer?.dispose();
-        chromeBridgeServer = null;
+        cookieImportBridge.dispose();
         void controller.dispose();
         void sshConnectionManager.dispose();
         browserExtractWindow?.close();

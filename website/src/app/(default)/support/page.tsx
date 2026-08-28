@@ -1,17 +1,14 @@
 import type { Metadata } from "next";
-import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
+import { ArrowLeft, LifeBuoy, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
-import contact from "../../../../../branding/contact.json";
-import { createPageMetadata } from "@/lib/seo";
+import { createPageMetadata, SECURITY_URL, SUPPORT_URL } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
-  title: "Poracode Support",
-  description: "Get help pairing the Poracode mobile companion or report a problem.",
+  title: "Y Space Support",
+  description: "Get help pairing the Y Space mobile companion or report a problem.",
   path: "/support",
 });
-
-const ISSUES_URL = "https://github.com/SDSLeon/lightcode/issues";
 
 export default function SupportPage() {
   return (
@@ -36,30 +33,34 @@ export default function SupportPage() {
 
       <main className="relative z-10 mx-auto max-w-3xl px-8 py-12">
         <header className="mb-12">
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Poracode Support</h1>
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Y Space Support</h1>
           <p className="mt-3 text-lg leading-8 text-gray-400">
-            Help with pairing, connections, notifications, and the Poracode mobile companion.
+            Help with pairing, connections, notifications, and the Y Space mobile companion.
           </p>
         </header>
 
         <div className="mb-12 grid gap-4 sm:grid-cols-2">
           <a
-            href={`mailto:${contact.supportEmail}`}
-            className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.05]"
-          >
-            <Mail className="mb-4 size-5 text-gray-400" />
-            <span className="block font-semibold text-white">Email support</span>
-            <span className="mt-1 block text-sm text-gray-400">{contact.supportEmail}</span>
-          </a>
-          <a
-            href={ISSUES_URL}
+            href={SUPPORT_URL}
             target="_blank"
             rel="noreferrer"
             className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.05]"
           >
-            <ExternalLink className="mb-4 size-5 text-gray-400" />
-            <span className="block font-semibold text-white">Report a bug</span>
-            <span className="mt-1 block text-sm text-gray-400">Open a GitHub issue</span>
+            <LifeBuoy className="mb-4 size-5 text-gray-400" />
+            <span className="block font-semibold text-white">Project support</span>
+            <span className="mt-1 block text-sm text-gray-400">Open the GitHub issue tracker</span>
+          </a>
+          <a
+            href={SECURITY_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.05]"
+          >
+            <ShieldCheck className="mb-4 size-5 text-gray-400" />
+            <span className="block font-semibold text-white">Security guidance</span>
+            <span className="mt-1 block text-sm text-gray-400">
+              Review private reporting options
+            </span>
           </a>
         </div>
 
@@ -67,7 +68,7 @@ export default function SupportPage() {
           <section>
             <h2 className="mb-3 text-xl font-semibold text-white">Pair a desktop</h2>
             <ol className="list-decimal space-y-2 pl-5 marker:text-gray-500">
-              <li>Open Settings → Remote Access in the Poracode desktop app.</li>
+              <li>Open Settings → Remote Access in the Y Space desktop app.</li>
               <li>Make sure Remote Access is enabled and the desktop is running.</li>
               <li>
                 Scan its QR code in the mobile app, or enter the displayed endpoint and access token
@@ -111,7 +112,7 @@ export default function SupportPage() {
           <section>
             <h2 className="mb-3 text-xl font-semibold text-white">Send a useful report</h2>
             <p>
-              Include the Poracode desktop and mobile versions, phone model, operating system,
+              Include the Y Space desktop and mobile versions, phone model, operating system,
               connection type, steps to reproduce, and the exact error. Attach relevant logs or
               screenshots, but remove access tokens, private source code, and other secrets first.
             </p>
@@ -127,7 +128,7 @@ export default function SupportPage() {
                 Privacy policy
               </Link>
               <a
-                href="https://github.com/SDSLeon/lightcode"
+                href="https://github.com/zvone187/y-space"
                 target="_blank"
                 rel="noreferrer"
                 className="text-white underline underline-offset-4"

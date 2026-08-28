@@ -165,7 +165,7 @@ describe("authenticateAcpAgent", () => {
         methodId: "browser-login",
       }),
     ).rejects.toThrow(
-      "My ACP reported authentication success, but Poracode could not verify it. Configure My ACP directly, then try again.",
+      "My ACP reported authentication success, but Y Space could not verify it. Configure My ACP directly, then try again.",
     );
 
     const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as {

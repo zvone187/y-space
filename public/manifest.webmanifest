@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Poracode",
-  "short_name": "Poracode",
-  "description": "Follow and steer your Poracode AI agents from your phone — threads, git review, and live browser, paired to your desktop.",
+  "name": "Y Space",
+  "short_name": "Y Space",
+  "description": "Follow and steer your Y Space AI agents from your phone — tasks, git review, and the live embedded browser, paired to your desktop.",
   "start_url": "/threads",
   "scope": "/",
   "display": "standalone",

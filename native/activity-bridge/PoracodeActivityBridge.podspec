@@ -11,9 +11,9 @@ Pod::Spec.new do |s|
   s.version = package['version']
   s.summary = package['description']
   s.license = package['license']
-  s.homepage = 'https://github.com/SDSLeon/lightcode'
+  s.homepage = 'https://github.com/zvone187/y-space'
   s.author = package['author']
-  s.source = { :git => 'https://github.com/SDSLeon/lightcode.git', :tag => s.version.to_s }
+  s.source = { :git => 'https://github.com/zvone187/y-space.git', :tag => s.version.to_s }
   s.source_files = 'ios/Sources/**/*.{swift,h,m,c,cc,mm,cpp}'
   s.ios.deployment_target = '14.0'
   s.dependency 'Capacitor'

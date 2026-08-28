@@ -3,9 +3,16 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
-import { createPageMetadata, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/seo";
+import {
+  absoluteUrl,
+  createPageMetadata,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
+} from "@/lib/seo";
 
-// Geist is the Poracode brand typeface (branding/BRAND.md §7). Exposed as CSS
+// Geist is the Y Space brand typeface (branding/BRAND.md §7). Exposed as CSS
 // vars that globals.css maps onto Tailwind's --font-sans / --font-mono.
 const geistSans = Geist({
   subsets: ["latin"],
@@ -52,14 +59,14 @@ export const ROOT_METADATA: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/favicon-48x48.png", type: "image/png", sizes: "48x48" },
-      { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.png", type: "image/png", sizes: "358x358" },
+      { url: absoluteUrl("/favicon-48x48.png"), type: "image/png", sizes: "48x48" },
+      { url: absoluteUrl("/favicon-96x96.png"), type: "image/png", sizes: "96x96" },
+      { url: absoluteUrl("/favicon.ico"), sizes: "any" },
+      { url: absoluteUrl("/icon.png"), type: "image/png", sizes: "358x358" },
     ],
-    apple: [{ url: "/icon-192.png", type: "image/png", sizes: "192x192" }],
+    apple: [{ url: absoluteUrl("/icon-192.png"), type: "image/png", sizes: "192x192" }],
   },
-  manifest: "/manifest.webmanifest",
+  manifest: absoluteUrl("/manifest.webmanifest"),
   ...(googleSiteVerification ? { verification: { google: googleSiteVerification } } : {}),
 };
 

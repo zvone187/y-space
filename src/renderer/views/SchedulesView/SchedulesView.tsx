@@ -278,7 +278,7 @@ export function SchedulesView() {
       const store = useAppStore.getState();
       store.setComposerSeed(
         project.id,
-        t`Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me.`,
+        t`Help me create a schedule. Ask for any missing details, then use the Y Space schedule controls to create it for me.`,
       );
       store.openDraft(project.id);
     } catch (agentError) {
@@ -369,7 +369,7 @@ export function SchedulesView() {
       title={t`Scheduled tasks`}
       description={
         <Trans>
-          Run standalone tasks on this device. Schedules run while the device is awake and Poracode
+          Run standalone tasks on this device. Schedules run while the device is awake and Y Space
           is open.
         </Trans>
       }

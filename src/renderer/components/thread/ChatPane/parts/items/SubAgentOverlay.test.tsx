@@ -398,7 +398,9 @@ describe("SubAgentContent", () => {
     );
 
     const dialog = await screen.findByRole("region");
-    expect(await within(dialog).findByText("Inspect the renderer.")).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText("Inspect the renderer.", {}, { timeout: 5_000 }),
+    ).toBeInTheDocument();
     expect(within(dialog).getByText(byTextContent("2 commands"))).toBeInTheDocument();
     expect(
       await within(dialog).findByRole("heading", { name: "Child result" }, { timeout: 5_000 }),

@@ -96,11 +96,11 @@ describe("installOpenCodePlugin", () => {
 
     expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toMatchObject({
       installed: true,
-      version: "1.8.0",
+      version: "1.9.0",
     });
   });
 
-  it("overwrites private Crossagents routing metadata from the trusted tool context", async () => {
+  it("overwrites private routing metadata for every session-aware built-in", async () => {
     const baseDir = makeBaseDir();
     const opencodeDir = makeBaseDir();
     process.env.OPENCODE_CONFIG_DIR = opencodeDir;
@@ -123,12 +123,15 @@ describe("installOpenCodePlugin", () => {
     const originalRouting = process.env.PORACODE_OPENCODE_SESSION_ROUTING;
     process.env.PORACODE_OPENCODE_SESSION_ROUTING = "1";
     try {
-      const output = { args: { __poracode_provider_session_id: "forged", prompt: "review" } };
-      await hooks["tool.execute.before"]?.(
-        { tool: "crossagents_run_agent", sessionID: "session-trusted" },
-        output,
-      );
-      expect(output.args.__poracode_provider_session_id).toBe("session-trusted");
+      for (const tool of [
+        "browser_new_tab",
+        "poracode_get_current_thread",
+        "crossagents_run_agent",
+      ]) {
+        const output = { args: { __poracode_provider_session_id: "forged", prompt: "review" } };
+        await hooks["tool.execute.before"]?.({ tool, sessionID: "session-trusted" }, output);
+        expect(output.args.__poracode_provider_session_id).toBe("session-trusted");
+      }
 
       const unrelated = { args: { prompt: "leave alone" } };
       await hooks["tool.execute.before"]?.(

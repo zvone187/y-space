@@ -10,7 +10,24 @@ import { captureProductEvent } from "../analytics/productAnalytics";
 import { captureRendererException } from "../diagnostics/sentry";
 import { hasUnresolvedConflicts } from "@/renderer/utils/mergeConflicts";
 import { useGitStore } from "./gitStore";
+import { useRightWorkspaceTabsStore } from "./rightWorkspaceTabsStore";
+import { rightWorkspaceFileTabId } from "./rightWorkspaceTabs";
 import { resolveAbsolutePath } from "@/renderer/utils/resolveAbsolutePath";
+
+function closeWorkspaceDocumentTabs(): void {
+  const workspace = useRightWorkspaceTabsStore.getState();
+  for (const tab of workspace.tabs) {
+    if (tab.kind === "file") workspace.closeTab(tab.id);
+  }
+}
+
+function workspaceFileKey(rootContext: FileEditorRootContext, path: string) {
+  return {
+    projectId: rootContext.projectId,
+    worktreePath: rootContext.worktreePath ?? "",
+    path,
+  };
+}
 
 /**
  * Paths in the file editor are either project-relative (e.g. `src/foo.ts`)
@@ -20,12 +37,25 @@ import { resolveAbsolutePath } from "@/renderer/utils/resolveAbsolutePath";
  * external-file IPC instead (which has no containment restriction).
  */
 function isExternalPath(path: string): boolean {
-  return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+  return (
+    path.startsWith("/") ||
+    path.startsWith("\\\\") ||
+    path.startsWith("//") ||
+    /^[A-Za-z]:[\\/]/.test(path)
+  );
 }
 
 function containsPathTraversal(path: string): boolean {
   const normalized = path.replace(/\\/g, "/");
   return /(^|\/)\.\.($|\/)/.test(normalized);
+}
+
+function normalizeRelativeFileOpenPath(path: string): string {
+  return path
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((segment) => segment.length > 0 && segment !== ".")
+    .join("/");
 }
 
 /**
@@ -39,10 +69,11 @@ export function resolvePathForFileOpen(
   rootContext: FileEditorRootContext | null,
   rawPath: string,
 ): string {
-  if (!rootContext) return rawPath;
   if (isExternalPath(rawPath)) return rawPath;
-  if (!containsPathTraversal(rawPath)) return rawPath;
-  return resolveAbsolutePath(rootContext.projectLocation, rawPath);
+  const normalizedPath = normalizeRelativeFileOpenPath(rawPath);
+  if (!rootContext) return normalizedPath;
+  if (!containsPathTraversal(normalizedPath)) return normalizedPath;
+  return resolveAbsolutePath(rootContext.projectLocation, normalizedPath);
 }
 
 function externalReadAsProjectResult(result: ReadExternalFileResult): ReadProjectFileResult {
@@ -267,6 +298,38 @@ async function readFileForContext(
       });
 }
 
+/**
+ * Share only the filesystem read for concurrent opens of the same file. Every
+ * caller still runs computeTabOpen and applies its own preview/pin/reveal/diff
+ * intent immediately; this prevents a double-click from being downgraded by an
+ * earlier single-click whose read is still pending.
+ */
+const inFlightFileReads = new WeakMap<
+  FileEditorRootContext,
+  Map<string, Promise<ReadProjectFileResult>>
+>();
+
+function readFileForContextDeduped(
+  rootContext: FileEditorRootContext,
+  path: string,
+): Promise<ReadProjectFileResult> {
+  let reads = inFlightFileReads.get(rootContext);
+  if (!reads) {
+    reads = new Map();
+    inFlightFileReads.set(rootContext, reads);
+  }
+  const existing = reads.get(path);
+  if (existing) return existing;
+
+  const pending = readFileForContext(rootContext, path);
+  reads.set(path, pending);
+  const clear = () => {
+    if (reads?.get(path) === pending) reads.delete(path);
+  };
+  void pending.then(clear, clear);
+  return pending;
+}
+
 async function writeFileForContext(
   rootContext: FileEditorRootContext,
   path: string,
@@ -365,6 +428,12 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
   pendingReveal: null,
   setRootContext: (rootContext) => {
     const nextRootContext = rootContext ? normalizeRootContext(rootContext) : null;
+    const currentRootContext = get().rootContext;
+    const identityChanged =
+      currentRootContext?.projectId !== nextRootContext?.projectId ||
+      currentRootContext?.worktreePath !== nextRootContext?.worktreePath ||
+      currentRootContext?.remoteServerId !== nextRootContext?.remoteServerId;
+    if (identityChanged) closeWorkspaceDocumentTabs();
     set((state) => {
       if (
         state.rootContext?.projectId === nextRootContext?.projectId &&
@@ -387,7 +456,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       };
     });
   },
-  clearSession: () =>
+  clearSession: () => {
+    closeWorkspaceDocumentTabs();
     set((state) => ({
       rootContext: null,
       overlayMode: null,
@@ -398,7 +468,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       buffers: {},
       pendingReveal: null,
       refreshToken: state.refreshToken + 1,
-    })),
+    }));
+  },
   consumeReveal: (token) =>
     set((state) =>
       state.pendingReveal && state.pendingReveal.token === token ? { pendingReveal: null } : {},
@@ -484,7 +555,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
     });
 
     try {
-      const result = await readFileForContext(rootContext, openPath);
+      const result = await readFileForContextDeduped(rootContext, openPath);
       if (get().rootContext !== rootContext) return result;
       set((state) => ({
         buffers: {
@@ -523,7 +594,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
   pinTab: (path) => set((state) => (state.previewTab === path ? { previewTab: null } : {})),
   setOverlayMode: (overlayMode) => set({ overlayMode }),
   setActivePath: (activePath) => set({ activePath }),
-  cycleTab: (direction) =>
+  cycleTab: (direction) => {
+    let activatedPath: string | null = null;
     set((state) => {
       if (state.tabs.length < 2) return {};
       const currentIndex = state.activePath ? state.tabs.indexOf(state.activePath) : -1;
@@ -532,8 +604,16 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       // and "previous" on the last.
       const from = currentIndex === -1 ? (direction === "next" ? -1 : 0) : currentIndex;
       const nextPath = state.tabs[(from + delta + state.tabs.length) % state.tabs.length];
+      activatedPath = nextPath ?? null;
       return nextPath && nextPath !== state.activePath ? { activePath: nextPath } : {};
-    }),
+    });
+    const rootContext = get().rootContext;
+    if (rootContext && activatedPath) {
+      useRightWorkspaceTabsStore
+        .getState()
+        .activateTab(rightWorkspaceFileTabId(workspaceFileKey(rootContext, activatedPath)));
+    }
+  },
   updateBuffer: (path, content) =>
     set((state) => {
       const buffer = state.buffers[path];
@@ -602,7 +682,13 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       void maybeStageResolvedConflict(rootContext, path, savedContent);
     }
   },
-  closeTab: (path) =>
+  closeTab: (path) => {
+    const rootContext = get().rootContext;
+    if (rootContext) {
+      useRightWorkspaceTabsStore
+        .getState()
+        .closeTab(rightWorkspaceFileTabId(workspaceFileKey(rootContext, path)));
+    }
     set((state) => {
       if (!state.tabs.includes(path)) return {};
 
@@ -620,7 +706,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         overlayMode:
           tabs.length === 0 && state.overlayMode !== "fullscreen" ? null : state.overlayMode,
       };
-    }),
+    });
+  },
   reorderTabs: (fromIndex, toIndex) =>
     set((state) => {
       if (

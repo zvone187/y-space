@@ -49,7 +49,7 @@ export function MainPageLayout(props: { onTitleClick: () => void }) {
         <MainPanelDropZone>
           <AppContent />
           <Suspense>
-            <DeferredFileEditorPanel />
+            <DeferredFileEditorPanel presentation="desktop" />
           </Suspense>
         </MainPanelDropZone>
       }

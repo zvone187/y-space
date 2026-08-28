@@ -279,9 +279,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     this.rememberSessionId(id);
     this.sessionHasPermissionOverride = permission !== undefined;
     this.appliedPermissionSyncKey =
-      this.crossagentDeniedPermissionRules().length === 0
-        ? this.permissionSyncKey(config)
-        : undefined;
+      this.disabledMcpPermissionRules().length === 0 ? this.permissionSyncKey(config) : undefined;
     if (this.mapperState) setOpenCodeMainSessionId(this.mapperState, id, { fresh: true });
     await this.refreshSlashCommands();
     return id;
@@ -546,21 +544,21 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     const base = permission
       ? "full-access"
       : `supervised:${config.mode === "plan" ? "plan" : "build"}`;
-    const deniedCrossagentTools = this.crossagentDeniedPermissionRules()
+    const deniedMcpTools = this.disabledMcpPermissionRules()
       .map((rule) => rule.permission)
       .sort()
       .join(",");
-    return `${base}:crossagents-denied=${deniedCrossagentTools}`;
+    return `${base}:mcp-denied=${deniedMcpTools}`;
   }
 
-  private crossagentDeniedPermissionRules(): PermissionRule[] {
-    const server = this.mcpServers?.find((candidate) => candidate.id === "crossagents");
-    if (!server?.disabledTools || server.disabledTools.length === 0) return [];
-    return server.disabledTools.map((toolName) => ({
-      permission: `${server.name}_${toolName}`,
-      pattern: "*",
-      action: "deny",
-    }));
+  private disabledMcpPermissionRules(): PermissionRule[] {
+    return (this.mcpServers ?? []).flatMap((server) =>
+      (server.disabledTools ?? []).map((toolName) => ({
+        permission: `${server.name}_${toolName}`,
+        pattern: "*",
+        action: "deny" as const,
+      })),
+    );
   }
 
   private async syncSessionPermissions(config: ThreadConfig): Promise<void> {
@@ -570,19 +568,16 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     const acquired = this.requireAcquired();
     const sessionID = this.requireSessionId();
     const fullAccessPermission = buildOpenCodePermissionRules(config.approvalPolicy);
-    const deniedCrossagentTools = this.crossagentDeniedPermissionRules();
+    const deniedMcpTools = this.disabledMcpPermissionRules();
 
     if (fullAccessPermission) {
-      await this.updateSessionPermission(sessionID, [
-        ...fullAccessPermission,
-        ...deniedCrossagentTools,
-      ]);
+      await this.updateSessionPermission(sessionID, [...fullAccessPermission, ...deniedMcpTools]);
       this.sessionHasPermissionOverride = true;
       this.appliedPermissionSyncKey = syncKey;
       return;
     }
 
-    if (!this.sessionHasPermissionOverride && deniedCrossagentTools.length === 0) {
+    if (!this.sessionHasPermissionOverride && deniedMcpTools.length === 0) {
       // Fresh supervised sessions have no session-level permission override;
       // OpenCode already resolves permissions from its loaded config stack.
       this.appliedPermissionSyncKey = syncKey;
@@ -601,7 +596,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       throw new Error(classifyOpenCodeError({ cause, operation: "app.agents" }), { cause });
     }
 
-    await this.updateSessionPermission(sessionID, [...rules, ...deniedCrossagentTools]);
+    await this.updateSessionPermission(sessionID, [...rules, ...deniedMcpTools]);
     this.sessionHasPermissionOverride = true;
     this.appliedPermissionSyncKey = syncKey;
   }
@@ -735,14 +730,16 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
   }
 
-  /**
-   * Assemble a provider-neutral acquisition for this session. OpenCode routes
-   * the directory-scoped client and MCP state inside the shared runtime server.
-   */
+  /** Assemble a provider-neutral acquisition for this session. */
   private buildAcquireInput(): AcquireOpenCodeServerInput {
     const { mcpServers } = this;
     return {
       projectLocation: this.input.projectLocation,
+      // OpenCode's MCP registry is directory-scoped, not task-scoped. Give
+      // each long-lived GUI task its own authenticated server so one model can
+      // never reuse another task's Browser/App/Computer capability. Terminal
+      // allocation is short-lived and continues to use the shared pool.
+      ...(this.isGui ? { serverIsolationKey: this.threadId } : {}),
       ...(mcpServers !== undefined ? { mcpServers } : {}),
     };
   }

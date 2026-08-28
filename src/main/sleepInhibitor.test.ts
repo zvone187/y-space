@@ -126,8 +126,11 @@ describe("createSleepInhibitor", () => {
     expect(spawnFn).toHaveBeenCalledTimes(1);
     expect(spawnFn).toHaveBeenCalledWith(
       "systemd-inhibit",
-      ["--what=sleep:idle", "--who=Poracode", "--why=Poracode is active", "--mode=block", "cat"],
-      expect.objectContaining({ detached: false }),
+      ["--what=sleep:idle", "--who=Y Space", "--why=Y Space is active", "--mode=block", "cat"],
+      {
+        detached: false,
+        stdio: ["pipe", "ignore", "ignore"],
+      },
     );
   });
 

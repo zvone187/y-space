@@ -1,11 +1,14 @@
 import { cpSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import {
+  replaceManagedAndroidAppLinks,
+  replaceManagedIosAssociatedDomains,
+} from "./mobile-app-links.mjs";
 
 const root = process.cwd();
-// Domain that owns pairing/universal links. The installed app claims
-// `applinks:<host>` so https://<host>/pair opens the app instead of the hosted
-// PWA. Override with PORACODE_MOBILE_APP_HOST (e.g. a staging domain).
-const DEFAULT_MOBILE_APP_HOST = "poracode.com";
+// Optional domain that owns pairing/universal links. The installed app claims
+// `applinks:<host>` so https://<host>/pair opens the app. Y Space has no shared
+// hosted default; deployments must opt in with PORACODE_MOBILE_APP_HOST.
 const appHost = readAppHost();
 const requireAndroidLinks =
   readBoolEnv("PORACODE_MOBILE_REQUIRE_NATIVE_LINKS") ||
@@ -14,13 +17,18 @@ const requireIosLinks =
   readBoolEnv("PORACODE_MOBILE_REQUIRE_NATIVE_LINKS") ||
   readBoolEnv("PORACODE_MOBILE_REQUIRE_IOS_LINKS");
 
-if ((requireAndroidLinks || requireIosLinks) && !appHost) {
-  console.error("[configure-mobile-native] missing PORACODE_MOBILE_APP_HOST for native app links.");
-  process.exit(1);
-}
-
 if (!appHost) {
-  console.log("[configure-mobile-native] PORACODE_MOBILE_APP_HOST not set; skipping app links.");
+  configureAndroid(null);
+  configureIosAppLinks(null);
+  console.log(
+    "[configure-mobile-native] PORACODE_MOBILE_APP_HOST not set; pruned managed app links.",
+  );
+  if (requireAndroidLinks || requireIosLinks) {
+    console.error(
+      "[configure-mobile-native] missing PORACODE_MOBILE_APP_HOST for native app links.",
+    );
+    process.exit(1);
+  }
 } else {
   configureAndroid(appHost);
   configureIosAppLinks(appHost);
@@ -45,7 +53,7 @@ function readBoolEnv(key) {
 }
 
 function readAppHost() {
-  const raw = readEnv("PORACODE_MOBILE_APP_HOST") || DEFAULT_MOBILE_APP_HOST;
+  const raw = readEnv("PORACODE_MOBILE_APP_HOST");
   if (!raw) return "";
   try {
     return new URL(raw.includes("://") ? raw : `https://${raw}`).host;
@@ -62,34 +70,17 @@ function configureAndroid(host) {
     return;
   }
 
-  const intentFilters = `
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:scheme="https" android:host="${host}" android:pathPrefix="/pair" />
-                <data android:scheme="https" android:host="${host}" android:pathPrefix="/app" />
-            </intent-filter>`;
-
   const manifest = readFileSync(manifestPath, "utf8");
-  if (manifest.includes(`android:host="${host}"`)) {
-    console.log("[configure-mobile-native] Android app links already configured.");
-    return;
-  }
-
-  const next = manifest.replace(
-    /(<activity\b[^>]*android:name="\.MainActivity"[\s\S]*?)(\s*<\/activity>)/,
-    `$1${intentFilters}$2`,
-  );
-  if (next === manifest) {
-    console.error("[configure-mobile-native] unable to locate Android MainActivity.");
+  let next;
+  try {
+    next = replaceManagedAndroidAppLinks(manifest, host);
+  } catch (error) {
+    console.error(`[configure-mobile-native] ${error.message}.`);
     process.exit(1);
   }
 
   writeFileSync(manifestPath, next, "utf8");
-  console.log("[configure-mobile-native] configured Android app links.");
+  console.log(`[configure-mobile-native] ${host ? "replaced" : "pruned"} Android app links.`);
 }
 
 function configureIosLocalNetworking() {
@@ -137,45 +128,14 @@ function configureIosAts(infoPlistPath) {
 
 function configureIosEntitlements(host) {
   const entitlementsPath = resolve(root, "ios/App/App/App.entitlements");
-  const domainValues = [`applinks:${host}`, `webcredentials:${host}`];
   let entitlements = existsSync(entitlementsPath)
     ? readFileSync(entitlementsPath, "utf8")
-    : buildEntitlements(domainValues);
-
-  if (!entitlements.includes("<key>com.apple.developer.associated-domains</key>")) {
-    entitlements = entitlements.replace(
-      /\n<\/dict>\s*<\/plist>\s*$/,
-      `\n\t<key>com.apple.developer.associated-domains</key>\n\t<array>\n${domainValues
-        .map((value) => `\t\t<string>${value}</string>`)
-        .join("\n")}\n\t</array>\n</dict>\n</plist>\n`,
-    );
-  } else {
-    for (const value of domainValues) {
-      if (entitlements.includes(`<string>${value}</string>`)) continue;
-      entitlements = entitlements.replace(
-        /(<key>com\.apple\.developer\.associated-domains<\/key>\s*<array>)/,
-        `$1\n\t\t<string>${value}</string>`,
-      );
-    }
-  }
+    : buildEmptyEntitlements();
+  entitlements = replaceManagedIosAssociatedDomains(entitlements, host);
 
   writeFileSync(entitlementsPath, entitlements, "utf8");
   configureIosProjectEntitlements();
-  console.log("[configure-mobile-native] configured iOS associated domains.");
-}
-
-function buildEntitlements(domainValues) {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-\t<key>com.apple.developer.associated-domains</key>
-\t<array>
-${domainValues.map((value) => `\t\t<string>${value}</string>`).join("\n")}
-\t</array>
-</dict>
-</plist>
-`;
+  console.log(`[configure-mobile-native] ${host ? "replaced" : "pruned"} iOS associated domains.`);
 }
 
 function configureIosProjectEntitlements() {

@@ -1,6 +1,4 @@
 import {
-  addInitScript,
-  addInitStyle,
   back,
   clearCookies,
   evalJs,
@@ -13,7 +11,6 @@ import {
   getFrameTree,
   pageSnapshot,
   querySelectorAllSnapshot,
-  removeInitScript,
   setCookie,
   storageClear,
   storageGet,
@@ -37,7 +34,7 @@ import {
   setCheckedSelector,
   typeIntoSelector,
 } from "../../pageDriver";
-import { glideCursorToSelector, setCursorOverlayVisible } from "../../cursorOverlay";
+import { glideCursorToSelector } from "../../cursorOverlay";
 import {
   agentTabOpts,
   clampInteger,
@@ -63,19 +60,27 @@ export async function dispatchTool(
       return {
         server: "browser",
         description:
-          "Controls the Poracode in-app browser panel through tabs, navigation, inspection, input, screenshots, console, network, dialogs, cookies, and storage.",
+          "Controls first-class Y Space browser page tabs through navigation, inspection, input, screenshots, console, network, dialogs, cookies, and storage.",
         guidance: [
-          "Prefer this MCP server over shell-driven browser automation when a page is visible in Poracode.",
+          "Prefer this MCP server over shell-driven browser automation when a page is visible in Y Space.",
           "Call enable before a browsing session and disable before pausing for user input or finishing.",
           "Start with snapshot or find to identify @e refs before click, fill, type, hover, get, is, or scroll.",
           "Use fill for form fields when replacing text; use type only when appending text to the current value.",
           "Use wait after navigation or mutations instead of fixed sleeps unless a plain ms delay is intentional.",
           "Use requests and console after actions to verify web app behavior and diagnose failures.",
-          "Use eval, cookies, and storage only when the corresponding Poracode setting allows it.",
+          "Use eval, cookies, and storage only when the corresponding Y Space setting allows it.",
         ],
         workflows: {
-          inspect: ["list_tabs", "snapshot", "find", "get", "is"],
-          navigate: ["new_tab", "open", "navigate", "back", "forward", "reload"],
+          inspect: ["list_tabs", "find_tabs", "snapshot", "find", "get", "is"],
+          navigate: [
+            "new_tab",
+            "open_or_focus_tab",
+            "open",
+            "navigate",
+            "back",
+            "forward",
+            "reload",
+          ],
           interact: [
             "click",
             "dblclick",
@@ -106,43 +111,96 @@ export async function dispatchTool(
             "Use interactiveOnly/includeUrls/selector to reduce output before handing page state to the model.",
         },
         tools: TOOLS.filter((tool) => tool.name !== "api").map(compactToolSpec),
-        tabs: ctx.manager.snapshot(),
+        tabs: tabOverview(ctx),
       };
     case "enable": {
-      ctx.manager.setAutomationSession(ctx.threadId ?? "unscoped", true);
-      const tab = ctx.manager.getActiveTab();
+      const sessionId = ctx.threadId ?? "unscoped";
+      ctx.manager.setAutomationSession(sessionId, true);
+      const tab = ctx.threadId
+        ? ctx.manager.getActiveTabForThread(ctx.threadId)
+        : ctx.manager.getActiveTab();
       if (tab) {
+        ctx.manager.recordAutomationTarget(sessionId, tab.tabId);
         await ctx.manager.ensureTabReady(tab.tabId);
-        await tab.cdp.attach();
-        await setCursorOverlayVisible(tab.cdp, true);
+        await ctx.manager.showAutomationCursor(sessionId, tab.tabId);
       }
       return { enabled: true };
     }
     case "disable": {
-      const shouldHidePresence = ctx.manager.setAutomationSession(
-        ctx.threadId ?? "unscoped",
-        false,
-      );
-      const tab = ctx.manager.getActiveTab();
-      if (shouldHidePresence && tab) {
-        await tab.cdp.attach();
-        await setCursorOverlayVisible(tab.cdp, false);
-      }
+      ctx.manager.setAutomationSession(ctx.threadId ?? "unscoped", false);
       return { enabled: false };
     }
     case "list_tabs":
-      return ctx.manager.snapshot();
+      return tabOverview(ctx);
+    case "find_tabs": {
+      const query = String(payload.query ?? "")
+        .trim()
+        .toLowerCase();
+      if (!query) throw new Error("query required");
+      const limit = clampInteger(payload.limit, 20, 1, 100);
+      const state = agentVisibleState(ctx);
+      return {
+        tabs: state.tabs
+          .filter((tab) =>
+            [tab.tabId, tab.url, tab.title].some((value) => value.toLowerCase().includes(query)),
+          )
+          .slice(0, limit),
+        implicitTabId: ctx.threadId
+          ? (ctx.manager.getActiveTabForThread(ctx.threadId)?.tabId ?? null)
+          : state.activeTabId,
+      };
+    }
     case "new_tab": {
       const url = typeof payload.url === "string" ? payload.url : undefined;
       const activate = payload.activate !== false;
-      return await ctx.manager.createTab({ ...(url ? { url } : {}), activate }, agentTabOpts(ctx));
+      const sessionId = ctx.threadId ?? "unscoped";
+      ctx.manager.touchAutomationSession(sessionId);
+      const tab = await ctx.manager.createTab(
+        { ...(url ? { url } : {}), activate },
+        agentTabOpts(ctx),
+      );
+      ctx.manager.recordAutomationTarget(sessionId, tab.tabId);
+      await ctx.manager.showAutomationCursor(sessionId, tab.tabId);
+      return tab;
     }
     case "activate_tab": {
-      ctx.manager.setActiveTab(String(payload.tabId ?? ""));
+      const tabId = String(payload.tabId ?? "");
+      if (!ctx.manager.getTab(tabId)) throw new Error(`unknown tab ${tabId}`);
+      ctx.manager.setActiveTab(tabId);
+      if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, tabId);
+      ctx.manager.recordAutomationTarget(ctx.threadId ?? "unscoped", tabId);
+      await ctx.manager.ensureTabReady(tabId);
+      await ctx.manager.showAutomationCursor(ctx.threadId ?? "unscoped", tabId);
       return { ok: true };
     }
+    case "open_or_focus_tab": {
+      const url = String(payload.url ?? "").trim();
+      if (!url) throw new Error("url required");
+      const match =
+        payload.match === "origin" || payload.match === "prefix" ? payload.match : "exact";
+      const existing = agentVisibleState(ctx).tabs.find((tab) =>
+        tabUrlMatches(tab.url, url, match),
+      );
+      if (existing) {
+        if (payload.activate !== false) ctx.manager.setActiveTab(existing.tabId);
+        if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, existing.tabId);
+        ctx.manager.recordAutomationTarget(ctx.threadId ?? "unscoped", existing.tabId);
+        await ctx.manager.ensureTabReady(existing.tabId);
+        await ctx.manager.showAutomationCursor(ctx.threadId ?? "unscoped", existing.tabId);
+        return { created: false, tab: existing };
+      }
+      const activate = payload.activate !== false;
+      const sessionId = ctx.threadId ?? "unscoped";
+      ctx.manager.touchAutomationSession(sessionId);
+      const tab = await ctx.manager.createTab({ url, activate }, agentTabOpts(ctx));
+      ctx.manager.recordAutomationTarget(sessionId, tab.tabId);
+      await ctx.manager.showAutomationCursor(sessionId, tab.tabId);
+      return { created: true, tab };
+    }
     case "close_tab": {
-      await ctx.manager.closeTab(String(payload.tabId ?? ""));
+      const tabId = String(payload.tabId ?? "");
+      if (!ctx.manager.getTab(tabId)) throw new Error(`unknown tab ${tabId}`);
+      await ctx.manager.closeTab(tabId);
       return { ok: true };
     }
     case "navigate": {
@@ -270,7 +328,7 @@ export async function dispatchTool(
     }
     case "eval": {
       if (!ctx.allowEval) {
-        return { error: "eval is disabled in Poracode settings" };
+        return { error: "eval is disabled in Y Space settings" };
       }
       const { tab } = await requireTab(ctx, payload);
       const expression = String(payload.js ?? "");
@@ -489,7 +547,7 @@ export async function dispatchTool(
       if (!ctx.allowDataAccess) {
         return {
           error:
-            "cookies is disabled. Enable 'Allow agents to read/write cookies and storage' in Poracode settings.",
+            "cookies is disabled. Enable 'Allow agents to read/write cookies and storage' in Y Space settings.",
         };
       }
       const { tab } = await requireTab(ctx, payload);
@@ -520,7 +578,7 @@ export async function dispatchTool(
       if (!ctx.allowDataAccess) {
         return {
           error:
-            "storage is disabled. Enable 'Allow agents to read/write cookies and storage' in Poracode settings.",
+            "storage is disabled. Enable 'Allow agents to read/write cookies and storage' in Y Space settings.",
         };
       }
       const { tab } = await requireTab(ctx, payload);
@@ -594,26 +652,17 @@ export async function dispatchTool(
       if (op === "add") {
         const source = String(payload.source ?? "");
         if (!source) throw new Error("source required");
-        const res = await addInitScript(tab.cdp, source);
-        tab.rememberInitScript(res.identifier);
-        return { identifier: res.identifier };
+        return await tab.addInitScript(source);
       }
       if (op === "remove") {
         const identifier = String(payload.identifier ?? "");
         if (!identifier) throw new Error("identifier required");
-        await removeInitScript(tab.cdp, identifier);
-        tab.forgetInitScript(identifier);
+        await tab.removeInitScript(identifier);
         return { ok: true };
       }
       if (op === "removeAll") {
-        const ids = tab.listInitScripts();
-        for (const id of ids) {
-          try {
-            await removeInitScript(tab.cdp, id);
-          } catch {}
-          tab.forgetInitScript(id);
-        }
-        return { ok: true, removed: ids.length };
+        const removed = await tab.removeAllInitScripts();
+        return { ok: true, removed };
       }
       throw new Error(`unknown addscript op: ${op}`);
     }
@@ -624,9 +673,7 @@ export async function dispatchTool(
       const css = String(payload.css ?? "");
       if (!css) throw new Error("css required");
       if (op === "add") {
-        const res = await addInitStyle(tab.cdp, css);
-        tab.rememberInitScript(res.identifier);
-        return { identifier: res.identifier };
+        return await tab.addInitStyle(css);
       }
       if (op === "oneshot") {
         await evaluateOneShotStyle(tab.cdp, css);
@@ -636,5 +683,41 @@ export async function dispatchTool(
     }
     default:
       throw new Error(`unknown tool: ${name}`);
+  }
+}
+
+function tabOverview(ctx: ToolContext): ReturnType<ToolContext["manager"]["snapshot"]> & {
+  implicitTabId: string | null;
+} {
+  const state = agentVisibleState(ctx);
+  return {
+    ...state,
+    implicitTabId: ctx.threadId
+      ? (ctx.manager.getActiveTabForThread(ctx.threadId)?.tabId ?? null)
+      : (ctx.manager.getActiveTab()?.tabId ?? null),
+  };
+}
+
+function agentVisibleState(ctx: ToolContext): ReturnType<ToolContext["manager"]["snapshot"]> {
+  const state = ctx.manager.snapshot();
+  const tabs = state.tabs.filter((tab) => ctx.manager.getTab(tab.tabId) !== null);
+  return {
+    ...state,
+    tabs,
+    activeTabId: tabs.some((tab) => tab.tabId === state.activeTabId) ? state.activeTabId : null,
+  };
+}
+
+function tabUrlMatches(
+  candidate: string,
+  requested: string,
+  match: "exact" | "origin" | "prefix",
+): boolean {
+  if (match === "prefix") return candidate.startsWith(requested);
+  if (match === "exact") return candidate === requested;
+  try {
+    return new URL(candidate).origin === new URL(requested).origin;
+  } catch {
+    return false;
   }
 }

@@ -3,9 +3,7 @@ import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { findExperimentByWorktree } from "@/renderer/state/experimentStore";
 import { startPostPushPrStatusRefresh } from "@/renderer/state/gitRefresh";
-import { usePanelStore } from "@/renderer/state/panelStore";
 import { usePullFromSourceDialogStore } from "@/renderer/state/pullFromSourceDialogStore";
-import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
 import {
   runGitMergeToSource,
@@ -16,20 +14,14 @@ import {
   showGitOperationFailure,
 } from "./gitCommandRunner";
 import { deleteWorktreeGroup } from "./worktreeActions";
+import { showGitReviewPanel } from "./panelActions";
 
 function captureGitActionError(error: unknown): void {
   showGitActionError(error, { capture: true });
 }
 
 export function openGitReviewForWorktree(projectId: string, worktreePath: string): void {
-  const mode = useSharedSettings.getState().gitReviewMode;
-  const panelStore = usePanelStore.getState();
-  panelStore.setGitReviewContext({ projectId, worktreePath });
-  if (mode === "panel") {
-    panelStore.setGitReviewAsPanel(true);
-  } else {
-    panelStore.setGitOverlayOpen(true);
-  }
+  showGitReviewPanel(projectId, worktreePath);
 }
 
 export function gitSync(projectId: string, worktreePath?: string): void {

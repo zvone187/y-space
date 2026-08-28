@@ -29,6 +29,7 @@ import {
   Settings2,
   Sparkles,
   TerminalSquare,
+  Unplug,
   UserRound,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -63,6 +64,7 @@ const DESKTOP_ONLY_SECTIONS = new Set<SettingsSection>([
   "skills",
   "mcpServers",
   "plugins",
+  "connections",
   "browser",
   "archived",
   "about",
@@ -268,6 +270,7 @@ export function SettingsSidebar(props: {
         { id: "skills", icon: <Box className="size-4" />, label: t`Skills` },
         { id: "mcpServers", icon: <Cable className="size-4" />, label: t`MCP Servers` },
         { id: "plugins", icon: <Puzzle className="size-4" />, label: t`Plugins` },
+        { id: "connections", icon: <Unplug className="size-4" />, label: t`Connections` },
         {
           id: "usage",
           icon: <Gauge className="size-4" />,

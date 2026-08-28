@@ -50,7 +50,7 @@ export function GeneralSettings() {
       <SettingRow
         anchorId="general.language"
         title={t`Language`}
-        description={<Trans>Choose the display language for Poracode's interface.</Trans>}
+        description={<Trans>Choose the display language for Y Space's interface.</Trans>}
       >
         <Select
           aria-label={t`Language`}
@@ -108,7 +108,7 @@ export function GeneralSettings() {
         <SettingRow
           anchorId="general.launchAtStartup"
           title={t`Launch at startup`}
-          description={<Trans>Launch Poracode automatically when you sign in to Windows.</Trans>}
+          description={<Trans>Launch Y Space automatically when you sign in to Windows.</Trans>}
         >
           <ToggleSwitch
             aria-label={t`Launch at startup`}
@@ -126,7 +126,7 @@ export function GeneralSettings() {
         <SettingRow
           anchorId="general.startMinimized"
           title={t`Start minimized`}
-          description={<Trans>Keep Poracode in the system tray when it launches at startup.</Trans>}
+          description={<Trans>Keep Y Space in the system tray when it launches at startup.</Trans>}
         >
           <ToggleSwitch
             aria-label={t`Start minimized`}
@@ -197,8 +197,8 @@ export function GeneralSettings() {
           title={t`Close to tray`}
           description={
             <Trans>
-              When you close the window, keep Poracode running in the system tray. Disable to quit
-              on close.
+              When you close the window, keep Y Space running in the system tray. Disable to quit on
+              close.
             </Trans>
           }
         >

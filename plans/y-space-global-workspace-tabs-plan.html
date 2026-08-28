@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Y Space Global Workspace Tabs Plan</title>
+    <style>
+      :root {
+        --canvas: #f6f2e8;
+        --ink: #172026;
+        --muted: #65727a;
+        --border: #2c3338;
+        --paper: #fff;
+        --blue: #d9ecff;
+        --green: #dff5df;
+        --yellow: #fff1b8;
+        --pink: #ffe2eb;
+        --purple: #eadfff;
+        --shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background:
+          linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
+          linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px), var(--canvas);
+        background-size: 28px 28px;
+        color: var(--ink);
+        line-height: 1.45;
+        margin: 0;
+      }
+      main {
+        margin: 0 auto;
+        padding: 30px 22px 52px;
+        width: min(1240px, 100%);
+      }
+      header {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: 1.4fr 0.8fr;
+        margin-bottom: 22px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(2rem, 5vw, 4.4rem);
+        line-height: 0.96;
+      }
+      h2 {
+        font-size: 1.1rem;
+        text-transform: uppercase;
+      }
+      a {
+        color: #0f5f85;
+        font-weight: 750;
+        text-decoration: none;
+      }
+      code {
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(47, 58, 66, 0.24);
+        border-radius: 6px;
+        padding: 2px 5px;
+      }
+      .hero,
+      .card,
+      details,
+      .sticky {
+        border: 2px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .hero,
+      .card,
+      details {
+        background: var(--paper);
+        border-radius: 16px;
+      }
+      .hero {
+        padding: 26px;
+      }
+      .hero p {
+        color: var(--muted);
+        margin-top: 12px;
+        max-width: 760px;
+      }
+      .meta-stack,
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .card {
+        padding: 16px;
+      }
+      .card small {
+        color: var(--muted);
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+      .card strong {
+        display: block;
+        font-size: 1.3rem;
+        line-height: 1.1;
+        margin-top: 4px;
+      }
+      .tag {
+        background: var(--yellow);
+        border: 2px solid var(--border);
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: 0.78rem;
+        font-weight: 900;
+        margin-bottom: 12px;
+        padding: 5px 9px;
+        text-transform: uppercase;
+      }
+      .board-section {
+        margin-top: 24px;
+      }
+      .section-title {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .pin {
+        background: #ff6b57;
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        height: 16px;
+        width: 16px;
+      }
+      .sticky {
+        border-radius: 3px;
+        min-height: 128px;
+        padding: 16px;
+        transform: rotate(-0.7deg);
+      }
+      .sticky:nth-child(even) {
+        transform: rotate(0.7deg);
+      }
+      .sticky h3 {
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+      }
+      .sticky p,
+      .sticky li {
+        color: #334148;
+        font-size: 0.94rem;
+      }
+      .sticky ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .bg-blue {
+        background: var(--blue);
+      }
+      .bg-green {
+        background: var(--green);
+      }
+      .bg-yellow {
+        background: var(--yellow);
+      }
+      .bg-pink {
+        background: var(--pink);
+      }
+      .bg-purple {
+        background: var(--purple);
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 850;
+        list-style: none;
+        padding: 14px 16px;
+      }
+      summary::before {
+        content: "+";
+        display: inline-block;
+        font-weight: 900;
+        margin-right: 10px;
+        width: 14px;
+      }
+      details[open] summary::before {
+        content: "−";
+      }
+      .detail-body {
+        border-top: 2px solid var(--border);
+        color: #334148;
+        padding: 14px 16px 16px;
+      }
+      .detail-body ul,
+      .detail-body ol {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid #9aa5aa;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      @media (max-width: 900px) {
+        header,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="hero" aria-labelledby="title">
+          <span class="tag">Implementation Plan</span>
+          <h1 id="title">Global workspace tabs for Y Space</h1>
+          <p>
+            Promote the right pane from a tool switcher into a tabbed workspace where tools and
+            documents coexist, while keeping the proven embedded Browser page model and agent bridge
+            intact.
+          </p>
+        </section>
+        <aside class="meta-stack" aria-label="Report metadata">
+          <div class="card bg-green">
+            <small>Status</small><strong>Approved by user direction</strong>
+          </div>
+          <div class="card bg-blue">
+            <small>Branch</small><strong>y-space-browser-integrations</strong>
+          </div>
+          <div class="card bg-yellow"><small>Date</small><strong>2026-08-27</strong></div>
+        </aside>
+      </header>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Fast Answer</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-pink">
+            <h3>Current state</h3>
+            <p>
+              Files, Browser pages, and panel tools use three unrelated tab/state systems. File
+              clicks leave the panel for an overlay; XLS/XLSX are generic binary files.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Recommended path</h3>
+            <p>
+              Add one outer workspace strip for Files, Git, Usage, Notes, Browser, Terminal,
+              plans/subagents, and dynamic document tabs. Keep Browser pages nested and
+              single-mounted.
+            </p>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Main risk</h3>
+            <p>
+              Reparenting Browser webviews or remounting Notes/Usage would lose state. The design
+              therefore wraps existing owners instead of replacing them.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Resolved Product Decisions</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-blue">
+            <h3>One outer strip</h3>
+            <p>
+              Every right-pane tool opens as a labeled, selectable workspace tab. Opening the same
+              singleton tool focuses it instead of duplicating it.
+            </p>
+          </div>
+          <div class="sticky bg-purple">
+            <h3>Files are documents</h3>
+            <p>
+              Source, Markdown, PDF, CSV/TSV, XLS, and XLSX files open beside tools as document
+              tabs. Single-click preview replacement and pin/edit semantics remain.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Browser stays safe</h3>
+            <p>
+              Browser is one outer tool tab with its existing page strip, manager, persistence,
+              OAuth behavior, and agent MCP. No external browser is introduced.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Implementation Shape</h2>
+        </div>
+        <div class="grid two">
+          <div class="sticky bg-green">
+            <h3>Reuse</h3>
+            <ul>
+              <li><code>panelStore</code> tool contexts/open flags</li>
+              <li><code>fileEditorStore</code> buffers and preview/pin logic</li>
+              <li><code>BrowserPanelManager</code> and Browser MCP</li>
+              <li>Existing Notes, Usage, Git, Terminal, plan, and subagent components</li>
+            </ul>
+          </div>
+          <div class="sticky bg-blue">
+            <h3>Change</h3>
+            <ul>
+              <li>
+                Add a discriminated workspace-tab registry and deterministic selection/close/reorder
+                helpers
+              </li>
+              <li>Render a keyboard-accessible global strip in <code>UnifiedRightPanel</code></li>
+              <li>Route ordinary file opens through a single workspace action</li>
+              <li>
+                Add a bounded, allowlisted document-preview IPC for PDF/XLS/XLSX bytes and render
+                documents inline instead of opening the modal by default
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>New Preview Capability</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-purple">
+            <h3>PDF</h3>
+            <p>
+              Request bytes through a new size-bounded, extension-allowlisted preview IPC, create a
+              renderer-local Blob URL, and display it inside the document tab. Revoke the URL on tab
+              change/unmount.
+            </p>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Spreadsheet</h3>
+            <p>
+              Use SheetJS CE 0.20.3 from its authoritative distribution to parse XLS/XLSX locally,
+              with sheet selection and a bounded read-only grid. CSV/TSV share the grid.
+            </p>
+          </div>
+          <div class="sticky bg-pink">
+            <h3>Safety limits</h3>
+            <p>
+              No network viewer, no macro execution, no formulas evaluated, no write-back.
+              Malformed, encrypted, remote-unavailable, and oversized files show finite errors.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>TDD Contract</h2>
+        </div>
+        <details open>
+          <summary>Failing tests to add first</summary>
+          <div class="detail-body">
+            <ol>
+              <li>
+                Workspace IDs cannot collide; singleton tools focus idempotently; document paths
+                coexist.
+              </li>
+              <li>
+                Close picks an adjacent tab, closing dirty documents can be cancelled, and reorder
+                preserves selection.
+              </li>
+              <li>
+                The global strip has exactly one selected tab, roving keyboard focus, Home/End/arrow
+                support, close focus restoration, and overflow access.
+              </li>
+              <li>
+                Tree, chat/file path, Git, command, PDF, and spreadsheet opens route through the
+                workspace action without a modal.
+              </li>
+              <li>
+                Browser → file → Git → Browser preserves the same Browser host/webview nodes and
+                does not duplicate pages.
+              </li>
+              <li>PDF opening is single-instance and Blob URLs are revoked.</li>
+              <li>
+                XLS/XLSX/CSV/TSV render sheet names and cells; malformed, encrypted, and oversized
+                files fail safely.
+              </li>
+              <li>
+                Inactive document panes cannot intercept Cmd/Ctrl+W, Save, Find, or Browser reload
+                shortcuts.
+              </li>
+            </ol>
+          </div>
+        </details>
+        <details>
+          <summary>Manual user stories</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                Open Files, Git, Notes, Usage, and Browser from the current top-right controls; each
+                appears as its own outer tab and keeps its state while switching.
+              </li>
+              <li>
+                Open two source files, one PDF, one XLS, and one XLSX; each appears as a separate
+                document tab and no external app launches.
+              </li>
+              <li>
+                Reorder and close mixed tool/document tabs, then verify the correct neighbor
+                receives focus and dirty work is protected.
+              </li>
+              <li>
+                Keep several Browser page tabs open, switch through document/tool tabs, return to
+                Browser, and verify all pages and agent control still work.
+              </li>
+            </ul>
+          </div>
+        </details>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Constraints And Boundaries</h2>
+        </div>
+        <details open>
+          <summary>Scope boundary</summary>
+          <div class="detail-body">
+            The outer workspace is scoped to the current project/worktree in this implementation.
+            Existing Browser page persistence remains cross-launch. File contents and dirty buffers
+            remain session-only unless an existing editor restore contract already applies; no
+            content is silently persisted.
+          </div>
+        </details>
+        <details>
+          <summary>Dependency decision</summary>
+          <div class="detail-body">
+            Add SheetJS Community Edition 0.20.3 from
+            <code>https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz</code>, following the
+            project's pnpm lockfile. The full build is required because the mini build omits XLS. No
+            PDF dependency is needed.
+          </div>
+        </details>
+        <details>
+          <summary>Files likely involved</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                <code>src/renderer/state/panelStore.ts</code> and a focused workspace-tab
+                state/helper module
+              </li>
+              <li>
+                <code>src/renderer/components/layout/UnifiedRightPanel.tsx</code> and a new
+                tab-strip component
+              </li>
+              <li><code>src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx</code></li>
+              <li>
+                <code>src/renderer/views/FileEditorOverlay/parts/ProjectFilesPanel.tsx</code> and
+                <code>FileEditorPane.tsx</code>
+              </li>
+              <li>
+                Shared preview contracts/procedure plus supervisor handlers with extension and byte
+                limits
+              </li>
+              <li>File-open commands/helpers and focused tests</li>
+              <li><code>package.json</code> / <code>pnpm-lock.yaml</code></li>
+            </ul>
+          </div>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>

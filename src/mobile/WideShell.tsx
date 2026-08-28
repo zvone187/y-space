@@ -366,7 +366,7 @@ export function WideShell(props: {
           <Outlet />
           {showDesktopTools && fileEditorOpen ? (
             <Suspense fallback={null}>
-              <DeferredFileEditorPanel />
+              <DeferredFileEditorPanel presentation="mobile" />
             </Suspense>
           ) : null}
         </main>

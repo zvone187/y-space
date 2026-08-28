@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  CHANGELOG_URL,
   changelogDocumentSchema,
   compareVersions,
   hasUnseenChangelog,
@@ -8,6 +9,12 @@ import {
   parseChangelogDocument,
   releasesSince,
 } from "./changelog";
+
+it("loads release notes from the Y Space fork", () => {
+  expect(CHANGELOG_URL).toBe(
+    "https://raw.githubusercontent.com/zvone187/y-space/master/website/public/changelog.json",
+  );
+});
 
 // The single source of truth lives in the website (served at /changelog.json).
 const rawDocument = JSON.parse(readFileSync("website/public/changelog.json", "utf8")) as unknown;

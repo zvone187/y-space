@@ -1,0 +1,313 @@
+{
+  "version": 2,
+  "project": "Y Space",
+  "branch": "y-space-browser-integrations",
+  "platform": "macOS Apple Silicon desktop",
+  "testedOn": "2026-08-27",
+  "status": "complete_with_external_blockers",
+  "build": {
+    "kind": "unsigned ad-hoc macOS package",
+    "app": "release/mac-arm64/Y Space.app",
+    "dmg": "release/Y-Space-1.6.6-arm64.dmg",
+    "architecture": "arm64",
+    "sha256": "1d1d19638d6e0091f652ce5935ae64c29a84f7d44fcdfcd39e751074e9f49505",
+    "bytes": 155951077,
+    "codesign": "codesign --verify --deep --strict passed",
+    "notarized": false
+  },
+  "verification": {
+    "fullSuite": {
+      "passedFiles": 879,
+      "skippedFiles": 5,
+      "passedTests": 9896,
+      "skippedTests": 85
+    },
+    "checks": {
+      "typecheck": "pass",
+      "lint": "pass",
+      "typeAwareLint": "pass",
+      "format": "pass",
+      "i18n": "pass: 3,269 extracted messages and 0 missing across 12 translated catalogs",
+      "diffCheck": "pass"
+    },
+    "productionBuilds": {
+      "desktop": "pass on final source; packaged as the ARM64 app and DMG above",
+      "mobile": "pass on final source after the desktop Pipedream file-picker patch"
+    }
+  },
+  "architecture": {
+    "tabModel": "One global workspace tab strip. Every browser page, file, PDF, spreadsheet, Terminal, Files, Git, Usage, and Notes surface is a peer tab; there is no nested browser tab strip.",
+    "browserResidency": {
+      "ordinaryLiveLimit": 6,
+      "sensitiveLiveLimit": 4,
+      "metadataLimit": 30,
+      "policy": "true LRU with the active page protected; evicted pages retain bounded resume metadata and remount on user or agent activation"
+    },
+    "manualProcessObservation": "A packaged two-cycle churn run created and closed 30 disposable browser peers. Metadata reached the hard cap of 30, a 31st creation was rejected, and both peaks retained exactly six guest renderers. Both cleanups returned to the four-renderer baseline; final browser-core RSS was 0.9% above baseline, no disposable tab restored after restart, and no helper survived quit."
+  },
+  "tests": [
+    {
+      "id": "YS-E2E-001",
+      "title": "Y Space identity and compatibility migration",
+      "status": "pass",
+      "evidence": [
+        "The packaged app launched as Y Space against the existing profile.",
+        "Existing project, task, tool, and browser-page metadata restored.",
+        "Compatibility-sensitive data paths and partitions remain stable; migration tests pass."
+      ]
+    },
+    {
+      "id": "YS-E2E-002",
+      "title": "Browser pages are independent global workspace tabs",
+      "status": "pass",
+      "evidence": [
+        "The sole top tab strip showed independent Alpha, Gamma, and DuckDuckGo browser pages beside Files and document tabs.",
+        "Cmd+T created a new browser page as a peer global tab; no nested browser strip appeared.",
+        "Switching pages preserved Gamma's Network request verified state.",
+        "Cmd+W inside a browser guest closed that browser page and selected the adjacent Files peer tab."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-browser-peer-tabs.jpeg",
+        "implementation assets/qa-screenshots/global-cmd-t-new-browser.jpeg",
+        "implementation assets/qa-screenshots/global-browser-close-to-files.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-003",
+      "title": "Codex controls and reuses embedded browser pages",
+      "status": "pass",
+      "models": ["gpt-5.6-luna", "gpt-5.6-sol"],
+      "evidence": [
+        "Packaged Codex gpt-5.6-luna listed the exact Y Space browser-page inventory and active page.",
+        "It found Alpha, activated it, filled and saved Controlled by Codex through Y Space, and observed the confirmation.",
+        "It focused the existing Gamma URL without duplication, ran the request, observed Network request verified, and captured a Browser screenshot.",
+        "A second packaged task visibly selected Codex 5.6 Sol, searched the global browser inventory, and focused the existing https://example.com page without creating, duplicating, or closing a tab.",
+        "Codex gpt-5.6-sol reported the active tab ID, exact URL, Example Domain title, and Example Domain H1, and captured a Browser screenshot before returning to Idle.",
+        "No external browser was used."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/codex-browser-agent-pass.jpeg",
+        "implementation assets/qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-004",
+      "title": "Claude Code embedded-browser access",
+      "status": "blocked_logged_out",
+      "evidence": [
+        "Claude Code 2.1.210 is installed.",
+        "claude auth status reported loggedIn=false, authMethod=none, apiProvider=firstParty.",
+        "A noninteractive no-tools/no-session Sonnet smoke request exited before inference with an authentication blocker and no network-failure signature.",
+        "No credentials were entered on the user's behalf, so a live model/browser run could not be performed."
+      ],
+      "nextAction": "The user must run claude auth login, then the same packaged browser-control scenario can be repeated."
+    },
+    {
+      "id": "YS-E2E-005",
+      "title": "OpenCode models and packaged embedded-browser control",
+      "status": "pass",
+      "evidence": [
+        "OpenCode 1.18.23 reported configured OpenCode Zen and Z.AI providers.",
+        "opencode/gpt-5.6-luna returned YSPACE_OPENCODE_GPT_PASS.",
+        "zai/glm-4.5-flash returned YSPACE_OPENCODE_GLM_PASS.",
+        "A final packaged in-app OpenCode task using ZAI GLM-4.5-Flash used only Y Space built-in Browser tools and listed all 9 global browser tabs.",
+        "It created or focused https://example.com without external browser control and reported active tab tab-3e5ee0a7-e49e-4224-ade6-3229ba824a63 with title Example Domain.",
+        "It captured a 39,346-byte 1140x1646 Browser screenshot and returned to Idle.",
+        "A second final packaged task visibly selected OpenCode GPT-5.6 Terra, started with 10 global browser tabs, reused the existing example.com page, created one example.org peer tab, and captured a Browser screenshot.",
+        "OpenCode GPT-5.6 Terra closed only its disposable example.org tab, reactivated the original example.com tab, verified the final count returned to 10, and reported the active tab ID/title before returning to Idle.",
+        "Signed provider-session isolation and Browser/app-controls wiring pass automated tests."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/final-opencode-browser-control-success.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-006",
+      "title": "Browser capability, app controls, and Y Space core skills",
+      "status": "automated_pass",
+      "evidence": [
+        "Provider launch tests verify Browser and app-controls injection with signed task identity.",
+        "Global Browser disable and core-skill synchronization are covered without replacing user-owned skill collisions.",
+        "The live Codex run proved the packaged Browser capability is discoverable and operable."
+      ]
+    },
+    {
+      "id": "YS-E2E-007",
+      "title": "Pair Chrome and Brave cookie-import sources",
+      "status": "deferred_by_user_direction",
+      "reason": "The user explicitly said not to install Chrome or Brave extensions because normal browsing is embedded in Y Space. Import-only bridge security and protocol behavior remain covered by automated tests."
+    },
+    {
+      "id": "YS-E2E-008",
+      "title": "Extension-free cookie-file preview and import",
+      "status": "pass",
+      "evidence": [
+        "The final packaged app selected a harmless JSON fixture through the native file picker.",
+        "The preview and import completed with 1 cookie accepted and 0 rejected for example.com.",
+        "No Chrome or Brave extension and no external browser control were used."
+      ],
+      "screenshots": ["implementation assets/qa-screenshots/final-cookie-file-import-success.jpeg"]
+    },
+    {
+      "id": "YS-E2E-009",
+      "title": "Cookie-import denial, limits, and legacy-control rejection",
+      "status": "automated_pass",
+      "evidence": [
+        "Automated bridge tests cover signed pairing, encryption, malformed P-256 points, expiry, revocation, bounds, redaction, and rejection of legacy browser-control messages.",
+        "Manual cookie-file import exercised the extension-free path; external extension pairing remained intentionally uninstalled."
+      ]
+    },
+    {
+      "id": "YS-E2E-010",
+      "title": "Personal Pipedream MCP OAuth",
+      "status": "not_run_authorization_required",
+      "evidence": ["The implementation and automated tests are present."],
+      "reason": "A live run would create an OAuth grant/account connection, which was not separately authorized."
+    },
+    {
+      "id": "YS-E2E-011",
+      "title": "Pipedream environment-file safety and read-only live credentials flow",
+      "status": "pass_without_external_grant",
+      "evidence": [
+        "The native picker accepted a harmless syntactically complete environment fixture in the final packaged app.",
+        "The fake credentials were rejected safely without leaking their values.",
+        "Forget environment file removed the saved path and returned the UI to its unconfigured state.",
+        "The ignored mode-600 root environment file produced a ready bootstrap without printing any credential value.",
+        "The production token broker completed a client-credentials exchange against Pipedream's official token endpoint.",
+        "The production API client completed the configured project lookup and returned 1 app for a read-only Slack catalog sample.",
+        "The credential-excluding account-list request for a synthetic QA external user returned 0 accounts, as expected.",
+        "The final packaged app launched with the real ignored file, displayed BYO Connect as Ready, and stated that credentials are never exposed to agents.",
+        "A hands-on Slack search returned the live Slack result and Connect button while Connected accounts remained empty; the Connect button was not clicked.",
+        "After clean quit, no Pipedream environment-path or connection-store JSON had been persisted in the Y Space user-data directory.",
+        "Six focused Pipedream boundary test files passed all 34 tests with loopback binding enabled.",
+        "No Connect token, OAuth account grant, account connection, disconnect, or other account mutation was created."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/final-pipedream-fixture-rejected-safely.jpeg",
+        "implementation assets/qa-screenshots/final-pipedream-fixture-forgotten.jpeg"
+      ],
+      "notRun": "No user OAuth grant or Pipedream account connection was created because that persistent-access action requires separate authorization."
+    },
+    {
+      "id": "YS-E2E-012",
+      "title": "Pipedream disable, disconnect, and restart cleanup",
+      "status": "automated_pass_live_not_run",
+      "reason": "Live teardown requires first creating an authorized account connection; relay, reconciliation, revocation, and restart behavior are covered by automated suites."
+    },
+    {
+      "id": "YS-E2E-013",
+      "title": "Pipedream relay spoofing and consequential retry safety",
+      "status": "automated_pass",
+      "evidence": [
+        "Tests cover launch bearer enforcement, pinned routing headers, session-to-binding isolation, safe read retry after 401, and no tools/call replay."
+      ]
+    },
+    {
+      "id": "YS-E2E-014",
+      "title": "Secret inheritance and persistence audit",
+      "status": "pass",
+      "evidence": [
+        ".env.pipedream is ignored by git and mode 600.",
+        "Only required variable names and presence were inspected; values were never printed.",
+        "Provider translation and persistence tests verify opaque descriptors, loopback-only bearer exposure, and renderer-safe redaction."
+      ]
+    },
+    {
+      "id": "YS-E2E-015",
+      "title": "Global right-workspace tool tabs",
+      "status": "pass",
+      "evidence": [
+        "Files, Git, Usage, Notes, Browser, and Terminal opened or focused as labeled peer tabs in the one global strip.",
+        "Top-right Browser focused an existing browser page instead of creating a nested or duplicate tab."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-tool-tabs-git.jpeg",
+        "implementation assets/qa-screenshots/global-terminal-tab.jpeg",
+        "implementation assets/qa-screenshots/global-files-tab.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-016",
+      "title": "Source, Markdown, PDF, XLS, and XLSX global document tabs",
+      "status": "pass",
+      "evidence": [
+        "Source and Markdown files opened as peer global tabs.",
+        "XLS and XLSX rendered locally with People and Metrics sheets and expected Ada/Grace cells.",
+        "The two-page PDF rendered inside the packaged app through Chromium's PDF viewer with 1 / 2 page state and Finished loading PDF.",
+        "Malformed XLSX produced a finite in-app error instead of crashing."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-source-tab.jpeg",
+        "implementation assets/qa-screenshots/global-markdown-tab.jpeg",
+        "implementation assets/qa-screenshots/global-pdf-tab-fixed.jpeg",
+        "implementation assets/qa-screenshots/global-xls-tab.jpeg",
+        "implementation assets/qa-screenshots/global-xlsx-tab.jpeg",
+        "implementation assets/qa-screenshots/global-malformed-xlsx.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-017",
+      "title": "Mixed-tab reorder, keyboard access, and shortcut isolation",
+      "status": "pass",
+      "evidence": [
+        "Mixed browser, document, and tool peers reordered in the sole global strip.",
+        "Ctrl+Tab cycled between browser peers and crossed from the last browser page into Files, even with the browser address field focused.",
+        "Browser Cmd+T and guest Cmd+W applied to browser peers without invoking a hidden file/editor layer."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/global-outer-tabs-reordered.jpeg",
+        "implementation assets/qa-screenshots/global-tab-keyboard-cycle.jpeg"
+      ]
+    },
+    {
+      "id": "YS-E2E-018",
+      "title": "Agent browser control survives global workspace switching and LRU suspension",
+      "status": "pass",
+      "evidence": [
+        "Browser metadata remained discoverable while Files, documents, Git, Usage, and Notes were active.",
+        "Agent targeting promotes a suspended page to the resident LRU set before interaction.",
+        "Nine browser metadata tabs produced only four browser renderer processes plus the main renderer during packaged QA, below the configured six-page ordinary ceiling.",
+        "Automated tests cover LRU promotion/eviction, late-snapshot merge, persistent script/style restoration, sensitive auth redaction, and listener teardown."
+      ]
+    },
+    {
+      "id": "YS-E2E-019",
+      "title": "Native macOS Y Space menu identity",
+      "status": "pass",
+      "evidence": [
+        "The final packaged app exposed the Y Space application menu.",
+        "The native menu showed About Y Space and Quit Y Space."
+      ]
+    },
+    {
+      "id": "YS-E2E-020",
+      "title": "Packaged browser churn, caps, cleanup, and restart",
+      "status": "pass_no_leak_signal",
+      "evidence": [
+        "Computer Use created 20 independent browser peer tabs from a 10-tab baseline, reaching the 30-tab metadata ceiling in the sole global workspace strip.",
+        "A 31st Cmd+T produced no additional tab and the packaged main-process log reported the expected Browser tab limit reached (30) rejection.",
+        "The first peak used six guest renderer processes; closing only the 20 disposable peers returned immediately to the four-renderer baseline and preserved the original 10 tab titles in order.",
+        "A second cycle created and closed 10 more peers; its peak again used six guest renderers and cleanup again returned to four.",
+        "Final browser-core RSS was 855,872 KiB versus an 848,416 KiB baseline, a 7,456 KiB or 0.9% delta. Main-process RSS finished 12.1% below baseline.",
+        "After clean quit, zero packaged Y Space or helper processes remained. Relaunch restored exactly the original 10 tabs and none of the 30 disposable tabs."
+      ],
+      "artifact": "implementation assets/browser-memory-soak.json"
+    },
+    {
+      "id": "YS-E2E-021",
+      "title": "Multiple live models control the packaged embedded browser",
+      "status": "pass_with_claude_external_blocker",
+      "evidence": [
+        "Codex gpt-5.6-luna and gpt-5.6-sol both completed packaged Browser-tool workflows against first-class global tabs.",
+        "OpenCode ZAI GLM-4.5-Flash and OpenCode GPT-5.6 Terra both completed packaged Browser-tool workflows; separate CLI smokes also passed for ZAI GLM-4.5-Flash and OpenCode GPT-5.6 Luna.",
+        "The Codex Sol and OpenCode Terra screenshots visibly identify the selected model in the packaged composer and show the returned browser evidence.",
+        "Claude Code remains the only provider without a live model run because its installed CLI is logged out; the safe Sonnet request stopped before inference."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
+      ]
+    }
+  ]
+}

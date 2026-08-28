@@ -19,7 +19,6 @@ import {
   finalizeFileCheckpoint,
   hydrateFileCheckpoints,
 } from "@/renderer/state/fileCheckpointActions";
-import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useProjectRootNames } from "@/renderer/state/projectRootNamesStore";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
 import { useRemoteServersStore } from "@/renderer/state/remoteServersStore";
@@ -28,7 +27,7 @@ import {
   openFileInEditor,
   resolveWorktreeBranch,
 } from "@/renderer/utils/gitHelpers";
-import { showSubAgentPanel } from "@/renderer/actions/panelActions";
+import { showFilesPanel, showSubAgentPanel } from "@/renderer/actions/panelActions";
 import { ChatFindBar, type ScrollToIndex } from "@/renderer/components/find/ChatFindBar";
 import { ChatPaneActionsContext, type ChatPaneActions } from "./chatPaneActionsContext";
 import { ChatScrollControls, type ChatScrollControlsHandle } from "./ChatScrollControls";
@@ -170,17 +169,7 @@ export function ChatPane(props: ChatPaneProps) {
           onRevealProjectFolderInTree(normalized);
           return;
         }
-        const fileEditor = useFileEditorStore.getState();
-        const currentRoot = fileEditor.rootContext;
-        const isSameContext =
-          currentRoot?.projectId === targetContext.projectId &&
-          currentRoot?.worktreePath === targetContext.worktreePath;
-        if (!isSameContext) {
-          fileEditor.setRootContext(targetContext);
-        }
-        if (fileEditor.overlayMode !== "fullscreen") {
-          fileEditor.setOverlayMode("modal");
-        }
+        showFilesPanel(targetContext.projectId, targetContext.worktreePath);
         const ancestors = collectPathAncestors(normalized);
         useProjectTreeStore.getState().expandMany(ancestors);
       },

@@ -8,6 +8,10 @@ import type { TerminalExitStatus } from "@agentclientprotocol/sdk";
 import type { ProjectLocation } from "@/shared/contracts";
 import { processEnvRecord } from "@/supervisor/processEnv";
 import {
+  posixPrivilegedEnvironmentUnsetPrefix,
+  sanitizePrivilegedChildEnvironment,
+} from "@/supervisor/privilegedChildEnvironment";
+import {
   buildPosixExportPrefix,
   buildPowerShellInvocationScript,
   buildWslLoginShellCommand,
@@ -114,6 +118,7 @@ export function buildAcpTerminalLaunch(
   args: string[],
   requestEnv: Record<string, string>,
 ): { command: string; args: string[]; cwd?: string; env: Record<string, string> } {
+  requestEnv = sanitizePrivilegedChildEnvironment(requestEnv);
   if (location.kind === "windows") {
     const env = { ...buildAcpTerminalEnv(location), ...requestEnv };
     const shell = detectShell();
@@ -140,7 +145,7 @@ export function buildAcpTerminalLaunch(
 
   if (location.kind === "wsl") {
     const exports = buildPosixExportPrefix({ TERM: "xterm-256color", ...requestEnv });
-    const script = `${exports}${buildPosixTerminalScript(command, args)}`;
+    const script = `${posixPrivilegedEnvironmentUnsetPrefix()}${exports}${buildPosixTerminalScript(command, args)}`;
     return {
       ...buildWslLoginShellCommand(location.distro, cwd, script),
       env: processEnvRecord(),

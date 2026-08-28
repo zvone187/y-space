@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Y Space — Final Implementation Report</title>
+    <style>
+      :root {
+        --canvas: #f6f2e8;
+        --ink: #172026;
+        --muted: #65727a;
+        --border: #2c3338;
+        --paper: #ffffff;
+        --blue: #d9ecff;
+        --green: #dff5df;
+        --yellow: #fff1b8;
+        --pink: #ffe2eb;
+        --purple: #eadfff;
+        --shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        background:
+          linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
+          linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px), var(--canvas);
+        background-size: 28px 28px;
+        color: var(--ink);
+        line-height: 1.45;
+        margin: 0;
+      }
+      main {
+        margin: 0 auto;
+        padding: 30px 22px 52px;
+        width: min(1240px, 100%);
+      }
+      header {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: 1.4fr 0.8fr;
+        margin-bottom: 22px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(2.2rem, 6vw, 4.8rem);
+        line-height: 0.95;
+      }
+      h2 {
+        font-size: 1.05rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      a {
+        color: #0f5f85;
+        font-weight: 800;
+        text-decoration: none;
+      }
+      code {
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(47, 58, 66, 0.24);
+        border-radius: 6px;
+        padding: 2px 5px;
+      }
+      .hero,
+      .card,
+      .sticky,
+      details,
+      .shot {
+        border: 2px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .hero,
+      .card,
+      details,
+      .shot {
+        background: var(--paper);
+        border-radius: 16px;
+      }
+      .hero {
+        padding: 26px;
+      }
+      .hero p {
+        color: var(--muted);
+        margin-top: 12px;
+        max-width: 780px;
+      }
+      .meta-stack,
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .grid.four {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .card {
+        padding: 16px;
+      }
+      .card small {
+        color: var(--muted);
+        display: block;
+        font-size: 0.78rem;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+      .card strong {
+        display: block;
+        font-size: 1.25rem;
+        line-height: 1.15;
+        margin-top: 4px;
+        overflow-wrap: anywhere;
+      }
+      .tag,
+      .pill {
+        border: 2px solid var(--border);
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: 0.76rem;
+        font-weight: 900;
+        padding: 5px 9px;
+        text-transform: uppercase;
+      }
+      .tag {
+        background: var(--green);
+        margin-bottom: 12px;
+      }
+      .pill {
+        margin: 0 6px 6px 0;
+      }
+      .board-section {
+        margin-top: 26px;
+      }
+      .section-title {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .pin {
+        background: #ff6b57;
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        height: 16px;
+        width: 16px;
+      }
+      .sticky {
+        border-radius: 3px;
+        min-height: 138px;
+        padding: 16px;
+        transform: rotate(-0.45deg);
+      }
+      .sticky:nth-child(even) {
+        transform: rotate(0.45deg);
+      }
+      .sticky h3 {
+        font-size: 1.08rem;
+        margin-bottom: 8px;
+      }
+      .sticky p,
+      .sticky li {
+        color: #334148;
+        font-size: 0.92rem;
+      }
+      .sticky ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .bg-blue {
+        background: var(--blue);
+      }
+      .bg-green {
+        background: var(--green);
+      }
+      .bg-yellow {
+        background: var(--yellow);
+      }
+      .bg-pink {
+        background: var(--pink);
+      }
+      .bg-purple {
+        background: var(--purple);
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 850;
+        padding: 14px 16px;
+      }
+      .detail-body {
+        border-top: 2px solid var(--border);
+        color: #334148;
+        padding: 14px 16px 16px;
+      }
+      .detail-body ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 0.88rem;
+        margin-top: 10px;
+        width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid rgba(47, 58, 66, 0.35);
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--blue);
+      }
+      .shot {
+        overflow: hidden;
+      }
+      .shot img {
+        display: block;
+        height: 260px;
+        object-fit: cover;
+        object-position: top;
+        width: 100%;
+      }
+      .shot figcaption {
+        color: var(--muted);
+        font-size: 0.86rem;
+        padding: 10px 12px;
+      }
+      @media (max-width: 900px) {
+        header,
+        .grid.two,
+        .grid.three,
+        .grid.four {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="hero" aria-labelledby="title">
+          <span class="tag">Implementation complete</span>
+          <h1 id="title">Y Space</h1>
+          <p>
+            Y Space now has one global workspace tab model. Each embedded browser page is its own
+            peer tab beside files, PDFs, spreadsheets, Terminal, Files, Git, Usage, and Notes. There
+            is no browser-within-browser tab strip.
+          </p>
+          <p>
+            <a href="https://github.com/zvone187/y-space/pull/1">Open pull request #1</a>
+          </p>
+        </section>
+        <aside class="meta-stack" aria-label="Report metadata">
+          <div class="card bg-green">
+            <small>Status</small><strong>Ready, with two external account gates</strong>
+          </div>
+          <div class="card bg-blue">
+            <small>Automated</small><strong>9,896 passed · 85 skipped</strong>
+          </div>
+          <div class="card bg-yellow">
+            <small>Browser residency</small><strong>6 ordinary · 4 sensitive</strong>
+          </div>
+          <div class="card bg-purple"><small>Date</small><strong>2026-08-27</strong></div>
+        </aside>
+      </header>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Outcome</h2>
+        </div>
+        <div class="grid three">
+          <article class="sticky bg-green">
+            <h3>One tab concept</h3>
+            <p>
+              Browser pages, tools, source files, Markdown, PDF, XLS, and XLSX all participate in
+              the same draggable, keyboard-accessible top strip.
+            </p>
+          </article>
+          <article class="sticky bg-blue">
+            <h3>Agent-native browser</h3>
+            <p>
+              Agents can list, find, activate, open-or-focus, inspect, screenshot, and interact with
+              any Y Space browser page by stable ID—even when another workspace tab is visible.
+            </p>
+          </article>
+          <article class="sticky bg-yellow">
+            <h3>Bounded memory</h3>
+            <p>
+              Browser metadata may reach 30 pages, but ordinary live webviews are true-LRU capped at
+              six. Sensitive authentication guests use a separate four-view ceiling.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Browser lifecycle</h2>
+        </div>
+        <div class="grid four">
+          <article class="sticky bg-blue">
+            <h3>Independent page</h3>
+            <p>
+              Every browser global tab owns one URL, history, title, page state, and agent target.
+            </p>
+          </article>
+          <article class="sticky bg-green">
+            <h3>True LRU</h3>
+            <p>
+              User and agent activation promote the target. The active page is protected and the
+              least-recent inactive ordinary page is suspended first.
+            </p>
+          </article>
+          <article class="sticky bg-purple">
+            <h3>Safe resume</h3>
+            <p>
+              Bounded metadata restores pages on demand. Sensitive URLs stay memory-only and are
+              redacted to <code>about:blank</code> in persistence.
+            </p>
+          </article>
+          <article class="sticky bg-pink">
+            <h3>Real teardown</h3>
+            <p>
+              Eviction and close unmount webviews, detach DOM/global listeners, suspend CDP
+              controllers, clear manager state, and ignore stale async callbacks.
+            </p>
+          </article>
+        </div>
+        <details open>
+          <summary>Packaged process evidence</summary>
+          <div class="detail-body">
+            Nine browser pages were present as global-tab metadata, but the packaged process list
+            contained only four browser renderer processes plus the main renderer. That observed
+            live set stayed below the six-page ordinary ceiling instead of retaining one renderer
+            per metadata tab.
+          </div>
+        </details>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Manual packaged QA</h2>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Flow</th>
+              <th>Result</th>
+              <th>Observed evidence</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Global browser peers</td>
+              <td>Pass</td>
+              <td>
+                Alpha, Gamma, and DuckDuckGo appeared in the sole global strip; no nested strip.
+              </td>
+            </tr>
+            <tr>
+              <td>Browser create/switch/close</td>
+              <td>Pass</td>
+              <td>
+                Cmd+T created a peer browser tab; switching preserved state; guest Cmd+W selected
+                adjacent Files.
+              </td>
+            </tr>
+            <tr>
+              <td>Top-right tools</td>
+              <td>Pass</td>
+              <td>
+                Files, Git, Usage, Notes, Browser, and Terminal opened or focused peer global tabs.
+              </td>
+            </tr>
+            <tr>
+              <td>Documents</td>
+              <td>Pass</td>
+              <td>
+                Source, Markdown, PDF, XLS, XLSX, and malformed-workbook handling stayed inside Y
+                Space.
+              </td>
+            </tr>
+            <tr>
+              <td>Mixed-tab keyboard access</td>
+              <td>Pass</td>
+              <td>
+                Ctrl+Tab cycled between browser peers and crossed from the last browser into Files,
+                including while the browser address field was focused.
+              </td>
+            </tr>
+            <tr>
+              <td>Bounded browser residency</td>
+              <td>Pass</td>
+              <td>
+                A packaged two-cycle churn run created and closed 30 disposable browser peers.
+                Metadata reached 30 and rejected a 31st tab; both peaks held exactly 6 guest
+                renderers, and both cleanups returned to the 4-renderer baseline. Final browser-core
+                RSS was only 0.9% above baseline, original tabs survived intact, closed disposable
+                tabs did not restore, and no helper survived quit.
+              </td>
+            </tr>
+            <tr>
+              <td>Codex browser control</td>
+              <td>Pass</td>
+              <td>
+                gpt-5.6-luna listed pages, edited Alpha, reused Gamma, ran its request, and captured
+                a screenshot. A second packaged run visibly selected gpt-5.6-sol, reused the
+                existing Example Domain tab without changing the 10-tab inventory, read its exact
+                URL/title/H1, captured a Browser screenshot, and returned Idle.
+              </td>
+            </tr>
+            <tr>
+              <td>OpenCode models</td>
+              <td>Pass</td>
+              <td>
+                Both live CLI model checks passed. In the final package, ZAI GLM-4.5-Flash used only
+                Y Space Browser tools, listed all 9 tabs, opened or focused Example Domain without
+                external browser control, captured a 39,346-byte 1140×1646 screenshot, and returned
+                Idle. A second packaged run visibly selected OpenCode GPT-5.6 Terra, created one
+                example.org peer from a 10-tab baseline, captured it, closed only that disposable
+                page, and returned to the same 10 tabs with the original example.com page active.
+              </td>
+            </tr>
+            <tr>
+              <td>Cookie-file import</td>
+              <td>Pass</td>
+              <td>
+                The native picker imported the harmless example.com fixture with 1 cookie accepted
+                and 0 rejected. No browser extension or external browser was used.
+              </td>
+            </tr>
+            <tr>
+              <td>Pipedream environment and live API</td>
+              <td>Read-only pass</td>
+              <td>
+                The packaged native picker accepted a harmless fixture, safely rejected its fake
+                credentials, and then forgot the saved path. The ignored mode-600 real file then
+                passed production client-credentials exchange plus read-only project, app-catalog (1
+                Slack sample), and credential-excluding account-list requests (0 accounts for a
+                synthetic QA user). No Connect token, OAuth account grant, or account mutation was
+                created. In the final package, BYO Connect rendered Ready, a hands-on Slack search
+                returned its Connect action, and Connected accounts stayed empty; Connect was not
+                clicked. Clean quit left no Pipedream path or connection-store JSON. Six focused
+                Pipedream boundary files also passed all 34 tests.
+              </td>
+            </tr>
+            <tr>
+              <td>Native app menu</td>
+              <td>Pass</td>
+              <td>The macOS menu showed About Y Space and Quit Y Space.</td>
+            </tr>
+            <tr>
+              <td>Claude Code</td>
+              <td>External blocker</td>
+              <td>
+                2.1.210 is installed but logged out. A no-tools/no-session Sonnet smoke request
+                stopped before inference with the same authentication blocker; user login is
+                required for a live model run.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Visual evidence</h2>
+        </div>
+        <div class="grid three">
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-single-global-browser-tabs.jpeg"
+              alt="Browser pages shown as peer tabs in the global workspace strip"
+            />
+            <figcaption>
+              Final package: independent browser pages in the one global strip.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/global-xlsx-tab.jpeg"
+              alt="XLSX workbook rendered in a global Y Space tab"
+            />
+            <figcaption>Spreadsheet preview as a peer document tab.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/global-pdf-tab-fixed.jpeg"
+              alt="Two-page PDF rendered in the packaged Y Space application"
+            />
+            <figcaption>Two-page PDF rendered inside the packaged desktop app.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-opencode-browser-control-success.jpeg"
+              alt="Successful OpenCode GLM-4.5-Flash control of Y Space embedded browser tabs"
+            />
+            <figcaption>
+              OpenCode used only built-in Browser tools, listed 9 tabs, and focused Example Domain.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg"
+              alt="Codex GPT-5.6 Sol controlling the existing Y Space Example Domain browser tab"
+            />
+            <figcaption>
+              Codex 5.6 Sol reused the existing browser page, read URL/title/H1, and captured it.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
+              alt="OpenCode GPT-5.6 Terra creating and cleaning up a Y Space browser peer tab"
+            />
+            <figcaption>
+              OpenCode GPT-5.6 Terra created one browser peer, captured it, and restored the
+              original 10-tab inventory.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-cookie-file-import-success.jpeg"
+              alt="Successful extension-free cookie-file import in Y Space"
+            />
+            <figcaption>Harmless cookie fixture imported: 1 accepted, 0 rejected.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-pipedream-fixture-rejected-safely.jpeg"
+              alt="Pipedream harmless fixture rejected safely in packaged Y Space"
+            />
+            <figcaption>Fake Pipedream credentials rejected safely without disclosure.</figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/final-pipedream-fixture-forgotten.jpeg"
+              alt="Pipedream environment file forgotten in packaged Y Space"
+            />
+            <figcaption>
+              Saved environment-file path forgotten; state returned to unconfigured.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Verification</h2>
+        </div>
+        <div class="grid two">
+          <article class="sticky bg-green">
+            <h3>Automated</h3>
+            <ul>
+              <li>879 test files passed; 5 skipped</li>
+              <li>9,896 tests passed; 85 skipped</li>
+              <li>TypeScript typecheck passed</li>
+              <li>Lint and type-aware lint passed</li>
+              <li>Format, i18n, and diff checks passed</li>
+            </ul>
+          </article>
+          <article class="sticky bg-yellow">
+            <h3>Browser lifecycle</h3>
+            <ul>
+              <li>30 browser peers created and closed by hand</li>
+              <li>30-tab metadata ceiling enforced</li>
+              <li>6 live guest renderers at both peaks</li>
+              <li>4 live guest renderers after both cleanups</li>
+              <li>Final browser-core RSS: +0.9%</li>
+              <li>0 packaged processes left after quit</li>
+            </ul>
+          </article>
+          <article class="sticky bg-blue">
+            <h3>Package</h3>
+            <ul>
+              <li>Apple Silicon app and DMG built</li>
+              <li>Deep/strict code-sign verification passed</li>
+              <li>ARM64, unsigned/ad-hoc as authorized</li>
+              <li>DMG size: 155,951,077 bytes</li>
+              <li>Final-source mobile production build passed</li>
+            </ul>
+          </article>
+          <article class="sticky bg-purple">
+            <h3>DMG SHA-256</h3>
+            <p><code>1d1d19638d6e0091f652ce5935ae64c29a84f7d44fcdfcd39e751074e9f49505</code></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Security and integration boundaries</h2>
+        </div>
+        <div class="grid two">
+          <article class="sticky bg-yellow">
+            <h3>Cookie import</h3>
+            <p>
+              Extension-free file import passed in the final package with a harmless example.com
+              fixture: 1 accepted and 0 rejected. Encrypted pairing remains available, but no Chrome
+              or Brave extension was installed, as directed.
+            </p>
+          </article>
+          <article class="sticky bg-pink">
+            <h3>Pipedream</h3>
+            <p>
+              The native environment-file path passed its packaged safety flow: a harmless fixture
+              was accepted, fake credentials were rejected without leakage, and the saved path was
+              forgotten. The real ignored mode-600 file then passed the production token broker and
+              read-only project, catalog, and credential-excluding account-list APIs without
+              exposing values. The final packaged UI also rendered Ready and returned the live Slack
+              catalog without persisting connection state. Live OAuth/account connection still
+              awaits explicit authorization.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <details open>
+          <summary>External follow-ups—not implementation failures</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                Run <code>claude auth login</code> before a live Claude Code browser-control pass.
+              </li>
+              <li>
+                Explicitly authorize a Pipedream OAuth/account grant before connected-account and
+                disconnect testing. Client-credentials and read-only APIs already pass.
+              </li>
+              <li>
+                The unsigned build may require macOS Gatekeeper confirmation on another machine.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Final artifacts</summary>
+          <div class="detail-body">
+            <ul>
+              <li><a href="../release/Y-Space-1.6.6-arm64.dmg">ARM64 Y Space DMG</a></li>
+              <li><a href="qa-e2e-tests.json">Structured QA evidence</a></li>
+              <li><a href="browser-memory-soak.json">Browser memory-soak evidence</a></li>
+              <li><a href="https://github.com/zvone187/y-space/pull/1">Pull request #1</a></li>
+            </ul>
+          </div>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>

@@ -80,9 +80,9 @@ const SKILL_FILE = "SKILL.md";
 const MANIFEST_FILE = ".poracode-skill.json";
 /** Root id/label for read-only skills shipped with the app (resources/skills). */
 export const BUNDLED_PROVIDER_ID = "poracode-built-in";
-const BUNDLED_PROVIDER_LABEL = "Poracode built-ins";
+const BUNDLED_PROVIDER_LABEL = "Y Space built-ins";
 const PORACODE_PROVIDER_GROUP_ID = "poracode";
-const PORACODE_PROVIDER_GROUP_LABEL = "Poracode";
+const PORACODE_PROVIDER_GROUP_LABEL = "Y Space";
 
 const PORACODE_PROVIDER_GROUP_ORDER = -1;
 const DISABLED_SUFFIX = ".poracode-disabled";
@@ -615,7 +615,7 @@ export class SkillsService {
       if (payload.query) url.searchParams.set("q", payload.query);
       url.searchParams.set("limit", "100");
       url.searchParams.set("sort", payload.sort === "rank" ? "stars" : payload.sort);
-      const response = await this.fetchImpl(url, { headers: { "User-Agent": "Poracode" } });
+      const response = await this.fetchImpl(url, { headers: { "User-Agent": "Y-Space" } });
       if (!response.ok) {
         throw new Error(`Skills Directory returned HTTP ${response.status}.`);
       }
@@ -627,7 +627,7 @@ export class SkillsService {
       };
     } else {
       const response = await this.fetchImpl(SKILLS_SH_URL, {
-        headers: { "User-Agent": "Poracode" },
+        headers: { "User-Agent": "Y-Space" },
       });
       if (!response.ok) throw new Error(`Skills.sh returned HTTP ${response.status}.`);
       const declaredLength = Number.parseInt(response.headers.get("content-length") ?? "0", 10);
@@ -688,7 +688,7 @@ export class SkillsService {
 
     const headers = {
       Accept: "application/vnd.github+json",
-      "User-Agent": "Poracode",
+      "User-Agent": "Y-Space",
       "X-GitHub-Api-Version": "2022-11-28",
     };
     let branch = marketplaceSkill.sourceRef;
@@ -779,7 +779,7 @@ export class SkillsService {
           const rawPath = entry.path.split("/").map(encodeURIComponent).join("/");
           const rawResponse = await this.fetchImpl(
             `https://raw.githubusercontent.com/${source}/${encodeURIComponent(branch)}/${rawPath}`,
-            { headers: { "User-Agent": "Poracode" } },
+            { headers: { "User-Agent": "Y-Space" } },
           );
           if (!rawResponse.ok) throw new Error(`GitHub returned HTTP ${rawResponse.status}.`);
           const contents = Buffer.from(await rawResponse.arrayBuffer());
@@ -1753,7 +1753,7 @@ export class SkillsService {
       scope === "global" ? environment.homeDisplayPath : environment.projectDisplayPath!;
     return {
       providerId: availability === "poracode" ? "poracode" : "agents",
-      providerLabel: availability === "poracode" ? "Poracode only" : "Shared agents",
+      providerLabel: availability === "poracode" ? "Y Space only" : "Shared agents",
       ...(availability === "poracode"
         ? {
             providerGroupId: PORACODE_PROVIDER_GROUP_ID,

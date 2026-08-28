@@ -12,8 +12,7 @@ import { SettingRow, SettingsPage } from "./SettingsForm";
 import appIconStableUrl from "../../../../../build/icon.png";
 import appIconNightlyUrl from "../../../../../build/icon-nightly.png";
 
-const GITHUB_REPO = "https://github.com/SDSLeon/lightcode";
-const WEBSITE_URL = "https://poracode.com/";
+const GITHUB_REPO = "https://github.com/zvone187/y-space";
 
 function AboutLink(props: { href: string; children: React.ReactNode }) {
   return (
@@ -124,17 +123,17 @@ export function AboutSettings() {
     try {
       const result = await bridge.requestLegacyDataMigration();
       if (result.status === "no-legacy-data") {
-        toast.warning(t`No Lightcode data was found.`);
+        toast.warning(t`No legacy app data was found.`);
         return;
       }
       if (result.status === "unavailable") {
-        toast.warning(t`Lightcode data import is unavailable with a custom data folder.`);
+        toast.warning(t`Legacy data import is unavailable with a custom data folder.`);
         return;
       }
       await bridge.relaunchApp();
     } catch (error) {
       toast.danger(
-        error instanceof Error ? error.message : t`Couldn't schedule the Lightcode data import.`,
+        error instanceof Error ? error.message : t`Couldn't schedule the legacy data import.`,
       );
     } finally {
       setMigrationPending(false);
@@ -196,11 +195,11 @@ export function AboutSettings() {
         {!isRemoteSession() && !bridge.isDev ? (
           <div className="mt-8 border-t border-[var(--hairline)] pt-6">
             <SettingRow
-              title={t`Import Lightcode data`}
+              title={t`Import legacy data`}
               description={
                 <Trans>
-                  Copy all Lightcode data into Poracode. Poracode restarts and keeps a complete
-                  backup of its current data.
+                  Copy data from an earlier installation into Y Space. Y Space restarts and keeps a
+                  complete backup of its current data.
                 </Trans>
               }
             >
@@ -217,10 +216,6 @@ export function AboutSettings() {
         ) : null}
 
         <div className="mt-8 space-y-3 border-t border-[var(--hairline)] pt-6">
-          <AboutLink href={WEBSITE_URL}>
-            <Trans comment="External link to the product website">Website</Trans>
-          </AboutLink>
-          <br />
           <AboutLink href={GITHUB_REPO}>
             <Trans>GitHub Repository</Trans>
           </AboutLink>
@@ -239,16 +234,16 @@ export function AboutSettings() {
         </div>
 
         <p className="mt-8 text-xs text-muted">
-          <Trans>&copy; {currentYear} Serhii Vecherenko. All rights reserved.</Trans>
+          <Trans>&copy; {currentYear} Y Space contributors. Licensed under Apache-2.0.</Trans>
         </p>
       </SettingsPage>
       <ConfirmDialog
         isOpen={showMigrationConfirm}
-        title={t`Import Lightcode data again?`}
+        title={t`Import legacy data again?`}
         body={
           <Trans>
-            Poracode will restart, back up its current data, and replace it with a complete copy of
-            your Lightcode data.
+            Y Space will restart, back up its current data, and replace it with a complete copy of
+            the legacy installation data.
           </Trans>
         }
         confirmLabel={t`Import and restart`}

@@ -78,7 +78,7 @@ describe("gitActions", () => {
     runnerMock.refreshGitStatusForWorktree.mockResolvedValue(undefined);
   });
 
-  it("refreshes a conflicted remote worktree before opening Git Review", async () => {
+  it("refreshes a conflicted remote worktree before opening the global Git workspace", async () => {
     runnerMock.runGitPullFromSource.mockResolvedValue({
       merged: false,
       fastForward: false,
@@ -88,7 +88,8 @@ describe("gitActions", () => {
 
     gitPullFromSource(project.id, "/repo-worktree");
 
-    await vi.waitFor(() => expect(panelMock.setGitOverlayOpen).toHaveBeenCalledWith(true));
+    await vi.waitFor(() => expect(panelMock.setGitReviewAsPanel).toHaveBeenCalledWith(true));
+    expect(panelMock.setGitOverlayOpen).toHaveBeenCalledWith(false);
     expect(runnerMock.refreshGitStatusForWorktree).toHaveBeenCalledWith(
       { kind: "posix", path: "/repo-worktree" },
       "/repo-worktree",

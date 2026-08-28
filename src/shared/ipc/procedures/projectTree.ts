@@ -7,6 +7,7 @@ import {
   moveProjectEntryPayloadSchema,
   readAbsoluteFilePayloadSchema,
   readExternalFilePayloadSchema,
+  readProjectFilePreviewPayloadSchema,
   readProjectFilePayloadSchema,
   renameProjectEntryPayloadSchema,
   revealProjectEntryPayloadSchema,
@@ -29,6 +30,8 @@ import type {
   ReadAbsoluteFileResult,
   ReadExternalFilePayload,
   ReadExternalFileResult,
+  ReadProjectFilePreviewPayload,
+  ReadProjectFilePreviewResult,
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
@@ -70,6 +73,11 @@ export const projectTreeProcedures = {
     ReadProjectFileResult,
     "supervisor"
   >("readProjectFile", "supervisor", readProjectFilePayloadSchema),
+  readProjectFilePreview: definePayloadProcedure<
+    ReadProjectFilePreviewPayload,
+    ReadProjectFilePreviewResult,
+    "main-local"
+  >("readProjectFilePreview", "main-local", readProjectFilePreviewPayloadSchema),
   readAbsoluteFile: definePayloadProcedure<
     ReadAbsoluteFilePayload,
     ReadAbsoluteFileResult,

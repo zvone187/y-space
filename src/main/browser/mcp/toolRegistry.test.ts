@@ -27,7 +27,9 @@ function createContext(): ToolContext {
         ],
         activeTabId: "tab-1",
       }),
-    } as ToolContext["manager"],
+      getTab: () => ({ tabId: "tab-1" }),
+      getActiveTab: () => ({ tabId: "tab-1" }),
+    } as unknown as ToolContext["manager"],
   };
 }
 
@@ -75,8 +77,14 @@ function createDispatchContext(send: ReturnType<typeof vi.fn>): ToolContext {
     },
     getConsoleEntries: () => [],
     clearConsole: vi.fn<() => void>(),
-    rememberInitScript: vi.fn<() => void>(),
-    forgetInitScript: vi.fn<() => void>(),
+    addInitScript: vi
+      .fn<(source: string) => Promise<{ identifier: string }>>()
+      .mockResolvedValue({ identifier: "ys-init-script" }),
+    addInitStyle: vi
+      .fn<(css: string) => Promise<{ identifier: string }>>()
+      .mockResolvedValue({ identifier: "ys-init-style" }),
+    removeInitScript: vi.fn<(identifier: string) => Promise<void>>().mockResolvedValue(undefined),
+    removeAllInitScripts: vi.fn<() => Promise<number>>().mockResolvedValue(1),
     listInitScripts: () => ["script-1"],
   };
   return {
@@ -102,7 +110,11 @@ function createDispatchContext(send: ReturnType<typeof vi.fn>): ToolContext {
       ensureTabReady: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       createTab: vi.fn<() => Promise<unknown>>().mockResolvedValue({ tabId: "tab-1" }),
       setAutomationSession: vi.fn<() => boolean>().mockReturnValue(true),
+      touchAutomationSession: vi.fn<() => void>(),
+      recordAutomationTarget: vi.fn<() => void>(),
+      showAutomationCursor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       setActiveTab: vi.fn<() => void>(),
+      rememberTabForThread: vi.fn<() => boolean>().mockReturnValue(true),
       closeTab: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       navigate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       reload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -158,9 +170,11 @@ const ROUTING_ARGS: Record<string, Record<string, unknown>> = {
   enable: {},
   disable: {},
   list_tabs: {},
+  find_tabs: { query: "example" },
   new_tab: { url: "https://example.test/", activate: true },
   open: { url: "https://example.test/open" },
   activate_tab: { tabId: "tab-1" },
+  open_or_focus_tab: { url: "https://example.test/focused" },
   close_tab: { tabId: "tab-1" },
   navigate: { url: "https://example.test/nav" },
   back: {},
@@ -203,6 +217,68 @@ const ROUTING_ARGS: Record<string, Record<string, unknown>> = {
 };
 
 describe("browser MCP tool registry", () => {
+  it("hides sensitive integration tabs and rejects agent mutations against them", async () => {
+    const safeTab = {
+      tabId: "safe-tab",
+      url: "https://example.test/",
+      title: "Example",
+      loading: false,
+      canGoBack: false,
+      canGoForward: false,
+      devToolsOpen: false,
+    };
+    const sensitiveTab = {
+      ...safeTab,
+      tabId: "oauth-tab",
+      url: "about:blank",
+      title: "Connecting…",
+      loading: true,
+    };
+    const manager = {
+      snapshot: () => ({
+        tabs: [safeTab, sensitiveTab],
+        activeTabId: sensitiveTab.tabId,
+      }),
+      getTab: (tabId: string) => (tabId === safeTab.tabId ? safeTab : null),
+      getActiveTab: () => null,
+      ensureTabReady: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      setActiveTab: vi.fn<() => void>(),
+      closeTab: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      navigate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      reload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    } as unknown as ToolContext["manager"];
+    const ctx = { allowDataAccess: false, allowEval: false, manager };
+
+    await expect(dispatchTool("list_tabs", {}, ctx)).resolves.toMatchObject({
+      tabs: [{ tabId: "safe-tab" }],
+      activeTabId: null,
+      implicitTabId: null,
+    });
+    await expect(dispatchTool("find_tabs", { query: "connecting" }, ctx)).resolves.toMatchObject({
+      tabs: [],
+    });
+    await expect(dispatchTool("activate_tab", { tabId: sensitiveTab.tabId }, ctx)).rejects.toThrow(
+      "unknown tab oauth-tab",
+    );
+    await expect(dispatchTool("close_tab", { tabId: sensitiveTab.tabId }, ctx)).rejects.toThrow(
+      "unknown tab oauth-tab",
+    );
+    await expect(
+      dispatchTool(
+        "navigate",
+        { tabId: sensitiveTab.tabId, url: "https://attacker.example/" },
+        ctx,
+      ),
+    ).rejects.toThrow("unknown tab oauth-tab");
+    await expect(dispatchTool("reload", { tabId: sensitiveTab.tabId }, ctx)).rejects.toThrow(
+      "unknown tab oauth-tab",
+    );
+    expect(manager.setActiveTab).not.toHaveBeenCalled();
+    expect(manager.closeTab).not.toHaveBeenCalled();
+    expect(manager.navigate).not.toHaveBeenCalled();
+    expect(manager.reload).not.toHaveBeenCalled();
+  });
+
   it("surfaces an API map as the first tool", async () => {
     expect(TOOLS[0]?.name).toBe("api");
     expect(isKnownToolName("api")).toBe(true);
@@ -312,6 +388,26 @@ describe("browser MCP tool registry", () => {
 
     expect(ctx.manager.setAutomationSession).toHaveBeenNthCalledWith(1, "unscoped", true);
     expect(ctx.manager.setAutomationSession).toHaveBeenNthCalledWith(2, "unscoped", false);
+  });
+
+  it("awaits residency and attachment when explicitly activating a browser page", async () => {
+    const ctx = { ...createDispatchContext(createRoutingSend()), threadId: "thread-1" };
+
+    await expect(dispatchTool("activate_tab", { tabId: "tab-1" }, ctx)).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(ctx.manager.setActiveTab).toHaveBeenCalledWith("tab-1");
+    expect(ctx.manager.recordAutomationTarget).toHaveBeenCalledWith("thread-1", "tab-1");
+    expect(ctx.manager.ensureTabReady).toHaveBeenCalledWith("tab-1");
+    expect(ctx.manager.showAutomationCursor).toHaveBeenCalledWith("thread-1", "tab-1");
+    expect(
+      (ctx.manager.recordAutomationTarget as unknown as ReturnType<typeof vi.fn>).mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(
+      (ctx.manager.ensureTabReady as unknown as ReturnType<typeof vi.fn>).mock
+        .invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
+    );
   });
 
   it("dispatches every advertised browser tool through the browser context", async () => {

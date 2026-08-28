@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ComputerUseMcpIngress, type ComputerUseMcpIngressOptions } from "./ComputerUseMcpIngress";
+import { createMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
 import type { ComputerUseDriver, ComputerUseInteractiveResult } from "./mcp/types";
 
 let ingress: ComputerUseMcpIngress | null = null;
@@ -28,10 +29,11 @@ function callTool(
   args: Record<string, unknown>,
   threadId = "thread-1",
 ): Promise<Response> {
-  return fetch(`${info.url}/mcp?thread=${encodeURIComponent(threadId)}`, {
+  const launchToken = createMcpLaunchContextToken(info.token, "computer-use", { threadId });
+  return fetch(`${info.url}/mcp`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${info.token}`,
+      Authorization: `Bearer ${launchToken}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -50,13 +52,18 @@ afterEach(() => {
 
 describe("ComputerUseMcpIngress", () => {
   it("advertises computer_use instructions and tools on initialize", async () => {
-    ingress = new ComputerUseMcpIngress();
+    ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+    });
     const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "computer-use", {
+      threadId: "thread-initialize",
+    });
 
     const response = await fetch(`${info.url}/mcp`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${info.token}`,
+        Authorization: `Bearer ${launchToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -82,7 +89,9 @@ describe("ComputerUseMcpIngress", () => {
   });
 
   it("requires bearer auth before listing tools", async () => {
-    ingress = new ComputerUseMcpIngress();
+    ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+    });
     const info = await ingress.start();
 
     const unauthorized = await fetch(`${info.url}/mcp`, {
@@ -92,10 +101,13 @@ describe("ComputerUseMcpIngress", () => {
     });
     expect(unauthorized.status).toBe(401);
 
+    const launchToken = createMcpLaunchContextToken(info.token, "computer-use", {
+      threadId: "thread-list",
+    });
     const authorized = await fetch(`${info.url}/mcp`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${info.token}`,
+        Authorization: `Bearer ${launchToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
@@ -111,6 +123,7 @@ describe("ComputerUseMcpIngress", () => {
     });
     const onActivity = vi.fn<NonNullable<ComputerUseMcpIngressOptions["onActivity"]>>();
     ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
       driver: createDriver({
         click: vi.fn<ComputerUseDriver["click"]>(() => clickResult),
       }),
@@ -140,7 +153,11 @@ describe("ComputerUseMcpIngress", () => {
 
   it("holds takeover activity between explicit enable and disable calls", async () => {
     const onActivity = vi.fn<NonNullable<ComputerUseMcpIngressOptions["onActivity"]>>();
-    ingress = new ComputerUseMcpIngress({ driver: createDriver(), onActivity });
+    ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+      driver: createDriver(),
+      onActivity,
+    });
     const info = await ingress.start();
 
     expect((await callTool(info, "enable", {})).status).toBe(200);
@@ -153,7 +170,11 @@ describe("ComputerUseMcpIngress", () => {
 
   it("does not emit takeover activity for passive tools", async () => {
     const onActivity = vi.fn<NonNullable<ComputerUseMcpIngressOptions["onActivity"]>>();
-    ingress = new ComputerUseMcpIngress({ driver: createDriver(), onActivity });
+    ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+      driver: createDriver(),
+      onActivity,
+    });
     const info = await ingress.start();
 
     expect((await callTool(info, "list_windows", {})).status).toBe(200);
@@ -162,7 +183,10 @@ describe("ComputerUseMcpIngress", () => {
 
   it("cancels active driver actions on emergency exit", () => {
     const driver = createDriver();
-    ingress = new ComputerUseMcpIngress({ driver });
+    ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+      driver,
+    });
 
     ingress.interruptActiveActions();
 
@@ -171,7 +195,11 @@ describe("ComputerUseMcpIngress", () => {
 
   it("normalizes interactive tool aliases in activity events", async () => {
     const onActivity = vi.fn<NonNullable<ComputerUseMcpIngressOptions["onActivity"]>>();
-    ingress = new ComputerUseMcpIngress({ driver: createDriver(), onActivity });
+    ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => context.identity,
+      driver: createDriver(),
+      onActivity,
+    });
     const info = await ingress.start();
 
     expect(

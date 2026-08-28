@@ -37,7 +37,12 @@ function makeFakeChild(): FakeChild {
   return child;
 }
 
-function makeClient(options: Pick<SupervisorClientOptions, "prepareStartThread"> = {}) {
+function makeClient(
+  options: Pick<
+    SupervisorClientOptions,
+    "prepareStartThread" | "resolvePipedreamPrivilegedBootstrap"
+  > = {},
+) {
   const child = makeFakeChild();
   forkMock.mockReturnValue(child);
   const client = new SupervisorClient({
@@ -201,5 +206,60 @@ describe("SupervisorClient lifecycle", () => {
 
     expect(terminateChildProcessTreeMock).toHaveBeenCalledExactlyOnceWith(child);
     expect(forkMock).toHaveBeenCalledOnce();
+  });
+
+  it("sends Pipedream credentials only in the privileged bootstrap message, never child env", () => {
+    const { child } = makeClient({
+      resolvePipedreamPrivilegedBootstrap: () => ({
+        bootstrap: {
+          state: "ready",
+          source: "environment",
+          credentials: {
+            clientId: "client-id-private",
+            clientSecret: "client-secret-private",
+            projectId: "proj_Test123",
+            environment: "development",
+          },
+        },
+        externalUserId: "y-space-install-private-id",
+      }),
+    });
+
+    const forkOptions = forkMock.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv };
+    expect(JSON.stringify(forkOptions.env)).not.toMatch(/PIPEDREAM|client-secret-private/);
+    expect(child.send).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "pipedream-privileged-bootstrap" }),
+      expect.any(Function),
+    );
+  });
+
+  it("reloads Pipedream credentials over privileged IPC without adding them to provider env", async () => {
+    const { client, child } = makeClient();
+    child.send.mockImplementation((_message, callback) => {
+      callback?.();
+      return true;
+    });
+    const payload = {
+      bootstrap: {
+        state: "ready" as const,
+        source: "environment" as const,
+        credentials: {
+          clientId: "runtime-client-id",
+          clientSecret: "runtime-client-secret",
+          projectId: "proj_Runtime123",
+          environment: "development" as const,
+        },
+      },
+      externalUserId: "y-space:runtime-install",
+    };
+
+    await client.configurePipedream(payload);
+
+    expect(child.send).toHaveBeenCalledExactlyOnceWith(
+      { kind: "pipedream-privileged-bootstrap", payload },
+      expect.any(Function),
+    );
+    const forkOptions = forkMock.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv };
+    expect(JSON.stringify(forkOptions.env)).not.toContain("runtime-client-secret");
   });
 });

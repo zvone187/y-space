@@ -15,6 +15,7 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
 } from "@/shared/contracts";
+import { posixPrivilegedEnvironmentUnsetPrefix } from "@/supervisor/privilegedChildEnvironment";
 import type { StructuredSessionUpdate } from "../base";
 import { ClaudeSdkSession } from "./sdkSession";
 
@@ -854,15 +855,16 @@ describe("ClaudeSdkSession", () => {
     expect(args).not.toContain("-l");
     expect(args).not.toContain("-i");
     expect(shellArgs[2]).toBe(
-      [
-        "export PATH='/home/demo/.nvm/versions/node/v24/bin:/usr/bin:/bin'",
-        "export NVM_DIR='/home/demo/.nvm'",
-        "export LS_COLORS='rs=0:di=01;34:ln=01'",
-        "export BROWSER='/bin/true'",
-        "export CLAUDE_AGENT_SDK_CLIENT_APP='poracode'",
-        "export FOO='bar'",
-        "exec '/home/demo/.local/bin/claude' 'chat' '--json'",
-      ].join("; "),
+      posixPrivilegedEnvironmentUnsetPrefix() +
+        [
+          "export PATH='/home/demo/.nvm/versions/node/v24/bin:/usr/bin:/bin'",
+          "export NVM_DIR='/home/demo/.nvm'",
+          "export LS_COLORS='rs=0:di=01;34:ln=01'",
+          "export BROWSER='/bin/true'",
+          "export CLAUDE_AGENT_SDK_CLIENT_APP='poracode'",
+          "export FOO='bar'",
+          "exec '/home/demo/.local/bin/claude' 'chat' '--json'",
+        ].join("; "),
     );
     expect(options).toMatchObject({
       env: process.env,

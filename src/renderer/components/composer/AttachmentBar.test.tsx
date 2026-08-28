@@ -149,6 +149,29 @@ describe("AttachmentBar", () => {
     );
   });
 
+  it.each(["report.xls", "report.xlsx", "report.csv", "report.tsv"])(
+    "opens %s attachments in the document preview",
+    (name) => {
+      const onPreviewPdf = vi.fn<(attachment: Attachment) => void>();
+      render(
+        <AttachmentBar
+          attachments={[
+            {
+              id: name,
+              path: `/tmp/${name}`,
+              name,
+              isImage: false,
+            },
+          ]}
+          onPreviewPdf={onPreviewPdf}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: `Preview ${name}` }));
+      expect(onPreviewPdf).toHaveBeenCalledWith(expect.objectContaining({ path: `/tmp/${name}` }));
+    },
+  );
+
   it("renders the CSS selector instead of the file name on picked attachments", () => {
     render(
       <AttachmentBar

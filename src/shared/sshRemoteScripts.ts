@@ -74,7 +74,7 @@ ${REMOTE_NODE_ENV_SCRIPT}
 HASH="$1"
 RUNTIME="$HOME/.poracode/ssh/runtime/$HASH"
 ensure_poracode_node || {
-  printf 'Poracode SSH requires Node 24.10 or newer on the remote host.\n' >&2
+  printf 'Y Space SSH requires Node 24.10 or newer on the remote host.\n' >&2
   exit 41
 }
 if [ -f "$RUNTIME/.ready" ] && [ "$(cat "$RUNTIME/.ready")" = "$HASH" ] && [ -f "$RUNTIME/server.cjs" ] && [ -f "$RUNTIME/supervisor.cjs" ]; then
@@ -92,14 +92,14 @@ export const INSTALL_REMOTE_RUNTIME_SCRIPT = String.raw`set -eu
 ${REMOTE_NODE_ENV_SCRIPT}
 HASH="$1"
 case "$HASH" in
-  *[!0-9a-f]*|'') printf 'Invalid Poracode runtime hash.\n' >&2; exit 2 ;;
+  *[!0-9a-f]*|'') printf 'Invalid Y Space runtime hash.\n' >&2; exit 2 ;;
 esac
 ensure_poracode_node || {
-  printf 'Poracode SSH requires Node 24.10 or newer on the remote host.\n' >&2
+  printf 'Y Space SSH requires Node 24.10 or newer on the remote host.\n' >&2
   exit 41
 }
 command -v npm >/dev/null 2>&1 || {
-  printf 'Poracode SSH requires npm on the remote host.\n' >&2
+  printf 'Y Space SSH requires npm on the remote host.\n' >&2
   exit 42
 }
 BASE="$HOME/.poracode/ssh"
@@ -107,7 +107,7 @@ ARCHIVE="$BASE/uploads/$HASH.tar.gz"
 FINAL="$BASE/runtime/$HASH"
 STAGE="$BASE/runtime/.staging-$HASH-$$"
 PREVIOUS="$BASE/runtime/.previous-$HASH-$$"
-test -f "$ARCHIVE" || { printf 'Uploaded Poracode runtime archive was not found.\n' >&2; exit 43; }
+test -f "$ARCHIVE" || { printf 'Uploaded Y Space runtime archive was not found.\n' >&2; exit 43; }
 rm -rf "$STAGE" "$PREVIOUS"
 mkdir -p "$STAGE"
 cleanup() { rm -rf "$STAGE" "$PREVIOUS"; }
@@ -140,13 +140,13 @@ ${REMOTE_NODE_ENV_SCRIPT}
 CONNECTION_ID="$1"
 RUNTIME_HASH="$2"
 case "$CONNECTION_ID" in
-  *[!0-9a-f-]*|'') printf 'Invalid Poracode SSH connection id.\n' >&2; exit 2 ;;
+  *[!0-9a-f-]*|'') printf 'Invalid Y Space SSH connection id.\n' >&2; exit 2 ;;
 esac
 case "$RUNTIME_HASH" in
-  *[!0-9a-f]*|'') printf 'Invalid Poracode runtime hash.\n' >&2; exit 2 ;;
+  *[!0-9a-f]*|'') printf 'Invalid Y Space runtime hash.\n' >&2; exit 2 ;;
 esac
 ensure_poracode_node || {
-  printf 'Poracode SSH requires Node 24.10 or newer on the remote host.\n' >&2
+  printf 'Y Space SSH requires Node 24.10 or newer on the remote host.\n' >&2
   exit 41
 }
 NODE="$(command -v node)"
@@ -159,7 +159,7 @@ RUNTIME_FILE="$STATE/runtime"
 LOG_FILE="$STATE/server.log"
 DATA_DIR="$STATE/data"
 mkdir -p "$STATE" "$DATA_DIR"
-test -f "$RUNTIME/.ready" || { printf 'Poracode remote runtime is not installed.\n' >&2; exit 45; }
+test -f "$RUNTIME/.ready" || { printf 'Y Space remote runtime is not installed.\n' >&2; exit 45; }
 APP_VERSION="$("$NODE" -p 'require(process.argv[1]).version' "$RUNTIME/package.json")"
 
 server_ready() {
@@ -219,7 +219,7 @@ else
     kill "$PID" 2>/dev/null || true
   fi
   rm -f "$PID_FILE" "$PORT_FILE" "$RUNTIME_FILE"
-  PORT="$(pick_port)" || { printf 'No remote loopback port is available for Poracode.\n' >&2; exit 46; }
+  PORT="$(pick_port)" || { printf 'No remote loopback port is available for Y Space.\n' >&2; exit 46; }
   nohup env \
     PORACODE_BASE_DIR="$DATA_DIR" \
     PORACODE_REMOTE_ACCESS_HOST=127.0.0.1 \
@@ -243,7 +243,7 @@ else
     sleep 0.2
   done
   if [ "$READY" -ne 1 ]; then
-    printf 'Poracode Helper failed to start or returned an incompatible protocol.\n' >&2
+    printf 'Y Space Helper failed to start or returned an incompatible protocol.\n' >&2
     tail -n 80 "$LOG_FILE" >&2 2>/dev/null || true
     kill "$PID" 2>/dev/null || true
     rm -f "$PID_FILE" "$PORT_FILE" "$RUNTIME_FILE"

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { selectAnyObstructingOverlayOpen, usePanelStore } from "./panelStore";
+import { useRightWorkspaceTabsStore } from "./rightWorkspaceTabsStore";
+import { DOCKABLE_PANEL_TABS, selectAnyObstructingOverlayOpen, usePanelStore } from "./panelStore";
 import { useFileEditorStore } from "./fileEditorStore";
 
 const initialPanelState = usePanelStore.getState();
@@ -170,6 +171,7 @@ describe("subagent panel lifecycle", () => {
 describe("panel dock state", () => {
   beforeEach(() => {
     resetPanelStore();
+    useRightWorkspaceTabsStore.getState().reset();
     usePanelStore.setState({
       rightPanelSplit: null,
       bottomPanelDocks: { left: null, right: null },
@@ -177,6 +179,7 @@ describe("panel dock state", () => {
   });
   afterEach(() => {
     resetPanelStore();
+    useRightWorkspaceTabsStore.getState().reset();
     usePanelStore.setState({
       rightPanelSplit: null,
       bottomPanelDocks: { left: null, right: null },
@@ -192,6 +195,16 @@ describe("panel dock state", () => {
 
     usePanelStore.getState().setRightPanelSplit(null);
     expect(usePanelStore.getState().rightPanelSplit).toBeNull();
+  });
+
+  it("rejects legacy Browser split and bottom-dock placements", () => {
+    expect(DOCKABLE_PANEL_TABS.has("browser")).toBe(false);
+
+    usePanelStore.getState().setRightPanelSplit({ tab: "browser", placement: "bottom" });
+    usePanelStore.getState().setBottomPanelDock("left", "browser");
+
+    expect(usePanelStore.getState().rightPanelSplit).toBeNull();
+    expect(usePanelStore.getState().bottomPanelDocks).toEqual({ left: null, right: null });
   });
 
   it("bails out when setting an identical split", () => {
@@ -283,9 +296,29 @@ describe("create project modal", () => {
 describe("browserOverlayMaximized lifecycle", () => {
   beforeEach(() => {
     resetPanelStore();
+    useRightWorkspaceTabsStore.getState().reset();
   });
   afterEach(() => {
     resetPanelStore();
+    useRightWorkspaceTabsStore.getState().reset();
+  });
+
+  it("keeps Browser presentation state independent of global workspace pages", () => {
+    useRightWorkspaceTabsStore.getState().openTool("git");
+    const before = useRightWorkspaceTabsStore.getState().tabs;
+
+    usePanelStore.getState().setBrowserPanelOpen(true);
+    usePanelStore.getState().setBrowserPanelOpen(false);
+    usePanelStore.getState().openBrowserPanel();
+
+    expect(useRightWorkspaceTabsStore.getState().tabs).toEqual(before);
+    expect(
+      useRightWorkspaceTabsStore.getState().tabs.some((tab) => tab.id === "tool:browser"),
+    ).toBe(false);
+    expect(usePanelStore.getState()).toMatchObject({
+      browserPanelOpen: true,
+      rightPanelTab: "browser",
+    });
   });
 
   it("defaults to false so the overlay opens in drawer mode", () => {

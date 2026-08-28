@@ -36,6 +36,17 @@ describe("parsePrimedEnvDump", () => {
   it("returns an empty record for an all-empty dump", () => {
     expect(parsePrimedEnvDump(["", ""])).toEqual({});
   });
+
+  it("never rehydrates privileged MCP or Pipedream credentials from a login shell", () => {
+    expect(
+      parsePrimedEnvDump([
+        "SAFE_VALUE=kept",
+        "PORACODE_BROWSER_MCP_TOKEN=browser-root",
+        "PIPEDREAM_CLIENT_SECRET=developer-secret",
+        "pipedream_project_id=case-insensitive-secret",
+      ]),
+    ).toEqual({ SAFE_VALUE: "kept" });
+  });
 });
 
 describe("readCommandOutputAsync", () => {

@@ -622,7 +622,7 @@ describe("CodexAppServerRpc", () => {
       id: "approval-first",
       error: {
         code: -32800,
-        message: "Request cancelled because the Poracode thread closed.",
+        message: "Request cancelled because the Y Space thread closed.",
       },
     });
 

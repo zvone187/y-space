@@ -148,6 +148,8 @@ export const startThreadPayloadSchema = z.object({
   presentationMode: threadPresentationModeSchema.optional(),
   /** Enabled custom MCP servers resolved by the renderer at launch time. */
   mcpServers: mcpServerListSchema.optional(),
+  /** Raw project overrides retained for provider settings live reloads. */
+  projectMcpServers: mcpServerListSchema.optional(),
   /** Built-in MCP ids hard-disabled when this launch snapshot was created. */
   disabledBuiltInMcpServerIds: z.array(z.enum(BUILT_IN_MCP_SERVER_IDS)).optional(),
   /** Supervisor-owned restrictions that must survive every restart of this thread. */

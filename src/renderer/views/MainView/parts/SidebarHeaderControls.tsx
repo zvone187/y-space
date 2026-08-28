@@ -108,7 +108,7 @@ export function SidebarHeaderControls() {
         <Tooltip.Trigger>
           <Button
             isIconOnly
-            aria-label={browserVisible ? t`Hide browser` : t`Open browser`}
+            aria-label={browserVisible ? t`Focus browser` : t`Open browser`}
             size="sm"
             variant="ghost"
             className="size-6 min-w-0 text-muted hover:text-foreground"

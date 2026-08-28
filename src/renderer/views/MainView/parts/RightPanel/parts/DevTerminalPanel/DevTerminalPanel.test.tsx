@@ -134,14 +134,14 @@ describe("DevTerminalPanel", () => {
     resetStores();
   });
 
-  it("closes the unified right panel when the last right-panel terminal tab is removed", () => {
+  it("closes only Terminal when the last right-panel terminal tab is removed", () => {
     render(<DevTerminalPanel hideHeader />);
 
     fireEvent.click(screen.getByRole("button", { name: "close right tab" }));
 
     expect(useDevTerminalStore.getState().isOpen).toBe(false);
-    expect(usePanelStore.getState().gitReviewContext).toBeNull();
-    expect(usePanelStore.getState().filesPanelContext).toBeNull();
+    expect(usePanelStore.getState().gitReviewContext).toEqual({ projectId: project.id });
+    expect(usePanelStore.getState().filesPanelContext?.projectId).toBe(project.id);
     expect(bridge.closeThread).toHaveBeenCalledWith({ threadId: tab.id });
   });
 

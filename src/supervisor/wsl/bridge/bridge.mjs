@@ -42,16 +42,17 @@ import {
   statSync,
   existsSync,
   lstatSync,
+  realpathSync,
   writeFileSync,
   watch as fsWatch,
 } from "node:fs";
 // We always run on Linux inside a distro, so force POSIX semantics — this
 // also keeps the unit tests path-agnostic when executed on a Windows host.
-import { isAbsolute, normalize, resolve as resolvePath } from "node:path/posix";
+import { isAbsolute, normalize, relative, resolve as resolvePath } from "node:path/posix";
 import { createRequire } from "node:module";
 
 // Bumped on every behavioural change. Windows side reads this via regex.
-const BRIDGE_VERSION = "2.14.0";
+const BRIDGE_VERSION = "2.17.0";
 
 /**
  * Lazily loads `@parcel/watcher` (staged next to this script as
@@ -258,7 +259,10 @@ function resolveSafePath(projectRoot, target) {
   if (typeof target !== "string" || !isAbsolute(target)) return null;
   const normRoot = normalize(projectRoot);
   const normTarget = normalize(target);
-  if (normTarget !== normRoot && !normTarget.startsWith(normRoot + "/")) return null;
+  const relativeTarget = relative(normRoot, normTarget);
+  if (relativeTarget === ".." || relativeTarget.startsWith("../") || isAbsolute(relativeTarget)) {
+    return null;
+  }
   return normTarget;
 }
 
@@ -409,8 +413,26 @@ function findHandler(req, body) {
 }
 
 function readFileHandler(req, body) {
-  const target = resolveSafePath(body.projectRoot, body.path);
+  let target = resolveSafePath(body.projectRoot, body.path);
   if (!target) return { status: 400, code: "ESCAPE", message: "path escapes projectRoot" };
+  if (body.enforceRealpathContainment === true) {
+    try {
+      const realRoot = realpathSync(body.projectRoot);
+      const realTarget = realpathSync(target);
+      const relativeTarget = relative(realRoot, realTarget);
+      if (
+        relativeTarget === ".." ||
+        relativeTarget.startsWith("../") ||
+        isAbsolute(relativeTarget)
+      ) {
+        return { status: 400, code: "ESCAPE", message: "path resolves outside projectRoot" };
+      }
+      target = realTarget;
+    } catch (err) {
+      const code = typeof err?.code === "string" ? err.code : "EIO";
+      return { status: code === "ENOENT" ? 404 : 500, code, message: String(err?.message ?? err) };
+    }
+  }
   let st;
   try {
     st = statSync(target);
@@ -889,9 +911,9 @@ async function processBatchHandler(req, body) {
 // outrank config, so they are only applied as a retry after git reports a
 // missing identity — a configured identity keeps authoring its own snapshots.
 const CHECKPOINT_FALLBACK_IDENT_ENV = {
-  GIT_AUTHOR_NAME: "Poracode",
+  GIT_AUTHOR_NAME: "Y Space",
   GIT_AUTHOR_EMAIL: "checkpoints@poracode.local",
-  GIT_COMMITTER_NAME: "Poracode",
+  GIT_COMMITTER_NAME: "Y Space",
   GIT_COMMITTER_EMAIL: "checkpoints@poracode.local",
 };
 
@@ -936,7 +958,7 @@ function gitCheckpointSnapshotHandler(req, body) {
       const tree = git(["write-tree"], projectRoot, env).trim();
       const head = gitMaybe(["rev-parse", "--verify", "HEAD"], projectRoot);
       const commitArgs = ["commit-tree", tree, ...(head ? ["-p", head] : []), "-F", "-"];
-      const message = `Poracode checkpoint\n\n${JSON.stringify(body.metadata)}\n`;
+      const message = `Y Space checkpoint\n\n${JSON.stringify(body.metadata)}\n`;
       const commit = commitCheckpointTree(commitArgs, projectRoot, env, message).trim();
       git(["update-ref", body.ref, commit], projectRoot);
       return { status: 200, data: { commit } };
@@ -1192,7 +1214,7 @@ async function handleMcpProxy(req, res) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader(
         "Access-Control-Allow-Headers",
-        "Authorization, X-Poracode-Token, Content-Type, Mcp-Session-Id",
+        "Authorization, X-Poracode-Token, X-Y-Space-Mcp-Context, Content-Type, Mcp-Session-Id",
       );
       res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
     }
@@ -1216,13 +1238,21 @@ async function handleMcpProxy(req, res) {
     candidates.splice(candidates.indexOf(knownBrowserMcpUpstreamUrl), 1);
     candidates.unshift(knownBrowserMcpUpstreamUrl);
   }
-  const upstreamToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
-  if (candidates.length === 0 || !upstreamToken) {
+  if (candidates.length === 0) {
     respond(res, 503, {
       jsonrpc: "2.0",
       id: null,
       error: { code: -32000, message: "browser MCP upstream unavailable" },
     });
+    return;
+  }
+
+  const launchContextHeader = req.headers["x-y-space-mcp-context"];
+  const launchContext = Array.isArray(launchContextHeader)
+    ? launchContextHeader[0]
+    : launchContextHeader;
+  if (typeof launchContext !== "string" || launchContext.length === 0) {
+    respond(res, 401, { error: "signed browser launch context required" });
     return;
   }
 
@@ -1239,7 +1269,7 @@ async function handleMcpProxy(req, res) {
   }
 
   const headers = {
-    authorization: `Bearer ${upstreamToken}`,
+    authorization: `Bearer ${launchContext}`,
     "content-type": req.headers["content-type"] ?? "application/json",
   };
   const sessionId = req.headers["mcp-session-id"];

@@ -9,6 +9,7 @@ import { buildCodexAppServerCommand } from "./argv";
 import { CodexAppServerConnection } from "./appServerRpc";
 import { buildCodexMcpSkillConflictArgs } from "./mcpSkillConflicts";
 import { CodexStdioTransport } from "./stdioTransport";
+import { sanitizeChildProcessEnv } from "@/supervisor/runtime/threadSession/spawnDiagnostics";
 
 interface ServerSnapshot {
   appServer: ChildProcess;
@@ -26,7 +27,7 @@ export interface AcquiredCodexAppServer {
   dispose(): void;
 }
 
-const THREAD_SCOPED_MCP_SERVER_IDS = new Set(["app-controls", "browser", "chrome", "computer-use"]);
+const THREAD_SCOPED_MCP_SERVER_IDS = new Set(["app-controls", "browser", "computer-use"]);
 const pool = new Map<string, PoolEntry>();
 const spawnedAppServers = new Set<ChildProcess>();
 const spawnedConnections = new Set<CodexAppServerConnection>();
@@ -50,11 +51,21 @@ function normalizedMcpServer(server: ResolvedMcpServer): ResolvedMcpServer {
   url.searchParams.delete("thread");
   url.searchParams.delete("title");
   url.searchParams.delete("disable");
+  const headers = Object.fromEntries(
+    Object.entries(server.transport.headers).map(([name, value]) => {
+      const normalizedName = name.toLowerCase();
+      const isSignedLaunchContext =
+        (normalizedName === "authorization" && value.startsWith("Bearer yspace-mcp-v1.")) ||
+        (normalizedName === "x-y-space-mcp-context" && value.startsWith("yspace-mcp-v1."));
+      return isSignedLaunchContext ? [name, `<thread-scoped:${normalizedName}>`] : [name, value];
+    }),
+  );
   return {
     ...server,
     transport: {
       ...server.transport,
       url: url.toString(),
+      headers,
     },
   };
 }
@@ -94,8 +105,7 @@ function spawnAppServer(command: ReturnType<typeof buildCodexAppServerCommand>):
   return spawn(command.command, command.args, {
     cwd: command.cwd ?? process.cwd(),
     env: {
-      ...process.env,
-      ...command.env,
+      ...sanitizeChildProcessEnv({ ...process.env, ...command.env }),
       TERM: "xterm-256color",
     },
     stdio: ["pipe", "pipe", "pipe"],

@@ -511,7 +511,7 @@ export function useRemoteDesktop() {
     const result = await connectMobileSsh(sshConnection, authentication, true);
     if (!result.pairingCredential) {
       await disconnectMobileSsh(sshConnection.id);
-      throw new Error(i18n._(msg`The remote Poracode server returned no pairing credential.`));
+      throw new Error(i18n._(msg`The remote Y Space server returned no pairing credential.`));
     }
     try {
       await setSshCredential(sshConnection.id, authentication);

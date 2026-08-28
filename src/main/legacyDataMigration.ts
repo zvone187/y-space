@@ -320,7 +320,7 @@ export function migrateLegacyDataOnLaunch(
         )
         .join("; ");
       throw new Error(
-        `Lightcode data import failed and Poracode data could not be fully restored: ${details}`,
+        `Legacy data import failed and Y Space data could not be fully restored: ${details}`,
         { cause: error },
       );
     }

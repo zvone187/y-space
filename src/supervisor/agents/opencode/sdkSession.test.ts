@@ -248,7 +248,7 @@ describe("OpencodeSdkSession", () => {
     expect(secondDispose).toHaveBeenCalledTimes(1);
   });
 
-  it("joins the shared pool and forwards the MCP set", async () => {
+  it("isolates a GUI task server and forwards its MCP set", async () => {
     const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mocks.acquireOpenCodeServer.mockResolvedValue({
       eventClient: emptyEventClient(),
@@ -288,7 +288,11 @@ describe("OpencodeSdkSession", () => {
     await session.activate();
 
     expect(mocks.acquireOpenCodeServer).toHaveBeenCalledWith(
-      expect.objectContaining({ projectLocation, mcpServers }),
+      expect.objectContaining({
+        projectLocation,
+        mcpServers,
+        serverIsolationKey: "thread-host-42",
+      }),
     );
 
     await session.dispose();
@@ -322,6 +326,7 @@ describe("OpencodeSdkSession", () => {
 
     const input = mocks.acquireOpenCodeServer.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(input.mcpServers).toBeUndefined();
+    expect(input.serverIsolationKey).toBe("thread-plain");
 
     await session.dispose();
   });
@@ -388,8 +393,8 @@ describe("OpencodeSdkSession", () => {
 
     const newMcpServers = [
       {
-        id: "chrome",
-        name: "chrome",
+        id: "remote-browser",
+        name: "remote-browser",
         timeoutMs: 300_000,
         transport: { type: "http" as const, url: "http://127.0.0.1:9502/mcp", headers: {} },
       },
@@ -429,6 +434,9 @@ describe("OpencodeSdkSession", () => {
     });
 
     await session.activate();
+    expect(mocks.acquireOpenCodeServer).toHaveBeenCalledWith(
+      expect.not.objectContaining({ serverIsolationKey: expect.anything() }),
+    );
     await expect(session.openThread(config)).resolves.toBe("ses_created");
 
     expect(session.launchOptions.resumeThreadId).toBe("ses_created");
@@ -1013,7 +1021,7 @@ describe("OpencodeSdkSession", () => {
     await session.dispose();
   });
 
-  it("keeps disabled Crossagents tools denied in full access mode", async () => {
+  it("keeps disabled built-in MCP tools denied in full access mode", async () => {
     const update = vi
       .fn<(input: unknown) => Promise<{ data: unknown }>>()
       .mockResolvedValue({ data: {} });
@@ -1050,6 +1058,20 @@ describe("OpencodeSdkSession", () => {
           disabledTools: ["spawn_agent"],
           transport: { type: "http", url: "http://127.0.0.1:4321/mcp", headers: {} },
         },
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          disabledTools: ["close_tab"],
+          transport: { type: "http", url: "http://127.0.0.1:4322/mcp", headers: {} },
+        },
+        {
+          id: "app-controls",
+          name: "poracode",
+          timeoutMs: 30_000,
+          disabledTools: ["delete_thread"],
+          transport: { type: "http", url: "http://127.0.0.1:4323/mcp", headers: {} },
+        },
       ],
     });
 
@@ -1063,6 +1085,8 @@ describe("OpencodeSdkSession", () => {
       permission: [
         { permission: "*", pattern: "*", action: "allow" },
         { permission: "crossagents_spawn_agent", pattern: "*", action: "deny" },
+        { permission: "browser_close_tab", pattern: "*", action: "deny" },
+        { permission: "poracode_delete_thread", pattern: "*", action: "deny" },
       ],
     });
     expect(promptAsync).toHaveBeenCalledTimes(1);

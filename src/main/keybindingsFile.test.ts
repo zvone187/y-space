@@ -233,6 +233,101 @@ describe("readKeybindingsFile", () => {
     );
   });
 
+  it("adds workspace focus to every shipped legacy next/previous tab binding", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "poracode-keybindings-"));
+    const path = join(tempDir, "keybindings.json");
+    const legacyWhen = "editorFocus || terminalFocus";
+    const legacyTabBindings = [
+      { command: "tab.next", key: "Ctrl+Tab", mac: "Ctrl+Tab", when: legacyWhen },
+      { command: "tab.next", key: "Ctrl+Shift+]", mac: "Meta+Shift+]", when: legacyWhen },
+      { command: "tab.next", key: "Ctrl+PageDown", mac: "Meta+PageDown", when: legacyWhen },
+      {
+        command: "tab.previous",
+        key: "Ctrl+Shift+Tab",
+        mac: "Ctrl+Shift+Tab",
+        when: legacyWhen,
+      },
+      {
+        command: "tab.previous",
+        key: "Ctrl+Shift+[",
+        mac: "Meta+Shift+[",
+        when: legacyWhen,
+      },
+      {
+        command: "tab.previous",
+        key: "Ctrl+PageUp",
+        mac: "Meta+PageUp",
+        when: legacyWhen,
+      },
+    ];
+    writeFileSync(
+      path,
+      `${JSON.stringify({ version: 1, keybindings: legacyTabBindings })}\n`,
+      "utf8",
+    );
+
+    const result = readKeybindingsFile(path).file;
+    const migrated = result.keybindings.filter(
+      (binding) => binding.command === "tab.next" || binding.command === "tab.previous",
+    );
+
+    expect(migrated).toEqual(
+      legacyTabBindings.map((binding) => ({
+        ...binding,
+        when: "workspaceFocus || editorFocus || terminalFocus",
+      })),
+    );
+    expect(readFileSync(path, "utf8")).toEqual(`${JSON.stringify(result, null, 2)}\n`);
+  });
+
+  it("preserves customized next/previous tab bindings during the workspace-focus migration", () => {
+    tempDir = mkdtempSync(join(tmpdir(), "poracode-keybindings-"));
+    const path = join(tempDir, "keybindings.json");
+    const customized = [
+      {
+        command: "tab.next",
+        key: "Ctrl+K",
+        mac: "Meta+K",
+        when: "editorFocus || terminalFocus",
+      },
+      {
+        command: "tab.previous",
+        key: "Ctrl+Shift+Tab",
+        mac: "Ctrl+Shift+Tab",
+        when: "browserFocus",
+      },
+      {
+        command: "tab.next",
+        key: "Ctrl+Tab",
+        mac: "Meta+Tab",
+        when: "editorFocus || terminalFocus",
+      },
+      {
+        command: "tab.previous",
+        key: "Ctrl+PageUp",
+        mac: "Meta+PageUp",
+        windows: "Alt+PageUp",
+        when: "editorFocus || terminalFocus",
+      },
+      {
+        command: "tab.next",
+        key: "Ctrl+PageDown",
+        mac: "Meta+PageDown",
+        when: "editorFocus || terminalFocus",
+        args: { direction: "custom" },
+      },
+    ];
+    writeFileSync(path, `${JSON.stringify({ version: 1, keybindings: customized })}\n`, "utf8");
+
+    const result = readKeybindingsFile(path).file;
+
+    expect(
+      result.keybindings.filter(
+        (binding) => binding.command === "tab.next" || binding.command === "tab.previous",
+      ),
+    ).toEqual(customized);
+  });
+
   it("rekeys a pre-existing Fast-toggle off the old Ctrl+F default", () => {
     tempDir = mkdtempSync(join(tmpdir(), "poracode-keybindings-"));
     const path = join(tempDir, "keybindings.json");

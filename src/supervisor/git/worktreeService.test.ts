@@ -71,7 +71,7 @@ describe("GitWorktreeService pull", () => {
 
     expect(commands).toEqual([
       "rev-parse --verify --quiet stash@{0}",
-      "stash push -u -m Poracode: before pull from origin",
+      "stash push -u -m Y Space: before pull from origin",
       "rev-parse --verify --quiet stash@{0}",
       "pull --no-rebase origin",
       "stash apply --index stash-sha",
@@ -95,7 +95,7 @@ describe("GitWorktreeService pull", () => {
     });
 
     await expect(new GitWorktreeService().pull(location, "origin", true)).rejects.toThrow(
-      "Pull did not complete. Your local changes remain in a Poracode stash.",
+      "Pull did not complete. Your local changes remain in a Y Space stash.",
     );
     expect(commands).not.toContain("stash apply --index stash-sha");
     expect(commands).not.toContain("stash drop stash@{0}");

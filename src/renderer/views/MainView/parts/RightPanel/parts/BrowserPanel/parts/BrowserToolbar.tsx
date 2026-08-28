@@ -17,6 +17,7 @@ import {
   TerminalSquare,
 } from "lucide-react";
 import { useShallow } from "zustand/shallow";
+import { BROWSER_HOME_URL } from "@/shared/browserDefaults";
 import { readBridge } from "@/renderer/bridge";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
@@ -24,8 +25,6 @@ import { panelHeaderIconButtonClass } from "@/renderer/components/layout/sidebar
 import type { BrowserHistoryEntryInfo } from "@/shared/ipc";
 import type { PickDestination, PickerThreadTarget } from "../hooks/useElementPicker";
 import { BrowserOmnibox } from "./BrowserOmnibox";
-
-const NEW_TAB_HOME = "https://duckduckgo.com";
 
 const toolbarButtonClass = `${panelHeaderIconButtonClass} disabled:pointer-events-none disabled:opacity-35`;
 const toolbarDropdownButtonClass =
@@ -99,7 +98,7 @@ export function BrowserToolbar(props: {
   const onMenuAction = (key: Key) => {
     const bridge = readBridge();
     if (key === "newTab") {
-      bridge.browserCreateTab({ url: NEW_TAB_HOME, activate: true }).catch(() => {});
+      bridge.browserCreateTab({ url: BROWSER_HOME_URL, activate: true }).catch(() => {});
       return;
     }
     if (key === "settings") {

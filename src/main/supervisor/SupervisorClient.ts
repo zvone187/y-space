@@ -12,9 +12,24 @@ import type {
   SupervisorReply,
   SupervisorRequest,
 } from "@/shared/ipc";
+import { PIPEDREAM_ENV_KEYS } from "@/shared/pipedreamBootstrap";
+import type {
+  PipedreamPrivilegedBootstrapPayload,
+  PipedreamPrivilegedConnectLinkResult,
+  PipedreamPrivilegedReply,
+} from "@/shared/pipedreamPrivilegedIpc";
+import { isPipedreamPrivilegedBootstrapMessage } from "@/shared/pipedreamPrivilegedIpc";
 
-function isSupervisorReply(message: unknown): message is SupervisorReply {
-  return typeof message === "object" && message !== null && "replyTo" in message;
+function isSupervisorReply(
+  message: unknown,
+): message is SupervisorReply | PipedreamPrivilegedReply {
+  return (
+    typeof message === "object" &&
+    message !== null &&
+    "replyTo" in message &&
+    "ok" in message &&
+    typeof message.ok === "boolean"
+  );
 }
 
 /**
@@ -57,7 +72,7 @@ export interface SupervisorClientOptions {
   wslHelpersDir: string;
   /**
    * Directory containing the read-only skills shipped with the app
-   * (`skill-creator-poracode`, …). Forwarded to the supervisor via
+   * (`y-space-skill-creator`, …). Forwarded to the supervisor via
    * `PORACODE_BUNDLED_SKILLS_DIR` so the skills service can surface them.
    */
   bundledSkillsDir?: string;
@@ -74,6 +89,8 @@ export interface SupervisorClientOptions {
    * to inject `PORACODE_BROWSER_MCP_*` per-launch.
    */
   resolveExtraEnv?: () => Record<string, string>;
+  /** Secret-bearing bootstrap delivered over parent/child IPC, never child env or public bridge. */
+  resolvePipedreamPrivilegedBootstrap?: () => PipedreamPrivilegedBootstrapPayload;
   /** Apply main-process launch invariants before any start reaches the supervisor. */
   prepareStartThread?(payload: StartThreadPayload): StartThreadPayload;
   assignPid?(pid: number): Promise<void>;
@@ -127,27 +144,29 @@ export class SupervisorClient {
     this.stop(new Error("Supervisor restarting"));
 
     const extraEnv = this.options.resolveExtraEnv?.() ?? {};
+    const childEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      PORACODE_APP_VERSION: this.options.appVersion,
+      PORACODE_IS_DEV: this.options.isDev ? "1" : "0",
+      PORACODE_DATA_DIR: baseDir,
+      PORACODE_SECRET_STORAGE_KEY: this.options.secretStorageKey,
+      PORACODE_WSL_HELPERS_DIR: this.options.wslHelpersDir,
+      // Back-compat for one release; older supervisor builds still read
+      // the legacy var. Safe to drop once min supported supervisor knows
+      // about PORACODE_WSL_HELPERS_DIR.
+      PORACODE_WSL_WATCHER_DIR: this.options.wslHelpersDir,
+      ...(this.options.bundledSkillsDir
+        ? { PORACODE_BUNDLED_SKILLS_DIR: this.options.bundledSkillsDir }
+        : {}),
+      ...(this.options.bundledPluginsDir
+        ? { PORACODE_BUNDLED_PLUGINS_DIR: this.options.bundledPluginsDir }
+        : {}),
+      ...extraEnv,
+    };
+    for (const key of PIPEDREAM_ENV_KEYS) delete childEnv[key];
     const child = fork(this.options.supervisorPath, [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
-      env: {
-        ...process.env,
-        PORACODE_APP_VERSION: this.options.appVersion,
-        PORACODE_IS_DEV: this.options.isDev ? "1" : "0",
-        PORACODE_DATA_DIR: baseDir,
-        PORACODE_SECRET_STORAGE_KEY: this.options.secretStorageKey,
-        PORACODE_WSL_HELPERS_DIR: this.options.wslHelpersDir,
-        // Back-compat for one release; older supervisor builds still read
-        // the legacy var. Safe to drop once min supported supervisor knows
-        // about PORACODE_WSL_HELPERS_DIR.
-        PORACODE_WSL_WATCHER_DIR: this.options.wslHelpersDir,
-        ...(this.options.bundledSkillsDir
-          ? { PORACODE_BUNDLED_SKILLS_DIR: this.options.bundledSkillsDir }
-          : {}),
-        ...(this.options.bundledPluginsDir
-          ? { PORACODE_BUNDLED_PLUGINS_DIR: this.options.bundledPluginsDir }
-          : {}),
-        ...extraEnv,
-      },
+      env: childEnv,
     });
 
     pipeSupervisorStreamsToParent(child);
@@ -163,7 +182,7 @@ export class SupervisorClient {
       });
     }
 
-    child.on("message", (message: SupervisorReply | SupervisorEvent) => {
+    child.on("message", (message: unknown) => {
       if (isSupervisorReply(message)) {
         const pending = this.pendingRequests.get(message.replyTo);
         if (!pending) {
@@ -178,8 +197,23 @@ export class SupervisorClient {
         return;
       }
 
-      this.options.onEvent(message);
+      this.options.onEvent(message as SupervisorEvent);
     });
+
+    const privilegedBootstrap = this.options.resolvePipedreamPrivilegedBootstrap?.();
+    if (privilegedBootstrap) {
+      try {
+        child.send(
+          { kind: "pipedream-privileged-bootstrap", payload: privilegedBootstrap },
+          (error) => {
+            if (error)
+              console.error("[poracode] failed to initialize Pipedream supervisor service");
+          },
+        );
+      } catch {
+        console.error("[poracode] failed to initialize Pipedream supervisor service");
+      }
+    }
 
     this.options.onStarted?.();
 
@@ -280,6 +314,71 @@ export class SupervisorClient {
         });
       } catch (error) {
         failSend(error);
+      }
+    });
+  }
+
+  /** Internal-only RPC whose one-use Connect URL must never enter the public procedure map. */
+  async createPipedreamConnectLink(appSlug: string): Promise<PipedreamPrivilegedConnectLinkResult> {
+    await this.startedGate;
+    const child = this.child;
+    if (!child || !child.connected) throw new Error("Supervisor is not running.");
+    const id = randomUUID();
+    return new Promise<PipedreamPrivilegedConnectLinkResult>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (this.pendingRequests.delete(id)) reject(new Error("Pipedream request timed out."));
+      }, REQUEST_TIMEOUT_MS);
+      timeout.unref?.();
+      this.pendingRequests.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value as PipedreamPrivilegedConnectLinkResult);
+        },
+        reject: (reason) => {
+          clearTimeout(timeout);
+          reject(reason);
+        },
+      });
+      const fail = (error: unknown): void => {
+        const pending = this.pendingRequests.get(id);
+        if (!pending) return;
+        this.pendingRequests.delete(id);
+        pending.reject(error);
+      };
+      try {
+        child.send(
+          {
+            kind: "pipedream-privileged-request",
+            id,
+            request: { type: "create-connect-link", appSlug },
+          },
+          (error) => {
+            if (error) fail(error);
+          },
+        );
+      } catch (error) {
+        fail(error);
+      }
+    });
+  }
+
+  /** Reconfigure the live supervisor without routing credentials through public procedure IPC. */
+  async configurePipedream(payload: PipedreamPrivilegedBootstrapPayload): Promise<void> {
+    await this.startedGate;
+    const child = this.child;
+    if (!child || !child.connected) throw new Error("Supervisor is not running.");
+    const message = { kind: "pipedream-privileged-bootstrap" as const, payload };
+    if (!isPipedreamPrivilegedBootstrapMessage(message)) {
+      throw new Error("Pipedream configuration is invalid.");
+    }
+    await new Promise<void>((resolve, reject) => {
+      try {
+        child.send(message, (error) => {
+          if (error) reject(new Error("Unable to configure Pipedream."));
+          else resolve();
+        });
+      } catch {
+        reject(new Error("Unable to configure Pipedream."));
       }
     });
   }

@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 
 export interface PiRpcResponse {
   success: boolean;
@@ -64,7 +65,11 @@ export class PiRpcClient {
     const child = spawn(spec.command, spec.args, {
       ...(spec.cwd ? { cwd: spec.cwd } : {}),
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, TERM: "xterm-256color", ...(spec.env ?? {}) },
+      env: sanitizePrivilegedChildEnvironment({
+        ...process.env,
+        TERM: "xterm-256color",
+        ...(spec.env ?? {}),
+      }),
       shell: false,
       windowsHide: true,
     });

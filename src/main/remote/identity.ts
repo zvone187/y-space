@@ -17,7 +17,7 @@ export interface RemoteAccessIdentity {
 
 function defaultLabel(): string {
   const host = hostname().trim();
-  return host ? `Poracode on ${host}` : "Poracode Desktop";
+  return host ? `Y Space on ${host}` : "Y Space Desktop";
 }
 
 export function readOrCreateRemoteAccessIdentity(baseDir: string): RemoteAccessIdentity {

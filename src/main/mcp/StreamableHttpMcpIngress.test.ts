@@ -1,6 +1,13 @@
+import { createHmac } from "node:crypto";
 import { request } from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
-import { StreamableHttpMcpIngress } from "./StreamableHttpMcpIngress";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { McpThreadIdentity } from "@/shared/browserMcpThread";
+import { createMcpLaunchContextToken, type McpLaunchContext } from "@/shared/mcpLaunchContext";
+import {
+  StreamableHttpMcpIngress,
+  type StreamableHttpMcpIngressInfo,
+  type StreamableHttpMcpIngressOptions,
+} from "./StreamableHttpMcpIngress";
 
 let ingress: StreamableHttpMcpIngress<{ ok: true }> | null = null;
 
@@ -16,6 +23,112 @@ function makeIngress(): StreamableHttpMcpIngress<{ ok: true }> {
     dispatchTool: () => Promise.resolve({}),
     formatToolResult: () => ({ content: [{ type: "text", text: "ok" }] }),
   });
+}
+
+function makeScopedIngress(): StreamableHttpMcpIngress<RoutedContext> {
+  return new StreamableHttpMcpIngress<RoutedContext>({
+    bindHost: "127.0.0.1",
+    launchContextAudience: "browser",
+    resolveLaunchContextIdentity: async (context) => context.identity,
+    serverInfo: { name: "scoped", version: "0.0.0" },
+    instructions: "scoped",
+    tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
+    isKnownToolName: (name) => name === "noop",
+    buildContext: (identity) => ({ identity }),
+    dispatchTool: (_name, _args, ctx) => Promise.resolve(ctx.identity),
+    formatToolResult: (_name, result) => ({
+      content: [{ type: "text", text: JSON.stringify(result) }],
+    }),
+  });
+}
+
+const PROVIDER_SESSION_ID_ARG = "__poracode_provider_session_id";
+
+interface RoutedContext {
+  identity: McpThreadIdentity;
+}
+
+function makeRoutedIngress(
+  resolveLaunchContextIdentity: (
+    context: import("@/shared/mcpLaunchContext").McpLaunchContext,
+  ) => Promise<McpThreadIdentity | undefined>,
+) {
+  const dispatchTool = vi.fn<
+    (
+      name: string,
+      args: Record<string, unknown>,
+      ctx: RoutedContext,
+    ) => Promise<{ args: Record<string, unknown>; identity: McpThreadIdentity }>
+  >(async (_name: string, args: Record<string, unknown>, ctx: RoutedContext) => ({
+    args,
+    identity: ctx.identity,
+  }));
+  const options: StreamableHttpMcpIngressOptions<RoutedContext> & {
+    resolveLaunchContextIdentity(
+      context: import("@/shared/mcpLaunchContext").McpLaunchContext,
+    ): Promise<McpThreadIdentity | undefined>;
+  } = {
+    bindHost: "127.0.0.1",
+    launchContextAudience: "app-controls",
+    serverInfo: { name: "routed", version: "0.0.0" },
+    instructions: "routed",
+    tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
+    isKnownToolName: (name) => name === "noop",
+    resolveLaunchContextIdentity,
+    buildContext: (identity) => ({ identity }),
+    dispatchTool,
+    formatToolResult: (_name, result) => ({
+      content: [{ type: "text", text: JSON.stringify(result) }],
+    }),
+  };
+  return {
+    ingress: new StreamableHttpMcpIngress<RoutedContext>(options),
+    dispatchTool,
+  };
+}
+
+async function callWithForgedProviderSession(
+  info: StreamableHttpMcpIngressInfo,
+  providerSessionId: string,
+  query = "",
+) {
+  const launchToken = createMcpLaunchContextToken(info.token, "app-controls", {
+    threadId: "thread-1",
+    title: "Trusted caller",
+  });
+  const response = await fetch(`${info.url}/mcp${query}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${launchToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: {
+        name: "noop",
+        arguments: { [PROVIDER_SESSION_ID_ARG]: providerSessionId, value: "kept" },
+      },
+    }),
+  });
+  return (await response.json()) as {
+    result: { isError?: boolean; content: Array<{ type: "text"; text: string }> };
+  };
+}
+
+function legacyProviderBindingToken(rootToken: string, providerBindingId: string): string {
+  const encoded = Buffer.from(
+    JSON.stringify({
+      v: 1,
+      audience: "app-controls",
+      routing: "provider-session",
+      providerBindingId,
+    }),
+    "utf8",
+  ).toString("base64url");
+  const signature = createHmac("sha256", rootToken).update(encoded).digest("base64url");
+  return `yspace-mcp-v1.${encoded}.${signature}`;
 }
 
 /**
@@ -42,21 +155,26 @@ afterEach(() => {
 });
 
 describe("StreamableHttpMcpIngress auth + host guards", () => {
-  it("filters disabled tools from discovery and calls", async () => {
-    ingress = makeIngress();
+  it("binds identity and disabled tools to a signed launch credential", async () => {
+    ingress = makeScopedIngress() as unknown as StreamableHttpMcpIngress<{ ok: true }>;
     const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "trusted-thread",
+      title: "Trusted task",
+      disabledTools: ["noop"],
+    });
     const headers = {
-      authorization: `Bearer ${info.token}`,
+      authorization: `Bearer ${launchToken}`,
       "content-type": "application/json",
     };
-    const list = await fetch(`${info.url}/mcp?thread=test&disable=noop`, {
+    const list = await fetch(`${info.url}/mcp?thread=spoofed-thread&title=Spoofed&disable=`, {
       method: "POST",
       headers,
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
     });
     expect((await list.json()).result.tools).toEqual([]);
 
-    const call = await fetch(`${info.url}/mcp?thread=test&disable=noop`, {
+    const call = await fetch(`${info.url}/mcp?thread=spoofed-thread`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -67,6 +185,17 @@ describe("StreamableHttpMcpIngress auth + host guards", () => {
       }),
     });
     expect((await call.json()).result).toMatchObject({ isError: true });
+
+    const rootCredential = await fetch(`${info.url}/mcp`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${info.token}`,
+        "x-y-space-mcp-context": launchToken,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/list" }),
+    });
+    expect(rootCredential.status).toBe(401);
   });
 
   it("accepts a valid bearer token and rejects a wrong one", async () => {
@@ -114,5 +243,170 @@ describe("StreamableHttpMcpIngress auth + host guards", () => {
 
     const loopbackIp = await rawRequest(info.port, { ...base, Host: `127.0.0.1:${info.port}` });
     expect(loopbackIp.status).toBe(200);
+  });
+});
+
+describe("StreamableHttpMcpIngress thread-bound launch identity", () => {
+  it("strips a forged provider session id and dispatches as the signed task", async () => {
+    const resolver = vi.fn<(context: McpLaunchContext) => Promise<McpThreadIdentity | undefined>>(
+      async (context) => context.identity,
+    );
+    const routed = makeRoutedIngress(resolver);
+    try {
+      const info = await routed.ingress.start();
+      const body = await callWithForgedProviderSession(info, "session-owned-by-thread-2");
+
+      expect(body.result.isError).toBeUndefined();
+      expect(resolver).toHaveBeenCalledWith(
+        expect.objectContaining({ identity: { threadId: "thread-1", title: "Trusted caller" } }),
+      );
+      expect(routed.dispatchTool).toHaveBeenCalledWith(
+        "noop",
+        { value: "kept" },
+        { identity: { threadId: "thread-1", title: "Trusted caller" } },
+      );
+    } finally {
+      routed.ingress.dispose();
+    }
+  });
+
+  it("rejects a correctly signed legacy shared-directory binding token", async () => {
+    const resolver = vi.fn<() => Promise<McpThreadIdentity>>(async () => ({
+      threadId: "thread-2",
+    }));
+    const routed = makeRoutedIngress(resolver);
+    try {
+      const info = await routed.ingress.start();
+      const launchToken = legacyProviderBindingToken(
+        info.token,
+        "opencode-gui:shared-project-binding",
+      );
+      const response = await fetch(`${info.url}/mcp`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${launchToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "noop",
+            arguments: { [PROVIDER_SESSION_ID_ARG]: "session-owned-by-thread-2" },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(401);
+      expect(resolver).not.toHaveBeenCalled();
+      expect(routed.dispatchTool).not.toHaveBeenCalled();
+    } finally {
+      routed.ingress.dispose();
+    }
+  });
+
+  it("rejects a signed thread credential after server-side liveness is revoked", async () => {
+    let live = true;
+    const routed = new StreamableHttpMcpIngress<RoutedContext>({
+      bindHost: "127.0.0.1",
+      launchContextAudience: "browser",
+      resolveLaunchContextIdentity: async (context) => (live ? context.identity : undefined),
+      serverInfo: { name: "revocable", version: "0.0.0" },
+      instructions: "revocable",
+      tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
+      isKnownToolName: (name) => name === "noop",
+      buildContext: (identity) => ({ identity }),
+      dispatchTool: async () => ({}),
+      formatToolResult: () => ({ content: [{ type: "text", text: "ok" }] }),
+    });
+    try {
+      const info = await routed.start();
+      const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+        threadId: "thread-revoked",
+      });
+      const call = () =>
+        fetch(`${info.url}/mcp`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${launchToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        });
+
+      expect((await call()).status).toBe(200);
+      live = false;
+      expect((await call()).status).toBe(401);
+    } finally {
+      routed.dispose();
+    }
+  });
+
+  it("enforces disabled tools returned by live supervisor revalidation", async () => {
+    const resolver = vi.fn<() => Promise<McpThreadIdentity>>(async () => ({
+      threadId: "thread-1",
+      disabledTools: ["noop"],
+    }));
+    const routed = makeRoutedIngress(resolver);
+    try {
+      const info = await routed.ingress.start();
+      const body = await callWithForgedProviderSession(info, "session-owned-by-thread-2");
+
+      expect(body.result.isError).toBe(true);
+      expect(routed.dispatchTool).not.toHaveBeenCalled();
+    } finally {
+      routed.ingress.dispose();
+    }
+  });
+
+  it("keeps the signed launch identity authoritative over spoofed URL metadata", async () => {
+    const resolver = vi.fn<(context: McpLaunchContext) => Promise<McpThreadIdentity | undefined>>(
+      async (context) => context.identity,
+    );
+    const routed = makeRoutedIngress(resolver);
+    try {
+      const info = await routed.ingress.start();
+      const launchToken = createMcpLaunchContextToken(info.token, "app-controls", {
+        threadId: "trusted-thread",
+        title: "Trusted caller",
+      });
+      const response = await fetch(`${info.url}/mcp?thread=spoofed-thread&title=Spoofed%20caller`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${launchToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: {
+            name: "noop",
+            arguments: {
+              [PROVIDER_SESSION_ID_ARG]: "session-forged",
+              value: "kept",
+            },
+          },
+        }),
+      });
+      const body = (await response.json()) as {
+        result: { isError?: boolean; content: Array<{ type: "text"; text: string }> };
+      };
+
+      expect(body.result.isError).toBeUndefined();
+      expect(resolver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: { threadId: "trusted-thread", title: "Trusted caller" },
+        }),
+      );
+      expect(routed.dispatchTool).toHaveBeenCalledWith(
+        "noop",
+        { value: "kept" },
+        { identity: { threadId: "trusted-thread", title: "Trusted caller" } },
+      );
+    } finally {
+      routed.ingress.dispose();
+    }
   });
 });

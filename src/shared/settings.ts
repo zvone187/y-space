@@ -565,7 +565,7 @@ export const sharedSettingsSchema = z.object({
   agentHookSupport: z.record(z.string(), agentHookSupportEntrySchema),
   /**
    * Composer MCP servers the user has turned on persistently, keyed by composer
-   * MCP id (`"browser"`, `"crossagents"`, `"chrome"`, `"computer-use"`). `true` means the
+   * MCP id (`"browser"`, `"crossagents"`, `"computer-use"`). `true` means the
    * server is on for every *new* thread whose provider/presentation supports it
    * (baked into `thread.config` at launch) and shows no composer chip — it is a
    * standing default rather than a per-thread opt-in. Absent/`false` leaves the

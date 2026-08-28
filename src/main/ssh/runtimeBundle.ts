@@ -176,7 +176,7 @@ function assertHeadlessServerBundle(path: string): void {
   const source = readFileSync(path, "utf8");
   if (/\brequire\(["']electron["']\)|\bimport\(["']electron["']\)/.test(source)) {
     throw new Error(
-      "Poracode Helper cannot include Electron. Check the standalone server import graph.",
+      "Y Space Helper cannot include Electron. Check the standalone server import graph.",
     );
   }
 }
@@ -237,11 +237,11 @@ export function ensureSshRuntimeBundle(options: SshRuntimeBundleOptions): SshRun
   for (const file of buildManifest.files) {
     const source = join(options.mainBundleDir, file);
     if (!existsSync(source)) {
-      throw new Error(`Poracode SSH runtime asset is missing: ${source}`);
+      throw new Error(`Y Space SSH runtime asset is missing: ${source}`);
     }
   }
   if (!existsSync(options.agentPluginsDir)) {
-    throw new Error(`Poracode SSH agent plugins are missing: ${options.agentPluginsDir}`);
+    throw new Error(`Y Space SSH agent plugins are missing: ${options.agentPluginsDir}`);
   }
   assertHeadlessServerBundle(join(options.mainBundleDir, "server.cjs"));
 

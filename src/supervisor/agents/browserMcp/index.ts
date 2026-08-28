@@ -9,7 +9,9 @@
  */
 
 import type { ProjectLocation } from "@/shared/contracts";
-import { encodeThreadQuery, type McpThreadIdentity } from "@/shared/browserMcpThread";
+import type { McpThreadIdentity } from "@/shared/browserMcpThread";
+import { createMcpLaunchContextToken, MCP_LAUNCH_CONTEXT_HEADER } from "@/shared/mcpLaunchContext";
+import { readPrivilegedMcpEnvironment } from "@/supervisor/privilegedMcpEnvironment";
 
 /** Minimal shape needed to pick native-vs-WSL - accepts a `ProjectLocation` or
  *  a stripped-down `{ kind, distro? }` so internal installers can call without
@@ -25,11 +27,11 @@ export interface BrowserMcpEnv {
   token: string;
 }
 
+export const BROWSER_MCP_URL_ENV = "PORACODE_BROWSER_MCP_URL";
+export const BROWSER_MCP_TOKEN_ENV = "PORACODE_BROWSER_MCP_TOKEN";
+
 export function readBrowserMcpEnv(): BrowserMcpEnv | null {
-  const url = process.env.PORACODE_BROWSER_MCP_URL;
-  const token = process.env.PORACODE_BROWSER_MCP_TOKEN;
-  if (!url || !token) return null;
-  return { url, token };
+  return readPrivilegedMcpEnvironment("browser");
 }
 
 export interface BrowserMcpHttpConfig {
@@ -58,6 +60,7 @@ export interface BrowserMcpBridge {
  */
 export function resolveBrowserMcpHttpConfig(
   location: BrowserMcpLocation,
+  identity: McpThreadIdentity,
 ): BrowserMcpHttpConfig | null {
   const env = readBrowserMcpEnv();
   if (!env) return null;
@@ -65,10 +68,11 @@ export function resolveBrowserMcpHttpConfig(
   const url = env.url;
   // Append `/mcp` so the agent hits the Streamable-HTTP endpoint directly.
   const mcpUrl = `${url.replace(/\/$/, "")}/mcp`;
+  const launchToken = createMcpLaunchContextToken(env.token, "browser", identity);
   return {
     url: mcpUrl,
-    token: env.token,
-    headers: { Authorization: `Bearer ${env.token}` },
+    token: launchToken,
+    headers: { Authorization: `Bearer ${launchToken}` },
   };
 }
 
@@ -79,20 +83,25 @@ export async function resolveBrowserMcpHttpConfigForLaunch(
   identity?: McpThreadIdentity,
 ): Promise<BrowserMcpHttpConfig | undefined> {
   if (!enabled) return undefined;
+  if (!identity?.threadId) return undefined;
   if (location.kind === "wsl") {
     if (!bridge) return undefined;
     const env = readBrowserMcpEnv();
     if (!env) return undefined;
     const handle = await bridge.ensureBridge(location.distro);
     if (!handle) return undefined;
-    const url = encodeThreadQuery(`${handle.baseUrl.replace(/\/$/, "")}/mcp`, identity);
+    const launchContext = createMcpLaunchContextToken(env.token, "browser", identity);
+    const url = `${handle.baseUrl.replace(/\/$/, "")}/mcp`;
     return {
       url,
       token: handle.secret,
-      headers: { Authorization: `Bearer ${handle.secret}` },
+      headers: {
+        Authorization: `Bearer ${handle.secret}`,
+        [MCP_LAUNCH_CONTEXT_HEADER]: launchContext,
+      },
     };
   }
-  const cfg = resolveBrowserMcpHttpConfig(location);
+  const cfg = resolveBrowserMcpHttpConfig(location, identity);
   if (!cfg) return undefined;
-  return { ...cfg, url: encodeThreadQuery(cfg.url, identity) };
+  return cfg;
 }

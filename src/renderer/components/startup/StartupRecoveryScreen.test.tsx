@@ -37,7 +37,7 @@ describe("StartupRecoveryScreen", () => {
     render(<StartupRecoveryScreen onKeepWaiting={onKeepWaiting} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
-    fireEvent.click(screen.getByRole("button", { name: "Restart Poracode" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restart Y Space" }));
     fireEvent.click(screen.getByRole("button", { name: "Keep waiting" }));
 
     expect(bridge.checkForUpdate).toHaveBeenCalledOnce();

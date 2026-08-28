@@ -8,6 +8,11 @@ const path = require("path");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    // This site has separate English and localized root layouts. A global 404
+    // gives unmatched URLs a complete document without borrowing either tree.
+    globalNotFound: true,
+  },
   // Two pnpm workspace roots exist (this repo's, and website/'s standalone one
   // that Vercel installs from), so Next cannot infer which is the tracing root.
   // Name it explicitly: pages here import ../../../branding/contact.json, so the
@@ -34,48 +39,6 @@ const nextConfig = {
           { key: "Access-Control-Allow-Origin", value: "*" },
           { key: "Cache-Control", value: "public, max-age=300, s-maxage=300" },
         ],
-      },
-    ];
-  },
-  async redirects() {
-    return [
-      // Keep the established universal-link entry on poracode.com so existing
-      // native installs can claim it; browsers continue on the isolated PWA
-      // origin.
-      {
-        source: "/pair",
-        destination: "https://app.poracode.com/pair",
-        permanent: false,
-      },
-      {
-        source: "/app",
-        destination: "https://app.poracode.com/",
-        permanent: true,
-      },
-      {
-        source: "/app/:path*",
-        destination: "https://app.poracode.com/:path*",
-        permanent: true,
-      },
-      {
-        source: "/pwa",
-        destination: "https://app.poracode.com/",
-        permanent: true,
-      },
-      {
-        source: "/pwa/:path*",
-        destination: "https://app.poracode.com/:path*",
-        permanent: true,
-      },
-      {
-        source: "/app-nightly",
-        destination: "https://app-nightly.poracode.com/",
-        permanent: true,
-      },
-      {
-        source: "/app-nightly/:path*",
-        destination: "https://app-nightly.poracode.com/:path*",
-        permanent: true,
       },
     ];
   },

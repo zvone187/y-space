@@ -24,7 +24,7 @@ import {
 } from "@/renderer/components/layout/UnifiedRightPanel";
 import { showTerminalPanel } from "@/renderer/actions/terminalActions";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
-import { buildFileEditorContext, openFileInEditor } from "@/renderer/utils/gitHelpers";
+import { buildFileEditorContext, openFileInMobileEditor } from "@/renderer/utils/gitHelpers";
 import { ProjectFilesPanel } from "@/renderer/views/FileEditorOverlay/parts/ProjectFilesPanel";
 import {
   SubAgentContent,
@@ -201,7 +201,7 @@ export function DesktopWorkspacePanel(props: {
     handledOpenRequestRef.current = openRequestKey;
 
     if (initialFilePath) {
-      void openFileInEditor(
+      void openFileInMobileEditor(
         project,
         worktreePath,
         worktreeBranch,
@@ -410,7 +410,11 @@ export function DesktopWorkspacePanel(props: {
                 }
                 filesContent={
                   openedTabs.has("files") && filesRootContext ? (
-                    <ProjectFilesPanel key={threadId} rootContext={filesRootContext} />
+                    <ProjectFilesPanel
+                      key={threadId}
+                      rootContext={filesRootContext}
+                      presentation="legacy-modal"
+                    />
                   ) : null
                 }
                 browserContent={null}

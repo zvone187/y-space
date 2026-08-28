@@ -25,7 +25,7 @@ export function WorktreeSettings() {
   return (
     <SettingsPage
       title={t`Worktrees`}
-      description={t`Where Poracode creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are.`}
+      description={t`Where Y Space creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are.`}
     >
       <SettingRow
         anchorId="worktrees.storageLocation"

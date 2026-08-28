@@ -3,6 +3,11 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { isIP } from "node:net";
 import { decodeThreadIdentity, type McpThreadIdentity } from "@/shared/browserMcpThread";
 import { isLocalhostOrigin, readBoundedNodeRequestBody, writeJsonResponse } from "@/shared/http";
+import {
+  type McpLaunchContext,
+  type McpLaunchContextAudience,
+  verifyMcpLaunchContextToken,
+} from "@/shared/mcpLaunchContext";
 
 export interface StreamableHttpMcpIngressInfo {
   url: string;
@@ -28,6 +33,11 @@ export interface StreamableHttpMcpToolResult {
   isError?: boolean;
 }
 
+/** Revalidates a signed launch context through the live supervisor boundary. */
+export type McpLaunchContextIdentityResolver = (
+  context: McpLaunchContext,
+) => Promise<McpThreadIdentity | undefined>;
+
 export interface StreamableHttpMcpIngressOptions<TContext> {
   /**
    * Network interface to bind. Defaults to `0.0.0.0` so WSL agents can reach the
@@ -47,13 +57,22 @@ export interface StreamableHttpMcpIngressOptions<TContext> {
   buildContext(identity: McpThreadIdentity): TContext | null;
   instructions: string;
   isKnownToolName(name: string): boolean;
+  /**
+   * Require a signed launch capability bound to this server. When configured,
+   * unsigned URL query identity is ignored and the process-wide root token is
+   * never accepted directly from an agent.
+   */
+  launchContextAudience?: McpLaunchContextAudience;
   onBeforeToolCall?(name: string, ctx: TContext): void;
+  /** Revalidate the signed thread capability against live supervisor state. */
+  resolveLaunchContextIdentity?: McpLaunchContextIdentityResolver;
   serverInfo: { name: string; version: string };
   tools: readonly StreamableHttpMcpToolSpec[];
 }
 
 const MAX_BODY = 1024 * 1024;
 const MCP_PROTOCOL_VERSION = "2025-03-26";
+const PROVIDER_SESSION_ID_ARG = "__poracode_provider_session_id";
 
 interface JsonRpcRequest {
   jsonrpc: "2.0";
@@ -75,6 +94,11 @@ interface JsonRpcResponseErr {
 }
 
 type JsonRpcResponse = JsonRpcResponseOk | JsonRpcResponseErr;
+
+interface McpRequestTrust {
+  identity: McpThreadIdentity;
+  launchContext?: McpLaunchContext;
+}
 
 export class StreamableHttpMcpIngress<TContext> {
   private server: Server | null = null;
@@ -126,13 +150,22 @@ export class StreamableHttpMcpIngress<TContext> {
     writeJsonResponse(res, status, body, { cacheControl: "no-store" });
   }
 
-  private checkAuth(req: IncomingMessage): boolean {
+  private resolveRequestTrust(req: IncomingMessage): McpRequestTrust | undefined {
     const auth = req.headers.authorization;
-    if (auth && auth.startsWith("Bearer ") && this.tokenMatches(auth.slice(7).trim())) {
-      return true;
-    }
+    const bearer = auth?.startsWith("Bearer ") ? auth.slice(7).trim() : undefined;
     const xToken = req.headers["x-poracode-token"];
-    return typeof xToken === "string" && this.tokenMatches(xToken);
+    const candidate = bearer ?? (typeof xToken === "string" ? xToken : undefined);
+    const audience = this.options.launchContextAudience;
+
+    if (!audience) {
+      return candidate && this.tokenMatches(candidate)
+        ? { identity: decodeThreadIdentity(req.url) }
+        : undefined;
+    }
+
+    if (!candidate) return undefined;
+    const launchContext = verifyMcpLaunchContextToken(this.token, audience, candidate);
+    return launchContext ? { ...launchContext, launchContext } : undefined;
   }
 
   /**
@@ -206,7 +239,7 @@ export class StreamableHttpMcpIngress<TContext> {
           res.setHeader("Access-Control-Allow-Origin", origin);
           res.setHeader(
             "Access-Control-Allow-Headers",
-            "Authorization, X-Poracode-Token, Content-Type, Mcp-Session-Id",
+            "Authorization, X-Poracode-Token, X-Y-Space-Mcp-Context, Content-Type, Mcp-Session-Id",
           );
           res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
         }
@@ -215,9 +248,31 @@ export class StreamableHttpMcpIngress<TContext> {
         return;
       }
 
-      if (!this.checkAuth(req)) {
+      let trust = this.resolveRequestTrust(req);
+      if (!trust) {
         this.sendJson(res, 401, { error: "unauthorized" });
         return;
+      }
+      if (trust.launchContext) {
+        const resolver = this.options.resolveLaunchContextIdentity;
+        if (!resolver) {
+          this.sendJson(res, 401, { error: "launch context validation unavailable" });
+          return;
+        }
+        let liveIdentity: McpThreadIdentity | undefined;
+        try {
+          liveIdentity = await resolver(trust.launchContext);
+        } catch {
+          liveIdentity = undefined;
+        }
+        if (!liveIdentity?.threadId) {
+          this.sendJson(res, 401, { error: "launch context is stale or revoked" });
+          return;
+        }
+        trust = {
+          ...trust,
+          identity: mergeMcpIdentities(trust.identity, liveIdentity),
+        };
       }
 
       if (path === "/mcp" || path === "/mcp/") {
@@ -233,7 +288,7 @@ export class StreamableHttpMcpIngress<TContext> {
           this.sendJson(res, 405, { error: "method not allowed" });
           return;
         }
-        await this.handleMcp(req, res);
+        await this.handleMcp(req, res, trust);
         return;
       }
 
@@ -243,8 +298,12 @@ export class StreamableHttpMcpIngress<TContext> {
     }
   }
 
-  private async handleMcp(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const identity = decodeThreadIdentity(req.url);
+  private async handleMcp(
+    req: IncomingMessage,
+    res: ServerResponse,
+    trust: McpRequestTrust,
+  ): Promise<void> {
+    const { identity } = trust;
     const raw = await this.readBody(req);
     let body: unknown;
     try {
@@ -323,14 +382,19 @@ export class StreamableHttpMcpIngress<TContext> {
       if (method === "tools/call") {
         const p = (params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
         const name = String(p.name ?? "");
-        const args = (p.arguments ?? {}) as Record<string, unknown>;
+        const rawArgs = (p.arguments ?? {}) as Record<string, unknown>;
+        const args = { ...rawArgs };
+        // OpenCode's hook still adds this compatibility field. It is never an
+        // authority input: the signed thread capability is the sole identity.
+        delete args[PROVIDER_SESSION_ID_ARG];
+
         if (identity.disabledTools?.includes(name)) {
           return {
             jsonrpc: "2.0",
             id,
             result: {
               isError: true,
-              content: [{ type: "text", text: `Tool disabled by Poracode: ${name}` }],
+              content: [{ type: "text", text: `Tool disabled by Y Space: ${name}` }],
             },
           };
         }
@@ -396,4 +460,21 @@ function isJsonRpcRequest(value: unknown): value is JsonRpcRequest {
     (value as { jsonrpc?: unknown }).jsonrpc === "2.0" &&
     typeof (value as { method?: unknown }).method === "string"
   );
+}
+
+function mergeMcpIdentities(
+  launchIdentity: McpThreadIdentity,
+  providerIdentity: McpThreadIdentity,
+): McpThreadIdentity {
+  const disabledTools = [
+    ...new Set([
+      ...(launchIdentity.disabledTools ?? []),
+      ...(providerIdentity.disabledTools ?? []),
+    ]),
+  ];
+  return {
+    ...launchIdentity,
+    ...providerIdentity,
+    ...(disabledTools.length > 0 ? { disabledTools } : {}),
+  };
 }

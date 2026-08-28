@@ -677,7 +677,7 @@ switch ([string]$request.action) {
       $accessibility = [pscustomobject]@{
         tree = 'Window: "' + $window.title + '", App: ' + $window.app
       }
-      $notes += "Detailed UI Automation text is not available in this Poracode helper yet."
+      $notes += "Detailed UI Automation text is not available in this Y Space helper yet."
     }
     $result = [pscustomobject]@{
       window = Select-Window $window

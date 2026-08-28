@@ -22,7 +22,7 @@ export type PresetEnvRow = { key: string; value: string; sensitive: boolean };
 /**
  * Canonical z.ai (GLM) environment, per https://docs.z.ai/devpack/tool/claude.
  * `glm-5.3[1m]` is z.ai's real model name for the 1M-context GLM 5.3 — the `[1m]`
- * is part of the id, not Poracode's context selector, so it is sent verbatim.
+ * is part of the id, not Y Space's context selector, so it is sent verbatim.
  * `glm-5.3-flash[1m]` is the cheaper tier; z.ai lists Flash as its default
  * mapping for the Sonnet/Haiku slots (its manual-config example keeps the full
  * model on Sonnet) — we follow the default mapping.

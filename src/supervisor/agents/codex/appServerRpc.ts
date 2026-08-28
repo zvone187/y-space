@@ -256,7 +256,7 @@ export class CodexAppServerConnection {
             id: inbound.id,
             error: {
               code: REQUEST_CANCELLED_ERROR_CODE,
-              message: "Request cancelled because the Poracode thread closed.",
+              message: "Request cancelled because the Y Space thread closed.",
             },
           });
         } catch {

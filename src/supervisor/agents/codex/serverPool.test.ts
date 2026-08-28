@@ -42,7 +42,11 @@ function fakeChildProcess() {
   });
 }
 
-function browserServer(threadId: string, baseUrl = "http://127.0.0.1:9000"): ResolvedMcpServer {
+function browserServer(
+  threadId: string,
+  baseUrl = "http://127.0.0.1:9000",
+  token = `yspace-mcp-v1.${threadId}.signature`,
+): ResolvedMcpServer {
   return {
     id: "browser",
     name: "browser",
@@ -50,7 +54,7 @@ function browserServer(threadId: string, baseUrl = "http://127.0.0.1:9000"): Res
     transport: {
       type: "http",
       url: `${baseUrl}/mcp?thread=${threadId}&title=task`,
-      headers: { Authorization: "Bearer shared-token" },
+      headers: { Authorization: `Bearer ${token}` },
     },
   };
 }
@@ -89,10 +93,29 @@ describe("Codex app-server pool", () => {
     shutdownSpawnedCodexAppServers();
   });
 
+  it("does not inherit privileged Browser or App Controls ingress roots", async () => {
+    const previousBrowser = process.env.PORACODE_BROWSER_MCP_TOKEN;
+    const previousControls = process.env.PORACODE_APP_CONTROLS_MCP_TOKEN;
+    process.env.PORACODE_BROWSER_MCP_TOKEN = "browser-root";
+    process.env.PORACODE_APP_CONTROLS_MCP_TOKEN = "controls-root";
+    try {
+      const acquired = await acquireCodexAppServer(input("local-a", browserServer("local-a")));
+      const options = mocks.spawn.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv } | undefined;
+      expect(options?.env).not.toHaveProperty("PORACODE_BROWSER_MCP_TOKEN");
+      expect(options?.env).not.toHaveProperty("PORACODE_APP_CONTROLS_MCP_TOKEN");
+      acquired.dispose();
+    } finally {
+      if (previousBrowser === undefined) delete process.env.PORACODE_BROWSER_MCP_TOKEN;
+      else process.env.PORACODE_BROWSER_MCP_TOKEN = previousBrowser;
+      if (previousControls === undefined) delete process.env.PORACODE_APP_CONTROLS_MCP_TOKEN;
+      else process.env.PORACODE_APP_CONTROLS_MCP_TOKEN = previousControls;
+    }
+  });
+
   it("reuses one process when only thread-scoped MCP query values differ", async () => {
     const first = await acquireCodexAppServer(input("local-a", browserServer("local-a")));
     const secondInput = {
-      ...input("local-b", browserServer("local-b")),
+      ...input("local-b", browserServer("local-b", undefined, "yspace-mcp-v1.thread-b.signature")),
       projectLocation: { kind: "windows" as const, path: "D:\\other-repo" },
     };
     const second = await acquireCodexAppServer(secondInput);
@@ -266,7 +289,7 @@ describe("Codex app-server pool", () => {
     );
   });
 
-  it.each(["app-controls", "browser", "chrome", "computer-use"])(
+  it.each(["app-controls", "browser", "computer-use"])(
     "normalizes thread-scoped query values for %s",
     (id) => {
       const first = httpServer(

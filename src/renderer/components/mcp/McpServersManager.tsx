@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Input, Modal, Tooltip } from "@heroui/react";
 import {
-  AppWindow,
   Download,
   Globe,
   LogOut,
@@ -193,7 +192,7 @@ export function McpServersManager(props: {
       .map((server) => ({ scope, source, server })),
   );
 
-  const builtInDescription = t`Provided and managed by Poracode for supported agents.`;
+  const builtInDescription = t`Provided and managed by Y Space for supported agents.`;
   const builtIns: BuiltInRow[] = [
     {
       id: "browser",
@@ -213,14 +212,6 @@ export function McpServersManager(props: {
       ...(props.builtInSettings?.crossagents !== undefined
         ? { settingsLabel: props.builtInSettings.crossagents.actionLabel }
         : {}),
-    },
-    {
-      id: "chrome",
-      name: BUILT_IN_MCP_SERVER_NAMES.chrome,
-      tools: BUILT_IN_MCP_SERVER_TOOL_NAMES.chrome,
-      label: t`Chrome`,
-      description: builtInDescription,
-      icon: <AppWindow className="size-4" />,
     },
     {
       id: "computer-use",
@@ -569,8 +560,8 @@ export function McpServersManager(props: {
             <SectionHeading title={t`Built-in MCP servers`} count={visibleBuiltIns.length} />
             <p className="mt-0.5 text-xs text-muted">
               <Trans>
-                Built-in servers are managed by Poracode. They can be disabled globally but cannot
-                be edited or removed.
+                Built-in servers are managed by Y Space. They can be disabled globally but cannot be
+                edited or removed.
               </Trans>
             </p>
           </div>
@@ -811,7 +802,7 @@ function McpServerProbeStatus(props: {
         <span className="size-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
         <Trans>Authentication required</Trans>
         <span aria-hidden="true">·</span>
-        <Trans>This server requires authentication before Poracode can check it.</Trans>
+        <Trans>This server requires authentication before Y Space can check it.</Trans>
       </div>
     );
   }

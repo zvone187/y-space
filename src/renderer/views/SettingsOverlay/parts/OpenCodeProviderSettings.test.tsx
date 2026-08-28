@@ -126,7 +126,7 @@ beforeEach(() => {
   setMcpServersMock.mockReset();
   useSharedSettings.setState({
     agentSettings: {
-      opencode: { browserMcp: false, chromeMcp: false, computerUse: false },
+      opencode: { computerUse: false },
     },
     setAgentSetting: setAgentSettingMock,
     mcpServers: [],
@@ -207,7 +207,7 @@ describe("OpenCodeProviderSettings", () => {
     expect(screen.getByRole("button", { name: /Add provider/ })).toBeTruthy();
   });
 
-  it("enables Save after toggling an MCP server", () => {
+  it("enables Browser by default and enables Save after opting out", () => {
     render(
       <OpenCodeProviderSettings agentKind="opencode" statuses={[makeStatus()]} wslDistros={[]} />,
     );
@@ -215,7 +215,9 @@ describe("OpenCodeProviderSettings", () => {
     const saveButton = screen.getByRole("button", { name: "Save MCP servers" });
     expect(saveButton).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("switch", { name: "Browser" }));
+    const browserToggle = screen.getByRole("switch", { name: "Browser" });
+    expect(browserToggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(browserToggle);
     expect(saveButton).toBeEnabled();
   });
 
@@ -279,7 +281,7 @@ describe("OpenCodeProviderSettings", () => {
       expect(bridgeMock.reloadAgentMcpServers).toHaveBeenCalledWith({ agentKind: "opencode" });
     });
     expect(setAgentSettingMock).toHaveBeenCalledTimes(1);
-    expect(setAgentSettingMock).toHaveBeenCalledWith("opencode", "browserMcp", true);
+    expect(setAgentSettingMock).toHaveBeenCalledWith("opencode", "browserMcp", false);
     expect(flushSharedSettingsMock.mock.invocationCallOrder[0]).toBeLessThan(
       bridgeMock.reloadAgentMcpServers.mock.invocationCallOrder[0]!,
     );

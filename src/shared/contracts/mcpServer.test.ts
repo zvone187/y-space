@@ -9,11 +9,11 @@ import {
   mcpExternalServerCandidateSchema,
   mcpServerSchema,
   mergeMcpServers,
+  resolveMcpLaunchSnapshot,
   resolveEnabledMcpServers,
   type McpServer,
 } from "./mcpServer";
 import { TOOLS as browserTools } from "@/main/browser/mcp/tools/specs";
-import { CHROME_TOOLS as chromeTools } from "@/main/browser/external/chromeTools";
 import { TOOLS as computerUseTools } from "@/main/computer-use/mcp/toolRegistry";
 import { TOOLS as appControlsTools } from "@/main/app-controls/mcp/toolRegistry";
 import { TOOLS as crossagentTools } from "@/supervisor/crossagentMcp/toolRegistry";
@@ -48,14 +48,15 @@ describe("mcpServerSchema", () => {
   });
 
   it("protects all provider-visible built-in names case-insensitively", () => {
-    expect(isReservedMcpServerName("PoRaCoDe")).toBe(true);
+    expect(isReservedMcpServerName("Y_SpAcE")).toBe(true);
     expect(isReservedMcpServerName("computer_use")).toBe(true);
     expect(isValidMcpServerName("browser")).toBe(false);
+    expect(isValidMcpServerName("chrome")).toBe(true);
     expect(isValidMcpServerName("custom.server")).toBe(true);
     expect(
       mcpServerSchema.safeParse({
         id: "reserved",
-        name: "Chrome",
+        name: "Browser",
         transport: { type: "http", url: "https://example.test/mcp" },
       }).success,
     ).toBe(false);
@@ -70,14 +71,12 @@ describe("mcpServerSchema", () => {
     expect(BUILT_IN_MCP_SERVER_TOOL_NAMES).toEqual({
       browser: browserTools.map((tool) => tool.name),
       crossagents: crossagentTools.map((tool) => tool.name),
-      chrome: chromeTools.map((tool) => tool.name),
       "computer-use": computerUseTools.map((tool) => tool.name),
       "app-controls": appControlsTools.map((tool) => tool.name),
     });
     expect(BUILT_IN_MCP_SERVER_TOOL_COUNTS).toEqual({
       browser: browserTools.length,
       crossagents: crossagentTools.length,
-      chrome: chromeTools.length,
       "computer-use": computerUseTools.length,
       "app-controls": appControlsTools.length,
     });
@@ -137,5 +136,22 @@ describe("MCP resolution", () => {
     );
     expect(merged.map((item) => item.id)).toEqual(["project", "other"]);
     expect(resolveEnabledMcpServers(merged).map((item) => item.name)).toEqual(["docs"]);
+  });
+
+  it("retains raw project overrides in the launch snapshot for live provider reloads", () => {
+    const globalServer = server("global", "Memory");
+    const disabledProjectOverride = server("project", "memory", false);
+
+    const snapshot = resolveMcpLaunchSnapshot(
+      {
+        mcpServers: [globalServer],
+        disabledBuiltInMcpServers: {},
+        disabledBuiltInMcpTools: {},
+      },
+      [disabledProjectOverride],
+    );
+
+    expect(snapshot.mcpServers).toEqual([]);
+    expect(snapshot.projectMcpServers).toEqual([disabledProjectOverride]);
   });
 });

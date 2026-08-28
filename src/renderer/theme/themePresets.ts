@@ -5,7 +5,7 @@
  * the user's appearance mode (system / light / dark), so e.g. Catppuccin is
  * Latte in light and Mocha in dark. Palettes are adapted from the popular
  * VS Code / Cursor / editor themes of the same name and remapped onto
- * Poracode's token set — the app keeps its own layout, radius, and typography.
+ * Y Space's token set — the app keeps its own layout, radius, and typography.
  *
  * `THEME_SPECS` holds the authored anchor colors (the source of truth, also
  * consumed by the contrast test); `APP_THEME_PRESETS` is the derived token set.
@@ -33,12 +33,12 @@ export interface AppThemePreset {
 export const DEFAULT_THEME_ID = "default";
 
 export const THEME_SPECS: AppThemeSpec[] = [
-  // Poracode base. Mirrors the `.light` / `.dark` values in styles.css and is
+  // Y Space base. Mirrors the `.light` / `.dark` values in styles.css and is
   // used only for the gallery preview — at runtime the base theme clears all
   // overrides so styles.css stays the source of truth (see applyAppTheme).
   {
     id: DEFAULT_THEME_ID,
-    label: "Poracode",
+    label: "Y Space",
     // sRGB hex of the styles.css oklch values (anchors must be hex so muted can
     // be contrast-derived). Preview-only — runtime clears overrides for default.
     light: {
@@ -63,11 +63,11 @@ export const THEME_SPECS: AppThemeSpec[] = [
     },
   },
 
-  // Poracode Legacy — the original pre-Poracode look (neutral graphite +
+  // Y Space Legacy — the original pre-Y Space look (neutral graphite +
   // blue accent), preserved as a selectable theme so the old style isn't lost.
   {
     id: "poracode-legacy",
-    label: "Poracode Legacy",
+    label: "Y Space Legacy",
     light: {
       bg: "#f1f1f4",
       surface: "#fafafb",

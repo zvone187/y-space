@@ -1,6 +1,15 @@
 import type { CdpClient } from "./cdpClient";
+import { truncateUtf8, utf8ByteLength } from "../boundedText";
 
 const NETWORK_BUFFER_SIZE = 500;
+const MAX_NETWORK_REQUEST_ID_BYTES = 1024;
+const MAX_NETWORK_METHOD_BYTES = 64;
+const MAX_NETWORK_URL_BYTES = 64 * 1024;
+const MAX_NETWORK_RESOURCE_TYPE_BYTES = 128;
+const MAX_NETWORK_STATUS_TEXT_BYTES = 1024;
+const MAX_NETWORK_MIME_TYPE_BYTES = 1024;
+const MAX_NETWORK_ERROR_BYTES = 8 * 1024;
+export const MAX_NETWORK_CAPTURE_TOTAL_BYTES = 2 * 1024 * 1024;
 
 export interface NetworkRequestEntry {
   requestId: string;
@@ -62,48 +71,81 @@ export class NetworkCapture {
   private entries: NetworkRequestEntry[] = [];
   private byId = new Map<string, NetworkRequestEntry>();
   private unsubs: Array<() => void> = [];
+  private cdp: CdpClient | null = null;
+  private enablePromise: Promise<void> | null = null;
+  private bindingGeneration = 0;
   private enabled = false;
   private startWallSeconds = 0;
 
   async enable(cdp: CdpClient): Promise<void> {
-    if (this.enabled) return;
-    this.enabled = true;
+    if (this.enabled && this.cdp === cdp) return;
+    if (this.cdp === cdp && this.enablePromise) {
+      await this.enablePromise;
+      return;
+    }
+
+    this.releaseTransport();
+    const bindingGeneration = this.bindingGeneration;
+    this.cdp = cdp;
+    const enabling = this.enableOnClient(cdp, bindingGeneration);
+    this.enablePromise = enabling;
+    try {
+      await enabling;
+    } catch (error) {
+      if (this.cdp === cdp && this.bindingGeneration === bindingGeneration) {
+        this.releaseTransport();
+      }
+      throw error;
+    } finally {
+      if (this.enablePromise === enabling) this.enablePromise = null;
+    }
+  }
+
+  private async enableOnClient(cdp: CdpClient, bindingGeneration: number): Promise<void> {
     await cdp.send("Network.enable");
-    this.unsubs.push(
+    if (this.cdp !== cdp || this.bindingGeneration !== bindingGeneration) return;
+
+    const unsubs = [
       cdp.on("Network.requestWillBeSent", (params) => {
         const p = params as RequestWillBeSent;
         if (this.startWallSeconds === 0 && typeof p.wallTime === "number") {
           this.startWallSeconds = p.wallTime - p.timestamp;
         }
         const entry: NetworkRequestEntry = {
-          requestId: p.requestId,
+          requestId: truncateUtf8(String(p.requestId ?? ""), MAX_NETWORK_REQUEST_ID_BYTES),
           ts: this.tsMs(p.timestamp, p.wallTime),
-          method: p.request.method,
-          url: p.request.url,
+          method: truncateUtf8(String(p.request.method ?? ""), MAX_NETWORK_METHOD_BYTES),
+          url: truncateUtf8(String(p.request.url ?? ""), MAX_NETWORK_URL_BYTES),
           ended: false,
-          ...(p.type ? { resourceType: p.type } : {}),
+          ...(p.type
+            ? { resourceType: truncateUtf8(String(p.type), MAX_NETWORK_RESOURCE_TYPE_BYTES) }
+            : {}),
         };
         this.push(entry);
       }),
-    );
-    this.unsubs.push(
       cdp.on("Network.responseReceived", (params) => {
         const p = params as ResponseReceived;
-        const e = this.byId.get(p.requestId);
+        const e = this.byId.get(
+          truncateUtf8(String(p.requestId ?? ""), MAX_NETWORK_REQUEST_ID_BYTES),
+        );
         if (!e) return;
         e.status = p.response.status;
-        e.statusText = p.response.statusText;
-        e.mimeType = p.response.mimeType;
+        e.statusText = truncateUtf8(
+          String(p.response.statusText ?? ""),
+          MAX_NETWORK_STATUS_TEXT_BYTES,
+        );
+        e.mimeType = truncateUtf8(String(p.response.mimeType ?? ""), MAX_NETWORK_MIME_TYPE_BYTES);
         e.fromCache = Boolean(p.response.fromDiskCache || p.response.fromServiceWorker);
         if (typeof p.response.encodedDataLength === "number") {
           e.responseSize = p.response.encodedDataLength;
         }
+        this.enforceBufferLimits();
       }),
-    );
-    this.unsubs.push(
       cdp.on("Network.loadingFinished", (params) => {
         const p = params as LoadingFinished;
-        const e = this.byId.get(p.requestId);
+        const e = this.byId.get(
+          truncateUtf8(String(p.requestId ?? ""), MAX_NETWORK_REQUEST_ID_BYTES),
+        );
         if (!e) return;
         e.ended = true;
         e.durationMs = this.tsMs(p.timestamp, undefined) - e.ts;
@@ -111,17 +153,23 @@ export class NetworkCapture {
           e.responseSize = p.encodedDataLength;
         }
       }),
-    );
-    this.unsubs.push(
       cdp.on("Network.loadingFailed", (params) => {
         const p = params as LoadingFailed;
-        const e = this.byId.get(p.requestId);
+        const e = this.byId.get(
+          truncateUtf8(String(p.requestId ?? ""), MAX_NETWORK_REQUEST_ID_BYTES),
+        );
         if (!e) return;
         e.ended = true;
-        e.error = p.canceled ? "canceled" : (p.errorText ?? "failed");
+        e.error = truncateUtf8(
+          p.canceled ? "canceled" : String(p.errorText ?? "failed"),
+          MAX_NETWORK_ERROR_BYTES,
+        );
         e.durationMs = this.tsMs(p.timestamp, undefined) - e.ts;
+        this.enforceBufferLimits();
       }),
-    );
+    ];
+    this.unsubs.push(...unsubs);
+    this.enabled = true;
   }
 
   private tsMs(monotonicSec: number, wallSec?: number): number {
@@ -135,9 +183,21 @@ export class NetworkCapture {
   private push(entry: NetworkRequestEntry): void {
     this.entries.push(entry);
     this.byId.set(entry.requestId, entry);
-    if (this.entries.length > NETWORK_BUFFER_SIZE) {
-      const evicted = this.entries.splice(0, this.entries.length - NETWORK_BUFFER_SIZE);
-      for (const e of evicted) this.byId.delete(e.requestId);
+    this.enforceBufferLimits();
+  }
+
+  private enforceBufferLimits(): void {
+    let totalBytes = this.entries.reduce((total, entry) => total + networkEntryBytes(entry), 0);
+    while (
+      this.entries.length > 0 &&
+      (this.entries.length > NETWORK_BUFFER_SIZE || totalBytes > MAX_NETWORK_CAPTURE_TOTAL_BYTES)
+    ) {
+      const evicted = this.entries.shift();
+      if (!evicted) break;
+      totalBytes = Math.max(0, totalBytes - networkEntryBytes(evicted));
+      if (this.byId.get(evicted.requestId) === evicted) {
+        this.byId.delete(evicted.requestId);
+      }
     }
   }
 
@@ -167,19 +227,44 @@ export class NetworkCapture {
     this.byId.clear();
   }
 
-  dispose(): void {
+  private releaseTransport(): void {
+    this.bindingGeneration += 1;
     for (const u of this.unsubs) {
       try {
         u();
       } catch {}
     }
     this.unsubs = [];
+    this.cdp = null;
+    this.enablePromise = null;
+    this.enabled = false;
+    this.startWallSeconds = 0;
+  }
+
+  /** Drop references to a suspended webview's CDP client without losing history. */
+  suspend(): void {
+    this.releaseTransport();
+  }
+
+  dispose(): void {
+    this.releaseTransport();
     this.entries = [];
     this.byId.clear();
-    this.enabled = false;
   }
 
   isEnabled(): boolean {
     return this.enabled;
   }
+}
+
+function networkEntryBytes(entry: NetworkRequestEntry): number {
+  return utf8ByteLength(
+    entry.requestId,
+    entry.method,
+    entry.url,
+    entry.resourceType,
+    entry.statusText,
+    entry.mimeType,
+    entry.error,
+  );
 }

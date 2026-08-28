@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectLocation } from "@/shared/contracts";
+import { posixPrivilegedEnvironmentUnsetPrefix } from "@/supervisor/privilegedChildEnvironment";
 import { getWslCommand, injectWslEnv, buildAgentCommand } from "./base";
 
 const wslProject: ProjectLocation = {
@@ -71,7 +72,9 @@ describe("injectWslEnv", () => {
     });
 
     // Original is unchanged
-    expect(original.args[original.args.length - 1]).toBe("exec 'claude' '--version'");
+    expect(original.args[original.args.length - 1]).toBe(
+      `${posixPrivilegedEnvironmentUnsetPrefix()}exec 'claude' '--version'`,
+    );
 
     const script = patched.args[patched.args.length - 1]!;
     expect(script).toContain("export CLAUDE_CODE_NO_FLICKER='1'");

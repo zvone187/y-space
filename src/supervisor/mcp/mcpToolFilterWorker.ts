@@ -65,7 +65,7 @@ async function main(): Promise<void> {
     if (disabled.has(name)) {
       return {
         isError: true,
-        content: [{ type: "text", text: `Tool disabled by Poracode: ${name}` }],
+        content: [{ type: "text", text: `Tool disabled by Y Space: ${name}` }],
       };
     }
     return await client.callTool(request.params);

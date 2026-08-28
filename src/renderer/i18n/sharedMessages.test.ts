@@ -78,7 +78,7 @@ describe("shared message i18n integration", () => {
     );
 
     expect(summary).toBe(
-      "My ACP informó que la autenticación se realizó correctamente, pero Poracode no pudo verificarla. Configura My ACP directamente y vuelve a intentarlo.",
+      "My ACP informó que la autenticación se realizó correctamente, pero Y Space no pudo verificarla. Configura My ACP directamente y vuelve a intentarlo.",
     );
   });
 
@@ -89,7 +89,9 @@ describe("shared message i18n integration", () => {
       new Error(`Poracode SSH runtime manifest is missing or invalid: ${path}`),
     );
 
-    expect(summary).not.toBe(`Poracode SSH runtime manifest is missing or invalid: ${path}`);
+    expect(summary).toBe(
+      `Falta el manifiesto de tiempo de ejecución SSH de Y Space o no es válido: ${path}`,
+    );
     expect(summary).toContain(path);
   });
 });

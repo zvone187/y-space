@@ -97,11 +97,19 @@ export function usePluginOauth(plugin: LoadedPlugin) {
         return;
       }
       if (begin.status === "redirect") {
-        await bridge.openExternalNative(begin.authorizationUrl);
-        const result = await bridge.waitMcpServerOauth({ flowId: begin.flowId });
-        if (result.status === "error") {
-          setError(t`Could not sign in to ${serverName}.`);
-          return;
+        const oauthTab = await bridge.browserCreateSensitiveTab({
+          url: begin.authorizationUrl,
+          activate: true,
+          reveal: true,
+        });
+        try {
+          const result = await bridge.waitMcpServerOauth({ flowId: begin.flowId });
+          if (result.status === "error") {
+            setError(t`Could not sign in to ${serverName}.`);
+            return;
+          }
+        } finally {
+          await bridge.browserCloseTab({ tabId: oauthTab.tabId }).catch(() => {});
         }
       }
       await refresh();

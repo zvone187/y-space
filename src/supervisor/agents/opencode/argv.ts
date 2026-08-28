@@ -40,10 +40,11 @@ export function buildOpenCodeArgs(
 // so we mirror Codex's `buildCodexAppServerCommand`: bypass `bash -l -i` and
 // invoke the binary under `/usr/bin/env PATH=<segments>` instead. The TUI
 // launch keeps its login-shell wrapping (via `buildAgentCommand` in the
-// adapter's `buildLaunchArgv`). The pooled server starts from the runtime home,
+// adapter's `buildLaunchArgv`). Every server starts from the runtime home,
 // never the first acquired project; directory-scoped SDK requests select the
-// actual project. Native Windows may also pass an already-resolved absolute
-// executable path so packaged apps are not hostage to an ambient PATH.
+// actual project. Terminal allocation may pool that server, while GUI tasks
+// request an isolated instance. Native Windows may also pass an already-resolved
+// absolute executable path so packaged apps are not hostage to an ambient PATH.
 export function buildOpenCodeServerCommand(
   location: ProjectLocation,
   resolvedExecPath?: string,

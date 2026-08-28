@@ -109,10 +109,10 @@ describe("SkillImportModal", () => {
     expect(onImported).toHaveBeenCalled();
   });
 
-  it("imports a skill into the Poracode-only root", async () => {
+  it("imports a skill into the Y Space-only root", async () => {
     renderModal([skill()]);
     fireEvent.click(screen.getByLabelText("Skill availability"));
-    fireEvent.click(await screen.findByRole("option", { name: "Poracode only" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Y Space only" }));
     fireEvent.click(screen.getByRole("button", { name: "Show skills from Claude Code" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Select review from Claude Code" }));
     fireEvent.click(screen.getByRole("button", { name: "Import selected" }));

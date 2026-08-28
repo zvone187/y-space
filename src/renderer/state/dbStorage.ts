@@ -30,6 +30,36 @@ const CURRENT_STORAGE_PREFIX = "poracode";
 const LEGACY_STORAGE_PREFIX = "lightcode";
 const lastStorageValues = new Map<string, StorageValue<unknown>>();
 const lastStorageJson = new Map<string, string>();
+// Some non-desktop renderer environments (SSR/tests and hardened webviews) do
+// not expose Web Storage. They still need a non-throwing Zustand backend; this
+// process-local map preserves state for the lifetime of that renderer.
+const volatileStorage = new Map<string, string>();
+
+function rendererLocalStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getLocalItem(name: string): string | null {
+  const storage = rendererLocalStorage();
+  return storage ? storage.getItem(name) : (volatileStorage.get(name) ?? null);
+}
+
+function setLocalItem(name: string, value: string): void {
+  const storage = rendererLocalStorage();
+  if (storage) storage.setItem(name, value);
+  else volatileStorage.set(name, value);
+}
+
+function removeLocalItem(name: string): void {
+  const storage = rendererLocalStorage();
+  if (storage) storage.removeItem(name);
+  volatileStorage.delete(name);
+}
 
 function legacyStorageName(name: string): string | null {
   return name.startsWith(CURRENT_STORAGE_PREFIX)
@@ -52,7 +82,7 @@ async function readPersistedState(name: string): Promise<string | null> {
 
 const dbStorageBackend = {
   async getItem(name: string): Promise<StorageValue<unknown> | null> {
-    if (!hasBridge()) return parseStorageValue(localStorage.getItem(name));
+    if (!hasBridge()) return parseStorageValue(getLocalItem(name));
     if (name === APP_STORE_NAME) {
       return loadAppStore();
     }
@@ -63,7 +93,7 @@ const dbStorageBackend = {
     const json = shouldSkipWrite(name, value);
     if (json === null) return;
     if (!hasBridge()) {
-      localStorage.setItem(name, json || JSON.stringify(value));
+      setLocalItem(name, json || JSON.stringify(value));
       return;
     }
     if (name === APP_STORE_NAME) {
@@ -79,7 +109,7 @@ const dbStorageBackend = {
     lastStorageValues.delete(name);
     lastStorageJson.delete(name);
     if (!hasBridge()) {
-      localStorage.removeItem(name);
+      removeLocalItem(name);
       return;
     }
     readBridge()

@@ -15,7 +15,7 @@ import type { MessageKey } from "@/lib/i18n/messages";
 import { ChangelogNav } from "./changelog-nav";
 import { useActiveRelease } from "./use-active-release";
 
-const RELEASES_URL = "https://github.com/SDSLeon/lightcode/releases";
+const RELEASES_URL = "https://github.com/zvone187/y-space/releases";
 
 const KIND_ORDER: ChangelogChangeKind[] = ["added", "improved", "fixed"];
 

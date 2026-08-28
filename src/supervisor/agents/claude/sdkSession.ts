@@ -66,6 +66,7 @@ import {
 import { mapClaudeSlashCommands } from "./probe";
 import { AsyncPromptQueue } from "./promptQueue";
 import { projectCwd, spawnClaudeInWsl, spawnClaudeNative } from "./sdkSpawn";
+import { sanitizeChildProcessEnv } from "@/supervisor/runtime/threadSession/spawnDiagnostics";
 import { buildSdkUserMessage } from "./sdkPrompt";
 import {
   basePermissionModeForConfig,
@@ -646,7 +647,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
             getPrimedPosixEnv() ??
             (process.env as Record<string, string>))
           : undefined;
-      const env =
+      const env = sanitizeChildProcessEnv(
         this.input.projectLocation.kind === "wsl"
           ? {
               CLAUDE_AGENT_SDK_CLIENT_APP: "poracode",
@@ -657,7 +658,8 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
               ...(posixEnv ?? process.env),
               CLAUDE_AGENT_SDK_CLIENT_APP: "poracode",
               ...(this.input.env ?? {}),
-            };
+            },
+      );
       // Posix builds ship without the SDK's bundled `claude` SEA binary
       // (electron-builder strips `@anthropic-ai/claude-agent-sdk-*` from the
       // asar). The SDK falls back to that binary when `pathToClaudeCodeExecutable`
@@ -672,7 +674,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
             (await resolveExecutablePathAsync("claude"));
           if (!claudeExecutablePath) {
             throw new Error(
-              "Claude Code CLI not found on PATH. Install Claude Code (`npm i -g @anthropic-ai/claude-code` or via Homebrew) and restart Poracode.",
+              "Claude Code CLI not found on PATH. Install Claude Code (`npm i -g @anthropic-ai/claude-code` or via Homebrew) and restart Y Space.",
             );
           }
           break;

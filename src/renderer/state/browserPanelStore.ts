@@ -157,6 +157,7 @@ function tabInfoEqual(a: BrowserTabInfo, b: BrowserTabInfo): boolean {
     a.canGoBack === b.canGoBack &&
     a.canGoForward === b.canGoForward &&
     a.devToolsOpen === b.devToolsOpen &&
-    a.groupId === b.groupId
+    a.groupId === b.groupId &&
+    a.sensitiveIntegration === b.sensitiveIntegration
   );
 }

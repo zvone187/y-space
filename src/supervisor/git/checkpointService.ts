@@ -23,9 +23,9 @@ type CheckpointMetadata = FileCheckpointRecord | FileCheckpointTurn;
  * missing identity — a configured identity keeps authoring its own snapshots.
  */
 export const CHECKPOINT_FALLBACK_IDENT_ENV: Record<string, string> = {
-  GIT_AUTHOR_NAME: "Poracode",
+  GIT_AUTHOR_NAME: "Y Space",
   GIT_AUTHOR_EMAIL: "checkpoints@poracode.local",
-  GIT_COMMITTER_NAME: "Poracode",
+  GIT_COMMITTER_NAME: "Y Space",
   GIT_COMMITTER_EMAIL: "checkpoints@poracode.local",
 };
 
@@ -48,7 +48,7 @@ export function buildCheckpointCommitInput(
 ): { args: string[]; input: string } {
   return {
     args: ["commit-tree", tree, ...(head ? ["-p", head] : []), "-F", "-"],
-    input: `Poracode checkpoint\n\n${JSON.stringify(metadata)}\n`,
+    input: `Y Space checkpoint\n\n${JSON.stringify(metadata)}\n`,
   };
 }
 

@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "project": "Y Space",
+  "testedAtUtc": "2026-08-28T03:56:15.543Z",
+  "package": "release/mac-arm64/Y Space.app",
+  "method": {
+    "surface": "packaged macOS app operated through Computer Use",
+    "startingBrowserTabs": 10,
+    "cycles": [
+      {
+        "created": 20,
+        "peakBrowserTabs": 30,
+        "closed": 20,
+        "settledBrowserTabs": 10
+      },
+      {
+        "created": 10,
+        "peakBrowserTabs": 20,
+        "closed": 10,
+        "settledBrowserTabs": 10
+      }
+    ],
+    "totalCreated": 30,
+    "totalClosed": 30,
+    "processSampling": "Direct children of the retained Y Space main PID. Guest renderers are --type=renderer processes without --lc-window-kind=main. Browser-core RSS includes the main process, GPU, utility/network, and guest renderers; the main UI renderer and agent descendants are excluded."
+  },
+  "limits": {
+    "ordinaryMetadataTabs": 30,
+    "ordinaryResidentWebviews": 6,
+    "sensitiveResidentWebviews": 4
+  },
+  "observationsKiB": {
+    "baseline": {
+      "mainRss": 231168,
+      "guestRendererCount": 4,
+      "guestRendererRss": 464400,
+      "browserCoreRss": 848416,
+      "wholeBundleRss": 1213392
+    },
+    "cycle1Peak": {
+      "mainRss": 181824,
+      "guestRendererCount": 6,
+      "guestRendererRss": 980672,
+      "browserCoreRss": 1306160,
+      "wholeBundleRss": 1522672
+    },
+    "cycle1Cleanup": {
+      "mainRss": 207424,
+      "guestRendererCount": 4,
+      "guestRendererRss": 551600,
+      "browserCoreRss": 917872,
+      "wholeBundleRss": 1233744
+    },
+    "cycle2Peak": {
+      "mainRss": 205696,
+      "guestRendererCount": 6,
+      "guestRendererRss": 947168,
+      "browserCoreRss": 1308912,
+      "wholeBundleRss": 1621840
+    },
+    "cycle2Cleanup": {
+      "mainRss": 203088,
+      "guestRendererCount": 4,
+      "guestRendererRss": 494944,
+      "browserCoreRss": 855872,
+      "wholeBundleRss": 1153520
+    }
+  },
+  "finalDeltaFromBaseline": {
+    "guestRendererCount": 0,
+    "browserCoreRssKiB": 7456,
+    "browserCoreRssPercent": 0.9,
+    "mainRssKiB": -28080,
+    "mainRssPercent": -12.1
+  },
+  "assertions": {
+    "singleGlobalWorkspaceTabGroup": "pass",
+    "thirtiethBrowserPeerCreated": "pass",
+    "thirtyFirstBrowserPeerRejected": "pass",
+    "peakGuestRenderersAtOrBelowSix": "pass",
+    "guestRenderersReturnedToBaselineAfterEachCleanup": "pass",
+    "originalTenTabTitlesPreservedAfterBothCycles": "pass",
+    "closedDisposableTabsDidNotRestoreAfterRestart": "pass",
+    "packagedProcessesRemainingAfterQuit": 0
+  },
+  "result": "pass_no_leak_signal_in_bounded_churn_run",
+  "interpretation": "The live browser set stayed bounded at six while metadata reached 30, renderer count returned to baseline after both cleanup cycles, final browser-core RSS was 0.9% above baseline, and no helper survived quit. This is a bounded packaged-app churn result, not a claim that all possible long-duration leaks are impossible."
+}

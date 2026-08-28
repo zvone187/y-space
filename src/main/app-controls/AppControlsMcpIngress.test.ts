@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createMcpLaunchContextToken, type McpLaunchContext } from "@/shared/mcpLaunchContext";
 import type {
   AgentStatusesResponse,
   CloseThreadPayload,
@@ -255,14 +256,22 @@ function deps(overrides: Partial<AppControlsMcpIngressDeps> = {}): AppControlsMc
     openThreadInUi: vi.fn<(threadId: string) => boolean>(() => true),
     notifyUser: vi.fn<() => { delivered: boolean; note?: string }>(() => ({ delivered: true })),
     checkForUpdate: vi.fn<() => Promise<{ supported: boolean }>>(async () => ({ supported: true })),
+    resolveLaunchContextIdentity: async (context) => context.identity,
     ...overrides,
   };
 }
 
-async function callTool(url: string, token: string, name: string, args: Record<string, unknown>) {
-  const response = await fetch(`${url}/mcp?thread=thread-1`, {
+async function callTool(
+  url: string,
+  token: string,
+  name: string,
+  args: Record<string, unknown>,
+  query = "?thread=thread-1",
+) {
+  const launchToken = createMcpLaunchContextToken(token, "app-controls", { threadId: "thread-1" });
+  const response = await fetch(`${url}/mcp${query}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${launchToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
@@ -282,6 +291,34 @@ async function callTool(url: string, token: string, name: string, args: Record<s
 }
 
 describe("AppControlsMcpIngress", () => {
+  it("ignores a forged OpenCode provider session id and keeps the signed caller", async () => {
+    const resolveLaunchContextIdentity = vi.fn<
+      (context: McpLaunchContext) => Promise<McpLaunchContext["identity"] | undefined>
+    >(async (context) => (context.identity.threadId === "thread-1" ? context.identity : undefined));
+    const d = deps() as AppControlsMcpIngressDeps & {
+      resolveLaunchContextIdentity(
+        context: McpLaunchContext,
+      ): Promise<{ threadId?: string; title?: string } | undefined>;
+    };
+    d.resolveLaunchContextIdentity = resolveLaunchContextIdentity;
+    ingress = new AppControlsMcpIngress(d);
+    const info = await ingress.start();
+
+    const { isError, payload } = await callTool(
+      info.url,
+      info.token,
+      "get_current_thread",
+      { __poracode_provider_session_id: "session-controls" },
+      "",
+    );
+
+    expect(isError).toBe(false);
+    expect(payload?.threadId).toBe("thread-1");
+    expect(resolveLaunchContextIdentity).toHaveBeenCalledWith(
+      expect.objectContaining({ identity: { threadId: "thread-1" } }),
+    );
+  });
+
   it("serves schedule tools and applies calling-thread defaults over Streamable HTTP", async () => {
     const d = deps();
     ingress = new AppControlsMcpIngress(d);

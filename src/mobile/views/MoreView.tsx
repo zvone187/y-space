@@ -41,12 +41,16 @@ export function MoreView(props: {
           <MoreRow
             icon={<ShieldCheck className="size-4" />}
             label={<Trans>Privacy Policy</Trans>}
-            onPress={() => void readBridge().openExternal("https://poracode.com/privacy")}
+            onPress={() =>
+              void readBridge().openExternal("https://github.com/zvone187/y-space/security/policy")
+            }
           />
           <MoreRow
             icon={<LifeBuoy className="size-4" />}
             label={<Trans>Support</Trans>}
-            onPress={() => void readBridge().openExternal("https://poracode.com/support")}
+            onPress={() =>
+              void readBridge().openExternal("https://github.com/zvone187/y-space/issues")
+            }
           />
         </div>
       </div>

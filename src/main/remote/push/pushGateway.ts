@@ -8,14 +8,11 @@
 
 import type { RemoteWebPushSubscription } from "@/shared/remote";
 
-/** Production gateway origin (co-hosted with the marketing site / PWA). The
- * canonical domain is `website/src/lib/seo.ts` `SITE_URL`. */
-const DEFAULT_PUSH_GATEWAY_URL = "https://poracode.com";
-
-/** Resolve the gateway origin: env override, else the production default. */
-export function resolvePushGatewayUrl(): string {
+/** Resolve an explicitly configured gateway origin. Y Space has no shared
+ * hosted gateway, so unconfigured installs fail closed without network I/O. */
+export function resolvePushGatewayUrl(): string | null {
   const fromEnv = process.env.PORACODE_PUSH_GATEWAY_URL?.trim();
-  return fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_PUSH_GATEWAY_URL;
+  return fromEnv && fromEnv.length > 0 ? fromEnv : null;
 }
 
 interface NativeSendPushInput {
@@ -167,8 +164,9 @@ interface GatewayTransport {
  * abort/timeout dance have one source of truth. `/api/push` is root-absolute,
  * so only `base`'s origin matters (no trailing-slash fixup needed).
  */
-function createGatewayTransport(options: CreatePushGatewayOptions): GatewayTransport {
-  const base = options.gatewayUrl ?? resolvePushGatewayUrl();
+function createGatewayTransport(options: CreatePushGatewayOptions): GatewayTransport | null {
+  const base = options.gatewayUrl?.trim() || resolvePushGatewayUrl();
+  if (!base) return null;
   const doFetch: FetchLike = options.fetchImpl ?? ((url, init) => fetch(url, init as RequestInit));
   const timeoutMs = options.timeoutMs ?? DEFAULT_GATEWAY_TIMEOUT_MS;
   const endpoint = new URL("/api/push", base).toString();
@@ -193,6 +191,14 @@ function createGatewayTransport(options: CreatePushGatewayOptions): GatewayTrans
  */
 export function createPushGateway(options: CreatePushGatewayOptions = {}): SendPush {
   const transport = createGatewayTransport(options);
+  if (!transport) {
+    return async () => ({
+      ok: false,
+      status: 0,
+      unregistered: false,
+      reason: "Push gateway is not configured.",
+    });
+  }
   const reportOperationalIssue = createOperationalReporter(options);
   return async (input: SendPushInput): Promise<SendPushResult> => {
     try {
@@ -246,6 +252,11 @@ export function createWebPushPublicKeyResolver(
   options: CreatePushGatewayOptions = {},
 ): ResolveWebPushPublicKey {
   const transport = createGatewayTransport(options);
+  if (!transport) {
+    return async () => {
+      throw new Error("Push gateway is not configured.");
+    };
+  }
   const reportOperationalIssue = createOperationalReporter(options);
   const fetchPublicKey = async (): Promise<string> => {
     try {

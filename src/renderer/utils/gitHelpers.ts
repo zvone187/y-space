@@ -3,11 +3,14 @@ import type { Project } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { readBridge } from "@/renderer/bridge";
 import { updateProjectScripts } from "@/renderer/actions/projectActions";
+import { openWorkspaceFile } from "@/renderer/actions/openWorkspaceFile";
+import { switchFileEditorRoot } from "@/renderer/actions/fileEditorRootActions";
 import { captureRendererException } from "@/renderer/diagnostics/sentry";
 import { useAppStore } from "@/renderer/state/appStore";
-import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useGitStore } from "@/renderer/state/gitStore";
+import { usePanelStore } from "@/renderer/state/panelStore";
 import type { FileEditorRootContext } from "@/renderer/state/fileEditorStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 
 interface GitDiffEditorRequest {
   staged: boolean;
@@ -94,15 +97,7 @@ export async function openFileInEditor(
   options?: OpenFileInEditorOptions,
 ): Promise<void> {
   if (project.remoteServerId && (path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path))) return;
-  const fileEditor = useFileEditorStore.getState();
   const targetContext = buildFileEditorContext(project, worktreePath, worktreeBranch);
-  const currentRoot = fileEditor.rootContext;
-  const isSameContext =
-    currentRoot?.projectId === targetContext.projectId &&
-    currentRoot?.worktreePath === targetContext.worktreePath;
-  if (!isSameContext) {
-    fileEditor.setRootContext(targetContext);
-  }
   const openOptions = typeof options === "number" ? { lineNumber: options } : options;
   let gitDiff: { diff: string } | undefined;
   if (openOptions?.gitDiff && shouldOpenGitDiffEditor(openOptions.gitDiff.status)) {
@@ -125,7 +120,42 @@ export async function openFileInEditor(
     ...(gitDiff ? { gitDiff } : {}),
   };
   try {
-    await fileEditor.openFile(path, "modal", false, editorOptions);
+    await openWorkspaceFile({
+      path,
+      rootContext: targetContext,
+      preview: false,
+      source: "git",
+      editorOptions,
+    });
+    // A maximized Git review is an explicit temporary presentation. Once its
+    // file opens in the global workspace, reveal that document instead of
+    // leaving it obscured behind the legacy z-50 overlay.
+    usePanelStore.getState().setGitOverlayOpen(false);
+  } catch (error) {
+    captureRendererException(error, { featureArea: "file-editor" });
+    toast.danger(error instanceof Error ? error.message : String(error));
+  }
+}
+
+/**
+ * The remote desktop/mobile shell paints the existing modal editor rather than
+ * the desktop global workspace. Keep its deep-link route local to that shell so
+ * a requested file cannot open in an unrendered desktop-only tab store.
+ */
+export async function openFileInMobileEditor(
+  project: Project,
+  worktreePath: string | undefined,
+  worktreeBranch: string | undefined,
+  path: string,
+  lineNumber?: number,
+): Promise<void> {
+  if (project.remoteServerId && (path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path))) return;
+  const targetContext = buildFileEditorContext(project, worktreePath, worktreeBranch);
+  if (!switchFileEditorRoot(targetContext)) return;
+  try {
+    await useFileEditorStore
+      .getState()
+      .openFile(path, "modal", false, lineNumber === undefined ? undefined : { lineNumber });
   } catch (error) {
     captureRendererException(error, { featureArea: "file-editor" });
     toast.danger(error instanceof Error ? error.message : String(error));

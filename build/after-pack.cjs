@@ -16,6 +16,7 @@ const {
   rmSync,
 } = require("node:fs");
 const { join, resolve } = require("node:path");
+const { prepareMacAppBundleForPackaging } = require("./mac-signing.cjs");
 
 // electron-builder's Arch enum is numeric: ia32=0, x64=1, armv7l=2, arm64=3,
 // universal=4. Map to the node-pty prebuilds/<plat>-<arch> directory names.
@@ -247,4 +248,8 @@ module.exports = async function afterPack(context) {
   for (const path of fixed) {
     console.log(`[afterPack] chmod +x ${path}`);
   }
+  // Local macOS builds without configured credentials must still be signed
+  // before electron-builder creates a DMG/ZIP. A later certificate signing pass
+  // replaces this ad-hoc signature when keychain auto-discovery finds one.
+  prepareMacAppBundleForPackaging(context);
 };

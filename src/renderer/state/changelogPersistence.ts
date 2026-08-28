@@ -13,8 +13,8 @@ const LEGACY_CHANGELOG_STORAGE_KEYS = {
 } as const;
 
 /**
- * Preserve the user's changelog position across the Lightcode -> Poracode
- * rename. Copy only missing values so a Poracode launch always wins over stale
+ * Preserve the user's changelog position across the Lightcode -> Y Space
+ * rename. Copy only missing values so a Y Space launch always wins over stale
  * legacy state, and keep the originals for downgrade safety.
  */
 export function migrateLegacyChangelogStorage(storage: Pick<Storage, "getItem" | "setItem">): void {

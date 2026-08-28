@@ -225,7 +225,7 @@ describe("resolveNodeForDistro", () => {
     const { resolveNodeForDistro, PORACODE_PINNED_NODE_VERSION } = await loadRuntime();
 
     await expect(resolveNodeForDistro("Ubuntu", { minimumVersion: "23.0.0" })).rejects.toThrow(
-      `Poracode-managed Node ${PORACODE_PINNED_NODE_VERSION} does not satisfy the requested minimum 23.0.0.`,
+      `Y Space-managed Node ${PORACODE_PINNED_NODE_VERSION} does not satisfy the requested minimum 23.0.0.`,
     );
   });
 

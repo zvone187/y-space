@@ -119,6 +119,7 @@ describe("bridge.mjs Browser MCP proxy", () => {
     | {
         url: string | undefined;
         authorization: string | undefined;
+        launchContext: string | undefined;
         sessionId: string | undefined;
         body: string;
       }
@@ -133,6 +134,10 @@ describe("bridge.mjs Browser MCP proxy", () => {
         received = {
           url: req.url,
           authorization: req.headers.authorization,
+          launchContext:
+            typeof req.headers["x-y-space-mcp-context"] === "string"
+              ? req.headers["x-y-space-mcp-context"]
+              : undefined,
           sessionId:
             typeof req.headers["mcp-session-id"] === "string"
               ? req.headers["mcp-session-id"]
@@ -148,7 +153,6 @@ describe("bridge.mjs Browser MCP proxy", () => {
     upstreamBaseUrl = await listenLocalServer(upstream, "0.0.0.0");
     bridge = await startBridge({
       PORACODE_BROWSER_MCP_URL: upstreamBaseUrl,
-      PORACODE_BROWSER_MCP_TOKEN: "upstream-token",
     });
   });
 
@@ -163,6 +167,7 @@ describe("bridge.mjs Browser MCP proxy", () => {
       headers: {
         authorization: `Bearer ${SECRET}`,
         "content-type": "application/json",
+        "x-y-space-mcp-context": "signed-launch-context",
         "mcp-session-id": "agent-session",
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
@@ -177,10 +182,22 @@ describe("bridge.mjs Browser MCP proxy", () => {
     });
     expect(received).toEqual({
       url: "/mcp",
-      authorization: "Bearer upstream-token",
+      authorization: "Bearer signed-launch-context",
+      launchContext: undefined,
       sessionId: "agent-session",
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
     });
+  });
+
+  it("refuses to proxy without a signed launch capability", async () => {
+    const response = await fetch(`${bridge.baseUrl}/mcp`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}`, "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(received).toBeUndefined();
   });
 
   it("reaches a loopback-only upstream even when a default gateway exists (mirrored networking)", async () => {
@@ -194,13 +211,16 @@ describe("bridge.mjs Browser MCP proxy", () => {
     const loopbackBaseUrl = await listenLocalServer(loopbackUpstream, "127.0.0.1");
     const loopbackBridge = await startBridge({
       PORACODE_BROWSER_MCP_URL: loopbackBaseUrl,
-      PORACODE_BROWSER_MCP_TOKEN: "upstream-token",
     });
 
     try {
       const response = await fetch(`${loopbackBridge.baseUrl}/mcp`, {
         method: "POST",
-        headers: { authorization: `Bearer ${SECRET}`, "content-type": "application/json" },
+        headers: {
+          authorization: `Bearer ${SECRET}`,
+          "content-type": "application/json",
+          "x-y-space-mcp-context": "signed-loopback-context",
+        },
         body: JSON.stringify({ jsonrpc: "2.0", id: 7, method: "initialize", params: {} }),
       });
 
@@ -282,6 +302,34 @@ describeOnPosix("bridge.mjs fs endpoints", () => {
     const envelope = body as { ok: boolean; code: string };
     expect(envelope.ok).toBe(false);
     expect(envelope.code).toBe("ESCAPE");
+  });
+
+  it("read rejects a symlink whose real target escapes the project root", async () => {
+    const externalDir = mkdtempSync(join(tmpdir(), "lc-bridge-external-"));
+    const secretPath = join(externalDir, "secret.txt");
+    writeFileSync(secretPath, "outside-project-secret");
+    symlinkSync(secretPath, join(projectRoot, "linked-secret.txt"));
+    try {
+      const { status, body } = await post(`${bridge.baseUrl}/v1/fs/read`, {
+        projectRoot,
+        path: join(projectRoot, "linked-secret.txt"),
+        enforceRealpathContainment: true,
+      });
+      expect(status).toBe(400);
+      expect(body).toMatchObject({ ok: false, code: "ESCAPE" });
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
+  });
+
+  it("allows realpath-contained reads when the project root is the filesystem root", async () => {
+    const { status, body } = await post(`${bridge.baseUrl}/v1/fs/read`, {
+      projectRoot: "/",
+      path: "/etc/hosts",
+      enforceRealpathContainment: true,
+    });
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ ok: true });
   });
 
   it("rejects unauthorized requests", async () => {
@@ -413,7 +461,7 @@ describeOnPosix("bridge.mjs fs endpoints", () => {
       const envelope = body as { ok: boolean; data: { commit: string } };
       expect(envelope.ok).toBe(true);
       expect(git(projectRoot, "log", "-1", "--format=%an <%ae>", envelope.data.commit).trim()).toBe(
-        "Poracode <checkpoints@poracode.local>",
+        "Y Space <checkpoints@poracode.local>",
       );
     } finally {
       await identityBridge.dispose();

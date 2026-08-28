@@ -21,6 +21,10 @@ msgstr "-y @modelcontextprotocol/server-memory"
 msgid "…"
 msgstr "…"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "(disconnected)"
+msgstr "(отключено)"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "(Draft)"
 msgstr "(Черновик)"
@@ -182,6 +186,12 @@ msgstr "{0} в {time}"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} authenticated."
 msgstr "{0} аутентифицирован."
+
+#. placeholder {0}: domain.cookieCount
+#. placeholder {1}: domain.unsupportedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "{0} cookies · {1} unsupported"
+msgstr "{0} файлов cookie · {1} неподдерживаемых"
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
@@ -392,8 +402,8 @@ msgid "{0}mo ago"
 msgstr "{0} мес. назад"
 
 #: src/renderer/i18n/sharedMessages.ts
-msgid "{agent} reported authentication success, but Poracode could not verify it. Configure {agent} directly, then try again."
-msgstr "{agent} сообщил об успешной аутентификации, но Poracode не удалось её проверить. Настройте {agent} напрямую и повторите попытку."
+msgid "{agent} reported authentication success, but Y Space could not verify it. Configure {agent} directly, then try again."
+msgstr "{agent} сообщил об успешной аутентификации, но Y Space не удалось её проверить. Настройте {agent} напрямую и повторите попытку."
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "{agentLabel} install targets"
@@ -594,6 +604,15 @@ msgstr "{serverCount, plural, one {# сервер} other {# серверов}}"
 msgid "{serverName} from {providerLabel}: {disabledLabel}"
 msgstr "{serverName} из {providerLabel}: {disabledLabel}"
 
+#. placeholder {0}: activeRequest.domains.length
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "{totalCookieCount} cookies across {0} domains"
+msgstr "{totalCookieCount} файлов cookie в {0} доменах"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "{totalUnsupportedCount} unsupported"
+msgstr "{totalUnsupportedCount} неподдерживаемых"
+
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "{used} tokens"
 msgstr "{used} токенов"
@@ -646,12 +665,20 @@ msgstr "@cursor/sdk не установлен."
 #~ msgstr "/skill-creator Создайте новый управляемый навык для {destinationLabel}."
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
-msgstr "/skill-creator-poracode Создайте новый управляемый навык для {destinationLabel}."
+#~ msgid "/skill-creator-poracode Create a new managed skill for {destinationLabel}."
+#~ msgstr "/skill-creator-poracode Создайте новый управляемый навык для {destinationLabel}."
+
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "/y-space-skill-creator Create a new managed skill for {destinationLabel}."
+msgstr "/y-space-skill-creator Создайте новый управляемый навык для {destinationLabel}."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
-msgstr "© {currentYear} Serhii Vecherenko. Все права защищены."
+#~ msgid "© {currentYear} Serhii Vecherenko. All rights reserved."
+#~ msgstr "© {currentYear} Serhii Vecherenko. Все права защищены."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "© {currentYear} Y Space contributors. Licensed under Apache-2.0."
+msgstr "© {currentYear} Участники Y Space. Лицензия Apache-2.0."
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "<0/> of {matchCount}"
@@ -730,8 +757,8 @@ msgid "A server could not be started and was skipped."
 msgstr "Не удалось запустить сервер, он пропущен."
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "A server has a name Poracode cannot use."
-msgstr "У сервера имя, которое Poracode не может использовать."
+msgid "A server has a name Y Space cannot use."
+msgstr "У сервера имя, которое Y Space не может использовать."
 
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "A server is not configured correctly and was skipped."
@@ -933,6 +960,10 @@ msgstr "Добавить действие"
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Add an existing folder"
 msgstr "Добавить существующую папку"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Add and sign in"
+msgstr "Добавить и войти"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Add attachment or capability"
@@ -1233,6 +1264,7 @@ msgstr "Все уровни рассуждений"
 
 #: src/renderer/views/GitReviewOverlay/GitReviewOverlay.tsx
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "All files"
 msgstr "Все файлы"
 
@@ -1268,6 +1300,11 @@ msgstr "Разрешить"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Allow agents to read/write cookies and storage"
 msgstr "Разрешить агентам читать и записывать cookie и хранилище"
+
+#. placeholder {0}: account.name
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Allow agents to use {0}"
+msgstr "Разрешить агентам использовать {0}"
 
 #: src/mobile/QrScanner.tsx
 msgid "Allow camera access for this site in your browser settings and try again — or enter the endpoint and token below."
@@ -1359,8 +1396,8 @@ msgid "API_KEY=value"
 msgstr "API_KEY=value"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-msgid "App Browser"
-msgstr "Встроенный браузер"
+#~ msgid "App Browser"
+#~ msgstr "Встроенный браузер"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "App Controls"
@@ -1538,6 +1575,7 @@ msgstr "Звук"
 msgid "Authenticate"
 msgstr "Войти"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "Authenticated"
 msgstr "Аутентифицировано"
@@ -1548,6 +1586,7 @@ msgstr "Аутентификация"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Authentication required"
 msgstr "Требуется аутентификация"
 
@@ -1672,12 +1711,12 @@ msgid "Automation is paused: the configured helper agent is unavailable. Check t
 msgstr "Автоматизация приостановлена: настроенный вспомогательный агент недоступен. Проверьте подключение агента и настройки вспомогательного агента."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrWatchControls.tsx
-msgid "Automation is paused: this PR's branch could not be checked out. Poracode keeps retrying automatically."
-msgstr "Автоматизация приостановлена: не удалось переключиться на ветку этого PR. Poracode автоматически повторяет попытки."
-
-#: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrWatchControls.tsx
 #~ msgid "Automation is paused: this PR's branch could not be checked out. Re-select a mode to retry."
 #~ msgstr "Автоматизация приостановлена: не удалось переключиться на ветку этого PR. Выберите режим заново, чтобы повторить попытку."
+
+#: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrWatchControls.tsx
+msgid "Automation is paused: this PR's branch could not be checked out. Y Space keeps retrying automatically."
+msgstr "Автоматизация приостановлена: не удалось переключиться на ветку этого PR. Y Space автоматически повторяет попытки."
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "Autopilot"
@@ -1880,8 +1919,8 @@ msgid "Bring back to panel"
 msgstr "Вернуть на панель"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Bring it back into this panel, or jump to the window it’s running in."
-msgstr "Верните его на эту панель или перейдите к окну, в котором он запущен."
+#~ msgid "Bring it back into this panel, or jump to the window it’s running in."
+#~ msgstr "Верните его на эту панель или перейдите к окну, в котором он запущен."
 
 #: src/mobile/views/threadActionSurfaces.tsx
 #: src/mobile/views/threadContextMenus.tsx
@@ -1903,8 +1942,8 @@ msgid "Browse your GitHub repositories or paste a clone URL."
 msgstr "Просмотрите свои репозитории GitHub или вставьте URL для клонирования."
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "Browse, inspect, and test websites in Poracode's isolated in-app browser."
-msgstr "Просматривайте, изучайте и тестируйте сайты в изолированном встроенном браузере Poracode."
+msgid "Browse, inspect, and test websites in Y Space's isolated in-app browser."
+msgstr "Просматривайте, изучайте и тестируйте сайты в изолированном встроенном браузере Y Space."
 
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
@@ -1964,6 +2003,7 @@ msgid "Browser sign-in"
 msgstr "Вход через браузер"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 msgid "Browser tabs"
 msgstr "Вкладки браузера"
 
@@ -1998,16 +2038,16 @@ msgid "Built-in order"
 msgstr "Встроенный порядок"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-msgid "Built-in servers are managed by Poracode. They can be disabled globally but cannot be edited or removed."
-msgstr "Встроенные серверы управляются Poracode. Их можно отключить глобально, но нельзя редактировать или удалять."
+msgid "Built-in servers are managed by Y Space. They can be disabled globally but cannot be edited or removed."
+msgstr "Встроенные серверы управляются Y Space. Их можно отключить глобально, но нельзя редактировать или удалять."
 
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Built-in shortcut — can't be changed"
 msgstr "Встроенное сочетание клавиш — изменить нельзя"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
-msgid "Bundles of skills and MCP servers that work across every supported agent. Poracode loads any package built for the Agent Plugins specification."
-msgstr "Наборы навыков и MCP-серверов, работающие с любым поддерживаемым агентом. Poracode загружает любой пакет, созданный по спецификации Agent Plugins."
+msgid "Bundles of skills and MCP servers that work across every supported agent. Y Space loads any package built for the Agent Plugins specification."
+msgstr "Наборы навыков и MCP-серверов, работающие с любым поддерживаемым агентом. Y Space загружает любой пакет, созданный по спецификации Agent Plugins."
 
 #: src/renderer/utils/projectIcons.ts
 msgid "Business & finance"
@@ -2026,6 +2066,10 @@ msgstr "по запросам"
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "by tokens"
 msgstr "по токенам"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "BYO Connect"
+msgstr "BYO Connect"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Bypass branch protection rules"
@@ -2081,12 +2125,17 @@ msgstr "Не удалось связаться с удалённым серве�
 #: src/renderer/views/ProfileOverlay/parts/EditProfileDialog.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteHostFolderPicker.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Cancel"
 msgstr "Отмена"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Cancel cookie import"
+msgstr "Отменить импорт файлов cookie"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 #~ msgid "Cancel new Claude profile"
@@ -2099,6 +2148,10 @@ msgstr "Отмена"
 #: src/renderer/views/SettingsOverlay/parts/AgentProfileList.tsx
 msgid "Cancel new profile"
 msgstr "Отменить новый профиль"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Cancel pairing"
+msgstr "Отменить сопряжение"
 
 #: src/renderer/components/thread/ThreadPendingSteerStrip.tsx
 msgid "Cancel pending steer"
@@ -2305,6 +2358,18 @@ msgstr "Проверки пройдены"
 msgid "Checks pending"
 msgstr "Проверки ожидают выполнения"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Choose <0>Load unpacked</0> and select the folder that opens below."
+msgstr "Выберите <0>Загрузить распакованное расширение</0> и укажите папку, которая откроется ниже."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a connected browser profile before previewing cookies."
+msgstr "Перед предварительным просмотром файлов cookie выберите подключённый профиль браузера."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose a cookie export"
+msgstr "Выберите экспорт файлов cookie"
+
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
@@ -2342,15 +2407,22 @@ msgstr "Выберите изображение внутри папки прое
 msgid "Choose at least two candidates and enter a prompt."
 msgstr "Выберите как минимум двух кандидатов и введите промпт."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose at most {MAX_TARGET_ORIGINS} origins."
+msgstr "Выберите не более {MAX_TARGET_ORIGINS} источников."
+
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 #~ msgid "Choose automatically or override with a detected shell for new terminals."
 #~ msgstr "Выберите автоматически или укажите обнаруженную оболочку для новых терминалов."
 
-#: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Choose how Poracode performs manual merges and automatic PR merges."
-msgstr "Выберите, как Poracode выполняет ручное и автоматическое слияние PR."
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Choose cookie file"
+msgstr "Выбрать файл cookie"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose environment file"
+msgstr "Выбрать файл окружения"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
@@ -2360,13 +2432,22 @@ msgstr "Выберите способ входа для {env}."
 msgid "Choose how to sign in."
 msgstr "Выберите способ входа."
 
+#: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose how Y Space performs manual merges and automatic PR merges."
+msgstr "Выберите, как Y Space выполняет ручное и автоматическое слияние PR."
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Choose import destination"
 msgstr "Выберите область импорта"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Choose Pipedream environment file"
+msgstr "Выбрать файл окружения Pipedream"
+
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
-msgid "Choose shells for the Terminal panel and Poracode's internal commands."
-msgstr "Выберите оболочки для панели терминала и внутренних команд Poracode."
+msgid "Choose shells for the Terminal panel and Y Space's internal commands."
+msgstr "Выберите оболочки для панели терминала и внутренних команд Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Choose SSH identity file"
@@ -2374,8 +2455,8 @@ msgstr "Выбрать файл идентификации SSH"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Choose the display language for Poracode's interface."
-msgstr "Выберите язык интерфейса Poracode."
+msgid "Choose the display language for Y Space's interface."
+msgstr "Выберите язык интерфейса Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 #~ msgid "Choose the runtime for new Cursor GUI chats. SDK becomes available after its package is detected and its API key is authenticated."
@@ -2389,10 +2470,14 @@ msgstr "Выберите язык интерфейса Poracode."
 msgid "Choose thread to attach to"
 msgstr "Выберите тред для прикрепления"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Choose what to import"
+msgstr "Выберите, что импортировать"
+
 #: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Choose what Poracode does for new pull requests: nothing, fix merge blockers, or fix and merge."
-msgstr "Выберите, что Poracode будет делать с новыми pull request: ничего, устранять препятствия для слияния или устранять их и выполнять слияние."
+msgid "Choose what Y Space does for new pull requests: nothing, fix merge blockers, or fix and merge."
+msgstr "Выберите, что Y Space будет делать с новыми pull request: ничего, устранять препятствия для слияния или устранять их и выполнять слияние."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2401,8 +2486,8 @@ msgstr "Выберите, когда этот компьютер остаётс�
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Choose whether links from Poracode and browser popups stay in Poracode or open externally."
-msgstr "Выберите, остаются ли ссылки из Poracode и всплывающие окна браузера внутри Poracode или открываются во внешнем приложении."
+#~ msgid "Choose whether links from Y Space and browser popups stay in Y Space or open externally."
+#~ msgstr "Выберите, остаются ли ссылки из Y Space и всплывающие окна браузера внутри Y Space или открываются во внешнем приложении."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2421,20 +2506,20 @@ msgstr "Выбирайте, инструктируйте и координиру
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/plugins/pluginCopy.ts
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Chrome"
-msgstr "Chrome"
+#~ msgid "Chrome"
+#~ msgstr "Chrome"
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "Chrome Control"
-msgstr "Управление Chrome"
+#~ msgid "Chrome Control"
+#~ msgstr "Управление Chrome"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Chrome MCP enabled for this thread"
-msgstr "Chrome MCP включён для этого треда"
+#~ msgid "Chrome MCP enabled for this thread"
+#~ msgstr "Chrome MCP включён для этого треда"
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "Chrome Tools"
-msgstr "Инструменты Chrome"
+#~ msgid "Chrome Tools"
+#~ msgstr "Инструменты Chrome"
 
 #. placeholder {0}: trimmedName || displayLabel
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
@@ -3042,8 +3127,8 @@ msgid "Config directory"
 msgstr "Каталог конфигурации"
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
-msgid "Configure the server Poracode will add when supported agents start."
-msgstr "Настройте сервер, который Poracode будет добавлять при запуске поддерживаемых агентов."
+msgid "Configure the server Y Space will add when supported agents start."
+msgstr "Настройте сервер, который Y Space будет добавлять при запуске поддерживаемых агентов."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
@@ -3060,6 +3145,10 @@ msgstr "Подтверждать удаление потоков"
 #~ msgid "Confirm before deleting worktrees"
 #~ msgstr "Подтверждать удаление рабочих деревьев"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Confirm disconnect"
+msgstr "Подтвердить отключение"
+
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Conflict Resolver"
@@ -3075,10 +3164,16 @@ msgstr "Конфликтует с управляемым навыком"
 
 #: src/mobile/setupEmptyState.tsx
 #: src/renderer/components/plugins/PluginDetail.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Connect"
 msgstr "Подключить"
+
+#. placeholder {0}: app.name
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Connect {0}"
+msgstr "Подключить {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #~ msgid "Connect a server"
@@ -3098,29 +3193,34 @@ msgid "Connect desktop"
 msgstr "Подключить компьютер"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Poracode remote protocol, projects, threads, and agent runtimes."
-msgstr "Подключайтесь напрямую, через ретранслятор или по SSH. Для всех способов подключения используются один удалённый протокол Poracode, одни проекты, потоки и среды выполнения агентов."
+msgid "Connect directly, through a relay, or over SSH. Every transport uses the same Y Space remote protocol, projects, threads, and agent runtimes."
+msgstr "Подключайтесь напрямую, через ретранслятор или по SSH. Для всех способов подключения используются один удалённый протокол Y Space, одни проекты, потоки и среды выполнения агентов."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connect over SSH"
 msgstr "Подключиться по SSH"
-
-#: src/mobile/setupEmptyState.tsx
-msgid "Connect Poracode on your desktop before starting a thread."
-msgstr "Подключите Poracode на компьютере, прежде чем начать тред."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Connect the AI providers OpenCode can use and sign out of them here."
 msgstr "Подключайте провайдеров ИИ, которые может использовать OpenCode, и выходите из них здесь."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-#~ msgid "Connect to another Poracode desktop or a headless server to browse and manage its projects from here. Get its endpoint and pairing token from Settings → Remote Access on that machine."
-#~ msgstr "Подключитесь к другому компьютеру с Poracode или к серверу без интерфейса, чтобы просматривать проекты и управлять ими отсюда. Адрес и код сопряжения можно получить в разделе «Настройки → Удалённый доступ» на той машине."
+#~ msgid "Connect to another Y Space desktop or a headless server to browse and manage its projects from here. Get its endpoint and pairing token from Settings → Remote Access on that machine."
+#~ msgstr "Подключитесь к другому компьютеру с Y Space или к серверу без интерфейса, чтобы просматривать проекты и управлять ими отсюда. Адрес и код сопряжения можно получить в разделе «Настройки → Удалённый доступ» на той машине."
+
+#: src/mobile/setupEmptyState.tsx
+msgid "Connect Y Space on your desktop before starting a thread."
+msgstr "Подключите Y Space на компьютере, прежде чем начать тред."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/plugins/PluginDetail.tsx
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Connected"
 msgstr "Подключено"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Connected accounts"
+msgstr "Подключённые учётные записи"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Connecting to the desktop browser…"
@@ -3135,6 +3235,7 @@ msgstr "Подключение..."
 #: src/renderer/components/thread/ChatPane/ChatTurnElapsed.tsx
 #: src/renderer/components/thread/ThreadDraftView.tsx
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Connecting…"
 msgstr "Подключение…"
@@ -3164,6 +3265,8 @@ msgstr "Время ожидания подключения истекло."
 #: src/mobile/chrome.ts
 #: src/mobile/NarrowShell.tsx
 #: src/mobile/views/DesktopsView.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Connections"
 msgstr "Подключения"
 
@@ -3237,8 +3340,8 @@ msgid "Continue on the desktop address"
 msgstr "Продолжить по адресу десктопа"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Control an external Chrome browser."
-msgstr "Управляет внешним браузером Chrome."
+#~ msgid "Control an external Chrome browser."
+#~ msgstr "Управляет внешним браузером Chrome."
 
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Control desktop apps and complete visual workflows."
@@ -3261,6 +3364,14 @@ msgstr "Управляет сопряжённым рабочим столом, �
 #: src/renderer/views/PrReviewOverlay/parts/PrTabsPill.tsx
 msgid "Conversation"
 msgstr "Разговор"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Cookie exports"
+msgstr "Экспорты файлов cookie"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Cookie file:"
+msgstr "Файл cookie:"
 
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
@@ -3290,8 +3401,8 @@ msgid "Copy {0} device code {1}"
 msgstr "Копировать код устройства {0} {1}"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Copy all Lightcode data into Poracode. Poracode restarts and keeps a complete backup of its current data."
-msgstr "Скопируйте все данные Lightcode в Poracode. Poracode перезапустится и сохранит полную резервную копию текущих данных."
+#~ msgid "Copy all Y Space data into Y Space. Y Space restarts and keeps a complete backup of its current data."
+#~ msgstr "Скопируйте все данные Y Space в Y Space. Y Space перезапустится и сохранит полную резервную копию текущих данных."
 
 #: src/renderer/components/thread/ChatPane/parts/items/ItemMarkdownInner.tsx
 msgid "Copy code"
@@ -3300,6 +3411,10 @@ msgstr "Копировать код"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Copy Current URL"
 msgstr "Копировать текущий URL"
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Copy data from an earlier installation into Y Space. Y Space restarts and keeps a complete backup of its current data."
+msgstr "Скопируйте данные из предыдущей установки в Y Space. Y Space перезапустится и сохранит полную резервную копию текущих данных."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy desktop endpoint"
@@ -3348,6 +3463,10 @@ msgstr "Копировать путь"
 msgid "Copy Relative Path"
 msgstr "Копировать относительный путь"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
+msgstr "Скопируйте выбранные файлы cookie для входа во встроенный браузер Y Space. Расширение предназначено только для импорта и не может открывать страницы, проверять их содержимое или управлять другим браузером."
+
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Copy selection"
 msgstr "Копировать выделенное"
@@ -3368,9 +3487,21 @@ msgstr "Скопировать URL"
 msgid "Could not abort the merge: {detail}"
 msgstr "Не удалось прервать слияние: {detail}"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel browser pairing. Try again."
+msgstr "Не удалось отменить сопряжение с браузером. Повторите попытку."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not cancel the cookie import. Try again."
+msgstr "Не удалось отменить импорт файлов cookie. Повторите попытку."
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not complete the merge"
 msgstr "Не удалось завершить слияние"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not create a cookie preview. Check that the extension is connected."
+msgstr "Не удалось создать предварительный просмотр файлов cookie. Проверьте подключение расширения."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not create the project folder."
@@ -3381,18 +3512,42 @@ msgstr "Не удалось создать папку проекта."
 msgid "Could not extract context."
 msgstr "Не удалось извлечь контекст."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not forget that browser profile. Try again."
+msgstr "Не удалось удалить этот профиль браузера. Повторите попытку."
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not generate commit message: {detail}"
 msgstr "Не удалось сгенерировать сообщение коммита: {detail}"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not import the selected cookies. No cookie values were kept in this screen."
+msgstr "Не удалось импортировать выбранные файлы cookie. Значения файлов cookie не сохранялись на этом экране."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not load browser cookie-import settings."
+msgstr "Не удалось загрузить настройки импорта файлов cookie из браузера."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Could not load connections."
+msgstr "Не удалось загрузить подключения."
 
 #. placeholder {0}: failure.project.name
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Could not load pull requests for {0}."
 msgstr "Не удалось загрузить pull request для {0}."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not open the extension folder. Try again."
+msgstr "Не удалось открыть папку расширения. Повторите попытку."
+
 #: src/renderer/components/pdf/PdfViewer.tsx
 #~ msgid "Could not open this PDF."
 #~ msgstr "Не удалось открыть этот PDF-файл."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not preview that cookie file. Use Cookie-Editor JSON or Netscape cookies.txt."
+msgstr "Не удалось предварительно просмотреть этот файл cookie. Используйте JSON из Cookie-Editor или Netscape cookies.txt."
 
 #: src/renderer/components/thread/ChatPane/parts/items/useReadAbsoluteFile.tsx
 msgid "Could not read file."
@@ -3411,6 +3566,10 @@ msgstr "Не удалось войти в {serverName}."
 #: src/renderer/components/plugins/usePluginOauth.ts
 msgid "Could not sign out of {serverName}."
 msgstr "Не удалось выйти из {serverName}."
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Could not start browser pairing. Try again."
+msgstr "Не удалось начать сопряжение с браузером. Повторите попытку."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Couldn't access the GitHub account \"{login}\". Run \"gh auth login\" and try again."
@@ -3494,8 +3653,12 @@ msgid "Couldn't scan MCP server configurations."
 msgstr "Не удалось просканировать конфигурации MCP-серверов."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Couldn't schedule the Lightcode data import."
-msgstr "Не удалось запланировать импорт данных Lightcode."
+msgid "Couldn't schedule the legacy data import."
+msgstr "Не удалось запланировать импорт данных из предыдущей установки."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+#~ msgid "Couldn't schedule the Y Space data import."
+#~ msgstr "Не удалось запланировать импорт данных Y Space."
 
 #: src/mobile/QrScanner.tsx
 msgid "Couldn't start the camera"
@@ -3615,6 +3778,10 @@ msgstr "Создание worktree…"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Credentials are configured."
 msgstr "Учётные данные настроены."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Credentials are managed by the Y Space environment and never exposed to agents."
+msgstr "Учётные данные управляются средой Y Space и никогда не передаются агентам."
 
 #: src/renderer/components/providers/usageFormat.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
@@ -4239,8 +4406,8 @@ msgid "Disable Browser MCP"
 msgstr "Отключить Browser MCP"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Disable Chrome MCP"
-msgstr "Отключить Chrome MCP"
+#~ msgid "Disable Chrome MCP"
+#~ msgstr "Отключить Chrome MCP"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4278,8 +4445,8 @@ msgid "Disabled globally"
 msgstr "Отключён глобально"
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "Disabling a skill moves it out of active skill folders and removes Poracode-managed provider copies. Its files are preserved so you can enable it again."
-msgstr "При отключении навык перемещается из активных папок навыков, а управляемые Poracode копии для провайдеров удаляются. Файлы сохраняются, поэтому навык можно включить снова."
+msgid "Disabling a skill moves it out of active skill folders and removes Y Space-managed provider copies. Its files are preserved so you can enable it again."
+msgstr "При отключении навык перемещается из активных папок навыков, а управляемые Y Space копии для провайдеров удаляются. Файлы сохраняются, поэтому навык можно включить снова."
 
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Discard"
@@ -4312,6 +4479,11 @@ msgstr "Отменить эксперимент"
 msgid "Discard experiment?"
 msgstr "Отменить эксперимент?"
 
+#. placeholder {0}: tab.file.path
+#: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+msgid "Discard unsaved changes in {0}?"
+msgstr "Отменить несохранённые изменения в {0}?"
+
 #: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
@@ -4324,9 +4496,26 @@ msgstr "Отменить несохранённые изменения в {path}
 msgid "Discard unsaved editor changes?"
 msgstr "Отменить несохранённые изменения в редакторе?"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Disconnect"
+msgstr "Отключить"
+
+#. placeholder {0}: account.name
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Disconnect {0}"
+msgstr "Отключить {0}"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Disconnect account?"
+msgstr "Отключить учётную запись?"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Disconnect server"
 msgstr "Отключить сервер"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Disconnected"
+msgstr "Отключено"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Discovering coding agents…"
@@ -4476,6 +4665,10 @@ msgstr "напр., Codex GPT-5.5 fast для быстрых запросов, Op
 msgid "e.g. Work"
 msgstr "напр. Работа"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Each one-time code expires quickly and works only on this computer."
+msgstr "Каждый одноразовый код быстро истекает и работает только на этом компьютере."
+
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -4586,6 +4779,10 @@ msgstr "Включить уровень рассуждений {tierLabel}"
 msgid "Enable {tool}"
 msgstr "Включить {tool}"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Enable Developer mode."
+msgstr "Включите режим разработчика."
+
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Enable language server support for type checking, completions, and diagnostics. Requires a language server installed."
@@ -4633,6 +4830,10 @@ msgstr "Включённые серверы остаются активными 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Enables <0>cookies</0> and <1>storage</1>. Cookies can contain session tokens and storage often holds auth state — only enable when you trust both the agent and the sites it visits."
 msgstr "Включает <0>cookie</0> и <1>хранилище</1>. Cookie могут содержать токены сессии, а в хранилище часто хранится состояние аутентификации — включайте, только если доверяете и агенту, и сайтам, которые он посещает."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "End-user Pipedream MCP server named pd."
+msgstr "MCP-сервер Pipedream для конечного пользователя с именем pd."
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
@@ -4695,6 +4896,10 @@ msgstr "Введите допустимый SSH-адрес и порт."
 #~ msgid "Enter an absolute @cursor/sdk package path, or leave this blank for automatic discovery."
 #~ msgstr "Введите абсолютный путь к пакету @cursor/sdk или оставьте поле пустым для автоматического обнаружения."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Enter at least one HTTP(S) origin."
+msgstr "Введите хотя бы один источник HTTP(S)."
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Enter one MCP server configuration."
 msgstr "Введите конфигурацию одного сервера MCP."
@@ -4718,6 +4923,10 @@ msgstr "Введите допустимый JSON."
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Environment"
 msgstr "Окружение"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Environment files"
+#~ msgstr "Файлы окружения"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Environment variable name"
@@ -4937,6 +5146,11 @@ msgstr "Номер победителя эксперимента должен б
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Experiment prompt must not be blank"
 msgstr "Промпт эксперимента не должен быть пустым"
+
+#. placeholder {0}: formatCountdown(model.pairingRemainingMs)
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Expires in {0}"
+msgstr "Истекает через {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "Explicit selections recorded from past delegations — they feed the routing order above. Edit the tags or remove entries to reshape it."
@@ -5181,6 +5395,10 @@ msgstr "Найти в diff"
 msgid "Find in terminal"
 msgstr "Найти в терминале"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Finish connecting in the new embedded browser tab, then refresh accounts."
+msgstr "Завершите подключение в новой вкладке встроенного браузера, затем обновите учётные записи."
+
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Finish your review"
 msgstr "Завершите проверку"
@@ -5195,68 +5413,68 @@ msgid "Finished · Waiting for your input"
 msgstr "Завершено · Ожидается ваш ввод"
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Antigravity CLI integration using Poracode's native runtime."
-msgstr "Первоклассная интеграция Antigravity CLI с использованием нативной среды выполнения Poracode."
+msgid "First-class Antigravity CLI integration using Y Space's native runtime."
+msgstr "Первоклассная интеграция Antigravity CLI с использованием нативной среды выполнения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Claude Code integration using Poracode's native SDK runtime."
-msgstr "Первоклассная интеграция Claude Code с использованием нативной среды выполнения SDK Poracode."
+msgid "First-class Claude Code integration using Y Space's native SDK runtime."
+msgstr "Первоклассная интеграция Claude Code с использованием нативной среды выполнения SDK Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Codex CLI integration using Poracode's native app-server runtime."
-msgstr "Первоклассная интеграция Codex CLI с использованием нативной среды выполнения app-server Poracode."
+msgid "First-class Codex CLI integration using Y Space's native app-server runtime."
+msgstr "Первоклассная интеграция Codex CLI с использованием нативной среды выполнения app-server Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Command Code CLI integration using Poracode's native runtime."
-msgstr "Первоклассная интеграция Command Code CLI с использованием нативной среды выполнения Poracode."
+msgid "First-class Command Code CLI integration using Y Space's native runtime."
+msgstr "Первоклассная интеграция Command Code CLI с использованием нативной среды выполнения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-#~ msgid "First-class Cursor Agent integration using Poracode's native runtime."
-#~ msgstr "Первоклассная интеграция Cursor Agent с использованием нативной среды выполнения Poracode."
+#~ msgid "First-class Cursor Agent integration using Y Space's native runtime."
+#~ msgstr "Первоклассная интеграция Cursor Agent с использованием нативной среды выполнения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Cursor integration using ACP or the public SDK runtime."
 msgstr "Полноценная интеграция Cursor через ACP или общедоступную среду выполнения SDK."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Factory Droid integration using Poracode's ACP runtime."
-msgstr "Полноценная интеграция Factory Droid с использованием среды выполнения ACP от Poracode."
+msgid "First-class Factory Droid integration using Y Space's ACP runtime."
+msgstr "Полноценная интеграция Factory Droid с использованием среды выполнения ACP от Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Gemini CLI integration using Poracode's native runtime."
-msgstr "Первоклассная интеграция Gemini CLI с использованием нативной среды выполнения Poracode."
+msgid "First-class Gemini CLI integration using Y Space's native runtime."
+msgstr "Первоклассная интеграция Gemini CLI с использованием нативной среды выполнения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class GitHub Copilot CLI integration using Poracode's native runtime."
-msgstr "Первоклассная интеграция GitHub Copilot CLI с использованием нативной среды выполнения Poracode."
+msgid "First-class GitHub Copilot CLI integration using Y Space's native runtime."
+msgstr "Первоклассная интеграция GitHub Copilot CLI с использованием нативной среды выполнения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Grok Build CLI integration using Poracode's native runtime."
-msgstr "Первоклассная интеграция Grok Build CLI с использованием нативной среды выполнения Poracode."
+msgid "First-class Grok Build CLI integration using Y Space's native runtime."
+msgstr "Первоклассная интеграция Grok Build CLI с использованием нативной среды выполнения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Kimi Code CLI integration using Poracode's native runtime."
-msgstr "Первоклассная интеграция Kimi Code CLI с использованием нативной среды выполнения Poracode."
+msgid "First-class Kimi Code CLI integration using Y Space's native runtime."
+msgstr "Первоклассная интеграция Kimi Code CLI с использованием нативной среды выполнения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Muse Code CLI integration using Poracode's native terminal runtime."
-msgstr "Первоклассная интеграция Muse Code CLI с использованием нативной среды выполнения терминала Poracode."
+msgid "First-class Muse Code CLI integration using Y Space's native terminal runtime."
+msgstr "Первоклассная интеграция Muse Code CLI с использованием нативной среды выполнения терминала Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class OpenCode integration using Poracode's native SDK runtime."
-msgstr "Первоклассная интеграция OpenCode с использованием нативной среды выполнения SDK Poracode."
+msgid "First-class OpenCode integration using Y Space's native SDK runtime."
+msgstr "Первоклассная интеграция OpenCode с использованием нативной среды выполнения SDK Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
 msgid "First-class Pi integration using a real terminal and Pi's native SDK runtime."
 msgstr "Полноценная интеграция Pi с настоящим терминалом и нативной средой выполнения SDK Pi."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Qoder CLI integration using Poracode's native terminal and ACP runtimes."
-msgstr "Первоклассная интеграция Qoder CLI с использованием встроенных сред терминала и ACP в Poracode."
+msgid "First-class Qoder CLI integration using Y Space's native terminal and ACP runtimes."
+msgstr "Первоклассная интеграция Qoder CLI с использованием встроенных сред терминала и ACP в Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/agentRegistryNative.ts
-msgid "First-class Qwen Code integration using Poracode's native terminal and ACP runtimes."
-msgstr "Первоклассная интеграция Qwen Code с использованием встроенных сред терминала и ACP в Poracode."
+msgid "First-class Qwen Code integration using Y Space's native terminal and ACP runtimes."
+msgstr "Первоклассная интеграция Qwen Code с использованием встроенных сред терминала и ACP в Y Space."
 
 #: src/renderer/components/pdf/PdfViewer.tsx
 #~ msgid "Fit width"
@@ -5287,6 +5505,10 @@ msgstr "Исправлено"
 msgid "Flat list"
 msgstr "Плоский список"
 
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
+msgid "Focus browser"
+msgstr "Сфокусировать браузер"
+
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
 msgstr "Перейти на адресную строку браузера"
@@ -5296,8 +5518,8 @@ msgid "Focus the in-app browser address bar"
 msgstr "Перейти на адресную строку встроенного браузера"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
-msgid "Focus window"
-msgstr "Перейти к окну"
+#~ msgid "Focus window"
+#~ msgstr "Перейти к окну"
 
 #: src/renderer/components/thread/ChatPane/parts/items/InlineFolderPathChip.tsx
 msgid "Folder"
@@ -5347,6 +5569,19 @@ msgstr "Принудительно удалить? Несведённые изм
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Force reload browser page"
 msgstr "Принудительно перезагрузить страницу браузера"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Forget"
+msgstr "Удалить"
+
+#. placeholder {0}: source.label
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Forget {0}"
+msgstr "Удалить {0}"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Forget environment file"
+msgstr "Забыть файл окружения"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5715,9 +5950,13 @@ msgstr "Есть неотправленный черновик"
 msgid "Headers"
 msgstr "Заголовки"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Healthy"
+msgstr "Исправно"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-msgid "Help me create a schedule. Ask for any missing details, then use the Poracode schedule controls to create it for me."
-msgstr "Помоги мне создать расписание. Спроси недостающие детали, а затем создай его с помощью элементов управления расписаниями Poracode."
+msgid "Help me create a schedule. Ask for any missing details, then use the Y Space schedule controls to create it for me."
+msgstr "Помоги мне создать расписание. Спроси недостающие детали, а затем создай его с помощью элементов управления расписаниями Y Space."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconSources.tsx
 msgid "Hex color"
@@ -5744,8 +5983,8 @@ msgid "Hide all"
 msgstr "Скрыть всё"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Hide browser"
-msgstr "Скрыть браузер"
+#~ msgid "Hide browser"
+#~ msgstr "Скрыть браузер"
 
 #: src/renderer/components/thread/ThreadView.tsx
 msgid "Hide canonical runtime item inspector"
@@ -5912,9 +6151,19 @@ msgstr "Импортировать снова"
 msgid "Import and restart"
 msgstr "Импортировать и перезапустить"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Import browser cookies"
+msgstr "Импорт файлов cookie из браузера"
+
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Import conflict"
 msgstr "Конфликт импорта"
+
+#. placeholder {0}: domain.domain
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Import cookies for {0}"
+msgstr "Импортировать файлы cookie для {0}"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -5934,12 +6183,12 @@ msgid "Import external skills"
 msgstr "Импортировать внешние навыки"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Import Lightcode data"
-msgstr "Импортировать данные Lightcode"
+msgid "Import legacy data"
+msgstr "Импортировать данные предыдущей установки"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Import Lightcode data again?"
-msgstr "Импортировать данные Lightcode снова?"
+msgid "Import legacy data again?"
+msgstr "Снова импортировать данные предыдущей установки?"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Import MCP servers"
@@ -5953,6 +6202,10 @@ msgstr "Способ импорта"
 msgid "Import selected"
 msgstr "Импортировать выбранные"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Import selected cookies"
+msgstr "Импортировать выбранные файлы cookie"
+
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 msgid "Import to {destinationProjectName}"
 msgstr "Импортировать в {destinationProjectName}"
@@ -5965,11 +6218,25 @@ msgstr "Импортировать глобально"
 #~ msgid "Import to Project"
 #~ msgstr "Импортировать в проект"
 
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+#~ msgid "Import Y Space data"
+#~ msgstr "Импортировать данные Y Space"
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+#~ msgid "Import Y Space data again?"
+#~ msgstr "Импортировать данные Y Space снова?"
+
 #. placeholder {0}: selectedSkills.length
 #. placeholder {1}: selectedSkills.length === 1 ? "skill" : "skills"
 #: src/renderer/components/skills/SkillImportModal.tsx
 #~ msgid "Imported {0} {1}."
 #~ msgstr "Импортировано: {0} {1}."
+
+#. placeholder {0}: completedCounts.importedCount
+#. placeholder {1}: completedCounts.skippedCount
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Imported {0} cookies; skipped {1}."
+msgstr "Импортировано файлов cookie: {0}; пропущено: {1}."
 
 #. placeholder {0}: selectedSkills.length
 #: src/renderer/components/skills/SkillImportModal.tsx
@@ -6000,6 +6267,10 @@ msgstr "Неактивно"
 #: src/renderer/views/SettingsOverlay/parts/RemoteServerProjectList.tsx
 msgid "Include in sync"
 msgstr "Добавить в синхронизацию"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Incomplete setup"
+msgstr "Настройка не завершена"
 
 #: src/renderer/components/plugins/PluginDetail.tsx
 msgid "Information"
@@ -6188,6 +6459,10 @@ msgstr "Установить v{updateVersion}"
 msgid "Install v{version}"
 msgstr "Установить v{version}"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Install Y Space Cookie Import"
+msgstr "Установить Y Space Cookie Import"
+
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
@@ -6278,11 +6553,6 @@ msgstr "Помогай мне не сбиваться с курса"
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Keep Poracode in the system tray when it launches at startup."
-msgstr "При запуске вместе с системой оставлять Poracode в области уведомлений."
-
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #~ msgid "Keep the system awake while any thread is actively working."
 #~ msgstr "Не давать системе засыпать, пока хотя бы один тред активно работает."
 
@@ -6294,6 +6564,11 @@ msgstr "При запуске вместе с системой оставлят�
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
 msgid "Keep waiting"
 msgstr "Продолжить ожидание"
+
+#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Keep Y Space in the system tray when it launches at startup."
+msgstr "При запуске вместе с системой оставлять Y Space в области уведомлений."
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Kill bash"
@@ -6313,8 +6588,8 @@ msgid "Kimi Code"
 msgstr "Kimi Code"
 
 #: src/renderer/i18n/sharedMessages.ts
-msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Poracode or Kimi Code processes, then retry."
-msgstr "Kimi Code не удалось обновить учетные данные, поскольку файл учетных данных используется другим процессом. Закройте другие процессы Poracode или Kimi Code и повторите попытку."
+msgid "Kimi Code could not update its credentials because another process is using the credential file. Close other Y Space or Kimi Code processes, then retry."
+msgstr "Kimi Code не удалось обновить учетные данные, поскольку файл учетных данных используется другим процессом. Закройте другие процессы Y Space или Kimi Code и повторите попытку."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Kimi Code ended the turn without returning a response. Restart the thread and try again."
@@ -6349,14 +6624,14 @@ msgstr "Последний инструмент: <0>{0}</0>"
 msgid "Launch at startup"
 msgstr "Запускать при старте системы"
 
-#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Launch Poracode automatically when you sign in to Windows."
-msgstr "Автоматически запускать Poracode при входе в Windows."
-
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "Launch thread"
 msgstr "Запустить тред"
+
+#: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Launch Y Space automatically when you sign in to Windows."
+msgstr "Автоматически запускать Y Space при входе в Windows."
 
 #: src/mobile/presentation.ts
 msgid "Launching"
@@ -6382,6 +6657,10 @@ msgstr "Оставить комментарий"
 #: src/renderer/views/GitHubActionsView/GitHubActionsDispatchDialog.tsx
 #~ msgid "Leave empty to use the repository default branch."
 #~ msgstr "Оставьте пустым, чтобы использовать ветку репозитория по умолчанию."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Legacy data import is unavailable with a custom data folder."
+msgstr "Импорт данных предыдущей установки недоступен при использовании пользовательской папки данных."
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "Less"
@@ -6413,10 +6692,6 @@ msgstr "Токенов за всё время"
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Light"
 msgstr "Светлая"
-
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Lightcode data import is unavailable with a custom data folder."
-msgstr "Импорт данных Lightcode недоступен при использовании пользовательской папки данных."
 
 #: src/renderer/components/skills/SkillImportModal.tsx
 msgid "Link to source"
@@ -6459,6 +6734,10 @@ msgstr "Загрузка"
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Loading accounts…"
 msgstr "Загрузка аккаунтов…"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Loading browser profiles…"
+msgstr "Загрузка профилей браузера…"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
@@ -6693,12 +6972,12 @@ msgstr "Управляйте общими навыками на глобальн
 
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Manage the MCP server configurations Poracode adds when starting supported agents. Workspace servers can be configured in each project's settings."
-msgstr "Управляйте конфигурациями серверов MCP, которые Poracode добавляет при запуске поддерживаемых агентов. Серверы рабочей области можно настроить в параметрах каждого проекта."
+msgid "Manage the MCP server configurations Y Space adds when starting supported agents. Workspace servers can be configured in each project's settings."
+msgstr "Управляйте конфигурациями серверов MCP, которые Y Space добавляет при запуске поддерживаемых агентов. Серверы рабочей области можно настроить в параметрах каждого проекта."
 
 #: src/renderer/views/SettingsOverlay/parts/SkillsSettings.tsx
-#~ msgid "Manage the skills Poracode makes available to supported agents. Project skills can be managed in each project's settings."
-#~ msgstr "Управляйте навыками, которые Poracode предоставляет поддерживаемым агентам. Навыками проекта можно управлять в настройках каждого проекта."
+#~ msgid "Manage the skills Y Space makes available to supported agents. Project skills can be managed in each project's settings."
+#~ msgstr "Управляйте навыками, которые Y Space предоставляет поддерживаемым агентам. Навыками проекта можно управлять в настройках каждого проекта."
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
 #~ msgid "Manage workspaces"
@@ -6717,10 +6996,6 @@ msgstr "Управляется {0}"
 msgid "Managed by {pluginName}"
 msgstr "Управляется {pluginName}"
 
-#: src/renderer/components/mcp/McpExternalImportModal.tsx
-msgid "Managed by Poracode"
-msgstr "Управляется Poracode"
-
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Managed by provider"
 msgstr "Управляется провайдером"
@@ -6728,6 +7003,10 @@ msgstr "Управляется провайдером"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Managed by the provider or plugin."
 #~ msgstr "Управляется провайдером или плагином."
+
+#: src/renderer/components/mcp/McpExternalImportModal.tsx
+msgid "Managed by Y Space"
+msgstr "Управляется Y Space"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Managed skills"
@@ -7088,6 +7367,10 @@ msgstr "Зеркальная вкладка браузера десктопа"
 msgid "Mirroring is unavailable."
 msgstr "Зеркалирование недоступно."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Missing configuration:"
+msgstr "Не хватает параметров конфигурации:"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
 msgstr "Мобильные push-уведомления"
@@ -7230,8 +7513,8 @@ msgstr "Вернуть браузер в главное окно"
 
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
-msgid "Move browser to window"
-msgstr "Переместить браузер в окно"
+#~ msgid "Move browser to window"
+#~ msgstr "Переместить браузер в окно"
 
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Move changes to a new worktree"
@@ -7349,6 +7632,10 @@ msgstr "Переходите по страницам, изучайте и тес
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Needs approval"
 msgstr "Требует подтверждения"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Needs attention"
+msgstr "Требует внимания"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -7639,6 +7926,10 @@ msgstr "Закладок пока нет — добавьте текущую с�
 msgid "No branches found"
 msgstr "Ветки не найдены"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "No browser profiles paired yet."
+msgstr "Пока нет сопряжённых профилей браузера."
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserEmptyState.tsx
 msgid "No browser tab open"
 msgstr "Нет открытых вкладок браузера"
@@ -7684,6 +7975,10 @@ msgstr "Коммиты не найдены."
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "No configured MCP servers yet"
 msgstr "Серверы MCP ещё не настроены"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "No connected accounts yet."
+msgstr "Пока нет подключённых учётных записей."
 
 #: src/mobile/WideShell.tsx
 msgid "No connection paired"
@@ -7784,8 +8079,8 @@ msgid "No learned selections yet."
 msgstr "Выученных выборов пока нет."
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "No Lightcode data was found."
-msgstr "Данные Lightcode не найдены."
+msgid "No legacy app data was found."
+msgstr "Данные предыдущей версии приложения не найдены."
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "No marketplace skills match these filters."
@@ -7976,6 +8271,10 @@ msgstr "Нет подготовленных изменений"
 msgid "No supported agents detected"
 msgstr "Поддерживаемые агенты не обнаружены"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "No supported cookies were found for these origins."
+msgstr "Для этих источников не найдено поддерживаемых файлов cookie."
+
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "No tags — the entry stops influencing tag affinity."
 msgstr "Нет тегов — запись перестаёт влиять на сродство тегов."
@@ -8018,6 +8317,10 @@ msgstr "Запуски рабочих процессов не найдены."
 msgid "No wrap"
 msgstr "Без переноса"
 
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+#~ msgid "No Y Space data was found."
+#~ msgstr "Данные Y Space не найдены."
+
 #: src/renderer/i18n/sharedMessages.ts
 msgid "none"
 msgstr "нет"
@@ -8039,6 +8342,10 @@ msgstr "Не репозиторий git"
 #: src/renderer/views/MainView/parts/Sidebar/parts/GitBadge.tsx
 msgid "Not a Git repository"
 msgstr "Не репозиторий Git"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Not configured"
+msgstr "Не настроено"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "Not found"
@@ -8150,6 +8457,10 @@ msgstr "В начале часа"
 msgid "Once on {0}"
 msgstr "Один раз: {0}"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "One exact HTTP(S) origin per line, up to 12."
+msgstr "Один точный источник HTTP(S) в строке, не более 12."
+
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "One Header: value pair per line"
 msgstr "Одна пара «Заголовок: значение» в строке"
@@ -8193,6 +8504,10 @@ msgstr "Открыть {0}"
 msgid "Open {label}"
 msgstr "Открыть {label}"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Open <0>chrome://extensions</0> in Chrome, Brave, Edge, Arc, or Chromium."
+msgstr "Откройте <0>chrome://extensions</0> в Chrome, Brave, Edge, Arc или Chromium."
+
 #: src/renderer/commands/registry.ts
 msgid "Open a new browser tab"
 msgstr "Открыть новую вкладку браузера"
@@ -8229,6 +8544,10 @@ msgid "Open browser"
 msgstr "Открыть браузер"
 
 #: src/renderer/commands/registry.ts
+msgid "Open browser panel"
+msgstr "Открыть панель браузера"
+
+#: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "Открыть вкладку браузера"
 
@@ -8262,6 +8581,10 @@ msgstr "Открыть Crossagent: {0}"
 msgid "Open dialog"
 msgstr "Открывать диалог"
 
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "Open document tab"
+msgstr "Открыть вкладку документа"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open experiment"
 msgstr "Открыть эксперимент"
@@ -8270,6 +8593,10 @@ msgstr "Открыть эксперимент"
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
 msgid "Open experiment board"
 msgstr "Открыть доску эксперимента"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Open extension folder"
+msgstr "Открыть папку расширения"
 
 #: src/renderer/commands/registry.ts
 msgid "Open File"
@@ -8309,8 +8636,8 @@ msgid "Open image preview"
 msgstr "Открыть предпросмотр изображения"
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "Open in browser"
-msgstr "Открыть в браузере"
+#~ msgid "Open in browser"
+#~ msgstr "Открыть в браузере"
 
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictFileCard.tsx
@@ -8330,8 +8657,8 @@ msgstr "Открытый рейтинг с показателями устано
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Open links in"
-msgstr "Открывать ссылки в"
+#~ msgid "Open links in"
+#~ msgstr "Открывать ссылки в"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #~ msgid "Open marketplace"
@@ -8359,6 +8686,10 @@ msgstr "Открывать новые треды как полную стран�
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunList.tsx
 msgid "Open on GitHub"
 msgstr "Открыть на GitHub"
+
+#: src/renderer/commands/registry.ts
+msgid "Open or focus the browser workspace tab"
+msgstr "Открыть вкладку рабочего пространства браузера или перейти к ней"
 
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Open over SSH"
@@ -8411,12 +8742,12 @@ msgid "Open Settings"
 msgstr "Открыть настройки"
 
 #: src/mobile/views/DesktopsView.tsx
-#~ msgid "Open Settings → Remote Access in Poracode on this computer, then paste its pairing token here."
-#~ msgstr "Откройте Настройки → Удалённый доступ в Poracode на этом компьютере, затем вставьте сюда токен сопряжения."
+#~ msgid "Open Settings → Remote Access in Y Space on this computer, then paste its pairing token here."
+#~ msgstr "Откройте Настройки → Удалённый доступ в Y Space на этом компьютере, затем вставьте сюда токен сопряжения."
 
 #: src/mobile/views/DesktopsView.tsx
-msgid "Open Settings → Remote Access in Poracode on your desktop, then scan the QR code from here — or enter the endpoint and pairing token manually."
-msgstr "Откройте «Настройки → Удалённый доступ» в Poracode на компьютере, затем отсканируйте QR-код отсюда — или введите адрес и код сопряжения вручную."
+msgid "Open Settings → Remote Access in Y Space on your desktop, then scan the QR code from here — or enter the endpoint and pairing token manually."
+msgstr "Откройте «Настройки → Удалённый доступ» в Y Space на компьютере, затем отсканируйте QR-код отсюда — или введите адрес и код сопряжения вручную."
 
 #. placeholder {0}: display.title
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
@@ -8449,6 +8780,10 @@ msgstr "Открыть выбор усилия"
 msgid "Open the model picker"
 msgstr "Открыть выбор модели"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Open the Y Space Cookie Import popup in your browser and approve these origins."
+msgstr "Откройте всплывающее окно Y Space Cookie Import в браузере и разрешите доступ к этим источникам."
+
 #: src/renderer/components/providers/opencode/manifest.ts
 msgid "OpenCode"
 msgstr "OpenCode"
@@ -8469,8 +8804,8 @@ msgid "OpenSSH private key"
 msgstr "Закрытый ключ OpenSSH"
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "Operate desktop apps through Poracode's desktop-control tools."
-msgstr "Управляйте настольными приложениями через инструменты Poracode."
+msgid "Operate desktop apps through Y Space's desktop-control tools."
+msgstr "Управляйте настольными приложениями через инструменты Y Space."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
@@ -8567,6 +8902,10 @@ msgstr "Страница"
 msgid "Pair"
 msgstr "Связать"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Pair a browser profile"
+msgstr "Сопрячь профиль браузера"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Pair a connection"
 msgstr "Связать подключение"
@@ -8584,9 +8923,17 @@ msgstr "Сопрягите телефон, планшет или браузер 
 msgid "Pair again"
 msgstr "Связать снова"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Pair browser profile"
+msgstr "Сопрячь профиль браузера"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-msgid "Pair with Poracode"
-msgstr "Связать с Poracode"
+msgid "Pair with Y Space"
+msgstr "Связать с Y Space"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Paired browser profiles"
+msgstr "Сопряжённые профили браузера"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Paired devices"
@@ -8595,6 +8942,10 @@ msgstr "Сопряженные устройства"
 #: src/mobile/remoteConnectionState.ts
 msgid "Pairing"
 msgstr "Связывание"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Pairing code"
+msgstr "Код сопряжения"
 
 #: src/mobile/components.tsx
 #: src/mobile/useRemoteDesktop.ts
@@ -8719,12 +9070,16 @@ msgstr "Приостановлено"
 #~ msgstr "Приостановленные провайдеры пропускаются Crossagents до возобновления."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
+msgid "PDF preview opens in a Y Space document tab."
+msgstr "Предпросмотр PDF открывается во вкладке документа Y Space."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 #~ msgid "PDF preview opens in the browser panel."
 #~ msgstr "Предпросмотр PDF открывается в панели браузера."
 
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
-msgid "PDF preview opens in the browser."
-msgstr "Предпросмотр PDF открывается в браузере."
+#~ msgid "PDF preview opens in the browser."
+#~ msgstr "Предпросмотр PDF открывается в браузере."
 
 #: src/renderer/views/ProfileOverlay/parts/ShareCard.tsx
 msgid "peak day"
@@ -8774,6 +9129,18 @@ msgstr "разрешение"
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Personal"
 msgstr "Личное"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Personal MCP"
+msgstr "Personal MCP"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Personal MCP sign-in did not complete."
+msgstr "Вход в Personal MCP не завершён."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Personal Pipedream tools"
+msgstr "Личные инструменты Pipedream"
 
 #: src/renderer/components/providers/pi/manifest.ts
 msgid "Pi"
@@ -8831,6 +9198,18 @@ msgstr "Закреплено"
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "Pinned task routes"
 msgstr "Закреплённые маршруты задач"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Pipedream Connect could not be initialized."
+msgstr "Не удалось инициализировать Pipedream Connect."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Pipedream credentials loaded from the selected file."
+msgstr "Учётные данные Pipedream загружены из выбранного файла."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
+msgstr "Учётные записи OAuth под управлением Pipedream, доступные через аутентифицированные локальные ретрансляторы MCP."
 
 #: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
@@ -8895,58 +9274,8 @@ msgstr "Направьте этот профиль на провайдера, о
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Poracode. Each follows the light or dark mode above."
-msgstr "Популярные темы редакторов, адаптированные для Poracode. Каждая следует светлому или тёмному режиму, выбранному выше."
-
-#: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
-msgid "Poracode and your agents run on the remote machine. SSH is used only to start the remote environment and secure its local tunnel."
-msgstr "Poracode и ваши агенты работают на удалённом компьютере. SSH используется только для запуска удалённой среды и защиты её локального туннеля."
-
-#: src/renderer/components/plugins/pluginCopy.ts
-msgid "Poracode could not create this plugin's data folder."
-msgstr "Poracode не смог создать папку данных этого плагина."
-
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#~ msgid "Poracode does not store marketplace credentials in plain settings. Open the catalog to browse its security-scanned skills."
-#~ msgstr "Poracode не хранит учётные данные маркетплейса в настройках в открытом виде. Откройте каталог, чтобы просмотреть навыки, прошедшие проверку безопасности."
-
-#: src/renderer/i18n/sharedMessages.ts
-msgid "Poracode Helper failed to start. Check that Node 24.10 or newer and npm are installed on the remote machine."
-msgstr "Не удалось запустить Poracode Helper. Убедитесь, что на удалённом компьютере установлены Node 24.10 или новее и npm."
-
-#: src/renderer/i18n/sharedMessages.ts
-msgid "Poracode Helper is not ready yet (HTTP {status})."
-msgstr "Poracode Helper ещё не готов (HTTP {status})."
-
-#: src/renderer/i18n/sharedMessages.ts
-msgid "Poracode Helper returned an invalid response."
-msgstr "Poracode Helper вернул недопустимый ответ."
-
-#: src/renderer/components/startup/StartupRecoveryScreen.tsx
-msgid "Poracode may be waiting on saved data or a background service. You can keep waiting, restart, or install an available update."
-msgstr "Возможно, Poracode ожидает сохранённые данные или фоновую службу. Можно продолжить ожидание, перезапустить приложение или установить доступное обновление."
-
-#: src/renderer/components/skills/SkillImportModal.tsx
-#: src/renderer/components/skills/SkillMarketplaceModal.tsx
-#: src/renderer/components/skills/SkillsManager.tsx
-msgid "Poracode only"
-msgstr "Только в Poracode"
-
-#: src/renderer/i18n/sharedMessages.ts
-msgid "Poracode SSH runtime manifest is missing or invalid: {path}"
-msgstr "Манифест среды выполнения Poracode SSH отсутствует или недействителен: {path}"
-
-#: src/mobile/views/DesktopsView.tsx
-msgid "Poracode will install or reuse its server on the SSH host and keep credentials in this device's secure storage."
-msgstr "Poracode установит или повторно использует свой сервер на SSH-хосте и сохранит учетные данные в защищенном хранилище этого устройства."
-
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "Poracode will restart, back up its current data, and replace it with a complete copy of your Lightcode data."
-msgstr "Poracode перезапустится, создаст резервную копию текущих данных и заменит их полной копией данных Lightcode."
-
-#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Poracode's built-in browser tools."
-msgstr "Встроенные инструменты браузера Poracode."
+msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+msgstr "Популярные темы редакторов, адаптированные для Y Space. Каждая следует светлому или тёмному режиму, выбранному выше."
 
 #: src/renderer/components/thread/MoveThreadToWorktreeDialog.tsx
 #~ msgid "poracode/my-branch"
@@ -9083,6 +9412,14 @@ msgstr "Запрещать сон"
 #: src/renderer/components/composer/AttachmentBar.tsx
 msgid "Preview {0}"
 msgstr "Предпросмотр {0}"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Preview extension cookies"
+msgstr "Предварительный просмотр файлов cookie из расширения"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
+msgstr "Предварительный просмотр показывает только количество файлов cookie по доменам. Ничего не копируется, пока вы не подтвердите окончательный выбор. Для экспорта из Firefox и Safari можно использовать JSON из Cookie-Editor или Netscape cookies.txt."
 
 #: src/renderer/commands/registry.ts
 msgid "Previous chat"
@@ -9268,8 +9605,8 @@ msgid "Proposed plan"
 msgstr "Предложенный план"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-msgid "Provided and managed by Poracode for supported agents."
-msgstr "Предоставляется и управляется Poracode для поддерживаемых агентов."
+msgid "Provided and managed by Y Space for supported agents."
+msgstr "Предоставляется и управляется Y Space для поддерживаемых агентов."
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/authHelpers.ts
 msgid "provider"
@@ -9341,8 +9678,8 @@ msgid "Pull ↓{behind}"
 msgstr "Pull ↓{behind}"
 
 #: src/renderer/i18n/sharedMessages.ts
-msgid "Pull did not complete. Your local changes remain in a Poracode stash."
-msgstr "Pull не завершён. Ваши локальные изменения остались в stash Poracode."
+msgid "Pull did not complete. Your local changes remain in a Y Space stash."
+msgstr "Pull не завершён. Ваши локальные изменения остались в stash Y Space."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Pull failed: {detail}"
@@ -9527,6 +9864,7 @@ msgid "Reading each candidate's chat response…"
 msgstr "Чтение ответа каждого кандидата в чате…"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Ready"
 msgstr "Готово"
 
@@ -9604,6 +9942,7 @@ msgstr "Скрывать содержимое уведомлений"
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/AgentProfileList.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Refresh"
@@ -9617,6 +9956,10 @@ msgstr "Обновить аутентификацию {0}"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 msgid "Refresh {label}"
 msgstr "Обновить {label}"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Refresh accounts"
+msgstr "Обновить учётные записи"
 
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Refresh detected agents"
@@ -9907,8 +10250,8 @@ msgid "Removing {profileName} deletes its saved API key. Threads that use this p
 msgstr "При удалении {profileName} сохранённый API-ключ будет удалён. Треды, использующие этот профиль, больше не найдут своего агента."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
-msgid "Removing {profileName} drops its Poracode settings — env vars, models, and effort. Its config directory and the Claude credentials inside it stay on disk."
-msgstr "При удалении {profileName} пропадут его настройки Poracode — переменные окружения, модели и effort. Каталог конфигурации и учётные данные Claude в нём останутся на диске."
+msgid "Removing {profileName} drops its Y Space settings — env vars, models, and effort. Its config directory and the Claude credentials inside it stay on disk."
+msgstr "При удалении {profileName} пропадут его настройки Y Space — переменные окружения, модели и effort. Каталог конфигурации и учётные данные Claude в нём останутся на диске."
 
 #: src/mobile/ThreadTitleRow.tsx
 #: src/mobile/TodoActionsSheet.tsx
@@ -10108,8 +10451,8 @@ msgid "Resolves merge conflicts during rebase or merge."
 msgstr "Разрешает конфликты слияния во время rebase или слияния."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-msgid "Restart Poracode"
-msgstr "Перезапустить Poracode"
+msgid "Restart Y Space"
+msgstr "Перезапустить Y Space"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Restore"
@@ -10382,8 +10725,8 @@ msgstr "Запустите выполнение одного промпта не
 #~ msgstr "Запускайте автономные задачи на этом устройстве без проекта."
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-msgid "Run standalone tasks on this device. Schedules run while the device is awake and Poracode is open."
-msgstr "Запускайте автономные задачи на этом устройстве. Расписания выполняются, пока устройство активно и Poracode открыт."
+msgid "Run standalone tasks on this device. Schedules run while the device is awake and Y Space is open."
+msgstr "Запускайте автономные задачи на этом устройстве. Расписания выполняются, пока устройство активно и Y Space открыт."
 
 #: src/renderer/commands/registry.ts
 msgid "Run Terminal Command"
@@ -10517,6 +10860,10 @@ msgstr "Сохранить сочетание клавиш"
 msgid "Saved credentials are shared across all environments."
 msgstr "Сохранённые учётные данные используются во всех средах."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Saved environment file forgotten."
+msgstr "Сохранённый файл окружения забыт."
+
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Saved shell"
 msgstr "Сохранённая оболочка"
@@ -10566,8 +10913,8 @@ msgid "Scheduled tasks on this desktop"
 msgstr "Запланированные задачи на этом компьютере"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
-#~ msgid "Scheduled tasks run only while this device is awake and Poracode is open."
-#~ msgstr "Запланированные задачи выполняются только когда устройство активно и Poracode открыт."
+#~ msgid "Scheduled tasks run only while this device is awake and Y Space is open."
+#~ msgstr "Запланированные задачи выполняются только когда устройство активно и Y Space открыт."
 
 #: src/mobile/settingsSections.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/sidebarShortcuts.tsx
@@ -10641,6 +10988,7 @@ msgstr "SDK не установлен"
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SearchSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Search"
@@ -10653,6 +11001,10 @@ msgstr "Поиск агентов"
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Search agents..."
 msgstr "Поиск агентов..."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Search apps"
+msgstr "Поиск приложений"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Search branches..."
@@ -10698,6 +11050,10 @@ msgstr "Поиск моделей..."
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserOmnibox.tsx
 msgid "Search or enter address"
 msgstr "Поиск или ввод адреса"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Search Pipedream apps"
+msgstr "Поиск приложений Pipedream"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Search plugins"
@@ -10802,6 +11158,14 @@ msgstr "Выберите файл из дерева"
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Select a file to start editing."
 msgstr "Выберите файл, чтобы начать редактирование."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#~ msgid "Select a local environment file. Y Space stores only its location; credential values stay in the main process."
+#~ msgstr "Выберите локальный файл окружения. Y Space сохраняет только его расположение; значения учётных данных остаются в основном процессе."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Select a local environment file. Y Space stores only its location; credential values stay outside renderer and agent processes."
+msgstr "Выберите локальный файл окружения. Y Space сохраняет только его расположение; значения учётных данных остаются вне процессов рендерера и агентов."
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
@@ -10917,8 +11281,8 @@ msgid "Server {target} could not be started and was skipped."
 msgstr "Не удалось запустить сервер {target}, он пропущен."
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "Server {target} has a name Poracode cannot use."
-msgstr "У сервера {target} имя, которое Poracode не может использовать."
+msgid "Server {target} has a name Y Space cannot use."
+msgstr "У сервера {target} имя, которое Y Space не может использовать."
 
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Server {target} is not configured correctly and was skipped."
@@ -10929,8 +11293,8 @@ msgid "Server {target} runs on this computer and is unavailable for WSL projects
 msgstr "Сервер {target} работает на этом компьютере и недоступен для проектов WSL."
 
 #: src/renderer/components/plugins/PluginDetail.tsx
-msgid "Servers this plugin declares in mcp.json. Poracode passes them to every supported agent."
-msgstr "Серверы, объявленные этим плагином в mcp.json. Poracode передаёт их всем поддерживаемым агентам."
+msgid "Servers this plugin declares in mcp.json. Y Space passes them to every supported agent."
+msgstr "Серверы, объявленные этим плагином в mcp.json. Y Space передаёт их всем поддерживаемым агентам."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Set group color"
@@ -11092,8 +11456,8 @@ msgid "Show opened links in"
 msgstr "Показывать открытые ссылки в"
 
 #: src/renderer/commands/registry.ts
-msgid "Show or hide the browser panel"
-msgstr "Показать или скрыть панель браузера"
+#~ msgid "Show or hide the browser panel"
+#~ msgstr "Показать или скрыть панель браузера"
 
 #: src/renderer/commands/registry.ts
 msgid "Show or hide the sidebar"
@@ -11188,6 +11552,7 @@ msgid "Sidebar shortcuts"
 msgstr "Ярлыки боковой панели"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/UsageProviderRow.tsx
 msgid "Sign in"
 msgstr "Войти"
@@ -11211,6 +11576,7 @@ msgid "Sign in with the agent CLI."
 msgstr "Войдите через CLI агента."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/UsageProviderRow.tsx
 msgid "Sign out"
 msgstr "Выйти"
@@ -11261,6 +11627,10 @@ msgstr "Выход из {env}. Обнаруженные агенты обнов�
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "Signing out. Detected agents will refresh when it finishes."
 msgstr "Выход. Обнаруженные агенты обновятся по завершении."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Sites to import cookies for"
+msgstr "Сайты, для которых нужно импортировать файлы cookie"
 
 #: src/renderer/views/SettingsOverlay/parts/CodexProviderSettings.tsx
 msgid "Sizes shown in the Codex composer. Compaction starts automatically at 95% of the selected window. New chats default to 400k when that size is in the list."
@@ -11416,6 +11786,10 @@ msgstr "Сортировать навыки маркетплейса"
 msgid "Source branch {branch} moved before the worktree was created"
 msgstr "Исходная ветка {branch} переместилась до создания worktree"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Source browser profile"
+msgstr "Исходный профиль браузера"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Sources"
 msgstr "Источники"
@@ -11560,6 +11934,10 @@ msgstr "Начать с нуля"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Start minimized"
 msgstr "Запускать свёрнутым"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Start pairing below, then enter the code in the extension popup."
+msgstr "Начните сопряжение ниже, затем введите код во всплывающем окне расширения."
 
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 #~ msgid "Start remote thread"
@@ -11925,8 +12303,8 @@ msgid "System"
 msgstr "Системная"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-msgid "System Browser"
-msgstr "Системный браузер"
+#~ msgid "System Browser"
+#~ msgstr "Системный браузер"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 msgid "System default"
@@ -11974,8 +12352,8 @@ msgstr "Нажмите +, чтобы добавить папку или клон
 #~ msgstr "Нажмите +, чтобы выполнить прямое сопряжение или подключиться к удаленному компьютеру по SSH."
 
 #: src/mobile/views/DesktopsView.tsx
-#~ msgid "Tap + to pair with Poracode on your desktop."
-#~ msgstr "Нажмите +, чтобы подключиться к Poracode на компьютере."
+#~ msgid "Tap + to pair with Y Space on your desktop."
+#~ msgstr "Нажмите +, чтобы подключиться к Y Space на компьютере."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CreatePrModal.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
@@ -12096,8 +12474,8 @@ msgid "That pairing code is no longer valid. Open Settings → Remote Access on 
 msgstr "Этот код привязки больше не действует. Откройте на десктопе Настройки → Удалённый доступ, нажмите «Новый код» и повторите привязку."
 
 #: src/mobile/routeComponents.tsx
-msgid "That QR code isn't a Poracode pairing link."
-msgstr "Этот QR-код не является ссылкой для сопряжения Poracode."
+msgid "That QR code isn't a Y Space pairing link."
+msgstr "Этот QR-код не является ссылкой для сопряжения Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "That remote session was already gone."
@@ -12127,6 +12505,10 @@ msgstr "приложение"
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
 #~ msgid "the base branch"
 #~ msgstr "базовую ветку"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "The browser accepted them, but disk flush must be retried."
+msgstr "Браузер принял их, но запись на диск необходимо повторить."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "The candidates changed after judging. Compare them again."
@@ -12194,21 +12576,41 @@ msgstr "Сервер MCP недопустим."
 msgid "The normal app shell could not render. The diagnostics below are shown before reload so the failure can be investigated."
 msgstr "Обычная оболочка приложения не смогла отрендериться. Диагностика ниже показана перед перезагрузкой, чтобы проблему можно было исследовать."
 
-#: src/mobile/useRemoteDesktop.ts
-msgid "The remote Poracode server returned no pairing credential."
-msgstr "Удаленный сервер Poracode не вернул данные для сопряжения."
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The Pipedream request failed. Check your connection and configuration."
+msgstr "Сбой запроса Pipedream. Проверьте подключение и конфигурацию."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "The preview failed. Reconnect the extension and try again."
+msgstr "Не удалось выполнить предварительный просмотр. Переподключите расширение и повторите попытку."
 
 #: src/renderer/state/remoteServersStore.ts
 msgid "The remote server returned no pairing credential."
 msgstr "Удалённый сервер не вернул учётные данные для связывания."
 
+#: src/mobile/useRemoteDesktop.ts
+msgid "The remote Y Space server returned no pairing credential."
+msgstr "Удаленный сервер Y Space не вернул данные для сопряжения."
+
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "Расположение репозитория на диске. Обновите его, если вы переместили папку."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file could not be read."
+msgstr "Не удалось прочитать выбранный файл."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file does not contain Pipedream credentials."
+msgstr "Выбранный файл не содержит учётных данных Pipedream."
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "Выбранный файл не содержит допустимых конфигураций серверов MCP."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "The selected file is too large."
+msgstr "Выбранный файл слишком большой."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "The selected machine is unavailable. Reconnect it to manage archived threads."
@@ -12271,8 +12673,8 @@ msgid "The skills marketplace couldn't be loaded."
 msgstr "Не удалось загрузить маркетплейс навыков."
 
 #: src/renderer/i18n/sharedMessages.ts
-msgid "The SSH tunnel reached an incompatible Poracode server."
-msgstr "SSH-туннель подключился к несовместимому серверу Poracode."
+msgid "The SSH tunnel reached an incompatible Y Space server."
+msgstr "SSH-туннель подключился к несовместимому серверу Y Space."
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "the target provider"
@@ -12390,8 +12792,8 @@ msgstr "Эта HTTPS-страница не смогла обратиться к 
 #~ msgstr "Этот ключ используется Cursor CLI, ACP и SDK для данного профиля."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
-#~ msgid "This link opens the app Poracode serves on your network. The hosted app is served over HTTPS, which browsers block from reaching a plain-HTTP desktop."
-#~ msgstr "Эта ссылка открывает приложение, которое Poracode раздаёт в вашей сети. Размещённое приложение работает по HTTPS, поэтому браузеры блокируют обращение к десктопу по обычному HTTP."
+#~ msgid "This link opens the app Y Space serves on your network. The hosted app is served over HTTPS, which browsers block from reaching a plain-HTTP desktop."
+#~ msgstr "Эта ссылка открывает приложение, которое Y Space раздаёт в вашей сети. Размещённое приложение работает по HTTPS, поэтому браузеры блокируют обращение к десктопу по обычному HTTP."
 
 #: src/renderer/views/SettingsOverlay/parts/ArchivedThreadsSettings.tsx
 msgid "This machine"
@@ -12404,6 +12806,14 @@ msgstr "Это имя зарезервировано встроенным сер
 #: src/mobile/views/DesktopsView.tsx
 #~ msgid "This page is served over HTTPS, so the browser blocks it from reaching a desktop on plain HTTP. Continue on the desktop's own address to finish pairing there."
 #~ msgstr "Эта страница работает по HTTPS, поэтому браузер блокирует обращение к десктопу по обычному HTTP. Продолжите по собственному адресу десктопа, чтобы завершить привязку там."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF could not be loaded in the built-in preview."
+msgstr "Не удалось загрузить этот PDF во встроенном предпросмотре."
+
+#: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/MobilePdfPreview.tsx
+msgid "This PDF is too large for the built-in preview."
+msgstr "Этот PDF слишком велик для встроенного предпросмотра."
 
 #. placeholder {0}: deleteRun?.number
 #: src/renderer/views/GitHubActionsView/GitHubActionsView.tsx
@@ -12429,12 +12839,12 @@ msgid "This plugin's folder could not be read."
 msgstr "Не удалось прочитать папку этого плагина."
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "This plugin's Poracode settings were ignored because they are not valid."
-msgstr "Настройки Poracode этого плагина проигнорированы, так как они некорректны."
-
-#: src/renderer/components/plugins/pluginCopy.ts
 msgid "This plugin's skills could not be read."
 msgstr "Не удалось прочитать навыки этого плагина."
+
+#: src/renderer/components/plugins/pluginCopy.ts
+msgid "This plugin's Y Space settings were ignored because they are not valid."
+msgstr "Настройки Y Space этого плагина проигнорированы, так как они некорректны."
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "This profile runs on the Cursor SDK. Cursor CLI and ACP share one machine login, so they stay on the main Cursor tile."
@@ -12457,6 +12867,10 @@ msgstr "Удалённый сервер этого проекта офлайн. 
 msgid "This removes later messages and restores files when a checkpoint snapshot is available."
 msgstr "Это удаляет последующие сообщения и восстанавливает файлы, если доступен снимок контрольной точки."
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "This removes the Pipedream account and immediately revokes agent access through Y Space."
+msgstr "Учётная запись Pipedream будет удалена, а доступ агентов через Y Space — немедленно отозван."
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "This removes the schedule and its latest result from this device."
 msgstr "Удаляет расписание и его последний результат с этого устройства."
@@ -12473,8 +12887,8 @@ msgid "This removes the worktree on \"{0}\", then deletes the branch."
 msgstr "Это удаляет worktree в \"{0}\", а затем удаляет ветку."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
-msgid "This server requires authentication before Poracode can check it."
-msgstr "Для проверки этого сервера в Poracode сначала нужно пройти аутентификацию."
+msgid "This server requires authentication before Y Space can check it."
+msgstr "Для проверки этого сервера в Y Space сначала нужно пройти аутентификацию."
 
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "This server runs on this computer and is unavailable for WSL projects."
@@ -12508,8 +12922,8 @@ msgstr "Этот workflow нельзя запустить вручную."
 
 #. placeholder {0}: activeDialog.sourceBranch
 #: src/renderer/views/MainView/parts/PullFromSourceDialog.tsx
-msgid "This worktree has local changes. Poracode can temporarily stash them, pull from {0}, then re-apply your changes."
-msgstr "В этом worktree есть локальные изменения. Poracode может временно спрятать их, получить изменения из {0}, а затем повторно применить ваши изменения."
+msgid "This worktree has local changes. Y Space can temporarily stash them, pull from {0}, then re-apply your changes."
+msgstr "В этом worktree есть локальные изменения. Y Space может временно спрятать их, получить изменения из {0}, а затем повторно применить ваши изменения."
 
 #: src/renderer/components/thread/ChatPane/parts/items/Reasoning.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ReasoningInline.tsx
@@ -12602,8 +13016,8 @@ msgid "Timed out"
 msgstr "Время ожидания истекло"
 
 #: src/renderer/i18n/sharedMessages.ts
-msgid "Timed out waiting for Poracode Helper."
-msgstr "Время ожидания Poracode Helper истекло."
+msgid "Timed out waiting for Y Space Helper."
+msgstr "Время ожидания Y Space Helper истекло."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Timeout (ms)"
@@ -12628,8 +13042,8 @@ msgid "To-dos"
 msgstr "Задачи"
 
 #: src/renderer/commands/registry.ts
-msgid "Toggle browser panel"
-msgstr "Переключить панель браузера"
+#~ msgid "Toggle browser panel"
+#~ msgstr "Переключить панель браузера"
 
 #: src/renderer/commands/composerCommands.ts
 #: src/renderer/components/providers/standardGuiSlashCommands.ts
@@ -12773,8 +13187,8 @@ msgstr "Попробовать"
 
 #: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Turn on Auto-merge automatically for pull requests you create in Poracode."
-#~ msgstr "Автоматически включать автослияние для pull request, созданных в Poracode."
+#~ msgid "Turn on Auto-merge automatically for pull requests you create in Y Space."
+#~ msgstr "Автоматически включать автослияние для pull request, созданных в Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Turn on remote access to show a pairing code."
@@ -12782,8 +13196,8 @@ msgstr "Включите удаленный доступ, чтобы показ�
 
 #: src/renderer/views/SettingsOverlay/parts/GitSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-#~ msgid "Turn on Watch PR automatically for pull requests you create in Poracode."
-#~ msgstr "Автоматически включать наблюдение за PR для pull request, созданных в Poracode."
+#~ msgid "Turn on Watch PR automatically for pull requests you create in Y Space."
+#~ msgstr "Автоматически включать наблюдение за PR для pull request, созданных в Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Turn tracking on or off per provider. Disabled providers are skipped by the auto-refresh."
@@ -13280,10 +13694,6 @@ msgstr "Ошибка обновления: {detail}"
 msgid "Update method"
 msgstr "Способ обновления"
 
-#: src/mobile/views/PortsView.tsx
-msgid "Update Poracode on your desktop to use port forwarding."
-msgstr "Обновите Poracode на десктопе, чтобы использовать перенаправление портов."
-
 #: src/renderer/views/SettingsOverlay/parts/cursorRuntimeInstall.ts
 msgid "Update SDK"
 msgstr "Обновить SDK"
@@ -13324,6 +13734,10 @@ msgstr "Обновить с коммитом слияния"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Update with rebase"
 msgstr "Обновить через rebase"
+
+#: src/mobile/views/PortsView.tsx
+msgid "Update Y Space on your desktop to use port forwarding."
+msgstr "Обновите Y Space на десктопе, чтобы использовать перенаправление портов."
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunDetail.tsx
 msgid "Updated"
@@ -13391,6 +13805,10 @@ msgstr "Использование неизвестно"
 msgid "Use + to pair directly or connect to a remote machine over SSH."
 msgstr "Используйте + для прямого сопряжения или подключения к удалённому компьютеру по SSH."
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Use active embedded tab"
+msgstr "Использовать активную вкладку встроенного браузера"
+
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectMenu.tsx
 msgid "Use an existing folder"
 msgstr "Использовать существующую папку"
@@ -13400,8 +13818,8 @@ msgid "Use an image from the project folder..."
 msgstr "Использовать изображение из папки проекта..."
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "Use Chrome safely when a task needs an existing browser session."
-msgstr "Используйте Chrome безопасно, когда задаче нужна существующая сессия браузера."
+#~ msgid "Use Chrome safely when a task needs an existing browser session."
+#~ msgstr "Используйте Chrome безопасно, когда задаче нужна существующая сессия браузера."
 
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Use config"
@@ -13410,6 +13828,10 @@ msgstr "Использовать конфигурацию"
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use detected session?"
 msgstr "Использовать обнаруженную сессию?"
+
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Use HTTP(S) origins without usernames, passwords, paths, or private URL details."
+msgstr "Используйте источники HTTP(S) без имён пользователей, паролей, путей и конфиденциальных деталей URL-адресов."
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -13424,6 +13846,10 @@ msgstr "Используйте буквы, цифры, точки, дефисы 
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
 msgstr "Используйте одну глобальную папку или вкладывайте worktree внутрь каждого проекта в .poracode/worktrees."
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
+msgstr "Используйте Personal MCP для собственных инструментов Pipedream или BYO Connect, чтобы предоставить локальным агентам доступ к выбранным учётным записям приложений."
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"
@@ -13465,8 +13891,8 @@ msgstr "Используется командой {conflict}"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
-msgid "Used for agents, authentication, installs, and Poracode's internal commands."
-msgstr "Используется для агентов, аутентификации, установки и внутренних команд Poracode."
+msgid "Used for agents, authentication, installs, and Y Space's internal commands."
+msgstr "Используется для агентов, аутентификации, установки и внутренних команд Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13707,8 +14133,6 @@ msgstr "Веб-поиск"
 msgid "Web server"
 msgstr "Веб-сервер"
 
-#. External link to the product website
-#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Website"
 msgstr "Веб-сайт"
@@ -13761,8 +14185,8 @@ msgid "What's New"
 msgstr "Что нового"
 
 #: src/renderer/views/SettingsOverlay/parts/ChangelogSettings.tsx
-msgid "What's new in Poracode, newest first."
-msgstr "Что нового в Poracode, сначала новые."
+msgid "What's new in Y Space, newest first."
+msgstr "Что нового в Y Space, сначала новые."
 
 #: src/renderer/views/SettingsOverlay/parts/SearchSettings.tsx
 msgid "When enabled, search respects <0>.gitignore</0> entries."
@@ -13770,8 +14194,8 @@ msgstr "Если включено, поиск учитывает записи <0
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "When links open in a Poracode browser tab, choose where the browser is revealed."
-msgstr "Когда ссылки открываются во вкладке браузера Poracode, выберите, где появляется браузер."
+msgid "When links open in a Y Space browser tab, choose where the browser is revealed."
+msgstr "Когда ссылки открываются во вкладке браузера Y Space, выберите, где появляется браузер."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "When off, suppress notifications from terminal threads whose status comes from the OSC fallback (no CLI hook plugin)."
@@ -13784,8 +14208,8 @@ msgstr "Когда показывать всплывающие уведомле�
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "When you close the window, keep Poracode running in the system tray. Disable to quit on close."
-msgstr "При закрытии окна оставлять Poracode работать в системном трее. Отключите, чтобы выходить из приложения при закрытии."
+msgid "When you close the window, keep Y Space running in the system tray. Disable to quit on close."
+msgstr "При закрытии окна оставлять Y Space работать в системном трее. Отключите, чтобы выходить из приложения при закрытии."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13796,10 +14220,6 @@ msgstr "Куда направляется выбор элемента брауз
 msgid "Where do you want to begin?"
 msgstr "С чего вы хотите начать?"
 
-#: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-msgid "Where Poracode creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
-msgstr "Где Poracode создаёт git worktree для новых веток. Изменения применяются к worktree, создаваемым с этого момента; существующие worktree остаются на месте."
-
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
 msgid "Where the run's conversation is created."
 msgstr "Где создаётся беседа запуска."
@@ -13808,6 +14228,10 @@ msgstr "Где создаётся беседа запуска."
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Where the terminal panel appears."
 msgstr "Где появляется панель терминала."
+
+#: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
+msgid "Where Y Space creates git worktrees for new branches. Changes apply to worktrees created from now on; existing worktrees stay where they are."
+msgstr "Где Y Space создаёт git worktree для новых веток. Изменения применяются к worktree, создаваемым с этого момента; существующие worktree остаются на месте."
 
 #: src/renderer/views/SettingsOverlay/parts/GeneralSettings.tsx
 msgid "While working"
@@ -13853,8 +14277,8 @@ msgid "Work in the current checkout"
 msgstr "Работать в текущем checkout"
 
 #: src/renderer/components/plugins/pluginCopy.ts
-msgid "Work with the pages and signed-in sessions already open in Chrome."
-msgstr "Работайте со страницами и авторизованными сессиями, уже открытыми в Chrome."
+#~ msgid "Work with the pages and signed-in sessions already open in Chrome."
+#~ msgstr "Работайте со страницами и авторизованными сессиями, уже открытыми в Chrome."
 
 #: src/renderer/components/thread/ChatPane/ChatTurnElapsed.tsx
 #: src/renderer/components/thread/ChatPane/parts/MessageList.tsx
@@ -14002,8 +14426,8 @@ msgstr "Место хранения worktree"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/ThreadSettings.tsx
-msgid "Worktree threads are marked done as soon as Poracode sees their pull request merge. Threads mid-turn wait until the turn finishes."
-msgstr "Треды worktree отмечаются выполненными, как только Poracode увидит слияние их pull request. Треды с активным ходом дождутся его завершения."
+msgid "Worktree threads are marked done as soon as Y Space sees their pull request merge. Threads mid-turn wait until the turn finishes."
+msgstr "Треды worktree отмечаются выполненными, как только Y Space увидит слияние их pull request. Треды с активным ходом дождутся его завершения."
 
 #. placeholder {0}: props.projectName
 #. placeholder {0}: props.worktreeBranch
@@ -14071,6 +14495,64 @@ msgstr "Базовая папка WSL"
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "WSL: {distro}"
 msgstr "WSL: {distro}"
+
+#: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
+msgid "Y Space and your agents run on the remote machine. SSH is used only to start the remote environment and secure its local tunnel."
+msgstr "Y Space и ваши агенты работают на удалённом компьютере. SSH используется только для запуска удалённой среды и защиты её локального туннеля."
+
+#: src/renderer/components/plugins/pluginCopy.ts
+msgid "Y Space could not create this plugin's data folder."
+msgstr "Y Space не смог создать папку данных этого плагина."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+#~ msgid "Y Space data import is unavailable with a custom data folder."
+#~ msgstr "Импорт данных Y Space недоступен при использовании пользовательской папки данных."
+
+#: src/renderer/components/skills/SkillMarketplaceModal.tsx
+#~ msgid "Y Space does not store marketplace credentials in plain settings. Open the catalog to browse its security-scanned skills."
+#~ msgstr "Y Space не хранит учётные данные маркетплейса в настройках в открытом виде. Откройте каталог, чтобы просмотреть навыки, прошедшие проверку безопасности."
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Y Space Helper failed to start. Check that Node 24.10 or newer and npm are installed on the remote machine."
+msgstr "Не удалось запустить Y Space Helper. Убедитесь, что на удалённом компьютере установлены Node 24.10 или новее и npm."
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Y Space Helper is not ready yet (HTTP {status})."
+msgstr "Y Space Helper ещё не готов (HTTP {status})."
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Y Space Helper returned an invalid response."
+msgstr "Y Space Helper вернул недопустимый ответ."
+
+#: src/renderer/components/startup/StartupRecoveryScreen.tsx
+msgid "Y Space may be waiting on saved data or a background service. You can keep waiting, restart, or install an available update."
+msgstr "Возможно, Y Space ожидает сохранённые данные или фоновую службу. Можно продолжить ожидание, перезапустить приложение или установить доступное обновление."
+
+#: src/renderer/components/skills/SkillImportModal.tsx
+#: src/renderer/components/skills/SkillMarketplaceModal.tsx
+#: src/renderer/components/skills/SkillsManager.tsx
+msgid "Y Space only"
+msgstr "Только в Y Space"
+
+#: src/renderer/i18n/sharedMessages.ts
+msgid "Y Space SSH runtime manifest is missing or invalid: {path}"
+msgstr "Манифест среды выполнения Y Space SSH отсутствует или недействителен: {path}"
+
+#: src/mobile/views/DesktopsView.tsx
+msgid "Y Space will install or reuse its server on the SSH host and keep credentials in this device's secure storage."
+msgstr "Y Space установит или повторно использует свой сервер на SSH-хосте и сохранит учетные данные в защищенном хранилище этого устройства."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Y Space will restart, back up its current data, and replace it with a complete copy of the legacy installation data."
+msgstr "Y Space перезапустится, создаст резервную копию текущих данных и заменит их полной копией данных из предыдущей установки."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+#~ msgid "Y Space will restart, back up its current data, and replace it with a complete copy of your Y Space data."
+#~ msgstr "Y Space перезапустится, создаст резервную копию текущих данных и заменит их полной копией данных Y Space."
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Y Space's built-in browser tools."
+msgstr "Встроенные инструменты браузера Y Space."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

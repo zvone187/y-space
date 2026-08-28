@@ -26,16 +26,19 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveMacSigningPolicy } from "./mac-signing-policy.mjs";
 import { scanRuntimeExternals } from "./runtime-externals.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const requireFromHere = createRequire(import.meta.url);
 const channelTable = requireFromHere("./electron-builder.shared.cjs");
+const { ADHOC_FALLBACK_ENV, findMacAppBundles, verifyMacAppBundle } = requireFromHere(
+  "../build/mac-signing.cjs",
+);
 const { restoreMacUpdaterManifests, snapshotMacUpdaterManifests } = requireFromHere(
   "./mac-updater-manifest.cjs",
 );
-const { supportEmail } = requireFromHere("../branding/contact.json");
 
 // Runtime externals — packages tsdown does NOT inline into dist/main/*.cjs.
 // Regenerate with `node scripts/scan-runtime-externals.mjs`.
@@ -183,6 +186,7 @@ function buildStagePackageJson(rootPkg) {
     homepage: rootPkg.homepage,
     license: rootPkg.license,
     author: rootPkg.author,
+    contributors: rootPkg.contributors,
     repository: rootPkg.repository,
     private: true,
     type: rootPkg.type ?? "module",
@@ -315,6 +319,7 @@ async function main() {
   const skipBuild = Boolean(args["skip-build"]);
   const checkRuntimeDeps = Boolean(args["check-runtime-deps"]);
   const publish = args.publish ?? "never";
+  const macSigningPolicy = resolveMacSigningPolicy(process.env, publish);
   const outputDir = resolve(repoRoot, args["output-dir"] ?? "release");
   const keepStage = Boolean(args["keep-stage"]);
 
@@ -345,6 +350,7 @@ async function main() {
     copyPackagedDist(stageRoot);
     copyDir(resolve(repoRoot, "build"), join(stageRoot, "build"));
     copyDir(resolve(repoRoot, "resources"), join(stageRoot, "resources"));
+    copyDir(resolve(repoRoot, "chrome-extension"), join(stageRoot, "chrome-extension"));
 
     // 4. Generate stage package.json.
     const rootPkg = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
@@ -355,7 +361,7 @@ async function main() {
     const initialMacArtifactKind = macArtifactKindFor(platform, target);
     writeFileSync(
       join(stageRoot, "electron-builder.yml"),
-      buildElectronBuilderConfig(initialMacArtifactKind),
+      buildElectronBuilderConfig(initialMacArtifactKind, macSigningPolicy),
     );
 
     // 6. Install prod + stage devdeps with a genuinely flat npm layout.
@@ -446,7 +452,7 @@ async function main() {
       if (platform === "mac") {
         writeFileSync(
           join(stageRoot, "electron-builder.yml"),
-          buildElectronBuilderConfig(macArtifactKind),
+          buildElectronBuilderConfig(macArtifactKind, macSigningPolicy),
         );
       }
       const electronBuilderArgs = [PLATFORM_FLAG[platform]];
@@ -456,7 +462,13 @@ async function main() {
         electronBuilderArgs.push(`--${arch}`);
       }
       electronBuilderArgs.push("--publish", publish);
-      run(electronBuilderBin, electronBuilderArgs, { cwd: stageRoot });
+      run(electronBuilderBin, electronBuilderArgs, {
+        cwd: stageRoot,
+        env: {
+          ...process.env,
+          [ADHOC_FALLBACK_ENV]: macSigningPolicy.allowAdhocFallback ? "1" : "0",
+        },
+      });
     };
 
     if (platform === "mac" && !target) {
@@ -476,6 +488,19 @@ async function main() {
       runElectronBuilder(target);
     }
 
+    if (platform === "mac") {
+      const appBundles = findMacAppBundles(join(stageRoot, "release"));
+      if (appBundles.length === 0) {
+        throw new Error("macOS packaging produced no .app bundle to verify");
+      }
+      for (const appBundle of appBundles) {
+        verifyMacAppBundle(appBundle, {
+          requireCertificate: macSigningPolicy.requireCertificate,
+        });
+        console.log(`[stage] verified macOS code signature: ${appBundle}`);
+      }
+    }
+
     // 8. Copy artifacts back to release/.
     const copied = copyArtifactsBack(join(stageRoot, "release"), outputDir);
     console.log(`\n[stage] artifacts:`);
@@ -490,12 +515,15 @@ async function main() {
 }
 
 // macOS ZIP updates ship under the legacy executable name as a Squirrel.Mac
-// migration bridge; DMGs and every other platform stay fully Poracode-branded.
+// migration bridge; DMGs and every other platform stay fully Y Space-branded.
 function macArtifactKindFor(platform, target) {
   return platform === "mac" && target === "zip" ? "updater" : "branded";
 }
 
-function buildElectronBuilderConfig(macArtifactKind = "branded") {
+function buildElectronBuilderConfig(
+  macArtifactKind = "branded",
+  macSigningPolicy = resolveMacSigningPolicy(process.env, "never"),
+) {
   // Generate the staged electron-builder config with a drastically simplified
   // `files:` block — the stage's node_modules contains only the runtime
   // externals we listed, so we can include all of node_modules without dragging
@@ -513,13 +541,15 @@ function buildElectronBuilderConfig(macArtifactKind = "branded") {
   const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
   const macEntitlements = "build/entitlements.mac.plist";
   const macEntitlementsInherit = "build/entitlements.mac.plist";
+  const macSigningIdentity = macSigningPolicy.identity;
+  const macIdentityLine = macSigningIdentity ? `\n  identity: "${macSigningIdentity}"` : "";
   const packagedDistFilesYaml = PACKAGED_DIST_FILES.map((glob) =>
     glob.startsWith("!") ? `  - "${glob}"` : `  - ${glob}`,
   ).join("\n");
 
   return `appId: ${appId}
 productName: ${productName}
-copyright: Copyright (C) 2026 Poracode
+copyright: Copyright (C) 2026 Y Space contributors
 
 directories:
   output: release
@@ -534,6 +564,10 @@ ${packagedDistFilesYaml}
   - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**/*"
 
 extraResources:
+  - from: chrome-extension
+    to: chrome-extension
+    filter:
+      - "**/*"
   - from: resources/wsl-helpers
     to: wsl-helpers
     filter:
@@ -576,8 +610,8 @@ afterPack: build/after-pack.cjs
 
 publish:
   provider: github
-  owner: SDSLeon
-  repo: lightcode${publishChannelLine}
+  owner: ${channelTable.githubPublishOwner}
+  repo: ${channelTable.githubPublishRepo}${publishChannelLine}
 
 win:
   target:
@@ -604,11 +638,11 @@ linux:
         - x64
   icon: build/icon${iconSuffix}.png
   category: Development
-  maintainer: SDSLeon <${supportEmail}>
+  maintainer: Y Space contributors
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:
-  executableName: ${macExecutableName}
+  executableName: ${macExecutableName}${macIdentityLine}
   target:
     - target: dmg
       arch:
@@ -624,10 +658,11 @@ mac:
   hardenedRuntime: true
   gatekeeperAssess: false
   extendInfo:
-    NSMicrophoneUsageDescription: Poracode uses the microphone for local voice input in the composer.
+    NSMicrophoneUsageDescription: Y Space uses the microphone for local voice input in the composer.
   entitlements: ${macEntitlements}
   entitlementsInherit: ${macEntitlementsInherit}
-  notarize: true
+  forceCodeSigning: ${macSigningPolicy.forceCodeSigning}
+  notarize: ${macSigningPolicy.notarize}
 
 npmRebuild: false
 `;

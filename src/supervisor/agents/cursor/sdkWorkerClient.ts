@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 import { buildAgentCommand } from "../base";
 import {
   resolveNodeForDistro,
@@ -456,16 +457,16 @@ async function spawnWorkerProcess(
     process.execPath,
     [workerPath],
     process.execPath,
-    options.env,
+    options.env ? sanitizePrivilegedChildEnvironment(options.env) : undefined,
   );
   const useProcessGroup = process.platform !== "win32";
   const child = spawnProcess(command.command, command.args, {
     cwd: command.cwd,
-    env: {
+    env: sanitizePrivilegedChildEnvironment({
       ...process.env,
       ...command.env,
       ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}),
-    },
+    }),
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
     detached: useProcessGroup,
@@ -503,11 +504,11 @@ async function spawnWslWorker(
     throw new Error("Cursor SDK worker could not be deployed to WSL.");
   }
   const workerPath = `${deployed.linuxBaseDir}/cursor-sdk/cursor-sdk-worker.mjs`;
-  const safeEnv = stripApiKey(options.env);
+  const safeEnv = sanitizePrivilegedChildEnvironment(stripApiKey(options.env) ?? {});
   const command = buildAgentCommand(location, node.nodePath, [workerPath], node.nodePath, safeEnv);
   const useProcessGroup = process.platform !== "win32";
   const child = spawnProcess(command.command, command.args, {
-    env: { ...process.env, ...command.env },
+    env: sanitizePrivilegedChildEnvironment({ ...process.env, ...command.env }),
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
     detached: useProcessGroup,

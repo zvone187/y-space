@@ -71,6 +71,7 @@ const AGENT_KIND: AgentKind = "term-test";
 const THREAD_ID = "thread-term";
 const PROJECT_LOCATION = { kind: "posix", path: "/repo" } as const;
 const CONFIG: ThreadConfig = { model: "term-test/model" };
+const CONFIG_WITH_BROWSER: ThreadConfig = { ...CONFIG, browserMcp: true };
 
 const managersToDispose: ThreadSessionManager[] = [];
 const tempDirs: string[] = [];
@@ -215,7 +216,7 @@ describe("ThreadSessionManager terminal restart", () => {
     expect(adapter.buildResumeArgv).toHaveBeenCalledTimes(1);
     expect(adapter.buildResumeArgv).toHaveBeenCalledWith(
       PROJECT_LOCATION,
-      CONFIG,
+      CONFIG_WITH_BROWSER,
       "resume work",
       { providerSessionId: "ses_existing" },
       expect.objectContaining({ agentSettings: expect.any(Object) }),
@@ -230,7 +231,7 @@ describe("ThreadSessionManager terminal restart", () => {
     expect(restarted!.launchPrompt).toBe("resume work");
     expect(restarted!.sessionRef).toEqual({ providerSessionId: "ses_existing" });
     expect(restarted!.presentationMode).toBe("terminal");
-    expect(restarted!.launchConfig).toEqual(CONFIG);
+    expect(restarted!.launchConfig).toEqual(CONFIG_WITH_BROWSER);
     expect(restarted!.structuredSession).toBeUndefined();
   });
 
@@ -267,7 +268,7 @@ describe("ThreadSessionManager terminal restart", () => {
     await restart(manager);
 
     expect(structuredSession.activate).toHaveBeenCalledTimes(1);
-    expect(structuredSession.openThread).toHaveBeenCalledWith(CONFIG, {
+    expect(structuredSession.openThread).toHaveBeenCalledWith(CONFIG_WITH_BROWSER, {
       providerSessionId: "ses_existing",
     });
     expect(structuredSession.setListener).toHaveBeenCalledTimes(1);
@@ -276,7 +277,7 @@ describe("ThreadSessionManager terminal restart", () => {
     // carry it as a launch arg.
     expect(adapter.buildResumeArgv).toHaveBeenCalledWith(
       PROJECT_LOCATION,
-      CONFIG,
+      CONFIG_WITH_BROWSER,
       "",
       { providerSessionId: "ses_existing" },
       expect.anything(),

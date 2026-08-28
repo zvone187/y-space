@@ -22,7 +22,7 @@ export async function prepareMcpToolFilters(
   const helpersDir = resolveWslHelpersDir();
   const workerSource = helpersDir ? join(helpersDir, "mcp-filter.mjs") : "";
   if (!workerSource || !existsSync(workerSource)) {
-    throw new Error("Poracode MCP tool filter is unavailable.");
+    throw new Error("Y Space MCP tool filter is unavailable.");
   }
 
   let command = process.execPath;
@@ -35,7 +35,7 @@ export async function prepareMcpToolFilters(
       `poracode-mcp-filter-${process.pid}`,
       [{ src: workerSource, relDest: "mcp-filter/mcp-filter.mjs" }],
     );
-    if (!deployed) throw new Error("Poracode MCP tool filter could not be deployed to WSL.");
+    if (!deployed) throw new Error("Y Space MCP tool filter could not be deployed to WSL.");
     command = node.nodePath;
     workerPath = `${deployed.linuxBaseDir}/mcp-filter/mcp-filter.mjs`;
   }

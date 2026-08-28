@@ -1,6 +1,6 @@
 # Security Policy
 
-Thanks for helping keep Poracode users safe.
+Thanks for helping keep Y Space users safe.
 
 ## Reporting a vulnerability
 
@@ -19,5 +19,5 @@ disclosure timeline when needed.
 
 ## Supported versions
 
-Security fixes target the latest released version of Poracode unless a
+Security fixes target the latest released version of Y Space unless a
 maintainer says otherwise in the report thread.

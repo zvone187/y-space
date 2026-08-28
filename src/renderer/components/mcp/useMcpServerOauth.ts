@@ -36,7 +36,7 @@ async function refreshAuthenticatedUrls(
 /**
  * OAuth sign-in state for user-configured HTTP/SSE MCP servers. Tokens live in
  * the supervisor; the renderer only tracks which URLs are authenticated and
- * hands the authorization URL to the system browser.
+ * hands the authorization URL to Y Space's embedded browser.
  */
 export function useMcpServerOauth(
   projectLocation?: ProjectLocation,
@@ -70,7 +70,8 @@ export function useMcpServerOauth(
     if (!transportUrl(server)) return false;
     setBusy(server.id, true);
     try {
-      const begin = await readBridge().beginMcpServerOauth({
+      const bridge = readBridge();
+      const begin = await bridge.beginMcpServerOauth({
         server,
         ...ownerPayload,
       });
@@ -80,17 +81,26 @@ export function useMcpServerOauth(
         return false;
       }
       if (begin.status === "redirect") {
-        // OAuth consent always goes to the system browser (matching agent
-        // login): that's where the user's sessions and password manager live.
-        await readBridge().openExternalNative(begin.authorizationUrl);
-        const result = await readBridge().waitMcpServerOauth({
-          flowId: begin.flowId,
-          ...ownerPayload,
+        // Authorization URLs use an explicit sensitive-tab path: the browser
+        // workspace can render them, but the renderer, persistence, and agent
+        // tools only ever receive a redacted tab snapshot.
+        const oauthTab = await bridge.browserCreateSensitiveTab({
+          url: begin.authorizationUrl,
+          activate: true,
+          reveal: true,
         });
-        if (result.status === "error") {
-          const message = result.message;
-          toast.danger(t`Could not sign in to ${serverName}: ${message}`);
-          return false;
+        try {
+          const result = await bridge.waitMcpServerOauth({
+            flowId: begin.flowId,
+            ...ownerPayload,
+          });
+          if (result.status === "error") {
+            const message = result.message;
+            toast.danger(t`Could not sign in to ${serverName}: ${message}`);
+            return false;
+          }
+        } finally {
+          await bridge.browserCloseTab({ tabId: oauthTab.tabId }).catch(() => {});
         }
       }
       toast.success(t`Signed in to ${serverName}.`);

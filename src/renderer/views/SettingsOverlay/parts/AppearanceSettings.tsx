@@ -106,8 +106,7 @@ export function AppearanceSettings() {
             </p>
             <p className="text-xs text-muted">
               <Trans>
-                Popular editor themes adapted to Poracode. Each follows the light or dark mode
-                above.
+                Popular editor themes adapted to Y Space. Each follows the light or dark mode above.
               </Trans>
             </p>
           </div>

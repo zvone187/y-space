@@ -2,12 +2,12 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "browser-tools",
   "version": "1.1.0",
-  "description": "Browse, inspect, and test websites in Poracode's isolated in-app browser.",
+  "description": "Browse, inspect, and test websites in Y Space's embedded multi-tab browser.",
   "author": {
-    "name": "Poracode",
-    "url": "https://poracode.com"
+    "name": "Y Space",
+    "url": "https://github.com/zvone187/y-space"
   },
-  "homepage": "https://poracode.com",
+  "homepage": "https://github.com/zvone187/y-space",
   "license": "Apache-2.0",
   "keywords": ["browser", "testing", "automation"],
   "extensions": {
@@ -15,7 +15,7 @@
       "title": "Browser Tools",
       "category": "developer-tools",
       "featured": true,
-      "examplePrompt": "Open my local app in Poracode's browser, test the requested flow, and report visual, console, and network evidence",
+      "examplePrompt": "Find the right Y Space browser tab, test my local app, and report visual, console, and network evidence",
       "coreSkill": "browser-control",
       "nativePluginNames": ["browser"],
       "nativeCoreSkill": "control-in-app-browser",

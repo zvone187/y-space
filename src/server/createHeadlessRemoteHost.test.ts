@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PORACODE_REMOTE_PROTOCOL_VERSION } from "@/shared/remote";
-import { createHeadlessRemoteHost, resolveLocalProxyBase } from "./createHeadlessRemoteHost";
+import {
+  createHeadlessMcpLaunchContextIdentityResolver,
+  createHeadlessRemoteHost,
+  resolveLocalProxyBase,
+} from "./createHeadlessRemoteHost";
 
 // Mutable state shared with the hoisted vi.mock factories.
 const h = vi.hoisted(() => ({
@@ -172,6 +176,32 @@ describe("createHeadlessRemoteHost", () => {
     await host.dispose();
   });
 
+  it("forwards the per-launch nonce when revalidating a headless MCP caller", async () => {
+    h.supervisorCall.mockResolvedValue({
+      threadId: "thread-1",
+      launchId: "launch-current",
+    });
+    const resolver = createHeadlessMcpLaunchContextIdentityResolver(
+      { call: h.supervisorCall } as Parameters<
+        typeof createHeadlessMcpLaunchContextIdentityResolver
+      >[0],
+      "app-controls",
+    );
+
+    await expect(
+      resolver({
+        routing: "thread",
+        identity: { threadId: "thread-1", launchId: "launch-current" },
+      }),
+    ).resolves.toEqual({ threadId: "thread-1", launchId: "launch-current" });
+    expect(h.supervisorCall).toHaveBeenCalledWith("resolveMcpCallerIdentity", {
+      routing: "thread",
+      threadId: "thread-1",
+      launchId: "launch-current",
+      serverId: "app-controls",
+    });
+  });
+
   it("resolves MCP launch settings from the headless settings file and project row", async () => {
     const globalServer = {
       id: "global-memory",
@@ -213,7 +243,9 @@ describe("createHeadlessRemoteHost", () => {
 
     expect(resolver?.("project-1")).toEqual({
       mcpServers: [projectServer],
-      disabledBuiltInMcpServerIds: ["chrome"],
+      projectMcpServers: [projectServer],
+      disabledBuiltInMcpServerIds: [],
+      disabledBuiltInMcpTools: undefined,
     });
     await host.dispose();
   });

@@ -19,7 +19,6 @@ const ADD_PROVIDER_KEY = "__add__";
 const OPEN_CODE_MCP_KEYS = [
   "browserMcp",
   "crossagentMcp",
-  "chromeMcp",
   "computerUse",
 ] as const satisfies readonly (ComposerMcpConfigKey | "computerUse")[];
 type OpenCodeMcpKey = (typeof OPEN_CODE_MCP_KEYS)[number];
@@ -28,11 +27,12 @@ function readMcpSettings(
   settings: Record<string, boolean | string> | undefined,
 ): Record<OpenCodeMcpKey, boolean> {
   return {
-    browserMcp: settings?.browserMcp === true,
-    // OpenCode's provider-session routing is safe by default. An explicit
-    // false remains an opt-out for users who do not want delegation.
+    // Every Y Space agent should be able to inspect and operate the embedded
+    // browser unless the user explicitly opts this provider out.
+    browserMcp: settings?.browserMcp !== false,
+    // Each OpenCode GUI task gets an isolated sidecar and direct thread token.
+    // An explicit false remains an opt-out for users who do not want delegation.
     crossagentMcp: settings?.crossagentMcp !== false,
-    chromeMcp: settings?.chromeMcp === true,
     computerUse: settings?.computerUse === true,
   };
 }
@@ -267,7 +267,7 @@ export function OpenCodeProviderSettings(props: {
                 <div className="space-y-0.5">
                   <McpToggleRow
                     title={t`Browser`}
-                    description={<Trans>Poracode's built-in browser tools.</Trans>}
+                    description={<Trans>Y Space's built-in browser tools.</Trans>}
                     isSelected={draftMcp.browserMcp}
                     onChange={(value) =>
                       setDraftMcp((current) => ({ ...current, browserMcp: value }))
@@ -279,14 +279,6 @@ export function OpenCodeProviderSettings(props: {
                     isSelected={draftMcp.crossagentMcp}
                     onChange={(value) =>
                       setDraftMcp((current) => ({ ...current, crossagentMcp: value }))
-                    }
-                  />
-                  <McpToggleRow
-                    title={t`Chrome`}
-                    description={<Trans>Control an external Chrome browser.</Trans>}
-                    isSelected={draftMcp.chromeMcp}
-                    onChange={(value) =>
-                      setDraftMcp((current) => ({ ...current, chromeMcp: value }))
                     }
                   />
                   {showComputerUse ? (

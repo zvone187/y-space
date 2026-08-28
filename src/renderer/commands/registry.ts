@@ -1,6 +1,7 @@
 import { toast } from "@heroui/react";
 import { msg } from "@lingui/core/macro";
 import type { MessageDescriptor } from "@lingui/core";
+import { BROWSER_HOME_URL } from "@/shared/browserDefaults";
 import { parseDraftProjectId } from "@/shared/paneId";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import type { AgentSlashCommand, Project, Thread } from "@/shared/contracts";
@@ -8,6 +9,7 @@ import { readBridge } from "@/renderer/bridge";
 import { i18n } from "@/renderer/i18n/i18n";
 import { captureThreadPromptSubmitted } from "@/renderer/analytics/posthog";
 import { addExistingProject } from "@/renderer/actions/createProjectActions";
+import { openWorkspaceFile } from "@/renderer/actions/openWorkspaceFile";
 import { getCurrentProjectId, resolveActivePaneId } from "@/renderer/actions/currentProject";
 import {
   openChangelogSettings,
@@ -28,6 +30,7 @@ import {
   openTerminal,
   openWorktreeTerminal,
   runProjectAction,
+  showTerminalPanel,
 } from "@/renderer/actions/terminalActions";
 import { cycleRecentThread } from "@/renderer/actions/recentThreadCycle";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -35,14 +38,17 @@ import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 import { toggleSidebar } from "@/renderer/state/sidebarOverlayStore";
 import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
 import { startShellWithToast, writeScriptToShell } from "@/renderer/utils/shellUtils";
+import { buildFileEditorContext } from "@/renderer/utils/gitHelpers";
 import { openFindForActiveSurface } from "@/renderer/components/find/findController";
 import { isEditorFocusElement, isTerminalFocusElement } from "./focusedSurface";
 import { useCommandPaletteStore } from "./commandPaletteStore";
 import type { CommandWhenContext } from "./when";
 import { evaluateWhenClause } from "./when";
+import { WORKSPACE_TAB_CYCLE_EVENT } from "./workspaceTabCycle";
 
 export interface AppCommand {
   id: string;
@@ -88,6 +94,12 @@ export function buildWhenContext(
   const panelFocus = Boolean(element?.closest("[data-poracode-panel], [data-overlay-surface]"));
   const sidebarFocus = Boolean(element?.closest(".poracode-sidebar-aside"));
   const browserFocus = Boolean(element?.closest("[data-poracode-browser]"));
+  const workspace = useRightWorkspaceTabsStore.getState();
+  const activeWorkspaceTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId);
+  const portaledBrowserFocus =
+    browserFocus && !workspace.hidden && activeWorkspaceTab?.kind === "browser-page";
+  const workspaceFocus =
+    Boolean(element?.closest("[data-y-space-workspace]")) || portaledBrowserFocus;
 
   return {
     paletteOpen,
@@ -100,6 +112,7 @@ export function buildWhenContext(
     panelFocus,
     sidebarFocus,
     browserFocus,
+    workspaceFocus,
     hasProject: Boolean(active.project),
     hasThread: Boolean(active.thread),
     view: app.view.kind,
@@ -125,20 +138,20 @@ function baseCommands(): AppCommand[] {
     {
       id: "palette.open",
       title: msg`Open Command Palette`,
-      group: "Poracode",
+      group: "Y Space",
       run: () => useCommandPaletteStore.getState().open(),
     },
     {
       id: "settings.open",
       title: msg`Open Settings`,
-      group: "Poracode",
+      group: "Y Space",
       run: openSettings,
     },
     {
       id: "changelog.open",
       title: msg`What's New`,
       subtitle: msg`View the changelog`,
-      group: "Poracode",
+      group: "Y Space",
       keywords: ["changelog", "release notes", "what's new", "updates"],
       run: openChangelogSettings,
     },
@@ -146,7 +159,7 @@ function baseCommands(): AppCommand[] {
       id: "find.open",
       title: msg`Find`,
       subtitle: msg`Search the current view`,
-      group: "Poracode",
+      group: "Y Space",
       keywords: ["find", "search", "filter"],
       run: openFindForActiveSurface,
     },
@@ -154,7 +167,7 @@ function baseCommands(): AppCommand[] {
       id: "sidebar.toggle",
       title: msg`Toggle sidebar`,
       subtitle: msg`Show or hide the sidebar`,
-      group: "Poracode",
+      group: "Y Space",
       run: toggleSidebar,
     },
     {
@@ -247,7 +260,7 @@ function baseCommands(): AppCommand[] {
       // yield to the editor/terminal/in-app browser where these chords carry a
       // local meaning. Unlike archive/star/rename this stays live while typing —
       // the chords don't produce text, so navigating mid-compose is intentional.
-      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus",
+      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus && !workspaceFocus",
       run: () => {
         const thread = resolveActiveContext().thread;
         if (thread) switchToAdjacentThread(thread, "next");
@@ -258,7 +271,7 @@ function baseCommands(): AppCommand[] {
       title: msg`Previous chat`,
       subtitle: msg`Switch to the previous chat`,
       group: msg`Thread`,
-      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus",
+      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus && !workspaceFocus",
       run: () => {
         const thread = resolveActiveContext().thread;
         if (thread) switchToAdjacentThread(thread, "previous");
@@ -272,7 +285,7 @@ function baseCommands(): AppCommand[] {
       // MRU chat switching (Ctrl+Tab). Shares the chat-shell scope of
       // thread.next/previous and yields to the editor/terminal/in-app browser,
       // where Ctrl+Tab cycles that surface's own tabs (tab.next/previous).
-      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus",
+      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus && !workspaceFocus",
       run: () => cycleRecentThread(1),
     },
     {
@@ -280,7 +293,7 @@ function baseCommands(): AppCommand[] {
       title: msg`Previous recently viewed chat`,
       subtitle: msg`Cycle to the previous recently viewed chat`,
       group: msg`Thread`,
-      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus",
+      when: "hasThread && !editorFocus && !terminalFocus && !browserFocus && !workspaceFocus",
       run: () => cycleRecentThread(-1),
     },
     {
@@ -383,20 +396,18 @@ function baseCommands(): AppCommand[] {
       id: "tab.next",
       title: msg`Next tab`,
       subtitle: msg`Switch to the next tab`,
-      group: "Poracode",
-      // Context-aware tab switching: cycles whichever surface holds focus — the
-      // editor tab strip or the terminal tab strip. thread.next/previous own the
-      // same chords elsewhere but stand down inside the editor/terminal (see
-      // their `when`), leaving them free here.
-      when: "editorFocus || terminalFocus",
+      group: "Y Space",
+      // The global right workspace owns these chords whenever focus is anywhere
+      // inside it. Standalone/bottom terminals retain their own inner cycling.
+      when: "workspaceFocus || editorFocus || terminalFocus",
       run: () => switchFocusedSurfaceTab("next"),
     },
     {
       id: "tab.previous",
       title: msg`Previous tab`,
       subtitle: msg`Switch to the previous tab`,
-      group: "Poracode",
-      when: "editorFocus || terminalFocus",
+      group: "Y Space",
+      when: "workspaceFocus || editorFocus || terminalFocus",
       run: () => switchFocusedSurfaceTab("previous"),
     },
     {
@@ -411,8 +422,8 @@ function baseCommands(): AppCommand[] {
     },
     {
       id: "browser.toggle",
-      title: msg`Toggle browser panel`,
-      subtitle: msg`Show or hide the browser panel`,
+      title: msg`Open browser panel`,
+      subtitle: msg`Open or focus the browser workspace tab`,
       group: msg`Browser`,
       run: toggleBrowserPanel,
     },
@@ -499,10 +510,10 @@ function resolveActiveContext(): ActiveContext {
 }
 
 function openNewBrowserTab(): void {
-  // Mirrors the browser toolbar "+" / empty-state action: a new tab on the home
-  // page, activated. Keep the home URL in sync with BrowserPanel's DEFAULT_HOME.
+  // Mirrors the browser toolbar "+" / empty-state action: a new tab on the
+  // shared embedded-browser home page, activated.
   void readBridge()
-    .browserCreateTab({ url: "https://www.google.com", activate: true })
+    .browserCreateTab({ url: BROWSER_HOME_URL, activate: true })
     .catch(() => {});
 }
 
@@ -521,9 +532,21 @@ function focusBrowserAddressBar(): void {
 }
 
 function switchFocusedSurfaceTab(direction: "next" | "previous"): void {
-  // The binding's `when` (editorFocus || terminalFocus) guarantees one of these
-  // surfaces holds focus when this runs; cycle that surface's own tab strip.
   const element = document.activeElement;
+  const workspace = useRightWorkspaceTabsStore.getState();
+  const activeWorkspaceTab = workspace.tabs.find((tab) => tab.id === workspace.activeTabId);
+  const browserInGlobalWorkspace =
+    !workspace.hidden &&
+    activeWorkspaceTab?.kind === "browser-page" &&
+    element instanceof Element &&
+    element.closest("[data-poracode-browser]") !== null;
+  if (
+    (element instanceof Element && element.closest("[data-y-space-workspace]")) ||
+    browserInGlobalWorkspace
+  ) {
+    window.dispatchEvent(new CustomEvent(WORKSPACE_TAB_CYCLE_EVENT, { detail: { direction } }));
+    return;
+  }
   if (isTerminalFocusElement(element)) {
     useDevTerminalStore.getState().cycleTab(direction);
     return;
@@ -580,20 +603,21 @@ function toggleStarCurrent(): void {
 function openFileFromArgs(args: unknown): void {
   const active = resolveActiveContext();
   if (!active.project) return;
-  const editor = useFileEditorStore.getState();
-  if (!editor.rootContext) {
-    openFilesPanel(active.project.id, active.worktreePath);
-  }
   if (!isRecord(args) || typeof args.path !== "string" || args.path.trim() === "") {
     openFilesPanel(active.project.id, active.worktreePath);
     return;
   }
-  void useFileEditorStore
-    .getState()
-    .openFile(args.path, "fullscreen", false, readLineNumber(args))
-    .catch((error) =>
-      toast.danger(error instanceof Error ? error.message : i18n._(msg`Unable to open file`)),
-    );
+  const rootContext = buildFileEditorContext(active.project, active.worktreePath);
+  const editorOptions = readLineNumber(args);
+  void openWorkspaceFile({
+    path: args.path,
+    rootContext,
+    preview: false,
+    source: "command",
+    ...(editorOptions ? { editorOptions } : {}),
+  }).catch((error) =>
+    toast.danger(error instanceof Error ? error.message : i18n._(msg`Unable to open file`)),
+  );
 }
 
 function readLineNumber(args: Record<string, unknown>): { lineNumber?: number } | undefined {
@@ -622,8 +646,7 @@ function runTerminalCommand(args: unknown): void {
   const tab = terminal.addTab(active.project.id, title, worktreePath);
 
   if (useSharedSettings.getState().autoShowTerminalPanel) {
-    if (worktreePath) terminal.openWorktreePanel(active.project.id, worktreePath);
-    else terminal.openPanel(active.project.id);
+    showTerminalPanel(active.project.id, worktreePath);
   }
   terminal.setActiveTab(tab.id);
 

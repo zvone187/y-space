@@ -390,6 +390,6 @@ function assertManagedNodeSatisfiesMinimum(
   const managedVersion = parseNodeVersion(PORACODE_PINNED_NODE_VERSION);
   if (managedVersion && compareNodeVersions(managedVersion, minimumVersion) >= 0) return;
   throw new Error(
-    `Poracode-managed Node ${PORACODE_PINNED_NODE_VERSION} does not satisfy the requested minimum ${requestedMinimum}.`,
+    `Y Space-managed Node ${PORACODE_PINNED_NODE_VERSION} does not satisfy the requested minimum ${requestedMinimum}.`,
   );
 }

@@ -12,8 +12,8 @@
 import { spawn as spawnChild, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
 import { homedir } from "node:os";
+import { basename, join } from "node:path";
 import { Readable, Writable } from "node:stream";
 import {
   ClientSideConnection,
@@ -43,6 +43,7 @@ import {
   type WriteTextFileRequest,
   type WriteTextFileResponse,
 } from "@agentclientprotocol/sdk";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 import type {
   AgentSlashCommand,
   ProjectLocation,
@@ -556,7 +557,11 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     const child = spawnChild(command.command, command.args, {
       ...(spawnCwd ? { cwd: spawnCwd } : {}),
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, TERM: "xterm-256color", ...(command.env ?? {}) },
+      env: sanitizePrivilegedChildEnvironment({
+        ...process.env,
+        TERM: "xterm-256color",
+        ...(command.env ?? {}),
+      }),
       shell: false,
       windowsHide: true,
     });

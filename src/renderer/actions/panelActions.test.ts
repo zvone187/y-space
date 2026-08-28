@@ -1,10 +1,42 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { BrowserTabInfo } from "@/shared/ipc";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
-import { dockPanelTab, openGitReview, openUsagePanel, undockPanelTab } from "./panelActions";
+import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import { useAppStore } from "@/renderer/state/appStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import {
+  dockPanelTab,
+  openBrowserPanel,
+  openGitReview,
+  openUsagePanel,
+  undockPanelTab,
+} from "./panelActions";
+
+const bridge = vi.hoisted(() => ({
+  browserActivateTab: vi.fn<(payload: { tabId: string }) => Promise<void>>(),
+  browserCreateTab:
+    vi.fn<(payload: { url?: string; activate?: boolean }) => Promise<BrowserTabInfo>>(),
+}));
+
+vi.mock("@/renderer/bridge", () => ({ readBridge: () => bridge }));
+
+function browserTab(tabId: string, title = "Example", url = "https://example.com/") {
+  return {
+    tabId,
+    title,
+    url,
+    loading: false,
+    canGoBack: false,
+    canGoForward: false,
+  } satisfies BrowserTabInfo;
+}
 
 function resetDockState() {
+  useAppStore.setState({ projects: [], threads: [], view: { kind: "home" }, focusedPaneId: null });
+  useRightWorkspaceTabsStore.getState().reset();
   useSharedSettings.setState({ terminalPosition: "bottom", gitReviewMode: "panel" });
   usePanelStore.setState({
     rightPanelTab: "git",
@@ -16,17 +48,43 @@ function resetDockState() {
     gitReviewContext: null,
     gitReviewAsPanel: false,
   });
+  useBrowserPanelStore.setState({
+    tabs: [],
+    groups: [],
+    activeTabId: null,
+    extracted: false,
+    bookmarks: [],
+    bookmarkBarVisible: false,
+    pickerActive: false,
+    attentionTabId: null,
+    automationActive: false,
+  });
+  bridge.browserActivateTab.mockReset().mockResolvedValue(undefined);
+  bridge.browserCreateTab.mockReset();
   useDevTerminalStore.setState({
     isOpen: false,
     explicitlyOpened: false,
     activeProjectId: null,
     activeWorktreePath: null,
   });
+  useFileEditorStore.setState({
+    rootContext: null,
+    overlayMode: null,
+    tabs: [],
+    activePath: null,
+    previewTab: null,
+    markdownPreviewPath: null,
+    buffers: {},
+    pendingReveal: null,
+  });
 }
 
 describe("dockPanelTab", () => {
   beforeEach(resetDockState);
-  afterEach(resetDockState);
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetDockState();
+  });
 
   it("docks a tab into a bottom slot and opens its content", () => {
     dockPanelTab("usage", { zone: "bottom-panel", placement: "right" });
@@ -76,10 +134,60 @@ describe("dockPanelTab", () => {
 
   it("does not split the active tab with itself", () => {
     usePanelStore.setState({ rightPanelTab: "usage", usagePanelOpen: true });
+    useRightWorkspaceTabsStore.getState().openTool("usage");
 
     dockPanelTab("usage", { zone: "right-panel", placement: "bottom" });
 
     expect(usePanelStore.getState().rightPanelSplit).toBeNull();
+  });
+
+  it("leaves docking and the outer Files tab unchanged when a dirty root switch is declined", () => {
+    useAppStore.setState({
+      projects: [
+        {
+          id: "project-b",
+          name: "Project B",
+          location: { kind: "posix", path: "/repo/b" },
+          createdAt: "2026-08-27T00:00:00.000Z",
+        },
+      ],
+      view: { kind: "home" },
+    });
+    useFileEditorStore.setState({
+      rootContext: {
+        projectId: "project-a",
+        projectName: "Project A",
+        projectLocation: { kind: "posix", path: "/repo/a" },
+        rootLabel: "Project A",
+      },
+      tabs: ["dirty.ts"],
+      activePath: "dirty.ts",
+      buffers: {
+        "dirty.ts": {
+          path: "dirty.ts",
+          status: "ready",
+          modifiedAtMs: 1,
+          content: "changed",
+          savedContent: "original",
+          lineEnding: "lf",
+          hasBom: false,
+          isDirty: true,
+          isLoading: false,
+        },
+      },
+    });
+    useRightWorkspaceTabsStore.getState().openTool("files");
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    dockPanelTab("files", { zone: "right-panel", placement: "bottom" });
+
+    expect(usePanelStore.getState().rightPanelSplit).toBeNull();
+    expect(usePanelStore.getState().bottomPanelDocks).toEqual({ left: null, right: null });
+    expect(useRightWorkspaceTabsStore.getState()).toMatchObject({
+      activeTabId: "tool:files",
+      tabs: [expect.objectContaining({ id: "tool:files" })],
+    });
+    expect(useFileEditorStore.getState().rootContext?.projectId).toBe("project-a");
   });
 
   it("ignores the terminal in the bottom row — it already owns the middle", () => {
@@ -131,12 +239,83 @@ describe("dockPanelTab", () => {
 
     expect(usePanelStore.getState().rightPanelSplit).toBeNull();
   });
+
+  it("ignores Browser now that browser pages live in the global tab strip", () => {
+    dockPanelTab("browser", { zone: "bottom-panel", placement: "right" });
+
+    expect(usePanelStore.getState().rightPanelSplit).toBeNull();
+    expect(usePanelStore.getState().bottomPanelDocks).toEqual({ left: null, right: null });
+    expect(usePanelStore.getState().browserPanelOpen).toBe(false);
+  });
 });
 
-// The toggle entry points close the right panel when their tab is already
-// active. A bottom-docked tab is not what the right panel is showing, so that
-// close is invisible — the toggle has to pull the panel back instead.
-describe("toggling a bottom-docked tab", () => {
+describe("openBrowserPanel", () => {
+  beforeEach(resetDockState);
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetDockState();
+  });
+
+  it("selects the manager's existing page instead of creating a Browser tool singleton", () => {
+    const page = browserTab("page-1");
+    useBrowserPanelStore.setState({ tabs: [page], activeTabId: page.tabId });
+    useRightWorkspaceTabsStore.getState().openTool("git");
+    useRightWorkspaceTabsStore
+      .getState()
+      .syncBrowserPages([{ browserTabId: page.tabId, title: page.title, url: page.url }]);
+
+    openBrowserPanel();
+
+    expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("browser:page-1");
+    expect(
+      useRightWorkspaceTabsStore.getState().tabs.some((tab) => tab.id === "tool:browser"),
+    ).toBe(false);
+    expect(bridge.browserCreateTab).not.toHaveBeenCalled();
+    expect(usePanelStore.getState()).toMatchObject({
+      browserPanelOpen: true,
+      rightPanelTab: "browser",
+    });
+  });
+
+  it("creates and selects a home page asynchronously when no page exists", async () => {
+    const created = browserTab("page-new", "DuckDuckGo", "https://duckduckgo.com/");
+    bridge.browserCreateTab.mockResolvedValue(created);
+    useRightWorkspaceTabsStore.getState().openTool("git");
+
+    openBrowserPanel();
+
+    expect(bridge.browserCreateTab).toHaveBeenCalledWith({
+      url: "https://duckduckgo.com",
+      activate: true,
+    });
+    expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("tool:git");
+    await vi.waitFor(() =>
+      expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("browser:page-new"),
+    );
+  });
+
+  it("does not steal focus if the user selects another workspace tab before creation resolves", async () => {
+    let resolveCreated!: (tab: BrowserTabInfo) => void;
+    bridge.browserCreateTab.mockReturnValue(
+      new Promise<BrowserTabInfo>((resolve) => {
+        resolveCreated = resolve;
+      }),
+    );
+    useRightWorkspaceTabsStore.getState().openTool("git");
+
+    openBrowserPanel();
+    useRightWorkspaceTabsStore.getState().openTool("notes");
+    resolveCreated(browserTab("page-late"));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("tool:notes");
+  });
+});
+
+// Global workspace launchers always open or focus a singleton. A bottom-docked
+// tool is pulled back into the outer tab strip before it is focused.
+describe("opening a bottom-docked tab", () => {
   beforeEach(resetDockState);
   afterEach(resetDockState);
 
@@ -165,13 +344,15 @@ describe("toggling a bottom-docked tab", () => {
     expect(usePanelStore.getState().rightPanelTab).toBe("git");
   });
 
-  it("still closes the panel when the tab is not docked", () => {
+  it("focuses the existing singleton when the tab is not docked", () => {
     usePanelStore.getState().setUsagePanelOpen(true);
     usePanelStore.setState({ rightPanelTab: "usage" });
 
     openUsagePanel();
 
-    expect(usePanelStore.getState().usagePanelOpen).toBe(false);
+    expect(usePanelStore.getState().usagePanelOpen).toBe(true);
+    expect(useRightWorkspaceTabsStore.getState().tabs).toHaveLength(1);
+    expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("tool:usage");
   });
 });
 

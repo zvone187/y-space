@@ -122,6 +122,31 @@ export const readProjectFilePayloadSchema = z.object({
 });
 export type ReadProjectFilePayload = z.infer<typeof readProjectFilePayloadSchema>;
 
+/** Default renderer-requested ceiling for an in-app PDF or spreadsheet preview. */
+export const PROJECT_FILE_PREVIEW_DEFAULT_MAX_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Immutable main-process ceiling. Callers may ask for less, but can never make
+ * the desktop process allocate more than this for one preview request.
+ */
+export const PROJECT_FILE_PREVIEW_HARD_MAX_BYTES = 16 * 1024 * 1024;
+
+export const readProjectFilePreviewPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  path: z.string().min(1),
+  maxBytes: z.number().int().min(1).max(PROJECT_FILE_PREVIEW_HARD_MAX_BYTES).optional(),
+});
+export type ReadProjectFilePreviewPayload = z.infer<typeof readProjectFilePreviewPayloadSchema>;
+
+export interface ReadProjectFilePreviewResult {
+  /** Normalized project-relative path. */
+  path: string;
+  /** Structured-cloneable bytes exposed by the Electron preload bridge. */
+  bytes: Uint8Array;
+  sizeBytes: number;
+  modifiedAtMs: number;
+}
+
 export type AbsoluteFileReadStatus = ProjectFileReadStatus | "missing";
 
 export interface ReadAbsoluteFileResult {

@@ -409,8 +409,35 @@ describe("createOpenCodeAdapter", () => {
     expect(adapter.label).toBe("OpenCode");
     expect(adapter.pluginId).toBe("poracode-status@opencode");
     expect(adapter.minProtocolVersion).toBe(1);
-    expect(adapter.capabilities.crossagentMcpRouting).toBe("provider-session");
+    expect(adapter.capabilities.crossagentMcpRouting).toBe("thread-token");
+    expect(adapter.capabilities.agentSettingsDefaults?.browserMcp).toBe(true);
     expect(adapter.capabilities.agentSettingsDefaults?.crossagentMcp).toBe(true);
+  });
+
+  it("does not enable retired provider-session routing for built-in MCP servers", () => {
+    const adapter = createOpenCodeAdapter();
+    const launch = adapter.buildLaunchArgv(
+      { kind: "posix", path: "/repo" },
+      { model: "opencode/big-pickle" },
+      "test the app",
+      undefined,
+      {
+        mcpServers: [
+          {
+            id: "app-controls",
+            name: "poracode",
+            timeoutMs: 30_000,
+            transport: {
+              type: "http",
+              url: "http://127.0.0.1:43211/mcp",
+              headers: { Authorization: "Bearer controls-token" },
+            },
+          },
+        ],
+      },
+    );
+
+    expect(launch.env?.PORACODE_OPENCODE_SESSION_ROUTING).toBeUndefined();
   });
 
   it("returns no extra args/env from pluginLaunchExtras (in-process plugin)", async () => {
@@ -575,7 +602,7 @@ describe("createOpenCodeAdapter", () => {
       },
     );
 
-    expect(argv.env?.PORACODE_OPENCODE_SESSION_ROUTING).toBe("1");
+    expect(argv.env?.PORACODE_OPENCODE_SESSION_ROUTING).toBeUndefined();
   });
 
   it("does not override OpenCode config when no custom MCP is selected", () => {

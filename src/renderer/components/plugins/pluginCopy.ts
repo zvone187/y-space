@@ -5,7 +5,7 @@ import { usePlugins } from "@/renderer/state/pluginsStore";
 /**
  * Display copy for loaded Agent Plugins packages.
  *
- * Poracode's own packages ship English text in `plugin.json`, so their names and
+ * Y Space's own packages ship English text in `plugin.json`, so their names and
  * descriptions are overridden here with translated strings. Third-party packages
  * carry author-written metadata that cannot live in our catalogs, so their
  * manifest text is shown as authored — that is the correct behavior for a
@@ -43,11 +43,7 @@ export function useLocalizedPluginCatalog(): LocalizedPlugin[] {
     switch (plugin.name) {
       case "browser-tools":
         name = t`Browser Tools`;
-        description = t`Browse, inspect, and test websites in Poracode's isolated in-app browser.`;
-        break;
-      case "chrome-tools":
-        name = t`Chrome Tools`;
-        description = t`Work with the pages and signed-in sessions already open in Chrome.`;
+        description = t`Browse, inspect, and test websites in Y Space's isolated in-app browser.`;
         break;
       case "computer-use":
         name = t`Computer Use`;
@@ -79,17 +75,11 @@ export function useLocalizedPluginCatalog(): LocalizedPlugin[] {
             name: t`Browser Control`,
             description: t`Navigate, inspect, and test pages with the in-app Browser MCP.`,
           };
-        case "chrome-tools:chrome-control":
-          return {
-            id: skill.folder,
-            name: t`Chrome Control`,
-            description: t`Use Chrome safely when a task needs an existing browser session.`,
-          };
         case "computer-use:computer-use":
           return {
             id: skill.folder,
             name: t`Computer Use`,
-            description: t`Operate desktop apps through Poracode's desktop-control tools.`,
+            description: t`Operate desktop apps through Y Space's desktop-control tools.`,
           };
         case "subagent-delegation:subagent-delegation":
           return {
@@ -114,13 +104,11 @@ export function useLocalizedPluginCatalog(): LocalizedPlugin[] {
         name:
           id === "browser"
             ? t`Browser`
-            : id === "chrome"
-              ? t`Chrome`
-              : id === "crossagents"
-                ? t`Crossagents`
-                : id === "computer-use"
-                  ? t`Computer Use`
-                  : id,
+            : id === "crossagents"
+              ? t`Crossagents`
+              : id === "computer-use"
+                ? t`Computer Use`
+                : id,
       }),
     );
     const declaredMcpServers = plugin.mcpServers.map((server): LocalizedPluginContribution => {
@@ -191,7 +179,7 @@ export function useLocalizedPluginDiagnostic(): (diagnostic: PluginDiagnostic) =
         return t`Ignored an unrecognized field in plugin.json.`;
       case "manifest-extensions-not-object":
       case "extension-invalid":
-        return t`This plugin's Poracode settings were ignored because they are not valid.`;
+        return t`This plugin's Y Space settings were ignored because they are not valid.`;
       case "extension-unknown-skill":
         return t`This plugin describes a skill it does not actually ship.`;
       case "path-escapes-root":
@@ -223,10 +211,10 @@ export function useLocalizedPluginDiagnostic(): (diagnostic: PluginDiagnostic) =
           : t`This server runs on this computer and is unavailable for WSL projects.`;
       case "mcp-name-unusable":
         return target
-          ? t`Server ${target} has a name Poracode cannot use.`
-          : t`A server has a name Poracode cannot use.`;
+          ? t`Server ${target} has a name Y Space cannot use.`
+          : t`A server has a name Y Space cannot use.`;
       case "plugin-data-unavailable":
-        return t`Poracode could not create this plugin's data folder.`;
+        return t`Y Space could not create this plugin's data folder.`;
       default:
         return diagnostic.message;
     }

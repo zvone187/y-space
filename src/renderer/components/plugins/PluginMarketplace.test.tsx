@@ -24,46 +24,46 @@ describe("PluginMarketplace", () => {
 
     expect(screen.getByRole("heading", { name: "Featured" })).toBeInTheDocument();
     expect(screen.getByText("Browser Tools")).toBeInTheDocument();
-    expect(screen.getByText("Chrome Tools")).toBeInTheDocument();
+    expect(screen.getByText("Computer Use")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Browser Tools Install" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Browser Tools" }));
     expect(onOpen).toHaveBeenCalledWith("browser-tools");
     onOpen.mockClear();
 
     fireEvent.change(screen.getByRole("textbox", { name: "Search plugins" }), {
-      target: { value: "chrome" },
+      target: { value: "desktop" },
     });
 
-    expect(screen.getByText("Chrome Tools")).toBeInTheDocument();
+    expect(screen.getByText("Computer Use")).toBeInTheDocument();
     expect(screen.queryByText("Browser Tools")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Chrome Tools Install" }));
+    fireEvent.click(screen.getByRole("button", { name: "Computer Use Install" }));
 
-    expect(useSharedSettings.getState().installedPlugins["chrome-tools"]).toMatchObject({
+    expect(useSharedSettings.getState().installedPlugins["computer-use"]).toMatchObject({
       version: "1.1.0",
       enabled: true,
     });
-    expect(onOpen).toHaveBeenLastCalledWith("chrome-tools");
+    expect(onOpen).toHaveBeenLastCalledWith("computer-use");
 
-    fireEvent.click(screen.getByRole("button", { name: "Chrome Tools Manage" }));
+    fireEvent.click(screen.getByRole("button", { name: "Computer Use Manage" }));
     expect(onOpen).toHaveBeenCalledTimes(2);
-    expect(onOpen).toHaveBeenLastCalledWith("chrome-tools");
+    expect(onOpen).toHaveBeenLastCalledWith("computer-use");
   });
 
   it("surfaces installed plugins in the installed strip", () => {
-    useSharedSettings.getState().installPlugin(pluginFixture("chrome-tools"));
+    useSharedSettings.getState().installPlugin(pluginFixture("computer-use"));
     const onOpen = vi.fn<(pluginId: string) => void>();
     render(<Marketplace onOpen={onOpen} />);
 
     // The shortcut is named distinctly from the card title so a screen reader
     // does not read two identically-named controls for the same plugin.
     const strip = screen.getByRole("heading", { name: "Installed" }).closest("section")!;
-    expect(within(strip).getByRole("button", { name: "Open Chrome Tools" })).toBeInTheDocument();
+    expect(within(strip).getByRole("button", { name: "Open Computer Use" })).toBeInTheDocument();
     expect(
       within(strip).queryByRole("button", { name: "Open Browser Tools" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(within(strip).getByRole("button", { name: "Open Chrome Tools" }));
-    expect(onOpen).toHaveBeenCalledWith("chrome-tools");
+    fireEvent.click(within(strip).getByRole("button", { name: "Open Computer Use" }));
+    expect(onOpen).toHaveBeenCalledWith("computer-use");
   });
 
   it("groups non-featured plugins under their category", () => {

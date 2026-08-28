@@ -4,9 +4,8 @@ import { evalJs } from "./cdp/tools";
 /**
  * Agent "presence" overlay: a page-injected brand cursor that glides smoothly to
  * the element the agent is about to act on, plus a click ripple. It makes agent
- * activity visible (like Claude/Codex). Installed and animated via CDP
- * `Runtime.evaluate`, so the SAME code drives both the embedded browser and the
- * external Chrome — both expose a {@link CdpSession}.
+ * activity visible (like Claude/Codex). Installed and animated through the
+ * embedded tab's CDP {@link CdpSession}.
  *
  * The cursor is a single persistent `<div>` (position:fixed, pointer-events:none,
  * max z-index) that transitions its transform; moving it re-triggers the glide.
@@ -176,9 +175,8 @@ export async function withCursorOverlayHidden<T>(
  *
  *  Returns IMMEDIATELY when the page is hidden: a presence cursor nobody can see
  *  is pointless, and hidden tabs pause requestAnimationFrame + throttle timers —
- *  so awaiting a glide there would otherwise stall the action (external Chrome's
- *  workspace is a background tab; the internal webview goes hidden when the app
- *  window is minimized). The rAF wait below is also capped so a mid-glide hide
+ *  so awaiting a glide there would otherwise stall the action (the embedded
+ *  webview goes hidden when the app window is minimized). The rAF wait below is also capped so a mid-glide hide
  *  can't wedge it. */
 export function cursorGlideExpr(targetExpr: string, glideMs = GLIDE_MS): string {
   return `(async () => {

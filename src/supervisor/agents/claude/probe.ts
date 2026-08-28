@@ -1,6 +1,7 @@
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentCapability, AgentTerminalAuthMethod } from "@/shared/contracts";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 import type { SlashCommand } from "@anthropic-ai/claude-agent-sdk";
 import {
   readWslLoginShellCommandOutputAsync,
@@ -142,7 +143,7 @@ async function probeClaudeSdkPartialNative(
           pathToClaudeCodeExecutable: executablePath,
           persistSession: false,
           cwd: process.platform === "win32" ? (process.env.USERPROFILE ?? process.cwd()) : "/tmp",
-          ...(envOverrides ? { env: { ...process.env, ...envOverrides } } : {}),
+          env: sanitizePrivilegedChildEnvironment({ ...process.env, ...(envOverrides ?? {}) }),
           settingSources: ["user", "project", "local"],
           allowedTools: [],
           stderr: () => {},

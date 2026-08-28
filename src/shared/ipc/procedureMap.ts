@@ -1,5 +1,6 @@
 import { appProcedures } from "./procedures/app";
 import { browserProcedures } from "./procedures/browser";
+import { browserCookieImportProcedures } from "./procedures/browserCookieImport";
 import { dbProcedures } from "./procedures/db";
 import { experimentProcedures } from "./procedures/experiment";
 import { githubProcedures } from "./procedures/github";
@@ -7,6 +8,7 @@ import { gitProcedures } from "./procedures/git";
 import { lspProcedures } from "./procedures/lsp";
 import { mcpProcedures } from "./procedures/mcp";
 import { pluginProcedures } from "./procedures/plugins";
+import { pipedreamProcedures } from "./procedures/pipedream";
 import { profileProcedures } from "./procedures/profile";
 import { prWatchProcedures } from "./procedures/prWatches";
 import { scheduleProcedures } from "./procedures/schedules";
@@ -32,12 +34,14 @@ export const groupedIpcProcedures = {
   lsp: lspProcedures,
   mcp: mcpProcedures,
   browser: browserProcedures,
+  browserCookieImport: browserCookieImportProcedures,
   usage: usageProcedures,
   profile: profileProcedures,
   schedules: scheduleProcedures,
   prWatches: prWatchProcedures,
   skills: skillProcedures,
   plugins: pluginProcedures,
+  pipedream: pipedreamProcedures,
 } as const;
 
 export const ipcProcedureMap = {
@@ -54,12 +58,14 @@ export const ipcProcedureMap = {
   ...lspProcedures,
   ...mcpProcedures,
   ...browserProcedures,
+  ...browserCookieImportProcedures,
   ...usageProcedures,
   ...profileProcedures,
   ...scheduleProcedures,
   ...prWatchProcedures,
   ...skillProcedures,
   ...pluginProcedures,
+  ...pipedreamProcedures,
 } as const;
 
 export type IpcProcedureMap = typeof ipcProcedureMap;
@@ -83,6 +89,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "saveImageFile",
   "copyImageToClipboard",
   "readLocalImageFile",
+  "readProjectFilePreview",
   "createProjectDirectory",
   "remoteHttpRequest",
   "openExternal",
@@ -145,6 +152,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "installUpdate",
   "browserGetState",
   "browserCreateTab",
+  "browserCreateSensitiveTab",
   "browserCloseTab",
   "browserActivateTab",
   "browserMoveTab",
@@ -175,6 +183,15 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "browserRecentHistory",
   "browserExtractToWindow",
   "browserInjectToMain",
+  "browserCookieImportOpenExtensionFolder",
+  "browserCookieImportGetState",
+  "browserCookieImportChooseFile",
+  "browserCookieImportBeginPairing",
+  "browserCookieImportCancelPairing",
+  "browserCookieImportForgetSource",
+  "browserCookieImportPreview",
+  "browserCookieImportCommit",
+  "browserCookieImportCancel",
   "startUsageLogin",
   "cancelUsageLogin",
   "clearUsageLogin",
@@ -200,6 +217,9 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "upsertPrWatch",
   "deletePrWatch",
   "syncPrWatchAgent",
+  "pipedreamBeginConnect",
+  "pipedreamChooseEnvFile",
+  "pipedreamClearEnvFile",
 ] as const satisfies readonly IpcProcedureName[];
 
 export type MainLocalProcedureName = (typeof MAIN_LOCAL_PROCEDURE_NAMES)[number];

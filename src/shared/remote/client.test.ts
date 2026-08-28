@@ -79,7 +79,7 @@ describe("RemoteDesktopClient", () => {
     ).resolves.toMatchObject({ accessToken: "lc_access_test" });
     expect(body).toMatchObject({
       client: {
-        label: "Poracode web app",
+        label: "Y Space web app",
         deviceType: "browser",
       },
     });

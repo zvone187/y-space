@@ -26,6 +26,14 @@ export {
   type SupervisorIpcHandlerMap,
 } from "./bridge";
 export type { RemoteAccessTailscaleStatus, StartTailscaleResult } from "./procedures/app";
+export { pipedreamProcedures } from "./procedures/pipedream";
+export {
+  browserCookieImportProcedures,
+  type BrowserCookieImportCompletion,
+  type BrowserCookieImportPairingChallenge,
+  type BrowserCookieImportSource,
+  type BrowserCookieImportState,
+} from "./procedures/browserCookieImport";
 export type {
   SshConnectPayload,
   SshConnectResult,

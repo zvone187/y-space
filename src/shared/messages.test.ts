@@ -95,12 +95,12 @@ describe("friendlyErrorWithDetail", () => {
 
   it("maps helper bootstrap failures to shared messages", () => {
     expect(friendlyError(new Error("Poracode Helper probe returned HTTP 503."))).toBe(
-      "Poracode Helper is not ready yet (HTTP 503).",
+      "Y Space Helper is not ready yet (HTTP 503).",
     );
     expect(
       friendlyError(new Error("Poracode SSH requires Node 24.10 or newer on the remote host.")),
     ).toBe(
-      "Poracode Helper failed to start. Check that Node 24.10 or newer and npm are installed on the remote machine.",
+      "Y Space Helper failed to start. Check that Node 24.10 or newer and npm are installed on the remote machine.",
     );
   });
 
@@ -112,7 +112,7 @@ describe("friendlyErrorWithDetail", () => {
         ),
       ),
     ).toBe(
-      "Poracode SSH runtime manifest is missing or invalid: C:\\Poracode\\server.ssh-runtime-manifest.json",
+      "Y Space SSH runtime manifest is missing or invalid: C:\\Poracode\\server.ssh-runtime-manifest.json",
     );
   });
 
