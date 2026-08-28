@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Y Space Minimal Branding Plan</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f7f7f5;
+        --paper: #ffffff;
+        --ink: #181816;
+        --muted: #6f6f6a;
+        --border: #e7e5e1;
+        --accent: #ff5a1f;
+        --accent-soft: #fff2e8;
+        --green: #eaf6ed;
+        --amber: #fff4d8;
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+      main {
+        width: min(1160px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0 64px;
+      }
+      article {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: var(--paper);
+        box-shadow: 0 18px 50px rgba(24, 24, 22, 0.07);
+      }
+      header {
+        border-top: 6px solid var(--accent);
+        padding: 34px 36px 28px;
+      }
+      .eyebrow {
+        color: var(--accent);
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        margin-top: 10px;
+        font-size: clamp(2.2rem, 6vw, 4rem);
+        line-height: 1;
+        letter-spacing: -0.04em;
+      }
+      .lead {
+        max-width: 780px;
+        margin-top: 14px;
+        color: var(--muted);
+      }
+      .meta,
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+      .meta {
+        grid-template-columns: repeat(4, 1fr);
+        margin-top: 24px;
+      }
+      .card,
+      .record {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #fcfcfb;
+        padding: 15px;
+      }
+      .card small,
+      .label {
+        display: block;
+        color: var(--muted);
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
+      }
+      .card strong {
+        display: block;
+        margin-top: 6px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        border-block: 1px solid var(--border);
+        padding: 13px 36px;
+        background: #fbfbfa;
+      }
+      nav a {
+        border-radius: 999px;
+        background: #fff;
+        color: var(--ink);
+        padding: 5px 10px;
+        text-decoration: none;
+        font-size: 0.84rem;
+      }
+      .content {
+        padding: 0 36px 40px;
+      }
+      section {
+        padding: 28px 0;
+        border-top: 1px solid var(--border);
+      }
+      section:first-child {
+        border-top: 0;
+      }
+      h2 {
+        font-size: 1.45rem;
+        letter-spacing: -0.02em;
+      }
+      h3 {
+        margin: 18px 0 8px;
+        font-size: 1rem;
+      }
+      .section-note {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      ul,
+      ol {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      li + li {
+        margin-top: 6px;
+      }
+      code {
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: #f7f7f5;
+        padding: 1px 5px;
+      }
+      .accent {
+        border-left: 4px solid var(--accent);
+        background: var(--accent-soft);
+      }
+      .good {
+        background: var(--green);
+      }
+      .risk {
+        background: var(--amber);
+      }
+      .record + .record {
+        margin-top: 10px;
+      }
+      .order {
+        list-style: none;
+        counter-reset: item;
+        padding: 0;
+      }
+      .order li {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 10px;
+        align-items: start;
+      }
+      .order li::before {
+        counter-increment: item;
+        content: counter(item);
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 800;
+      }
+      @media (max-width: 820px) {
+        .meta,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+        header,
+        .content {
+          padding-inline: 18px;
+        }
+        nav {
+          padding-inline: 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <article>
+        <header>
+          <div class="eyebrow">Implementation plan</div>
+          <h1>Y Space, stripped back</h1>
+          <p class="lead">
+            A white-first, warm-neutral, orange-accent redesign that removes ambient developer
+            statistics and redundant chrome while preserving every agent, browser, file, document,
+            and global-tab workflow.
+          </p>
+          <div class="meta">
+            <div class="card"><small>Status</small><strong>Approved by user request</strong></div>
+            <div class="card"><small>Branch</small><strong>y-space-minimal-branding</strong></div>
+            <div class="card"><small>Base</small><strong>f56ff21d</strong></div>
+            <div class="card"><small>Date</small><strong>2026-08-28</strong></div>
+          </div>
+        </header>
+        <nav aria-label="Contents">
+          <a href="#summary">Summary</a><a href="#existing">Existing</a
+          ><a href="#implementation">Implementation</a><a href="#tests">Tests</a
+          ><a href="#order">Order</a><a href="#risks">Risks</a>
+        </nav>
+        <div class="content">
+          <section id="summary">
+            <h2>01 — Summary</h2>
+            <p class="section-note">
+              The request resolves the visual direction; no additional product decision is required.
+            </p>
+            <div class="grid two" style="margin-top: 14px">
+              <div class="record accent">
+                <span class="label">Goal</span>
+                <p>
+                  Make Y Space feel calm and approachable rather than like an IDE: white canvas,
+                  subtle warm gray hierarchy, sparse orange accents, and one clear action per area.
+                </p>
+              </div>
+              <div class="record">
+                <span class="label">Agreed approach</span>
+                <p>
+                  Restyle shared tokens first, then simplify ambient navigation/header/composer
+                  chrome. Keep detailed Git and runtime information available only inside dedicated
+                  views, tooltips, hover controls, or menus.
+                </p>
+              </div>
+              <div class="record good">
+                <span class="label">Decisions</span>
+                <ul>
+                  <li>
+                    Fresh profiles launch light; explicit saved dark mode remains supported but uses
+                    orange branding.
+                  </li>
+                  <li>
+                    Remove visible <code>+N/-N</code>, sync counts, PR numbers, and default usage
+                    rings from ambient chrome.
+                  </li>
+                  <li>
+                    Preserve exactly one global workspace tab strip; consolidate the separate
+                    right-panel tool rail into a compact add/overflow affordance.
+                  </li>
+                </ul>
+              </div>
+              <div class="record">
+                <span class="label">Dependencies</span>
+                <p>
+                  No new libraries or packages. Reuse existing HeroUI v3, Tailwind utilities,
+                  Lingui, Lucide, and theme infrastructure.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="existing">
+            <h2>02 — Existing implementation</h2>
+            <div class="grid two" style="margin-top: 14px">
+              <div class="record">
+                <span class="label">Reuse unchanged</span>
+                <ul>
+                  <li>
+                    <code>BrowserPanelManager</code>, Browser MCP, cookie import, Pipedream,
+                    provider runtimes.
+                  </li>
+                  <li>
+                    Global workspace-tab state, keyboard navigation, reorder, close focus,
+                    persistence, and webview LRU.
+                  </li>
+                  <li>
+                    Dedicated Git/diff surfaces and shared <code>DiffStat</code> inside those detail
+                    views.
+                  </li>
+                  <li>Existing HeroUI controls and responsive composer behavior.</li>
+                </ul>
+              </div>
+              <div class="record">
+                <span class="label">Change</span>
+                <ul>
+                  <li>
+                    <code>styles.css</code>, theme presets/defaults, initial document paint, and
+                    brand assets.
+                  </li>
+                  <li>
+                    Sidebar task rows, Git/sync affordances, usage rail default, and footer/header
+                    density.
+                  </li>
+                  <li>
+                    Thread header, ambient changes affordance, composer surface, and right-panel
+                    chrome.
+                  </li>
+                  <li>Visual tests, first-paint/theme tests, QA plan, and screenshots.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <section id="implementation">
+            <h2>03 — New implementation</h2>
+            <div class="grid three" style="margin-top: 14px">
+              <div class="record">
+                <span class="label">Foundation</span>
+                <p>
+                  Default palette: white canvas, <code>#FBFBFA</code> subtle surfaces,
+                  <code>#181816</code> text, <code>#EEEDE9</code> hairlines, accessible
+                  <code>#FF5A1F</code> orange actions, and pale orange selection/focus tints.
+                </p>
+              </div>
+              <div class="record">
+                <span class="label">Navigation</span>
+                <p>
+                  One-line task rows with title, state, and age; hover/focus actions stay
+                  accessible. Remove visible diff/sync counts and default usage rings. Consolidate
+                  secondary footer actions into overflow.
+                </p>
+              </div>
+              <div class="record">
+                <span class="label">Workspace</span>
+                <p>
+                  Flatten global tabs to text labels with one orange selected indicator. Remove the
+                  redundant always-visible tool rail; tools still create peer tabs through a compact
+                  menu.
+                </p>
+              </div>
+              <div class="record">
+                <span class="label">Conversation</span>
+                <p>
+                  Reduce the header to status, title, and essential actions/overflow. Keep assistant
+                  content flat and user prompts softly tinted.
+                </p>
+              </div>
+              <div class="record">
+                <span class="label">Composer</span>
+                <p>
+                  One white rounded input card with a hairline border, soft shadow, restrained
+                  controls, and an orange enabled Send/Stop action. Changes remain available as one
+                  icon-only review affordance.
+                </p>
+              </div>
+              <div class="record">
+                <span class="label">Brand assets</span>
+                <p>
+                  Replace the legacy indigo/dark-first icon palette across stable SVG masters,
+                  public icon, generation constants, and brand documentation; regenerate platform
+                  outputs.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section id="tests">
+            <h2>04 — Tests and user stories</h2>
+            <h3>User stories</h3>
+            <ul>
+              <li>
+                As a non-developer, I can understand my tasks without Git statistics or tool noise
+                competing with their titles.
+              </li>
+              <li>
+                As an agent user, I can still reach files, Git, browser pages, documents, settings,
+                and advanced actions when needed.
+              </li>
+              <li>
+                As a browser user, every page remains an independent peer in the one global tab
+                strip and retains state while I move elsewhere.
+              </li>
+              <li>
+                As an accessibility user, hidden visual metadata remains available through names,
+                tooltips, menus, focus, and keyboard navigation.
+              </li>
+            </ul>
+            <h3>Failing tests before production code</h3>
+            <div class="record">
+              <ul>
+                <li>
+                  Fresh settings and first paint require light mode; default theme anchors require
+                  white/warm-neutral/orange and prohibit legacy indigo.
+                </li>
+                <li>
+                  GitBadge, SyncBadge, and ThreadChangesBubble require glyph-only ambient controls
+                  with no visible counts while preserving accessible labels and click behavior.
+                </li>
+                <li>Default usage rail is off; explicit opt-in remains valid.</li>
+                <li>
+                  Global tab strip requires flat styling, one selected indicator, and unchanged tab
+                  semantics.
+                </li>
+                <li>
+                  Brand source SVGs/build constants require the orange/white system and reject
+                  <code>#8B7BFF</code>.
+                </li>
+              </ul>
+            </div>
+            <h3>Acceptance criteria</h3>
+            <div class="record good">
+              <ul>
+                <li>
+                  Fresh packaged app opens white with no black flash and no purple/indigo
+                  default-brand surfaces.
+                </li>
+                <li>
+                  Idle sidebar/composer chrome contains no visible line, file, sync, PR, token, or
+                  usage counts.
+                </li>
+                <li>All advanced actions remain keyboard- and screen-reader-accessible.</li>
+                <li>
+                  Files, Git, two browser pages, PDF/XLSX, Notes, Usage, and Terminal remain global
+                  peers with browser state preserved.
+                </li>
+                <li>
+                  All unit/integration tests, typecheck, lint, format, i18n, build, codesign, manual
+                  1440×900 and 1024×768 QA, and browser lifecycle regression pass.
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <section id="order">
+            <h2>05 — TDD implementation order</h2>
+            <ol class="order">
+              <li>
+                <p>
+                  Write theme, first-paint, default-setting, ambient-count, tab-style, and
+                  brand-asset contract tests; verify they fail for the intended old design.
+                </p>
+              </li>
+              <li><p>Implement theme/default/asset foundation and regenerate icons.</p></li>
+              <li>
+                <p>
+                  Simplify Git/sync/changes/usage/sidebar chrome while preserving behavior and
+                  accessibility.
+                </p>
+              </li>
+              <li>
+                <p>
+                  Consolidate right workspace tools into the global strip, then simplify thread
+                  header and composer.
+                </p>
+              </li>
+              <li>
+                <p>
+                  Run targeted and full suites, build the unsigned ARM64 package, and manually click
+                  both viewport sizes plus browser/global-tab regressions.
+                </p>
+              </li>
+            </ol>
+          </section>
+
+          <section id="risks">
+            <h2>06 — Risks and mitigations</h2>
+            <div class="grid two" style="margin-top: 14px">
+              <div class="record risk">
+                <span class="label">Hidden functionality</span>
+                <p>
+                  Over-trimming can make power features undiscoverable. Keep every removed ambient
+                  action in an overflow, tooltip, hover/focus state, or dedicated peer tab; verify
+                  keyboard and accessible names.
+                </p>
+              </div>
+              <div class="record risk">
+                <span class="label">Theme persistence</span>
+                <p>
+                  Fresh profiles become light, while explicit saved appearance remains respected.
+                  Manual QA will set the local Y Space profile to light so the user’s current
+                  machine receives the requested appearance.
+                </p>
+              </div>
+              <div class="record risk">
+                <span class="label">Browser regressions</span>
+                <p>
+                  Do not change browser ownership or workspace-tab state. Keep the existing
+                  global-tab/browser suites unchanged and rerun lifecycle/memory checks
+                  proportionate to the presentational diff.
+                </p>
+              </div>
+              <div class="record risk">
+                <span class="label">HeroUI helper unavailable</span>
+                <p>
+                  The repository-requested <code>heroui-react</code> skill is unavailable in this
+                  session. Reuse existing HeroUI v3 primitives and local patterns only; add no
+                  substitute UI dependency.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>

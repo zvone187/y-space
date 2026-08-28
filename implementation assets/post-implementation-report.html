@@ -258,28 +258,29 @@
     <main>
       <header>
         <section class="hero" aria-labelledby="title">
-          <span class="tag">Implementation complete</span>
-          <h1 id="title">Y Space</h1>
+          <span class="tag">Post-implementation handoff</span>
+          <h1 id="title">Y Space, refined</h1>
           <p>
-            Y Space now has one global workspace tab model. Each embedded browser page is its own
-            peer tab beside files, PDFs, spreadsheets, Terminal, Files, Git, Usage, and Notes. There
-            is no browser-within-browser tab strip.
+            The desktop app now presents a calm white-and-orange product shell with native system
+            typography, lighter glass surfaces, strong contrast, one compact footer menu, and the
+            same agent-connected global browser, tool, and document tab model underneath.
           </p>
           <p>
-            <a href="https://github.com/zvone187/y-space/pull/1">Open pull request #1</a>
+            Branding PR: <code>https://github.com/zvone187/y-space/pull/2</code> ·
+            <a href="https://github.com/zvone187/y-space/pull/1">base feature PR #1</a>
           </p>
         </section>
         <aside class="meta-stack" aria-label="Report metadata">
           <div class="card bg-green">
-            <small>Status</small><strong>Ready, with two external account gates</strong>
+            <small>Status</small><strong>Ready · external gates disclosed</strong>
           </div>
           <div class="card bg-blue">
-            <small>Automated</small><strong>9,896 passed · 85 skipped</strong>
+            <small>Final targeted QA</small><strong>80 / 80 passed</strong>
           </div>
           <div class="card bg-yellow">
-            <small>Browser residency</small><strong>6 ordinary · 4 sensitive</strong>
+            <small>Branch</small><strong>y-space-minimal-branding</strong>
           </div>
-          <div class="card bg-purple"><small>Date</small><strong>2026-08-27</strong></div>
+          <div class="card bg-purple"><small>Date</small><strong>2026-08-28</strong></div>
         </aside>
       </header>
 
@@ -290,27 +291,74 @@
         </div>
         <div class="grid three">
           <article class="sticky bg-green">
-            <h3>One tab concept</h3>
+            <h3>Quiet product shell</h3>
             <p>
-              Browser pages, tools, source files, Markdown, PDF, XLS, and XLSX all participate in
-              the same draggable, keyboard-accessible top strip.
+              Warm whites, very light gray hierarchy, restrained glass, and bright orange accents
+              replace the denser developer-tool presentation.
             </p>
           </article>
           <article class="sticky bg-blue">
-            <h3>Agent-native browser</h3>
+            <h3>One global tab concept</h3>
             <p>
-              Agents can list, find, activate, open-or-focus, inspect, screenshot, and interact with
-              any Y Space browser page by stable ID—even when another workspace tab is visible.
+              Browser pages, tools, source files, Markdown, PDF, XLS, and XLSX remain peers in one
+              draggable, keyboard-accessible top strip—never a browser-within-browser tab row.
             </p>
           </article>
           <article class="sticky bg-yellow">
-            <h3>Bounded memory</h3>
+            <h3>Capability preserved</h3>
             <p>
-              Browser metadata may reach 30 pages, but ordinary live webviews are true-LRU capped at
-              six. Sensitive authentication guests use a separate four-view ceiling.
+              Codex and OpenCode still manage embedded tabs directly. Browser metadata is bounded at
+              30 and ordinary live guests remain true-LRU capped at six.
             </p>
           </article>
         </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Minimal visual system</h2>
+        </div>
+        <div class="grid four">
+          <article class="sticky bg-green">
+            <h3>White + orange</h3>
+            <p>
+              Fresh profiles settle on white with warm-neutral surfaces, hairline borders, dark
+              text, and <code>#ff5a1f</code> reserved for active and primary moments.
+            </p>
+          </article>
+          <article class="sticky bg-blue">
+            <h3>Familiar typography</h3>
+            <p>
+              Ordinary labels and prose use the native macOS/system sans stack. Monospace remains
+              only where code, paths, terminal output, or technical identifiers need it.
+            </p>
+          </article>
+          <article class="sticky bg-yellow">
+            <h3>One footer menu</h3>
+            <p>
+              Four persistent utility icons became one More menu, including sidebar visibility.
+              Workspace, Usage, shortcuts, updates, Remote Access, and Settings stay named.
+            </p>
+          </article>
+          <article class="sticky bg-pink">
+            <h3>Contrast by contract</h3>
+            <p>
+              Accent text meets 4.5:1, control borders meet 3:1, focus rings remain visible, and
+              enabled muted text is solid rather than washed out by alpha.
+            </p>
+          </article>
+        </div>
+        <details open>
+          <summary>What was deliberately removed or simplified</summary>
+          <div class="detail-body">
+            Ambient Git line counts, repeated branch/project metadata, the always-visible thread
+            tool rail, developer-oriented descriptions, and the legacy four-icon footer no longer
+            compete with the user's work. Appearance copy now says things such as
+            <strong>Chat text size</strong> and describes the frosted-glass effect in plain
+            language.
+          </div>
+        </details>
       </section>
 
       <section class="board-section">
@@ -372,6 +420,59 @@
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td>Fresh visual baseline</td>
+              <td>Pass</td>
+              <td>
+                A fresh isolated profile settled on the white welcome workspace with warm-neutral
+                surfaces, thin dividers, dark text, and restrained bright-orange interaction states.
+              </td>
+            </tr>
+            <tr>
+              <td>Sidebar footer</td>
+              <td>Pass</td>
+              <td>
+                The final package showed only the More control in the footer. Its menu exposed
+                Workspace, Usage, Pull requests, Schedules, What's New, Remote Access Off, Settings,
+                and Hide sidebar as named items. Hiding left one collapsed-rail More control whose
+                menu exposed Show sidebar; selecting it restored the expanded sidebar.
+              </td>
+            </tr>
+            <tr>
+              <td>Compact panel docking</td>
+              <td>Pass</td>
+              <td>
+                Computer Use dragged the final packaged Files grip into the lower right-panel half.
+                Y Space rendered the split and announced the exact panel-tab to right-panel drop;
+                closing it preserved both browser peers.
+              </td>
+            </tr>
+            <tr>
+              <td>Typography and Appearance</td>
+              <td>Pass</td>
+              <td>
+                Ordinary product UI used native system typography. Settings used concise copy such
+                as Chat text size and plain-language frosted-glass descriptions; monospace remained
+                limited to genuinely technical content.
+              </td>
+            </tr>
+            <tr>
+              <td>Quiet update check</td>
+              <td>Pass</td>
+              <td>
+                No update-error toast appeared during a 35-second wait beyond the scheduled check
+                for the fork with no published GitHub versions. Real update failures remain visible.
+              </td>
+            </tr>
+            <tr>
+              <td>Saved dark appearance</td>
+              <td>Automated contract</td>
+              <td>
+                Theme preset and settings-migration tests verify that explicit saved appearance is
+                honored. A saved-dark profile was not manually re-captured in the final package, so
+                this report does not claim a manual dark-theme pass.
+              </td>
+            </tr>
             <tr>
               <td>Global browser peers</td>
               <td>Pass</td>
@@ -492,6 +593,44 @@
         <div class="grid three">
           <figure class="shot">
             <img
+              src="qa-screenshots/branding-welcome-package-final.jpg"
+              alt="Final Y Space white and orange welcome workspace with one compact footer menu"
+            />
+            <figcaption>
+              Final package: white/orange welcome, native typography, single More menu, and no
+              update-error toast after the scheduled check.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/branding-appearance-final.jpg"
+              alt="Final Y Space Appearance settings with simplified product language"
+            />
+            <figcaption>
+              Appearance: consumer-facing language, lighter surfaces, and familiar system type.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/branding-dock-handle-package-final.jpg"
+              alt="Final packaged Y Space browser workspace split with the Files panel after a compact-menu drag"
+            />
+            <figcaption>
+              Final package: Computer Use dragged the compact Files grip into a live right-panel
+              split, then closed it without disturbing either browser peer.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
+              src="qa-screenshots/branding-browser-global-tab-final.jpg"
+              alt="Embedded browser shown as a peer in the global Y Space tab strip"
+            />
+            <figcaption>
+              Branding-layer QA retained the browser as a first-class peer in the one global strip.
+            </figcaption>
+          </figure>
+          <figure class="shot">
+            <img
               src="qa-screenshots/final-single-global-browser-tabs.jpeg"
               alt="Browser pages shown as peer tabs in the global workspace strip"
             />
@@ -574,13 +713,23 @@
         </div>
         <div class="grid two">
           <article class="sticky bg-green">
-            <h3>Automated</h3>
+            <h3>Final targeted</h3>
             <ul>
-              <li>879 test files passed; 5 skipped</li>
-              <li>9,896 tests passed; 85 skipped</li>
+              <li>15 branding/footer/tab/theme/updater files passed</li>
+              <li>80 / 80 tests passed</li>
+              <li>Earlier broader focused pass: 21 files / 150 tests</li>
               <li>TypeScript typecheck passed</li>
               <li>Lint and type-aware lint passed</li>
-              <li>Format, i18n, and diff checks passed</li>
+              <li>Format and i18n passed: 3,275 messages, 0 missing</li>
+            </ul>
+          </article>
+          <article class="sticky bg-pink">
+            <h3>Final full suite</h3>
+            <ul>
+              <li>887 files / 9,926 tests passed</li>
+              <li>5 files / 85 tests intentionally skipped</li>
+              <li>102.98 seconds under pinned Node.js 24.13.0</li>
+              <li>No branding, contrast, footer, theme, updater, or tab regression failed</li>
             </ul>
           </article>
           <article class="sticky bg-yellow">
@@ -599,16 +748,28 @@
             <ul>
               <li>Apple Silicon app and DMG built</li>
               <li>Deep/strict code-sign verification passed</li>
-              <li>ARM64, unsigned/ad-hoc as authorized</li>
-              <li>DMG size: 155,951,077 bytes</li>
-              <li>Final-source mobile production build passed</li>
+              <li>Thin ARM64, unsigned/ad-hoc runtime signature, no Team ID</li>
+              <li>DMG size: 155,863,366 bytes</li>
+              <li>Packaged icon matches the source icon byte-for-byte</li>
+              <li>Website typecheck and production build passed</li>
+              <li>Next 16.3.1 generated 62 / 62 static pages</li>
             </ul>
           </article>
           <article class="sticky bg-purple">
             <h3>DMG SHA-256</h3>
-            <p><code>1d1d19638d6e0091f652ce5935ae64c29a84f7d44fcdfcd39e751074e9f49505</code></p>
+            <p><code>5cd6e6964f772721fc904e7d3ec335b0277501e5636570ccf7ed3c2c94b4131f</code></p>
           </article>
         </div>
+        <details>
+          <summary>Why the latest full-suite result is not presented as completely clean</summary>
+          <div class="detail-body">
+            After the final copy and optional-updater adjustment, the parallel full run hit a child
+            process timeout in <code>probeMcpServer.test.ts</code> and a render deadline in
+            <code>ChatPane.test.tsx</code>. Both files passed immediately when rerun together in
+            isolation (76 / 76 tests). A separate accidental command that expanded to the whole
+            suite was stopped after unrelated stress failures and is not counted as final evidence.
+          </div>
+        </details>
       </section>
 
       <section class="board-section">
@@ -641,6 +802,60 @@
       </section>
 
       <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Implementation decisions and handoff</h2>
+        </div>
+        <details open>
+          <summary>How the visual cleanup was implemented</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                Shared theme tokens define the white-first light palette, orange interaction colors,
+                solid muted text, minimum accent contrast, minimum control-border contrast, focus
+                rings, and adaptive glass surfaces.
+              </li>
+              <li>
+                Ordinary renderer UI now inherits the native system-sans stack. Existing monospace
+                styling remains scoped to code, paths, terminal content, and technical identifiers.
+              </li>
+              <li>
+                The legacy workspace switcher/update/What's New footer components and thread tool
+                rail were removed. One menu owns those destinations and attention states.
+              </li>
+              <li>
+                User-facing Appearance copy was simplified and translated across all 12 catalogs.
+              </li>
+              <li>
+                The updater suppresses only the exact optional “no published GitHub versions” case;
+                manifest, signature, download, disk, network, and unexpected failures stay visible.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Pass-criteria disposition</summary>
+          <div class="detail-body">
+            Branding criteria PC-41 and PC-43 through PC-48 pass. PC-42 has a fresh-light manual
+            pass plus automated saved-theme coverage; a final manual saved-dark capture was not
+            repeated. PC-49 carries the explicitly disclosed two full-parallel-load flakes, both of
+            which passed in immediate isolation. Account-gated criteria remain listed below and in
+            <a href="pass-criteria.md">the complete pass-criteria record</a>.
+          </div>
+        </details>
+        <details>
+          <summary>QA assumptions and boundaries</summary>
+          <div class="detail-body">
+            Final packaged branding QA used an isolated profile and command-line mock Keychain only
+            to avoid macOS Keychain prompts caused by repeated ad-hoc QA builds. This did not alter
+            production source or behavior; no normal user profile was read or modified. One older
+            isolated QA window was briefly raised read-only while resolving an ambiguous app name,
+            then all actions returned to the exact final package path. Older global-tab screenshots
+            prove the wider feature layer, while the final welcome, docking, and Appearance captures
+            prove the consolidated footer, compact grip, and latest copy. No manual dark-theme claim
+            is made.
+          </div>
+        </details>
         <details open>
           <summary>External follow-ups—not implementation failures</summary>
           <div class="detail-body">
@@ -664,8 +879,13 @@
             <ul>
               <li><a href="../release/Y-Space-1.6.6-arm64.dmg">ARM64 Y Space DMG</a></li>
               <li><a href="qa-e2e-tests.json">Structured QA evidence</a></li>
+              <li><a href="pass-criteria.md">Pass criteria and final disposition</a></li>
               <li><a href="browser-memory-soak.json">Browser memory-soak evidence</a></li>
-              <li><a href="https://github.com/zvone187/y-space/pull/1">Pull request #1</a></li>
+              <li>
+                Branding PR: <code>https://github.com/zvone187/y-space/pull/2</code> (target:
+                <code>y-space-browser-integrations</code>)
+              </li>
+              <li><a href="https://github.com/zvone187/y-space/pull/1">Base feature PR #1</a></li>
             </ul>
           </div>
         </details>

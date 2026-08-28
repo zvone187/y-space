@@ -1,38 +1,49 @@
 {
-  "version": 2,
+  "version": 3,
   "project": "Y Space",
-  "branch": "y-space-browser-integrations",
+  "branch": "y-space-minimal-branding",
   "platform": "macOS Apple Silicon desktop",
-  "testedOn": "2026-08-27",
+  "testedOn": "2026-08-28",
   "status": "complete_with_external_blockers",
   "build": {
     "kind": "unsigned ad-hoc macOS package",
     "app": "release/mac-arm64/Y Space.app",
     "dmg": "release/Y-Space-1.6.6-arm64.dmg",
     "architecture": "arm64",
-    "sha256": "1d1d19638d6e0091f652ce5935ae64c29a84f7d44fcdfcd39e751074e9f49505",
-    "bytes": 155951077,
-    "codesign": "codesign --verify --deep --strict passed",
+    "sha256": "5cd6e6964f772721fc904e7d3ec335b0277501e5636570ccf7ed3c2c94b4131f",
+    "bytes": 155866606,
+    "codesign": "codesign --verify --deep --strict passed; ad-hoc/runtime signature with no Team ID",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
-      "passedFiles": 879,
+      "status": "pass on the final source state under the repository's pinned Node.js runtime",
+      "passedFiles": 887,
       "skippedFiles": 5,
-      "passedTests": 9896,
-      "skippedTests": 85
+      "passedTests": 9926,
+      "skippedTests": 85,
+      "durationSeconds": 102.98
+    },
+    "targetedBranding": {
+      "status": "pass",
+      "passedFiles": 15,
+      "passedTests": 80,
+      "earlierBroadFocusedPass": "21 files and 150 tests",
+      "appearanceSearchBrandPass": "4 files and 29 tests",
+      "autoUpdaterPass": "1 file and 16 tests"
     },
     "checks": {
       "typecheck": "pass",
       "lint": "pass",
       "typeAwareLint": "pass",
       "format": "pass",
-      "i18n": "pass: 3,269 extracted messages and 0 missing across 12 translated catalogs",
+      "i18n": "pass: 3,275 extracted messages and 0 missing across 12 translated catalogs",
+      "websiteTypecheck": "pass",
       "diffCheck": "pass"
     },
     "productionBuilds": {
-      "desktop": "pass on final source; packaged as the ARM64 app and DMG above",
-      "mobile": "pass on final source after the desktop Pipedream file-picker patch"
+      "desktop": "pass on final source; packaged as the thin ARM64 app and DMG above",
+      "website": "pass with Next 16.3.1; 62 of 62 static pages generated"
     }
   },
   "architecture": {
@@ -308,6 +319,186 @@
         "implementation assets/qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg",
         "implementation assets/qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
       ]
+    },
+    {
+      "id": "YS-BRAND-E2E-001",
+      "title": "Fresh-profile white and orange visual baseline",
+      "userStory": "As a Y Space user, I want a calm white workspace so the product feels approachable rather than like a developer IDE.",
+      "setup": "Launch the final packaged ARM64 app with an isolated empty Y Space base directory. The final captured content frame is 1219x768; narrower responsive behavior is covered by component regressions rather than claimed as a second manual capture.",
+      "steps": [
+        "Launch from a cold profile and observe the first painted frame through the settled main workspace.",
+        "Open a thread, the sidebar, composer, and right workspace without selecting a custom theme.",
+        "Inspect focus, hover, selected, disabled, and loading contracts in the targeted component suites."
+      ],
+      "expected": [
+        "No black launch flash; the canvas is white and hierarchy uses warm-neutral surfaces and hairlines.",
+        "Orange is limited to focus, selected indicators, status accents, and the primary Send/Stop action.",
+        "No default purple or indigo brand surface is visible, and content remains legible in the final captured viewport."
+      ],
+      "evidence": [
+        "A fresh isolated packaged profile settled on the white welcome workspace with warm-neutral chrome and bright orange accents.",
+        "The final accessibility tree retained named navigation, composer, and the sole footer More control; Hide sidebar remained available inside that menu.",
+        "No update-error toast appeared during the 35-second scheduled-update observation window."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/branding-welcome-package-final.jpg",
+        "implementation assets/qa-screenshots/branding-welcome-no-toast-final.jpg"
+      ],
+      "status": "pass_final_viewport_and_automated_responsive_contracts"
+    },
+    {
+      "id": "YS-BRAND-E2E-002",
+      "title": "Minimal sidebar and single footer menu retain advanced access",
+      "userStory": "As a user scanning work, I want task titles and state to dominate while project and Git tooling stays available on demand.",
+      "setup": "Use the final isolated packaged profile for the footer/menu check and component fixtures for task-row state, actions, Git metadata, and usage settings.",
+      "steps": [
+        "Inspect the expanded packaged sidebar footer and its accessibility tree.",
+        "Open the single More menu and inspect workspace, Usage, saved shortcuts, What's New, update, Remote Access, and Settings entries.",
+        "Run the task-row, hover/focus, context-action, usage, and sidebar regression fixtures."
+      ],
+      "expected": [
+        "Idle rows show a provider/status glyph, one-line title, and time only; no visible +N/-N, sync counts, project path, branch, or inline tool rail.",
+        "Advanced actions remain discoverable by hover, focus, tooltip, context menu, and accessible name.",
+        "Usage rings are absent by default and return only after explicit opt-in.",
+        "The former four-icon footer is consolidated into one More control, with sidebar visibility inside that menu."
+      ],
+      "evidence": [
+        "The final packaged footer showed only More.",
+        "Opening More exposed Workspace, Usage, Pull requests, Schedules, What's New, Remote Access Off, Settings, and Hide sidebar in the accessibility tree.",
+        "Hide sidebar collapsed the rail to one bottom More control; its menu exposed Show sidebar, which restored the expanded sidebar.",
+        "Sidebar footer, workspace menu, task-row, usage, and accessibility regression tests passed."
+      ],
+      "screenshots": ["implementation assets/qa-screenshots/branding-welcome-package-final.jpg"],
+      "status": "pass_manual_footer_and_automated_task_row_regression"
+    },
+    {
+      "id": "YS-BRAND-E2E-003",
+      "title": "One global workspace strip after visual consolidation",
+      "userStory": "As a user, I want one tab concept for browser pages, tools, and documents without a second tool-tab row.",
+      "setup": "Open Files, Git, Notes, Usage, Terminal, two embedded browser pages, a source file, PDF, and XLSX in an isolated packaged profile.",
+      "steps": [
+        "Use the compact workspace add/overflow affordance to open each singleton tool as a peer tab.",
+        "Create two browser pages and open source, PDF, and XLSX documents as peers.",
+        "Navigate with click, ArrowLeft/Right, Home/End, Ctrl+Tab, drag reorder, and close; switch Browser to Git/document and back.",
+        "Open the compact Right panel menu, drag the Files grip into the lower right-panel half, verify the live split, then close the split."
+      ],
+      "expected": [
+        "Exactly one visible tablist exists; the active tab has a restrained orange underline and inactive tabs are neutral text.",
+        "Every tool and document remains a peer, singleton tools focus instead of duplicate, and no nested browser strip appears.",
+        "Browser page state, document state, Notes, Git, and Usage survive switching and deterministic close focus remains intact.",
+        "The compact menu retains a real drag source for advanced split docking without restoring an always-visible developer toolbar."
+      ],
+      "evidence": [
+        "Existing packaged global-tab QA remained green after the visual consolidation.",
+        "Browser pages, Files, Git, Usage, Notes, Terminal, source, PDF, XLS, and XLSX remained peers in the sole top strip.",
+        "Global-tab keyboard, reorder, close, state-preservation, and browser-residency regressions passed.",
+        "Computer Use dragged the final packaged Files grip into the lower right-panel half; the UI rendered the Files split and reported panel-tab:files dropping on panel-dock-zone:right-panel. Closing Split restored the two browser peers unchanged."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/branding-mixed-global-tabs-final.jpg",
+        "implementation assets/qa-screenshots/branding-dock-handle-package-final.jpg",
+        "implementation assets/qa-screenshots/global-tab-keyboard-cycle.jpeg"
+      ],
+      "status": "pass_manual_global_tabs_and_compact_docking"
+    },
+    {
+      "id": "YS-BRAND-E2E-004",
+      "title": "Clean conversation header and composer remain complete",
+      "userStory": "As an agent user, I want one clear conversation and composer surface without losing send, stop, attachments, status, or task controls.",
+      "setup": "Use safe local Codex/OpenCode test threads, one running task, one idle task, an attachment fixture, and a dirty fixture repository.",
+      "steps": [
+        "Inspect the idle and running thread headers, status control, overflow, and close behavior.",
+        "Submit by button and keyboard, stop a safe running task, attach a file, and open Review changes.",
+        "Repeat at narrow width and verify controls collapse without creating a second toolbar row."
+      ],
+      "expected": [
+        "Header shows one title, quiet status, essential actions, and overflow without branch/diff/token/debug copy in production.",
+        "Composer is one white card; enabled Send/Stop is orange; no visible line counts or PR number appears above it.",
+        "Submit, stop, attachments, review, authentication docks, and responsive layout remain functional and accessible."
+      ],
+      "evidence": [
+        "The final packaged welcome/composer surface remained a single calm card with named controls and native system typography.",
+        "Prior packaged Codex and OpenCode workflows exercised submit, running/idle state, browser evidence, and return to Idle on the same implementation base.",
+        "Focused ChatPane, header, composer, attachment, review, and responsive component regressions passed; the final full-suite run also completed cleanly."
+      ],
+      "screenshots": ["implementation assets/qa-screenshots/branding-welcome-package-final.jpg"],
+      "status": "pass_with_packaged_smoke_and_regression_coverage"
+    },
+    {
+      "id": "YS-BRAND-E2E-005",
+      "title": "Orange brand assets and native package identity",
+      "userStory": "As a user, I want Y Space to present one coherent white/orange identity in the app, package, dock, and owned assets.",
+      "setup": "Build the unsigned ARM64 app and DMG from the final source and inspect generated desktop, PWA, and native assets.",
+      "steps": [
+        "Inspect the app icon, wordmark, native menu, About identity, PWA manifest, and generated icons.",
+        "Search stable brand sources and generation constants for the retired indigo token.",
+        "Verify ad-hoc signature, architecture, package hash, and clean launch/quit."
+      ],
+      "expected": [
+        "Stable assets use a white tile, dark Y glyph, and orange mark with no legacy #8B7BFF source token.",
+        "The product remains named Y Space everywhere and compatibility-sensitive internal identifiers remain unchanged.",
+        "The unsigned package verifies, launches, and leaves no helpers after quit."
+      ],
+      "evidence": [
+        "Brand-contract tests passed for owned desktop, mobile, PWA, social, and website assets.",
+        "The final executable is thin arm64 and the unsigned/ad-hoc app passed deep/strict code-sign verification with no Team ID.",
+        "The final DMG is 155866606 bytes with SHA-256 5cd6e6964f772721fc904e7d3ec335b0277501e5636570ccf7ed3c2c94b4131f.",
+        "The packaged Contents/Resources/icon.icns is byte-identical to build/icon.icns (SHA-256 f597bd9d2d3917cbde3d98319a6bbcad2f5beb31eae8e16525fac2d20ae77eab).",
+        "The native application menu remained Y Space and the isolated packaged process left no helper after clean quit."
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "YS-BRAND-E2E-006",
+      "title": "Saved appearance and browser lifecycle regressions",
+      "userStory": "As an existing user, I want the new default without losing an explicit saved appearance or the browser memory protections.",
+      "setup": "Prepare one fresh profile, one explicit saved-dark profile, and the localhost-only browser lifecycle fixture.",
+      "steps": [
+        "Verify the fresh profile launches light and the explicitly saved-dark profile remains dark with orange branding.",
+        "Create and close enough browser peer tabs to cross the six-live-webview threshold while sampling guest renderers.",
+        "Quit and relaunch both profiles."
+      ],
+      "expected": [
+        "Fresh defaults are white, explicit saved dark remains honored, and neither theme uses legacy indigo branding.",
+        "Ordinary live guests remain capped at six, closed peers release their webviews/listeners, and metadata remains bounded at thirty.",
+        "Only intended tabs restore and zero packaged helpers survive quit."
+      ],
+      "evidence": [
+        "Fresh-profile light appearance was manually verified in the final package.",
+        "Theme preset, settings migration, and appearance contract tests verify that explicit saved themes remain honored and both variants use orange identity.",
+        "The existing packaged two-cycle browser soak reached the 30-tab metadata cap, peaked at six live guests, returned to four after cleanup, restored only intended tabs, and left zero helpers after quit."
+      ],
+      "artifact": "implementation assets/browser-memory-soak.json",
+      "manualDarkThemeNote": "A saved-dark profile was not manually re-captured in the final branding package; this part is covered by automated theme/settings contracts and is not presented as manual dark-theme QA.",
+      "status": "pass_automated_saved_theme_and_existing_manual_lifecycle"
+    },
+    {
+      "id": "YS-BRAND-E2E-007",
+      "title": "Consumer typography, contrast, footer consolidation, and quiet updater",
+      "userStory": "As a non-developer user, I want plain product language, familiar system typography, clean contrast, and one compact menu without noisy technical errors.",
+      "setup": "Launch the final unsigned package with a fresh isolated profile and inspect Welcome, More, and Settings > Appearance before and after the scheduled update check.",
+      "steps": [
+        "Inspect ordinary labels and prose for native system-sans typography while preserving monospace only for technical content.",
+        "Open the sole footer More menu, then open Settings and Appearance.",
+        "Wait beyond the scheduled update check and re-open More."
+      ],
+      "expected": [
+        "Ordinary product UI avoids developer-style typography and low-level implementation jargon.",
+        "Enabled text, borders, focus rings, orange accents, and danger states meet the visual contrast contracts.",
+        "No update-error toast appears when the fork has no published GitHub versions."
+      ],
+      "evidence": [
+        "Appearance used native system typography and simplified descriptions such as Chat text size and soft frosted-glass wording.",
+        "Theme accent foregrounds passed at or above 4.5:1, control borders at or above 3:1, and enabled muted text was made solid across the app.",
+        "The More menu remained clean and no update-error toast appeared after 35 seconds.",
+        "The fresh correctly scoped final branding/footer/global-tab/theme/updater run passed 15 files/80 tests; an earlier broader focused run passed 21 files/150 tests. Appearance/search/brand also passed 4 files/29 tests and autoUpdater passed 1 file/16 tests."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/branding-welcome-package-final.jpg",
+        "implementation assets/qa-screenshots/branding-welcome-no-toast-final.jpg",
+        "implementation assets/qa-screenshots/branding-appearance-final.jpg"
+      ],
+      "status": "pass"
     }
   ]
 }
