@@ -414,8 +414,11 @@
               <td>Bounded browser residency</td>
               <td>Pass</td>
               <td>
-                Nine browser metadata tabs retained four browser renderers plus the main renderer;
-                ordinary, sensitive, and metadata ceilings are 6, 4, and 30.
+                A packaged two-cycle churn run created and closed 30 disposable browser peers.
+                Metadata reached 30 and rejected a 31st tab; both peaks held exactly 6 guest
+                renderers, and both cleanups returned to the 4-renderer baseline. Final browser-core
+                RSS was only 0.9% above baseline, original tabs survived intact, closed disposable
+                tabs did not restore, and no helper survived quit.
               </td>
             </tr>
             <tr>
@@ -445,11 +448,18 @@
               </td>
             </tr>
             <tr>
-              <td>Pipedream environment picker</td>
-              <td>Safe local pass</td>
+              <td>Pipedream environment and live API</td>
+              <td>Read-only pass</td>
               <td>
                 The packaged native picker accepted a harmless fixture, safely rejected its fake
-                credentials, and then forgot the saved path. No real grant was created.
+                credentials, and then forgot the saved path. The ignored mode-600 real file then
+                passed production client-credentials exchange plus read-only project, app-catalog (1
+                Slack sample), and credential-excluding account-list requests (0 accounts for a
+                synthetic QA user). No Connect token, OAuth account grant, or account mutation was
+                created. In the final package, BYO Connect rendered Ready, a hands-on Slack search
+                returned its Connect action, and Connected accounts stayed empty; Connect was not
+                clicked. Clean quit left no Pipedream path or connection-store JSON. Six focused
+                Pipedream boundary files also passed all 34 tests.
               </td>
             </tr>
             <tr>
@@ -461,7 +471,9 @@
               <td>Claude Code</td>
               <td>External blocker</td>
               <td>
-                2.1.210 is installed but logged out; user login is required for a live model run.
+                2.1.210 is installed but logged out. A no-tools/no-session Sonnet smoke request
+                stopped before inference with the same authentication blocker; user login is
+                required for a live model run.
               </td>
             </tr>
           </tbody>
@@ -537,7 +549,7 @@
           <span class="pin"></span>
           <h2>Verification</h2>
         </div>
-        <div class="grid three">
+        <div class="grid two">
           <article class="sticky bg-green">
             <h3>Automated</h3>
             <ul>
@@ -548,6 +560,17 @@
               <li>Format, i18n, and diff checks passed</li>
             </ul>
           </article>
+          <article class="sticky bg-yellow">
+            <h3>Browser lifecycle</h3>
+            <ul>
+              <li>30 browser peers created and closed by hand</li>
+              <li>30-tab metadata ceiling enforced</li>
+              <li>6 live guest renderers at both peaks</li>
+              <li>4 live guest renderers after both cleanups</li>
+              <li>Final browser-core RSS: +0.9%</li>
+              <li>0 packaged processes left after quit</li>
+            </ul>
+          </article>
           <article class="sticky bg-blue">
             <h3>Package</h3>
             <ul>
@@ -555,7 +578,7 @@
               <li>Deep/strict code-sign verification passed</li>
               <li>ARM64, unsigned/ad-hoc as authorized</li>
               <li>DMG size: 155,951,077 bytes</li>
-              <li>Mobile build passed before the final desktop-main-only picker patch</li>
+              <li>Final-source mobile production build passed</li>
             </ul>
           </article>
           <article class="sticky bg-purple">
@@ -584,7 +607,11 @@
             <p>
               The native environment-file path passed its packaged safety flow: a harmless fixture
               was accepted, fake credentials were rejected without leakage, and the saved path was
-              forgotten. Live OAuth/account connection still awaits explicit authorization.
+              forgotten. The real ignored mode-600 file then passed the production token broker and
+              read-only project, catalog, and credential-excluding account-list APIs without
+              exposing values. The final packaged UI also rendered Ready and returned the live Slack
+              catalog without persisting connection state. Live OAuth/account connection still
+              awaits explicit authorization.
             </p>
           </article>
         </div>
@@ -599,8 +626,8 @@
                 Run <code>claude auth login</code> before a live Claude Code browser-control pass.
               </li>
               <li>
-                Explicitly authorize a Pipedream OAuth/client-credentials flow before live account
-                testing.
+                Explicitly authorize a Pipedream OAuth/account grant before connected-account and
+                disconnect testing. Client-credentials and read-only APIs already pass.
               </li>
               <li>
                 The unsigned build may require macOS Gatekeeper confirmation on another machine.
@@ -614,6 +641,7 @@
             <ul>
               <li><a href="../release/Y-Space-1.6.6-arm64.dmg">ARM64 Y Space DMG</a></li>
               <li><a href="qa-e2e-tests.json">Structured QA evidence</a></li>
+              <li><a href="browser-memory-soak.json">Browser memory-soak evidence</a></li>
               <li><a href="https://github.com/zvone187/y-space/pull/1">Pull request #1</a></li>
             </ul>
           </div>

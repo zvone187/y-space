@@ -32,7 +32,7 @@
     },
     "productionBuilds": {
       "desktop": "pass on final source; packaged as the ARM64 app and DMG above",
-      "mobile": "pass before the final desktop-main-process-only Pipedream file-picker patch"
+      "mobile": "pass on final source after the desktop Pipedream file-picker patch"
     }
   },
   "architecture": {
@@ -43,7 +43,7 @@
       "metadataLimit": 30,
       "policy": "true LRU with the active page protected; evicted pages retain bounded resume metadata and remount on user or agent activation"
     },
-    "manualProcessObservation": "Nine browser pages were present as tab metadata while the packaged app retained four browser renderer processes plus the main renderer. The observed live set remained below the six-page ordinary ceiling instead of retaining one renderer per metadata tab."
+    "manualProcessObservation": "A packaged two-cycle churn run created and closed 30 disposable browser peers. Metadata reached the hard cap of 30, a 31st creation was rejected, and both peaks retained exactly six guest renderers. Both cleanups returned to the four-renderer baseline; final browser-core RSS was 0.9% above baseline, no disposable tab restored after restart, and no helper survived quit."
   },
   "tests": [
     {
@@ -92,6 +92,7 @@
       "evidence": [
         "Claude Code 2.1.210 is installed.",
         "claude auth status reported loggedIn=false, authMethod=none, apiProvider=firstParty.",
+        "A noninteractive no-tools/no-session Sonnet smoke request exited before inference with an authentication blocker and no network-failure signature.",
         "No credentials were entered on the user's behalf, so a live model/browser run could not be performed."
       ],
       "nextAction": "The user must run claude auth login, then the same packaged browser-control scenario can be repeated."
@@ -158,18 +159,27 @@
     },
     {
       "id": "YS-E2E-011",
-      "title": "Packaged Pipedream environment-file safety flow",
+      "title": "Pipedream environment-file safety and read-only live credentials flow",
       "status": "pass_without_external_grant",
       "evidence": [
         "The native picker accepted a harmless syntactically complete environment fixture in the final packaged app.",
         "The fake credentials were rejected safely without leaking their values.",
-        "Forget environment file removed the saved path and returned the UI to its unconfigured state."
+        "Forget environment file removed the saved path and returned the UI to its unconfigured state.",
+        "The ignored mode-600 root environment file produced a ready bootstrap without printing any credential value.",
+        "The production token broker completed a client-credentials exchange against Pipedream's official token endpoint.",
+        "The production API client completed the configured project lookup and returned 1 app for a read-only Slack catalog sample.",
+        "The credential-excluding account-list request for a synthetic QA external user returned 0 accounts, as expected.",
+        "The final packaged app launched with the real ignored file, displayed BYO Connect as Ready, and stated that credentials are never exposed to agents.",
+        "A hands-on Slack search returned the live Slack result and Connect button while Connected accounts remained empty; the Connect button was not clicked.",
+        "After clean quit, no Pipedream environment-path or connection-store JSON had been persisted in the Y Space user-data directory.",
+        "Six focused Pipedream boundary test files passed all 34 tests with loopback binding enabled.",
+        "No Connect token, OAuth account grant, account connection, disconnect, or other account mutation was created."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/final-pipedream-fixture-rejected-safely.jpeg",
         "implementation assets/qa-screenshots/final-pipedream-fixture-forgotten.jpeg"
       ],
-      "notRun": "No real client-credentials token exchange, OAuth grant, or Pipedream account connection was created because that consequential action requires separate authorization."
+      "notRun": "No user OAuth grant or Pipedream account connection was created because that persistent-access action requires separate authorization."
     },
     {
       "id": "YS-E2E-012",
@@ -261,6 +271,20 @@
         "The final packaged app exposed the Y Space application menu.",
         "The native menu showed About Y Space and Quit Y Space."
       ]
+    },
+    {
+      "id": "YS-E2E-020",
+      "title": "Packaged browser churn, caps, cleanup, and restart",
+      "status": "pass_no_leak_signal",
+      "evidence": [
+        "Computer Use created 20 independent browser peer tabs from a 10-tab baseline, reaching the 30-tab metadata ceiling in the sole global workspace strip.",
+        "A 31st Cmd+T produced no additional tab and the packaged main-process log reported the expected Browser tab limit reached (30) rejection.",
+        "The first peak used six guest renderer processes; closing only the 20 disposable peers returned immediately to the four-renderer baseline and preserved the original 10 tab titles in order.",
+        "A second cycle created and closed 10 more peers; its peak again used six guest renderers and cleanup again returned to four.",
+        "Final browser-core RSS was 855,872 KiB versus an 848,416 KiB baseline, a 7,456 KiB or 0.9% delta. Main-process RSS finished 12.1% below baseline.",
+        "After clean quit, zero packaged Y Space or helper processes remained. Relaunch restored exactly the original 10 tabs and none of the 30 disposable tabs."
+      ],
+      "artifact": "implementation assets/browser-memory-soak.json"
     }
   ]
 }
