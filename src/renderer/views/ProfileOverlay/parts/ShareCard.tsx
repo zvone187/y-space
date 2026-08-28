@@ -49,7 +49,7 @@ export const ShareCard = forwardRef<
     >
       <div className="flex items-center gap-3">
         <div
-          className="flex size-12 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+          className="poracode-avatar-contrast flex size-12 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
           style={{ backgroundColor: identity.avatarColor }}
         >
           {initialsFor(identity.name)}
@@ -81,7 +81,7 @@ export const ShareCard = forwardRef<
         <Stat value={formatDaysLabel(totals.longestStreakDays, t)} label={t`longest streak`} />
       </div>
 
-      <div className="flex items-center justify-center pt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted/60">
+      <div className="flex items-center justify-center pt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
         Y Space
       </div>
     </div>

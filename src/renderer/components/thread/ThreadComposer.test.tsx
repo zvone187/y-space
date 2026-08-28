@@ -269,6 +269,7 @@ describe("ThreadComposer", () => {
     const { container } = renderComposerWithAttach(vi.fn());
     const shell = container.querySelector<HTMLElement>(".poracode-composer-shell");
     expect(shell).not.toBeNull();
+    expect(shell?.querySelector(".poracode-composer-border-glow")).toBeNull();
 
     fireEvent.dragEnter(shell!, {
       dataTransfer: { types: ["Files"], files: [], dropEffect: "copy" },

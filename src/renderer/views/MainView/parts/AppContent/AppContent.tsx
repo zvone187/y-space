@@ -291,7 +291,7 @@ export function AppContent() {
             <button
               type="button"
               aria-label={t`Close group`}
-              className="shrink-0 rounded p-0.5 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
+              className="shrink-0 rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
               onClick={() => useAppStore.getState().closeGroupView()}
             >
               <X className="size-3.5" />

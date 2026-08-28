@@ -34,7 +34,7 @@ export function ToolCallSections({ sections, leading }: ToolCallSectionsProps) {
           key={section.label}
           className={idx > 0 ? "border-t border-[color:var(--separator)] pt-2" : undefined}
         >
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-[color:var(--muted)]/80">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-[color:var(--muted)]">
             {section.label}
           </div>
           {section.renderAsMarkdown ? (

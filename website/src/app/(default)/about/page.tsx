@@ -55,7 +55,7 @@ export default function AboutPage() {
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(createAboutJsonLd()) }}
       />
 
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_55%_at_50%_0%,_rgba(139,123,255,0.14)_0%,_transparent_70%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_55%_at_50%_0%,_rgba(255,90,31,0.14)_0%,_transparent_70%)]" />
       <div className="brand-grid pointer-events-none fixed inset-x-0 top-0 h-[900px] opacity-60" />
 
       <nav className="relative z-20 mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-6 sm:px-8">
@@ -78,7 +78,7 @@ export default function AboutPage() {
       <main className="relative z-10 mx-auto max-w-4xl px-5 pb-24 pt-12 sm:px-8 md:pt-20">
         <header className="border-b border-white/[0.08] pb-14">
           <YSpaceIconTile className="mb-8 h-14 w-14" />
-          <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+          <p className="mb-4 font-mono text-xs uppercase tracking-[0.18em] text-accent-text">
             Official project profile
           </p>
           <h1 className="max-w-3xl text-4xl font-bold tracking-[-0.035em] sm:text-5xl md:text-6xl">
@@ -158,7 +158,7 @@ export default function AboutPage() {
                       href={href}
                       className="group flex items-start gap-3 px-5 py-4 transition-colors hover:bg-white/[0.035]"
                     >
-                      <Icon className="mt-0.5 size-4 shrink-0 text-accent" />
+                      <Icon className="mt-0.5 size-4 shrink-0 text-accent-text" />
                       <span className="min-w-0">
                         <span className="block text-sm font-medium text-moon">{label}</span>
                         <span className="mt-0.5 block break-words font-mono text-[12px] leading-5 text-dim">

@@ -128,7 +128,7 @@ export function UsageProviderCard(props: {
           ref={handleRef}
           type="button"
           aria-label={t`Reorder ${label}`}
-          className="flex size-4 shrink-0 cursor-grab items-center justify-center text-muted/40 transition-colors hover:text-foreground active:cursor-grabbing"
+          className="flex size-4 shrink-0 cursor-grab items-center justify-center text-muted transition-colors hover:text-foreground active:cursor-grabbing"
         >
           <GripVertical className="size-3.5" />
         </button>
@@ -171,7 +171,7 @@ export function UsageProviderCard(props: {
           title={t`Refresh ${label}`}
           onClick={() => void refresh()}
           disabled={refreshing}
-          className="flex size-5 shrink-0 items-center justify-center rounded-md text-muted/60 transition-colors hover:bg-muted/10 hover:text-foreground disabled:opacity-50"
+          className="flex size-5 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-muted/10 hover:text-foreground disabled:opacity-50"
         >
           <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
         </button>
@@ -182,7 +182,7 @@ export function UsageProviderCard(props: {
             title={t`Sign out ${label}`}
             onClick={() => void handleSignOut()}
             disabled={signingOut}
-            className="flex size-5 shrink-0 items-center justify-center rounded-md text-muted/60 transition-colors hover:bg-muted/10 hover:text-foreground disabled:opacity-50"
+            className="flex size-5 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-muted/10 hover:text-foreground disabled:opacity-50"
           >
             <LogOut className="size-3.5" />
           </button>
@@ -192,7 +192,7 @@ export function UsageProviderCard(props: {
           aria-expanded={!collapsed}
           aria-label={collapsed ? t`Expand ${label}` : t`Collapse ${label}`}
           onClick={() => onToggleCollapse(id)}
-          className="flex size-5 shrink-0 items-center justify-center rounded-md text-muted/60 transition-colors hover:bg-muted/10 hover:text-foreground"
+          className="flex size-5 shrink-0 items-center justify-center rounded-md text-muted transition-colors hover:bg-muted/10 hover:text-foreground"
         >
           <Chevron className="size-4" />
         </button>

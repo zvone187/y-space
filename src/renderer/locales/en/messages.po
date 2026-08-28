@@ -949,6 +949,10 @@ msgstr "Add a skill to .agents/skills or .poracode/skills, or import one from an
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
 #~ msgstr "Add a skill to .agents/skills or import one from another provider."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Add a soft frosted-glass effect to the sidebar."
+msgstr "Add a soft frosted-glass effect to the sidebar."
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "Add a to-do…"
@@ -1088,6 +1092,10 @@ msgstr "Additional arguments passed to each new Terminal-panel shell. Quote valu
 #~ msgid "Additional arguments passed to each new Windows shell. Quote values containing spaces."
 #~ msgstr "Additional arguments passed to each new Windows shell. Quote values containing spaces."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Adjust the size of conversation text."
+msgstr "Adjust the size of conversation text."
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
@@ -1103,8 +1111,8 @@ msgid "Agent ({subagent}): {description}"
 msgstr "Agent ({subagent}): {description}"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
-msgstr "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
+#~ msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
+#~ msgstr "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2277,6 +2285,11 @@ msgstr "Chat Commands"
 msgid "Chat starred"
 msgstr "Chat starred"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Chat text size"
+msgstr "Chat text size"
+
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Chat unstarred"
@@ -2390,6 +2403,11 @@ msgstr "Choose a local base branch for the experiment."
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "Choose a parent folder"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose a polished color palette for light or dark mode."
+msgstr "Choose a polished color palette for light or dark mode."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Choose a project icon image"
@@ -2654,6 +2672,7 @@ msgid "Close"
 msgstr "Close"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Close {closeTarget}"
 msgstr "Close {closeTarget}"
 
@@ -2899,8 +2918,8 @@ msgstr "Collapse error"
 #~ msgstr "Collapse experiment"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Collapse footer"
-msgstr "Collapse footer"
+#~ msgid "Collapse footer"
+#~ msgstr "Collapse footer"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -3346,6 +3365,10 @@ msgstr "Continue on the desktop address"
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Control desktop apps and complete visual workflows."
 msgstr "Control desktop apps and complete visual workflows."
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Control how much of the background shows through."
+msgstr "Control how much of the background shows through."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -4358,8 +4381,8 @@ msgid "Development"
 msgstr "Development"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
-msgid "Development-only overrides. Only visible in the PORACODE DEV build."
-msgstr "Development-only overrides. Only visible in the PORACODE DEV build."
+msgid "Development-only overrides. Visible only in Y Space Dev builds."
+msgstr "Development-only overrides. Visible only in Y Space Dev builds."
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4594,7 +4617,7 @@ msgid "Downloading into “{0}”. This can take a moment for large repositories
 msgstr "Downloading into “{0}”. This can take a moment for large repositories."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Downloading update"
 msgstr "Downloading update"
@@ -5045,8 +5068,8 @@ msgstr "Expand error"
 #~ msgstr "Expand experiment"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Expand footer"
-msgstr "Expand footer"
+#~ msgid "Expand footer"
+#~ msgstr "Expand footer"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -5327,7 +5350,7 @@ msgstr "File uses an unsupported encoding."
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Files"
 msgstr "Files"
 
@@ -5345,8 +5368,8 @@ msgid "Files for {0}"
 msgstr "Files for {0}"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Files for {projectName}"
-msgstr "Files for {projectName}"
+#~ msgid "Files for {projectName}"
+#~ msgstr "Files for {projectName}"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5506,8 +5529,8 @@ msgid "Flat list"
 msgstr "Flat list"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Focus browser"
-msgstr "Focus browser"
+#~ msgid "Focus browser"
+#~ msgstr "Focus browser"
 
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
@@ -5648,12 +5671,12 @@ msgid "From this project"
 msgstr "From this project"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
-msgstr "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
+#~ msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
+#~ msgstr "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
-msgstr "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
+#~ msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
+#~ msgstr "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Frozen worktree source is not a local branch: {branch}"
@@ -5740,7 +5763,7 @@ msgstr "Get task"
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useProjectMenu.tsx
@@ -5923,8 +5946,8 @@ msgstr "Grouped by project"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "GUI chat font size"
-msgstr "GUI chat font size"
+#~ msgid "GUI chat font size"
+#~ msgstr "GUI chat font size"
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "GUI runtime"
@@ -5968,7 +5991,6 @@ msgid "Hidden resumable threads are swept every 5 minutes and unloaded after thi
 msgstr "Hidden resumable threads are swept every 5 minutes and unloaded after this idle age."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
 msgid "Hide"
 msgstr "Hide"
 
@@ -6006,7 +6028,7 @@ msgstr "Hide MCP servers from {providerLabel}"
 msgid "Hide models you don't use from the model picker across every provider."
 msgstr "Hide models you don't use from the model picker across every provider."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Hide panel"
 msgstr "Hide panel"
 
@@ -6040,7 +6062,6 @@ msgstr "History"
 #: src/renderer/views/HomeView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#: src/renderer/views/WelcomeOverlay.tsx
 msgid "Home"
 msgstr "Home"
 
@@ -6440,7 +6461,7 @@ msgid "Install the package to add its API key."
 msgstr "Install the package to add its API key."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Install update"
 msgstr "Install update"
@@ -6450,7 +6471,7 @@ msgstr "Install update"
 msgid "Install v{0}"
 msgstr "Install v{0}"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Install v{updateVersion}"
 msgstr "Install v{updateVersion}"
 
@@ -6707,8 +6728,8 @@ msgid "List"
 msgstr "List"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "List options"
-msgstr "List options"
+#~ msgid "List options"
+#~ msgstr "List options"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "List packages"
@@ -6861,7 +6882,7 @@ msgstr "Location"
 msgid "Location glyph"
 msgstr "Location glyph"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Lock panel to the open thread"
 msgstr "Lock panel to the open thread"
 
@@ -6934,8 +6955,8 @@ msgid "Machine"
 msgstr "Machine"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
-msgstr "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+#~ msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+#~ msgstr "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Manage"
@@ -7084,7 +7105,7 @@ msgstr "Match case"
 msgid "Match your system, or force light or dark."
 msgstr "Match your system, or force light or dark."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize"
 msgstr "Maximize"
@@ -7432,6 +7453,7 @@ msgstr "Modes"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "More"
@@ -7521,6 +7543,7 @@ msgid "Move changes to a new worktree"
 msgstr "Move changes to a new worktree"
 
 #: src/renderer/components/layout/PanelDock/PanelSectionHeader.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Move panel"
 msgstr "Move panel"
 
@@ -8376,7 +8399,7 @@ msgstr "Not synced"
 
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "Notes"
@@ -8415,6 +8438,7 @@ msgstr "off"
 
 #: src/renderer/components/git/PrAutomationSlider.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Off"
 msgstr "Off"
@@ -8475,6 +8499,7 @@ msgstr "One time"
 
 #: src/renderer/components/common/RemoteServerStatusDot.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Online"
 msgstr "Online"
@@ -8540,8 +8565,8 @@ msgid "Open as Panel"
 msgstr "Open as Panel"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Open browser"
-msgstr "Open browser"
+#~ msgid "Open browser"
+#~ msgstr "Open browser"
 
 #: src/renderer/commands/registry.ts
 msgid "Open browser panel"
@@ -9274,8 +9299,8 @@ msgstr "Point this profile at a non-Anthropic provider (z.ai, …) with custom e
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
-msgstr "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+#~ msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+#~ msgstr "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
 
 #: src/renderer/components/thread/MoveThreadToWorktreeDialog.tsx
 #~ msgid "poracode/my-branch"
@@ -10021,7 +10046,6 @@ msgstr "Remote access"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Remote Access"
@@ -10618,6 +10642,10 @@ msgstr "Review PR"
 msgid "Review PR #{prNumber} for {0}"
 msgstr "Review PR #{prNumber} for {0}"
 
+#: src/renderer/components/thread/ThreadChangesBubble.tsx
+msgid "Review PR #{prNumber} for {worktreeName}"
+msgstr "Review PR #{prNumber} for {worktreeName}"
+
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "Review presentation"
@@ -10638,6 +10666,7 @@ msgstr "Revoke {name}"
 msgid "Right"
 msgstr "Right"
 
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Right panel"
 msgstr "Right panel"
@@ -11318,7 +11347,6 @@ msgstr "Set when this session started — start a new thread to change servers"
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
 msgstr "Settings"
@@ -11483,7 +11511,7 @@ msgstr "Show runtime debug panel"
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsSidebar.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -11504,7 +11532,7 @@ msgstr "Show source"
 msgid "Show the microphone button in the composer."
 msgstr "Show the microphone button in the composer."
 
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Show thread tools"
 msgstr "Show thread tools"
 
@@ -11984,6 +12012,7 @@ msgstr "Started {targetLabel} thread"
 #. Button label while the microphone test is starting
 #: src/mobile/remoteConnectionState.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Starting"
@@ -12258,8 +12287,8 @@ msgid "Switch to the previous tab"
 msgstr "Switch to the previous tab"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
-msgid "Switch workspace"
-msgstr "Switch workspace"
+#~ msgid "Switch workspace"
+#~ msgstr "Switch workspace"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
@@ -12319,6 +12348,7 @@ msgid "tab"
 msgstr "tab"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Tabs"
 msgstr "Tabs"
 
@@ -12400,7 +12430,7 @@ msgstr "Tell the target provider what to do next..."
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -12418,8 +12448,8 @@ msgid "Terminal for {0}"
 msgstr "Terminal for {0}"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Terminal for {projectName}"
-msgstr "Terminal for {projectName}"
+#~ msgid "Terminal for {projectName}"
+#~ msgstr "Terminal for {projectName}"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -13577,7 +13607,7 @@ msgstr "Unload idle threads after (minutes)"
 msgid "Unload Thread"
 msgstr "Unload Thread"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Unlock panel from the open thread"
 msgstr "Unlock panel from the open thread"
 
@@ -13786,6 +13816,7 @@ msgstr "URL is required."
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Usage"
 msgstr "Usage"
 
@@ -14179,7 +14210,7 @@ msgid "What this server provides"
 msgstr "What this server provides"
 
 #: src/renderer/commands/registry.ts
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "What's New"
 msgstr "What's New"
@@ -14363,6 +14394,7 @@ msgid "Working…"
 msgstr "Working…"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspace"
@@ -14376,7 +14408,7 @@ msgstr "Workspace MCP servers override user servers with the same name and are a
 msgid "Workspace view"
 msgstr "Workspace view"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspaces"

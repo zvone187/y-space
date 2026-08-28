@@ -123,7 +123,7 @@ export function PrReviewSidebar(props: {
                     <ChevronRight className="size-3" />
                   )}
                   <Trans>Changes in PR</Trans>
-                  <span className="font-normal text-muted/60">({files.length})</span>
+                  <span className="font-normal text-muted">({files.length})</span>
                 </button>
                 <span className="ml-auto flex items-center gap-0.5 text-[10px] leading-4 font-medium font-normal">
                   {totalAdditions > 0 && <span className="text-success">+{totalAdditions}</span>}
@@ -133,12 +133,12 @@ export function PrReviewSidebar(props: {
               {expanded && (
                 <div className="space-y-px">
                   {loading && files.length === 0 && (
-                    <div className="flex items-center justify-center px-2 py-3 text-xs text-muted/60">
+                    <div className="flex items-center justify-center px-2 py-3 text-xs text-muted">
                       <Trans>Loading PR…</Trans>
                     </div>
                   )}
                   {!loading && files.length === 0 && (
-                    <div className="flex items-center justify-center px-2 py-3 text-xs text-muted/60">
+                    <div className="flex items-center justify-center px-2 py-3 text-xs text-muted">
                       <Trans>No changes</Trans>
                     </div>
                   )}

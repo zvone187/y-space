@@ -2,5 +2,5 @@
   <!-- Tile-less Y Space glyph. The Y inherits currentColor; the orbit dot is the accent. -->
   <path fill="currentColor"
     d="M302 286H442L512 410L582 286H722L576 536V738H448V536L302 286Z"/>
-  <circle cx="690" cy="690" r="42" fill="#8B7BFF"/>
+  <circle cx="690" cy="690" r="42" fill="#FF5A1F"/>
 </svg>

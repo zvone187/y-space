@@ -14,11 +14,13 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const ROOT = resolve(HERE, "../..");
 
 // Tile color baked into poracode-icon.svg.
-const TILE_BG = "#0E0E14";
-// App/window background (matches capacitor.config.ts backgroundColor).
-const SPLASH_BG = "#070709";
+const TILE_BG = "#FFFFFF";
+// App/window background (matches capacitor.config.json backgroundColor).
+const SPLASH_BG = "#FFFFFF";
 // Glyph fill used by poracode-icon.svg for the "Y".
-const GLYPH_COLOR = "#EAF0FB";
+const GLYPH_COLOR = "#181816";
+// Orbit dot shared by stable and nightly artwork.
+const ORBIT_COLOR = "#FF5A1F";
 
 const iconSvg = await readFile(`${HERE}poracode-icon.svg`);
 // poracode-glyph.svg uses currentColor (renders black outside a DOM) — pin it.
@@ -31,7 +33,7 @@ const roundIconSvg = Buffer.from(
   <circle cx="512" cy="512" r="512" fill="${TILE_BG}"/>
   <path fill="${GLYPH_COLOR}"
     d="M302 286H442L512 410L582 286H722L576 536V738H448V536L302 286Z"/>
-  <circle cx="690" cy="690" r="42" fill="#8B7BFF"/>
+  <circle cx="690" cy="690" r="42" fill="${ORBIT_COLOR}"/>
 </svg>`,
 );
 

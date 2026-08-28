@@ -153,7 +153,7 @@ export function GitReviewOverlay(props: {
       contentHeaderChildren={
         <>
           <div className="poracode-overlay-header__controls flex min-w-0 shrink items-center gap-2 pl-1.5">
-            <span className="min-w-0 max-w-[min(200px,30vw)] truncate font-mono text-[13px] font-medium tracking-tight text-muted">
+            <span className="min-w-0 max-w-[min(200px,30vw)] truncate text-[13px] font-medium tracking-tight text-muted">
               {project.name}
             </span>
             {gitStatus?.branch ? (
@@ -165,7 +165,7 @@ export function GitReviewOverlay(props: {
                       className="min-w-0 max-w-[min(140px,20vw)] shrink"
                     >
                       <span className="inline-flex h-5 w-full min-w-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted">
-                        <GitBranch className="size-3 shrink-0 text-muted/50" />
+                        <GitBranch className="size-3 shrink-0 text-muted" />
                         <span className="min-w-0 truncate">{gitStatus.branch}</span>
                       </span>
                     </Tooltip.Trigger>
@@ -191,7 +191,7 @@ export function GitReviewOverlay(props: {
                         className="h-5 min-w-0 max-w-[min(140px,24vw)] shrink px-1.5 text-xs text-muted"
                         aria-label={t`Switch branch`}
                       >
-                        <GitBranch className="size-3 shrink-0 text-muted/50" />
+                        <GitBranch className="size-3 shrink-0 text-muted" />
                         <span className="min-w-0 truncate">{gitStatus.branch}</span>
                         <ChevronDown className="size-3 shrink-0" />
                       </Button>
@@ -199,7 +199,7 @@ export function GitReviewOverlay(props: {
                   />
                 )}
                 {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
-                  <span className="shrink-0 text-xs text-muted/60">
+                  <span className="shrink-0 text-xs text-muted">
                     ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
                   </span>
                 )}

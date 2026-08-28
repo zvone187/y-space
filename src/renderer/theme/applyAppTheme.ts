@@ -51,7 +51,7 @@ export function persistThemeBoot(appearance: Appearance, themeId: string): void 
   }
 }
 
-/** Whether the OS currently prefers a dark color scheme (defaults to dark). */
+/** Whether the OS currently prefers a dark color scheme. */
 export function systemPrefersDark(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return true;
@@ -71,7 +71,7 @@ export function bootstrapAppThemeFromCache(): void {
     if (!raw) return;
     const cached = JSON.parse(raw) as { themeMode?: unknown; themePreset?: unknown };
     const mode: ThemeMode =
-      cached.themeMode === "light" || cached.themeMode === "system" ? cached.themeMode : "dark";
+      cached.themeMode === "dark" || cached.themeMode === "system" ? cached.themeMode : "light";
     const themeId = typeof cached.themePreset === "string" ? cached.themePreset : DEFAULT_THEME_ID;
     const appearance = resolveThemeMode(mode, systemPrefersDark());
 

@@ -168,7 +168,7 @@ const DETAILS = [
 const MCP_POWERS = [
   {
     icon: SlidersHorizontal,
-    server: "poracode",
+    server: "y_space",
     title: "mcp.appControls.title",
     desc: "mcp.appControls.desc",
   },
@@ -178,7 +178,7 @@ const MCP_POWERS = [
     title: "mcp.crossagents.title",
     desc: "mcp.crossagents.desc",
   },
-  { icon: Plug, server: "poracode", title: "mcp.extend.title", desc: "mcp.extend.desc" },
+  { icon: Plug, server: "y_space", title: "mcp.extend.title", desc: "mcp.extend.desc" },
   {
     icon: MousePointerClick,
     server: "browser · computer_use",
@@ -490,7 +490,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
 
       {/* one-light-source ambient decor */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-52 left-1/2 h-[760px] w-[min(1180px,124vw)] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.18),transparent)] blur-[120px]" />
+        <div className="absolute -top-52 left-1/2 h-[760px] w-[min(1180px,124vw)] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,90,31,0.18),transparent)] blur-[120px]" />
         <div className="brand-grid absolute inset-x-0 top-0 h-[1200px]" />
       </div>
 
@@ -504,7 +504,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
         <span className="font-mono text-[12px] tracking-[-0.01em] text-dim transition-colors group-hover:text-moon">
           {versionLabel}
         </span>
-        <ArrowUpRight className="h-3 w-3 text-accent transition-transform group-hover:translate-x-0.5" />
+        <ArrowUpRight className="h-3 w-3 text-accent-text transition-transform group-hover:translate-x-0.5" />
       </Link>
 
       {/* ── §1 Nav ──────────────────────────────────────────────── */}
@@ -619,7 +619,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
               {t("hero.byo")}
             </span>
             <span className="inline-flex items-center gap-2">
-              <Scale className="h-4 w-4 text-accent" />
+              <Scale className="h-4 w-4 text-accent-text" />
               {t("hero.foss")}
             </span>
           </div>
@@ -643,7 +643,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
             ))}
             <a
               href="#acp-registry"
-              className="brand-chip whitespace-nowrap px-3.5 py-1.5 font-mono text-[13px] text-accent"
+              className="brand-chip whitespace-nowrap px-3.5 py-1.5 font-mono text-[13px] text-accent-text"
             >
               {t("hero.acpRegistry")}
               <ArrowUpRight className="h-3.5 w-3.5" />
@@ -653,7 +653,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
 
         {/* ── §3 App window showcase ──────────────────────────────── */}
         <section className="relative z-10 mx-auto max-w-6xl px-4 pb-28 sm:px-8">
-          <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_28%,rgba(139,123,255,0.22),transparent)] blur-[90px]" />
+          <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_28%,rgba(255,90,31,0.22),transparent)] blur-[90px]" />
           <AppWindow
             src="/hero-screenshot.png"
             alt="Y Space desktop app running Claude and Codex coding agents side by side"
@@ -670,10 +670,10 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
 
         {/* ── §3b Web app — the desktop, browser-borne ────────────── */}
         <section className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8 lg:pb-40">
-          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[560px] w-[920px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.10),transparent)] blur-3xl" />
+          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[560px] w-[920px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,90,31,0.10),transparent)] blur-3xl" />
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto mb-14 max-w-2xl text-center lg:mb-36">
-              <p className="mb-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+              <p className="mb-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent-text">
                 <span className="pora-dot h-1.5 w-1.5" />
                 {t("nav.webApp")}
               </p>
@@ -734,10 +734,10 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
           id="automation"
           className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8"
         >
-          <div className="pointer-events-none absolute left-1/2 top-20 -z-10 h-[440px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.12),transparent)] blur-3xl" />
+          <div className="pointer-events-none absolute left-1/2 top-20 -z-10 h-[440px] w-[860px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,90,31,0.12),transparent)] blur-3xl" />
           <div className="mx-auto max-w-6xl">
             <div className="mx-auto mb-14 max-w-2xl text-center">
-              <p className="mb-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+              <p className="mb-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent-text">
                 <span className="pora-dot h-1.5 w-1.5" />
                 {t("automation.eyebrow")}
               </p>
@@ -765,7 +765,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
 
         {/* ── §4b Showcase — real app surfaces, zig-zag ───────────── */}
         <section className="relative z-10 px-5 pb-28 sm:px-8">
-          <div className="pointer-events-none absolute left-1/2 top-1/3 -z-10 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(94,230,224,0.06),transparent)] blur-2xl" />
+          <div className="pointer-events-none absolute left-1/2 top-1/3 -z-10 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,90,31,0.06),transparent)] blur-2xl" />
           <div className="mx-auto flex max-w-6xl flex-col gap-20">
             {SHOWCASE.map((s, i) => (
               <div key={s.src} className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
@@ -778,7 +778,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
                   />
                 </div>
                 <div className={`lg:col-span-5 ${i % 2 === 1 ? "lg:order-1" : ""}`}>
-                  <p className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+                  <p className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent-text">
                     <span className="pora-dot h-1.5 w-1.5" />
                     {String(i + 1).padStart(2, "0")} / {String(SHOWCASE.length).padStart(2, "0")}
                   </p>
@@ -797,7 +797,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
         <section className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8">
           <div className="mx-auto max-w-6xl">
             <div className="mb-14 max-w-2xl">
-              <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+              <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent-text">
                 <span className="pora-dot h-1.5 w-1.5" />
                 {t("gallery.eyebrow")}
               </p>
@@ -852,7 +852,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
         {/* ── §5 ACP registry — living marquee ────────────────────── */}
         <section id="acp-registry" className="relative z-10 border-t border-white/[0.06] py-28">
           <div className="mx-auto mb-12 max-w-7xl px-5 text-center sm:px-8">
-            <p className="mb-3 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+            <p className="mb-3 font-mono text-xs uppercase tracking-[0.18em] text-accent-text">
               {t("acp.eyebrow")}
             </p>
             <h2 className="text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
@@ -869,7 +869,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
         {/* ── §7 Final CTA — signature close ──────────────────────── */}
         <section className="relative z-10 border-t border-white/[0.06] px-5 py-32 sm:px-8">
           <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/[0.08] bg-tile px-6 py-20 text-center sm:px-12">
-            <div className="pointer-events-none absolute -top-24 left-1/2 h-[360px] w-[760px] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,123,255,0.22),transparent)] blur-2xl" />
+            <div className="pointer-events-none absolute -top-24 left-1/2 h-[360px] w-[760px] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(255,90,31,0.22),transparent)] blur-2xl" />
             <div className="relative">
               <YSpaceIconTile className="mx-auto mb-7 h-14 w-14" />
               <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
@@ -878,7 +878,7 @@ function HomeBody({ release }: { release: ReleaseInfo }) {
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-dim">{t("features.subtitle")}</p>
               <p className="mt-4 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
-                <Scale className="h-4 w-4 text-accent" />
+                <Scale className="h-4 w-4 text-accent-text" />
                 {t("hero.foss")}
               </p>
               <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -973,14 +973,14 @@ function WebAppCard({ className, description }: { className?: string; descriptio
       {/* body: pairing link + pitch */}
       <span className="relative block px-6 py-12 sm:px-8 sm:py-14 lg:py-16 lg:pr-72">
         <span className="brand-grid absolute inset-0 opacity-50" />
-        <span className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.14),transparent)] blur-2xl" />
+        <span className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,90,31,0.14),transparent)] blur-2xl" />
         <span className="relative flex items-center justify-center">
           <YSpaceIconTile className="h-11 w-11 sm:h-14 sm:w-14" />
           <span className="relative mx-2 h-px w-20 bg-white/15 sm:mx-3 sm:w-28">
-            <span className="pora-pair-dot absolute -top-[3px] h-[7px] w-[7px] rounded-full bg-accent [box-shadow:0_0_8px_rgba(139,123,255,0.8)]" />
+            <span className="pora-pair-dot absolute -top-[3px] h-[7px] w-[7px] rounded-full bg-accent [box-shadow:0_0_8px_rgba(255,90,31,0.8)]" />
           </span>
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-[26%] bg-tile ring-1 ring-white/10 sm:h-14 sm:w-14">
-            <Globe className="h-[62%] w-[62%] text-accent" />
+            <Globe className="h-[62%] w-[62%] text-accent-text" />
           </span>
         </span>
         <span className="relative mx-auto mt-6 block max-w-lg text-center text-base leading-relaxed text-dim">
@@ -1025,7 +1025,7 @@ function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; classNam
         {/* paired state */}
         <span className="relative flex flex-1 flex-col items-center justify-center gap-5 px-6">
           <span className="brand-grid absolute inset-0 opacity-60" />
-          <span className="pointer-events-none absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.16),transparent)] blur-2xl" />
+          <span className="pointer-events-none absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(255,90,31,0.16),transparent)] blur-2xl" />
           <span className="relative">
             <span className="pora-pulse absolute -inset-3 rounded-[32%] bg-accent/15 blur-xl" />
             <YSpaceIconTile className="relative h-16 w-16" />
@@ -1129,7 +1129,7 @@ function AppWindow({
 
 /** Shared treatments repeated across the cards below — one edit per brand tweak. */
 const ACCENT_ICON_TILE =
-  "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20 transition group-hover:bg-accent/[0.16]";
+  "inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent-text ring-1 ring-accent/20 transition group-hover:bg-accent/[0.16]";
 const HOVER_HAIRLINE_TOP =
   "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100";
 
@@ -1145,7 +1145,7 @@ function DetailRow({
 }) {
   return (
     <div className="group flex items-start gap-4 border-t border-white/[0.07] py-5">
-      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-accent ring-1 ring-white/[0.06] transition group-hover:bg-accent/10">
+      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-accent-text ring-1 ring-white/[0.06] transition group-hover:bg-accent/10">
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0">
@@ -1252,7 +1252,7 @@ function FeatureCell({
   desc: string;
 }) {
   return (
-    <div className="group relative bg-night p-7 transition-colors hover:bg-[rgba(139,123,255,0.035)]">
+    <div className="group relative bg-night p-7 transition-colors hover:bg-[rgba(255,90,31,0.035)]">
       {/* cursor-sweep top edge on hover */}
       <span className="pointer-events-none absolute inset-x-0 top-0 h-px origin-left scale-x-0 bg-gradient-to-r from-accent/0 via-accent/70 to-accent/0 transition-transform duration-500 group-hover:scale-x-100" />
       <div className="mb-4 flex items-center justify-between">

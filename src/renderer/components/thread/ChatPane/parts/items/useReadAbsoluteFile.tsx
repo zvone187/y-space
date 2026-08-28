@@ -79,7 +79,7 @@ export function FileContentPlaceholder({ state, reason }: FileContentPlaceholder
             : state === "unsupported"
               ? t`File uses an unsupported encoding.`
               : (reason ?? t`Could not read file.`);
-  return <div className="font-mono text-[color:var(--muted)]/80 text-xs">{message}</div>;
+  return <div className="text-xs text-[color:var(--muted)]">{message}</div>;
 }
 
 function resolveAbsolutePath(rawPath: string, location: ProjectLocation): string {

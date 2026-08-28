@@ -24,7 +24,7 @@ import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
 import { GuiThreadContent } from "./ThreadContent";
 import { TerminalThreadContent } from "./TerminalThreadContent";
 import { ThreadHeaderStatusButton } from "./ThreadHeaderStatus";
-import { ThreadToolRail } from "./ThreadToolRail";
+import { ThreadToolsMenu } from "./ThreadToolsMenu";
 
 /**
  * Strip Electron's `Error invoking remote method '<channel>': Error: ` prefix
@@ -70,7 +70,6 @@ function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): 
     (!configAffectsLaunch || prev.thread.config === next.thread.config) &&
     prev.agentStatus === next.agentStatus &&
     prev.projectLocation === next.projectLocation &&
-    prev.projectName === next.projectName &&
     prev.pendingLaunchPrompt === next.pendingLaunchPrompt &&
     prev.pendingLaunchSegments === next.pendingLaunchSegments &&
     prev.pendingLaunchUserMessageItemId === next.pendingLaunchUserMessageItemId &&
@@ -99,7 +98,6 @@ export type ThreadViewProps = {
   thread: Thread;
   agentStatus: AgentStatus | undefined;
   projectLocation: ProjectLocation;
-  projectName?: string;
   pendingLaunchPrompt?: string;
   pendingLaunchSegments?: PromptSegment[];
   pendingLaunchUserMessageItemId?: string;
@@ -156,7 +154,6 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     thread,
     agentStatus,
     projectLocation,
-    projectName,
     pendingLaunchPrompt,
     pendingLaunchSegments,
     pendingLaunchUserMessageItemId,
@@ -357,12 +354,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                 </Tooltip.Content>
               </Tooltip>
               <div className="flex shrink-0 items-center">
-                {projectName ? (
-                  <span className="px-1 text-sm leading-tight text-muted/60 @max-[560px]:text-xs @max-[360px]:text-[11px]">
-                    {projectName}
-                  </span>
-                ) : null}
-                {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
+                {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted" /> : null}
                 {onContinueInProvider &&
                 installedAgents &&
                 installedAgents.filter((a) => a.kind !== thread.agentKind).length > 0 &&
@@ -372,7 +364,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                       <button
                         type="button"
                         aria-label={t`Continue in another provider`}
-                        className="poracode-overlay-header__controls shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
+                        className="poracode-overlay-header__controls shrink-0 rounded p-1 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
                         onClick={(e) => {
                           e.stopPropagation();
                           setContinueDialogOpen(true);
@@ -397,7 +389,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                             : t`Show runtime debug panel`
                         }
                         aria-pressed={runtimeDebugOpen}
-                        className={`poracode-overlay-header__controls shrink-0 rounded p-1 transition-colors hover:bg-[var(--row-hover)] ${runtimeDebugOpen ? "text-foreground" : "text-muted/60 hover:text-foreground"}`}
+                        className={`poracode-overlay-header__controls shrink-0 rounded p-1 transition-colors hover:bg-[var(--row-hover)] ${runtimeDebugOpen ? "text-foreground" : "text-muted hover:text-foreground"}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setRuntimeDebugOpen((o) => !o);
@@ -419,7 +411,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                   <button
                     type="button"
                     aria-label={thread.done ? t`Unmark done` : t`Mark done`}
-                    className={`poracode-overlay-header__controls shrink-0 rounded p-1 transition-colors hover:bg-[var(--row-hover)] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
+                    className={`poracode-overlay-header__controls shrink-0 rounded p-1 transition-colors hover:bg-[var(--row-hover)] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted hover:text-foreground"}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onMarkDone();
@@ -429,9 +421,8 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                   </button>
                 ) : null}
                 {awaitingWorktree ? null : (
-                  <ThreadToolRail
+                  <ThreadToolsMenu
                     projectId={thread.projectId}
-                    paneCount={paneCount}
                     {...(thread.worktreePath ? { worktreePath: thread.worktreePath } : {})}
                   />
                 )}
@@ -439,7 +430,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                   <button
                     type="button"
                     aria-label={t`Close pane`}
-                    className="poracode-overlay-header__controls shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
+                    className="poracode-overlay-header__controls shrink-0 rounded p-1 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       onClose?.();

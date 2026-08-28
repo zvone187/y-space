@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" class="dark" data-theme="dark">
+<html lang="en" class="light" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-visual"
     />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#ffffff" />
     <script data-mobile-display-bootstrap>
       // Safari's floating browser toolbar should blend with the in-flow app
       // paint, which needs a transparent theme-color. Installed Home Screen
@@ -42,7 +42,7 @@
     <meta name="robots" content="noindex, nofollow" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Y Space" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>Y Space</title>
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <link rel="icon" href="%BASE_URL%app-icon.svg" />
@@ -50,8 +50,16 @@
     <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon.png" />
     <style>
       :root {
+        --mobile-boot-bg: #ffffff;
+        --mobile-boot-fg: #181816;
+        color-scheme: light;
+        background: var(--mobile-boot-bg);
+      }
+
+      :root.dark {
+        --mobile-boot-bg: #070709;
+        --mobile-boot-fg: #fafafa;
         color-scheme: dark;
-        background: #000000;
       }
 
       html,
@@ -59,7 +67,7 @@
       #root {
         min-height: 100%;
         margin: 0;
-        background: #000000;
+        background: var(--mobile-boot-bg);
       }
 
       body {
@@ -71,8 +79,8 @@
         inset: 0;
         display: grid;
         place-items: center;
-        background: #000000;
-        color: #f4f4f5;
+        background: var(--mobile-boot-bg);
+        color: var(--mobile-boot-fg);
         font:
           600 15px ui-sans-serif,
           system-ui,
@@ -85,8 +93,8 @@
       .mobile-boot-screen__wordmark {
         display: inline-flex;
         align-items: baseline;
-        color: #eaf0fb;
-        font-size: clamp(2.25rem, 14vw, 4rem);
+        color: var(--mobile-boot-fg);
+        font-size: clamp(1.75rem, 10vw, 2.5rem);
         letter-spacing: -0.045em;
         line-height: 1;
       }
@@ -104,7 +112,7 @@
         height: 1em;
         margin: 0 0.03em 0 0.1em;
         overflow: visible;
-        fill: #8b7bff;
+        fill: #ff5a1f;
         vertical-align: baseline;
       }
     </style>
@@ -126,17 +134,52 @@
       })();
     </script>
     <script>
+      // Match the native white splash and honor an explicit saved appearance
+      // before the mobile renderer mounts. Fresh installs intentionally start
+      // light; the operating system is consulted only for an explicit
+      // `system` preference.
       (function () {
         try {
-          var prefersDark =
-            !window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var appearance = prefersDark ? "dark" : "light";
-          document.documentElement.classList.remove("light", "dark");
-          document.documentElement.classList.add(appearance);
-          document.documentElement.dataset.theme = appearance;
+          var root = document.documentElement;
+          var boot = JSON.parse(localStorage.getItem("poracode-boot") || "null");
+          var appearance =
+            boot && (boot.appearance === "light" || boot.appearance === "dark")
+              ? boot.appearance
+              : null;
+          if (!appearance) {
+            var settings = JSON.parse(localStorage.getItem("poracode-shared-settings") || "null");
+            var mode = settings && settings.themeMode;
+            var prefersDark =
+              !window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches;
+            // prettier-ignore
+            appearance =
+              mode === "dark"
+                ? "dark"
+                : mode === "system"
+                    ? prefersDark
+                      ? "dark"
+                      : "light"
+                    : "light";
+          }
+          root.classList.remove("light", "dark");
+          root.classList.add(appearance);
+          root.dataset.theme = appearance;
+
+          var background =
+            boot && typeof boot.bg === "string"
+              ? boot.bg
+              : appearance === "dark"
+                ? "#070709"
+                : "#ffffff";
+          root.style.setProperty("--mobile-boot-bg", background);
+          root.style.backgroundColor = background;
+          if (!root.hasAttribute("data-mobile-browser-chrome")) {
+            document.querySelector('meta[name="theme-color"]').setAttribute("content", background);
+          }
         } catch (e) {
-          document.documentElement.classList.add("dark");
-          document.documentElement.dataset.theme = "dark";
+          document.documentElement.classList.remove("dark");
+          document.documentElement.classList.add("light");
+          document.documentElement.dataset.theme = "light";
         }
       })();
     </script>

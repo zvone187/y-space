@@ -371,7 +371,7 @@ function CloneProjectForm() {
                   )}
                   {runtimeLabel}
                 </span>
-                <ChevronDown className="size-3.5 text-muted/60" />
+                <ChevronDown className="size-3.5 text-muted" />
               </Button>
               <Dropdown.Popover className="min-w-[--trigger-width]">
                 <Dropdown.Menu
@@ -502,7 +502,7 @@ function GitHubBrowser(props: {
           <code className="rounded bg-content2 px-1 py-0.5">gh auth login</code>, or{" "}
           <button
             type="button"
-            className="text-accent underline-offset-2 hover:underline"
+            className="text-accent-text underline-offset-2 hover:underline"
             onClick={props.onSwitchToUrl}
           >
             paste a clone URL
@@ -522,7 +522,7 @@ function GitHubBrowser(props: {
               <GithubMark className="size-4 text-muted" />
               {selectedAccount?.login ?? t`Select account`}
             </span>
-            <ChevronDown className="size-3.5 text-muted/60" />
+            <ChevronDown className="size-3.5 text-muted" />
           </Button>
           <Dropdown.Popover className="min-w-[--trigger-width]">
             <Dropdown.Menu
@@ -545,7 +545,7 @@ function GitHubBrowser(props: {
                 >
                   <GithubMark className="size-4 shrink-0 text-muted" />
                   <Label>{account.login}</Label>
-                  <span className="ml-auto text-[10px] text-muted/70">{account.host}</span>
+                  <span className="ml-auto text-[10px] text-muted">{account.host}</span>
                 </Dropdown.Item>
               ))}
             </Dropdown.Menu>
@@ -636,7 +636,7 @@ function RepoList(props: {
               <p className="truncate text-xs text-muted">{repo.description || t`No description`}</p>
             </div>
             {repo.pushedAt ? (
-              <span className="mt-0.5 shrink-0 text-[10px] text-muted/70">
+              <span className="mt-0.5 shrink-0 text-[10px] text-muted">
                 {formatRelativeTime(repo.pushedAt)}
               </span>
             ) : null}

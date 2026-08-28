@@ -199,9 +199,9 @@ export function WorkspaceView(props: {
             </button>
             <span className="m-git-head__title">
               {gitTarget ? (
-                <GitBranch className="size-3.5 shrink-0 text-muted/60" />
+                <GitBranch className="size-3.5 shrink-0 text-muted" />
               ) : (
-                <FolderTree className="size-3.5 shrink-0 text-muted/60" />
+                <FolderTree className="size-3.5 shrink-0 text-muted" />
               )}
               <span className="m-git-head__project">{projectLabel}</span>
               {gitTarget ? (
@@ -234,7 +234,7 @@ export function WorkspaceView(props: {
                     <span className="m-git-head__branch">{branchLabel || t`(no branch)`}</span>
                   )}
                   {ahead > 0 || behind > 0 ? (
-                    <span className="shrink-0 text-xs text-muted/70">
+                    <span className="shrink-0 text-xs text-muted">
                       {ahead > 0 ? `↑${ahead}` : ""}
                       {behind > 0 ? ` ↓${behind}` : ""}
                     </span>

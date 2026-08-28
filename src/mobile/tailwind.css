@@ -4,6 +4,10 @@
 @import "../renderer/styles.css";
 @import "./styles.css";
 
+@theme inline {
+  --color-accent-text: var(--accent-text);
+}
+
 @source "../renderer/**/*.{ts,tsx}";
 @source not "../renderer/**/*.{test,spec}.{ts,tsx}";
 @source "./**/*.{ts,tsx}";

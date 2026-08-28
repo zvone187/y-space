@@ -443,7 +443,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
           {currentLabelParts.name || t`Select model`}
         </span>
         {currentSubProvider ? (
-          <span className="max-w-full truncate text-[10px] font-medium leading-tight text-muted/70">
+          <span className="max-w-full truncate text-[10px] font-medium leading-tight text-muted">
             {currentSubProvider.label}
           </span>
         ) : null}
@@ -900,12 +900,12 @@ const WindowedProviderModelList = forwardRef<
                       className={
                         rowFastEnabled
                           ? "size-3 shrink-0 fill-current text-muted"
-                          : "size-3 shrink-0 text-muted/60"
+                          : "size-3 shrink-0 text-muted"
                       }
                     />
                   ) : null}
                   {mutedHint ? (
-                    <span className="shrink-0 text-[10px] leading-none text-muted/60">
+                    <span className="shrink-0 text-[10px] leading-none text-muted">
                       · {mutedHint}
                     </span>
                   ) : null}
@@ -926,7 +926,7 @@ const WindowedProviderModelList = forwardRef<
               );
             })()}
             {item.showProviderIcon || item.subProviderLabel ? (
-              <span className="ml-auto flex min-w-0 max-w-[45%] items-center gap-1 text-muted/70">
+              <span className="ml-auto flex min-w-0 max-w-[45%] items-center gap-1 text-muted">
                 {item.subProviderLabel ? (
                   <span className="min-w-0 truncate text-[10px]">{item.subProviderLabel}</span>
                 ) : null}
@@ -948,7 +948,7 @@ const WindowedProviderModelList = forwardRef<
                 className={`ml-1 flex size-5 shrink-0 items-center justify-center rounded transition ${
                   item.isFavorite
                     ? "text-foreground"
-                    : "text-muted/40 opacity-0 group-hover:opacity-100 hover:text-foreground"
+                    : "text-muted opacity-0 group-hover:opacity-100 hover:text-foreground"
                 }`}
                 onPointerDown={(event) => event.stopPropagation()}
                 onPointerUp={(event) => event.stopPropagation()}
@@ -1014,7 +1014,7 @@ function HeaderPlain(props: {
   return (
     <div
       role="presentation"
-      className={`${className} flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80`}
+      className={`${className} flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted`}
     >
       {t(item.label)}
     </div>
@@ -1030,7 +1030,7 @@ function HeaderProvider(props: {
   return (
     <div
       role="presentation"
-      className={`${className} flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80`}
+      className={`${className} flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted`}
     >
       <ProviderIcon
         kind={item.providerKind}
@@ -1043,7 +1043,7 @@ function HeaderProvider(props: {
       {subProviderLabel ? (
         <>
           <span className="text-muted/55">·</span>
-          <span className="min-w-0 truncate text-muted/70">{subProviderLabel}</span>
+          <span className="min-w-0 truncate text-muted">{subProviderLabel}</span>
         </>
       ) : null}
     </div>
@@ -1058,7 +1058,7 @@ function HeaderSub(props: {
   return (
     <div
       role="presentation"
-      className={`${className} flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80`}
+      className={`${className} flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted`}
     >
       {item.label}
     </div>

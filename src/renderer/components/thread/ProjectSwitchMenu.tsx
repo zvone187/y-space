@@ -52,9 +52,7 @@ export function ProjectSwitchMenu(props: {
   ) : null;
   // The machine trails the name, so the project stays the thing you read first.
   const triggerMachine = currentRemote.serverName ? (
-    <span className="min-w-0 shrink truncate text-xs text-muted/60">
-      {currentRemote.serverName}
-    </span>
+    <span className="min-w-0 shrink truncate text-xs text-muted">{currentRemote.serverName}</span>
   ) : null;
   const isDisabled =
     projects.length === 0 || (projects.length === 1 && projects[0]?.id === currentProjectId);
@@ -97,11 +95,11 @@ export function ProjectSwitchMenu(props: {
           <ProjectSelectorIcon project={project} remote={remote} />
           <span className="min-w-0 flex-1 truncate">{itemLabel}</span>
           {remote.serverName ? (
-            <span className="max-w-28 shrink-0 truncate text-xs text-muted/60">
+            <span className="max-w-28 shrink-0 truncate text-xs text-muted">
               {remote.serverName}
             </span>
           ) : null}
-          {selected ? <Check className="size-4 shrink-0 text-accent" /> : null}
+          {selected ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
         </button>
       );
     });
@@ -129,7 +127,7 @@ export function ProjectSwitchMenu(props: {
     const triggerClass =
       variant === "hero"
         ? "group mx-auto inline-flex max-w-full items-center gap-1.5 rounded border border-transparent px-2 py-0.5 outline-none transition-colors hover:border-border/60 hover:bg-[var(--row-hover)] disabled:cursor-default disabled:hover:border-transparent disabled:hover:bg-transparent"
-        : "group inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1 py-0.5 text-sm leading-tight text-muted/60 outline-none transition-colors hover:bg-[var(--row-hover)] hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted/60";
+        : "group inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1 py-0.5 text-sm leading-tight text-muted outline-none transition-colors hover:bg-[var(--row-hover)] hover:text-foreground disabled:cursor-default disabled:text-muted/60 disabled:hover:bg-transparent disabled:hover:text-muted/60";
     return (
       <ResponsiveMenuSurface
         isOpen={isOpen}
@@ -147,7 +145,7 @@ export function ProjectSwitchMenu(props: {
             }}
           >
             {variant === "hero" ? (
-              <span className="min-w-0 truncate pb-[0.08em] leading-snug font-medium tracking-normal text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono">
+              <span className="min-w-0 truncate pb-[0.08em] font-medium leading-snug tracking-tight text-muted">
                 {label}
               </span>
             ) : (
@@ -157,7 +155,7 @@ export function ProjectSwitchMenu(props: {
                 {triggerMachine}
               </>
             )}
-            {!isDisabled ? <ChevronDown className="size-3 shrink-0 text-muted/60" /> : null}
+            {!isDisabled ? <ChevronDown className="size-3 shrink-0 text-muted" /> : null}
           </button>
         }
       >
@@ -186,11 +184,11 @@ export function ProjectSwitchMenu(props: {
           isDisabled={isDisabled}
           className="group mx-auto inline-flex max-w-full items-center gap-1.5 rounded border border-transparent px-2 py-0.5 outline-none transition-colors hover:border-border/60 hover:bg-[var(--row-hover)] focus-visible:border-border focus-visible:bg-[var(--row-hover)] disabled:cursor-default disabled:hover:border-transparent disabled:hover:bg-transparent"
         >
-          <span className="min-w-0 truncate pb-[0.08em] leading-snug font-medium tracking-normal text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono">
+          <span className="min-w-0 truncate pb-[0.08em] font-medium leading-snug tracking-tight text-muted">
             {label}
           </span>
           {!isDisabled ? (
-            <ChevronDown className="size-3 shrink-0 text-muted/60 opacity-60 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+            <ChevronDown className="size-3 shrink-0 text-muted opacity-60 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
           ) : null}
         </Dropdown.Trigger>
         <Dropdown.Popover placement="bottom">{menu}</Dropdown.Popover>
@@ -203,7 +201,7 @@ export function ProjectSwitchMenu(props: {
       <Dropdown.Trigger
         aria-label={t`Switch project`}
         isDisabled={isDisabled}
-        className="group inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1 py-0.5 text-sm leading-tight text-muted/60 outline-none transition-colors hover:bg-[var(--row-hover)] hover:text-foreground focus-visible:bg-[var(--row-hover)] disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted/60"
+        className="group inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1 py-0.5 text-sm leading-tight text-muted outline-none transition-colors hover:bg-[var(--row-hover)] hover:text-foreground focus-visible:bg-[var(--row-hover)] disabled:cursor-default disabled:text-muted/60 disabled:hover:bg-transparent disabled:hover:text-muted/60"
       >
         {triggerIcon}
         <span className="min-w-0 truncate">{label}</span>

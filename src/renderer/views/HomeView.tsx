@@ -105,13 +105,13 @@ export function HomeView() {
                             <span className="max-w-40 truncate">{project.name}</span>
                             <ProjectRemoteServerChip info={remoteServerFor(project)} size="xs" />
                             {project.location.kind === "wsl" ? (
-                              <TuxIcon className="h-2.5 w-auto shrink-0 text-muted/60" />
+                              <TuxIcon className="h-2.5 w-auto shrink-0 text-muted" />
                             ) : null}
                           </span>
                         ) : null}
                         <RelativeTime
                           iso={thread.updatedAt}
-                          className="ml-3 w-[3ch] shrink-0 text-right font-mono text-xs tabular-nums text-muted"
+                          className="ml-3 w-[3ch] shrink-0 text-right text-xs tabular-nums text-muted"
                         />
                         <ArrowRight className="size-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100" />
                       </button>
@@ -158,7 +158,7 @@ function WorkspaceRow(props: {
         </span>
         <ProjectRemoteServerChip info={remote} size="sm" />
         {project.location.kind === "wsl" ? (
-          <TuxIcon className="h-3 w-auto shrink-0 text-muted/60" />
+          <TuxIcon className="h-3 w-auto shrink-0 text-muted" />
         ) : null}
       </button>
       <button

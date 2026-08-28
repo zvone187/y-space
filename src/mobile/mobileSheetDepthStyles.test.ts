@@ -21,7 +21,7 @@ function runDisplayModeBootstrap(input: {
   let browserChrome: string | null = null;
   let standaloneHeight: string | null = null;
   let standaloneShell: string | null = null;
-  let themeColor = "#000000";
+  let themeColor = "#ffffff";
   if (!bootstrapScript) throw new Error("Mobile display-mode bootstrap script not found.");
   runInNewContext(bootstrapScript, {
     window: {
@@ -80,7 +80,7 @@ describe("mobile sheet depth styles", () => {
     // Standalone PWAs paint the bottom safe-area band with the theme-color, so
     // the static meta stays opaque; browser mode flips it to transparent at
     // boot so Safari's floating toolbar blends with the app paint.
-    expect(mobileHtml).toContain('<meta name="theme-color" content="#000000" />');
+    expect(mobileHtml).toContain('<meta name="theme-color" content="#ffffff" />');
     expect(mobileHtml).toMatch(
       /navigator\.standalone === true[\s\S]*!standalone && window\.matchMedia\("\(display-mode: browser\)"\)\.matches[\s\S]*data-mobile-browser-chrome[\s\S]*meta\[name="theme-color"\][\s\S]*"content", "transparent"/,
     );
@@ -110,7 +110,7 @@ describe("mobile sheet depth styles", () => {
       browserChrome: null,
       standaloneHeight: "100lvh",
       standaloneShell: "true",
-      themeColor: "#000000",
+      themeColor: "#ffffff",
     });
   });
 
@@ -124,7 +124,7 @@ describe("mobile sheet depth styles", () => {
       browserChrome: null,
       standaloneHeight: "100lvh",
       standaloneShell: "true",
-      themeColor: "#000000",
+      themeColor: "#ffffff",
     });
   });
 
@@ -139,7 +139,7 @@ describe("mobile sheet depth styles", () => {
       browserChrome: null,
       standaloneHeight: null,
       standaloneShell: "true",
-      themeColor: "#000000",
+      themeColor: "#ffffff",
     });
   });
 

@@ -949,6 +949,10 @@ msgstr ".agents/skills veya .poracode/skills konumuna bir beceri ekleyin ya da b
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
 #~ msgstr ".agents/skills konumuna bir beceri ekleyin veya başka bir sağlayıcıdan içe aktarın."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Add a soft frosted-glass effect to the sidebar."
+msgstr "Kenar çubuğuna yumuşak bir buzlu cam efekti ekleyin."
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "Yapılacak iş ekleyin…"
@@ -1088,6 +1092,10 @@ msgstr "Her yeni terminal paneli kabuğuna aktarılan ek bağımsız değişkenl
 #~ msgid "Additional arguments passed to each new Windows shell. Quote values containing spaces."
 #~ msgstr "Her yeni Windows kabuğuna aktarılan ek bağımsız değişkenler. Boşluk içeren değerleri tırnak içine alın."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Adjust the size of conversation text."
+msgstr "Konuşma metninin boyutunu ayarlayın."
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "Özel bir temel URL duyurun, örn. bir ters proxy veya tünel. Otomatik için boş bırakın."
@@ -1103,8 +1111,8 @@ msgid "Agent ({subagent}): {description}"
 msgstr "Temsilci ({subagent}): {description}"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
-msgstr "Temsilci sohbeti (ACP / markdown). Komut satırları bu boyutu eksi 1 piksel kullanır; araç ve plan satırları 2 piksel eksiğini kullanır."
+#~ msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
+#~ msgstr "Temsilci sohbeti (ACP / markdown). Komut satırları bu boyutu eksi 1 piksel kullanır; araç ve plan satırları 2 piksel eksiğini kullanır."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2277,6 +2285,11 @@ msgstr "Sohbet Komutları"
 msgid "Chat starred"
 msgstr "Sohbet yıldızlandı"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Chat text size"
+msgstr "Sohbet metni boyutu"
+
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Sohbetin yıldızı kaldırıldı"
@@ -2390,6 +2403,11 @@ msgstr "Deney için yerel bir ana şube seçin."
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "Bir ana klasör seçin"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose a polished color palette for light or dark mode."
+msgstr "Açık veya koyu mod için şık bir renk paleti seçin."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Choose a project icon image"
@@ -2654,6 +2672,7 @@ msgid "Close"
 msgstr "Kapat"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Close {closeTarget}"
 msgstr "{closeTarget} kapat"
 
@@ -2899,8 +2918,8 @@ msgstr "Hatayı daralt"
 #~ msgstr "Deneyi daralt"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Collapse footer"
-msgstr "Altbilgiyi daralt"
+#~ msgid "Collapse footer"
+#~ msgstr "Altbilgiyi daralt"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -3346,6 +3365,10 @@ msgstr "Masaüstü adresinde devam et"
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Control desktop apps and complete visual workflows."
 msgstr "Masaüstü uygulamalarını denetleyin ve görsel iş akışlarını tamamlayın."
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Control how much of the background shows through."
+msgstr "Arka planın ne kadar görüneceğini ayarlayın."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -4358,8 +4381,8 @@ msgid "Development"
 msgstr "Geliştirme"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
-msgid "Development-only overrides. Only visible in the PORACODE DEV build."
-msgstr "Yalnızca geliştirme amaçlı geçersiz kılmalar. Yalnızca PORACODE DEV yapısında görünür."
+msgid "Development-only overrides. Visible only in Y Space Dev builds."
+msgstr "Yalnızca geliştirme amaçlı geçersiz kılmalar. Yalnızca Y Space Dev yapılarında görünür."
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4594,7 +4617,7 @@ msgid "Downloading into “{0}”. This can take a moment for large repositories
 msgstr "“{0}” içine indiriliyor. Büyük depolar için bu biraz zaman alabilir."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Downloading update"
 msgstr "Güncelleme indiriliyor"
@@ -5045,8 +5068,8 @@ msgstr "Hatayı genişlet"
 #~ msgstr "Deneyi genişlet"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Expand footer"
-msgstr "Altbilgiyi genişlet"
+#~ msgid "Expand footer"
+#~ msgstr "Altbilgiyi genişlet"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -5327,7 +5350,7 @@ msgstr "Dosya desteklenmeyen bir kodlama kullanıyor."
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Files"
 msgstr "Dosyalar"
 
@@ -5345,8 +5368,8 @@ msgid "Files for {0}"
 msgstr "{0} için dosyalar"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Files for {projectName}"
-msgstr "{projectName} için dosyalar"
+#~ msgid "Files for {projectName}"
+#~ msgstr "{projectName} için dosyalar"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5506,8 +5529,8 @@ msgid "Flat list"
 msgstr "Düz liste"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Focus browser"
-msgstr "Tarayıcıya odaklan"
+#~ msgid "Focus browser"
+#~ msgstr "Tarayıcıya odaklan"
 
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
@@ -5648,12 +5671,12 @@ msgid "From this project"
 msgstr "Bu projeden"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
-msgstr "Kenar çubuğunu, son macOS sürümlerini andıran sistem bulanıklık materyaliyle (vibrancy) buzlu cama dönüştürün. Desteklenmediğinde yarı saydam bir tona geri döner."
+#~ msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
+#~ msgstr "Kenar çubuğunu, son macOS sürümlerini andıran sistem bulanıklık materyaliyle (vibrancy) buzlu cama dönüştürün. Desteklenmediğinde yarı saydam bir tona geri döner."
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
-msgstr "{appearance} modundaki kenar çubuğunun sistem bulanıklığı üzerindeki buzlu cam yoğunluğu. Yüksek değer tema rengini korur; düşük değer arkadakini daha çok gösterir."
+#~ msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
+#~ msgstr "{appearance} modundaki kenar çubuğunun sistem bulanıklığı üzerindeki buzlu cam yoğunluğu. Yüksek değer tema rengini korur; düşük değer arkadakini daha çok gösterir."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Frozen worktree source is not a local branch: {branch}"
@@ -5740,7 +5763,7 @@ msgstr "Görev al"
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useProjectMenu.tsx
@@ -5923,8 +5946,8 @@ msgstr "Projeye göre gruplandır"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "GUI chat font size"
-msgstr "GUI sohbet yazı tipi boyutu"
+#~ msgid "GUI chat font size"
+#~ msgstr "GUI sohbet yazı tipi boyutu"
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "GUI runtime"
@@ -5968,7 +5991,6 @@ msgid "Hidden resumable threads are swept every 5 minutes and unloaded after thi
 msgstr "Gizli devam ettirilebilir konular her 5 dakikada bir taranır ve bu boşta kalma süresinden sonra bellekten kaldırılır."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
 msgid "Hide"
 msgstr "Gizle"
 
@@ -6006,7 +6028,7 @@ msgstr "{providerLabel} kaynağındaki MCP sunucularını gizle"
 msgid "Hide models you don't use from the model picker across every provider."
 msgstr "Kullanmadığınız modelleri her sağlayıcıdaki model seçiciden gizleyin."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Hide panel"
 msgstr "Paneli gizle"
 
@@ -6040,7 +6062,6 @@ msgstr "Geçmiş"
 #: src/renderer/views/HomeView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#: src/renderer/views/WelcomeOverlay.tsx
 msgid "Home"
 msgstr "Ana sayfa"
 
@@ -6440,7 +6461,7 @@ msgid "Install the package to add its API key."
 msgstr "API anahtarını eklemek için paketi yükleyin."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Install update"
 msgstr "Güncellemeyi yükle"
@@ -6450,7 +6471,7 @@ msgstr "Güncellemeyi yükle"
 msgid "Install v{0}"
 msgstr "v{0} sürümünü yükle"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Install v{updateVersion}"
 msgstr "v{updateVersion} sürümünü yükle"
 
@@ -6707,8 +6728,8 @@ msgid "List"
 msgstr "Liste"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "List options"
-msgstr "Liste seçenekleri"
+#~ msgid "List options"
+#~ msgstr "Liste seçenekleri"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "List packages"
@@ -6861,7 +6882,7 @@ msgstr "Konum"
 msgid "Location glyph"
 msgstr "Konum glifi"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Lock panel to the open thread"
 msgstr "Paneli açık konuya sabitle"
 
@@ -6934,8 +6955,8 @@ msgid "Machine"
 msgstr "Makine"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
-msgstr "Kenar çubuğunu yarı saydam yapın — Windows 11'de sistem bulanıklık materyali, diğerlerinde yarı saydam bir ton."
+#~ msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+#~ msgstr "Kenar çubuğunu yarı saydam yapın — Windows 11'de sistem bulanıklık materyali, diğerlerinde yarı saydam bir ton."
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Manage"
@@ -7084,7 +7105,7 @@ msgstr "Büyük/küçük harf eşleştir"
 msgid "Match your system, or force light or dark."
 msgstr "Sisteminizle eşleştirin veya açık veya koyu olanı zorlayın."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize"
 msgstr "Büyüt"
@@ -7432,6 +7453,7 @@ msgstr "Modlar"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "Çok"
@@ -7521,6 +7543,7 @@ msgid "Move changes to a new worktree"
 msgstr "Değişiklikleri yeni bir çalışma ağacına taşı"
 
 #: src/renderer/components/layout/PanelDock/PanelSectionHeader.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Move panel"
 msgstr "Paneli taşı"
 
@@ -8376,7 +8399,7 @@ msgstr "Senkronize değil"
 
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "Notlar"
@@ -8415,6 +8438,7 @@ msgstr "kapalı"
 
 #: src/renderer/components/git/PrAutomationSlider.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Off"
 msgstr "Kapalı"
@@ -8475,6 +8499,7 @@ msgstr "Bir kez"
 
 #: src/renderer/components/common/RemoteServerStatusDot.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Online"
 msgstr "Çevrimiçi"
@@ -8540,8 +8565,8 @@ msgid "Open as Panel"
 msgstr "Panel Olarak Aç"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Open browser"
-msgstr "Tarayıcıyı aç"
+#~ msgid "Open browser"
+#~ msgstr "Tarayıcıyı aç"
 
 #: src/renderer/commands/registry.ts
 msgid "Open browser panel"
@@ -9274,8 +9299,8 @@ msgstr "Bu profili özel ortam değişkenleri, model adları ve efor düzeyleriy
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
-msgstr "Y Space'a uyarlanmış popüler editör temaları. Her biri yukarıdaki açık veya karanlık modunu takip eder."
+#~ msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+#~ msgstr "Y Space'a uyarlanmış popüler editör temaları. Her biri yukarıdaki açık veya karanlık modunu takip eder."
 
 #: src/renderer/components/thread/MoveThreadToWorktreeDialog.tsx
 #~ msgid "poracode/my-branch"
@@ -10021,7 +10046,6 @@ msgstr "Uzaktan erişim"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Remote Access"
@@ -10618,6 +10642,10 @@ msgstr "PR'ı incele"
 msgid "Review PR #{prNumber} for {0}"
 msgstr "{0} için PR #{prNumber}'ı inceleyin"
 
+#: src/renderer/components/thread/ThreadChangesBubble.tsx
+msgid "Review PR #{prNumber} for {worktreeName}"
+msgstr "{worktreeName} için PR #{prNumber}'ı inceleyin"
+
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "İnceleme görünümü"
@@ -10638,6 +10666,7 @@ msgstr "{name} oturumunu iptal et"
 msgid "Right"
 msgstr "Sağ"
 
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Right panel"
 msgstr "Sağ panel"
@@ -11318,7 +11347,6 @@ msgstr "Bu oturum başlatıldığında sabitlendi — sunucuları değiştirmek 
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
 msgstr "Ayarlar"
@@ -11483,7 +11511,7 @@ msgstr "Çalışma zamanı hata ayıklama panelini göster"
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsSidebar.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -11504,7 +11532,7 @@ msgstr "Kaynağı göster"
 msgid "Show the microphone button in the composer."
 msgstr "Composer'da mikrofon düğmesini gösterin."
 
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Show thread tools"
 msgstr "Konu araçlarını göster"
 
@@ -11984,6 +12012,7 @@ msgstr "{targetLabel} iş parçacığı başlatıldı"
 #. Button label while the microphone test is starting
 #: src/mobile/remoteConnectionState.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Starting"
@@ -12258,8 +12287,8 @@ msgid "Switch to the previous tab"
 msgstr "Önceki sekmeye geç"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
-msgid "Switch workspace"
-msgstr "Çalışma alanını değiştir"
+#~ msgid "Switch workspace"
+#~ msgstr "Çalışma alanını değiştir"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
@@ -12319,6 +12348,7 @@ msgid "tab"
 msgstr "sekme"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Tabs"
 msgstr "Sekmeler"
 
@@ -12400,7 +12430,7 @@ msgstr "Hedef sağlayıcıya bundan sonra ne yapacağını söyleyin..."
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -12418,8 +12448,8 @@ msgid "Terminal for {0}"
 msgstr "{0} için terminal"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Terminal for {projectName}"
-msgstr "{projectName} için terminal"
+#~ msgid "Terminal for {projectName}"
+#~ msgstr "{projectName} için terminal"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -13577,7 +13607,7 @@ msgstr "Boşta kalan konuları şu süreden sonra kaldır (dakika)"
 msgid "Unload Thread"
 msgstr "Konuyu Kaldır"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Unlock panel from the open thread"
 msgstr "Panelin açık konuya sabitlemesini kaldır"
 
@@ -13786,6 +13816,7 @@ msgstr "URL gereklidir."
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Usage"
 msgstr "Kullanım"
 
@@ -14179,7 +14210,7 @@ msgid "What this server provides"
 msgstr "Bu sunucunun sağladıkları"
 
 #: src/renderer/commands/registry.ts
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "What's New"
 msgstr "Yenilikler"
@@ -14363,6 +14394,7 @@ msgid "Working…"
 msgstr "Çalışıyor…"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspace"
@@ -14376,7 +14408,7 @@ msgstr "Çalışma alanı MCP sunucuları aynı adlı kullanıcı sunucularını
 msgid "Workspace view"
 msgstr "Çalışma alanı görünümü"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspaces"

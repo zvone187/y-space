@@ -1,22 +1,20 @@
 import { type CSSProperties, type ReactNode, useRef } from "react";
-import { Lock, LockOpen, Maximize2, PanelRightClose, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
-import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
 import { PanelDockDropZone } from "@/renderer/components/layout/PanelDock/PanelDockDropZone";
 import { PanelSectionHeader } from "@/renderer/components/layout/PanelDock/PanelSectionHeader";
-import { PanelTabDragButton } from "@/renderer/components/layout/PanelDock/PanelTabDragButton";
 import {
   PANEL_TAB_ICONS,
   usePanelTabLabels,
 } from "@/renderer/components/layout/PanelDock/panelTabMeta";
 import { useSplitPercent } from "@/renderer/components/layout/PanelDock/useSplitPercent";
-import {
-  panelHeaderIconButtonClass,
-  panelHeaderRowClass,
-  panelHeaderTabIconButtonClass,
-} from "@/renderer/components/layout/sidebarChrome";
-import { DOCKABLE_PANEL_TABS, type RightPanelTab } from "@/renderer/state/panelStore";
+import { panelHeaderIconButtonClass } from "@/renderer/components/layout/sidebarChrome";
+import type { RightPanelTab } from "@/renderer/state/panelStore";
 import type { RightWorkspaceTab } from "@/renderer/state/rightWorkspaceTabs";
+import {
+  RightWorkspaceActionsMenu,
+  type RightWorkspaceToolMenuItem,
+} from "./RightWorkspaceActionsMenu";
 import { RightWorkspaceTabStrip } from "./RightWorkspaceTabStrip";
 
 export type { RightPanelTab };
@@ -35,7 +33,7 @@ export function UnifiedRightPanel(props: {
   subagentContent?: ReactNode;
   subagentModel?: ReactNode;
   subagentTitle?: ReactNode;
-  /** Tab-specific action buttons rendered in the header when the usage tab is active. */
+  /** Tab-specific action buttons rendered in the workspace strip when the usage tab is active. */
   usageHeaderActions?: ReactNode;
   showTerminalTab?: boolean;
   showFilesTab?: boolean;
@@ -102,7 +100,6 @@ export function UnifiedRightPanel(props: {
     showSubagentTab = false,
     showBrowserTab = true,
     onCloseSubagent,
-    projectName,
     onExpandGitToOverlay,
     onExpandFilesToOverlay,
     onExpandBrowserToOverlay,
@@ -164,14 +161,13 @@ export function UnifiedRightPanel(props: {
 
   const dragCtl = "poracode-overlay-header__controls";
   const labels = usePanelTabLabels();
-  const tabs = [
+  const tabs: readonly (RightWorkspaceToolMenuItem & { content: ReactNode | undefined })[] = [
     {
       id: "plan",
       label: labels.plan,
       icon: PANEL_TAB_ICONS.plan,
       content: planContent,
       visible: showPlanTab,
-      onOpen: undefined,
     },
     {
       id: "subagent",
@@ -179,7 +175,6 @@ export function UnifiedRightPanel(props: {
       icon: PANEL_TAB_ICONS.subagent,
       content: subagentContent,
       visible: showSubagentTab,
-      onOpen: undefined,
     },
     {
       id: "terminal",
@@ -243,132 +238,49 @@ export function UnifiedRightPanel(props: {
     splitTab && (splitTab !== activeTab || workspaceDocumentActive)
       ? tabs.find((tab) => tab.id === splitTab && tab.visible && tab.content !== undefined)
       : undefined;
-  /** Painted right now: the active layer, the split section, or a bottom dock slot. */
-  const isTabOnScreen = (tab: RightPanelTab) =>
-    (!workspaceDocumentActive && tab === activeTab) ||
-    tab === splitEntry?.id ||
-    dockedTabs.includes(tab);
+  const maximizeActiveTool = workspaceDocumentActive
+    ? undefined
+    : activeTab === "git"
+      ? onExpandGitToOverlay
+      : activeTab === "files"
+        ? onExpandFilesToOverlay
+        : activeTab === "browser"
+          ? onExpandBrowserToOverlay
+          : undefined;
 
   return (
     <div
       data-poracode-panel=""
       data-y-space-workspace=""
+      data-active-tab={workspaceDocumentActive ? "document" : activeTab}
       className="flex h-full min-h-0 flex-col bg-[var(--content-background)]"
     >
-      <div className={`poracode-overlay-header ${panelHeaderRowClass}`} data-active-tab={activeTab}>
-        {hasSubagentModel ? (
-          <div className="flex min-w-0 flex-1 items-center">{subagentModel}</div>
-        ) : projectName ? (
-          <PanelHeaderProjectName
-            name={projectName}
-            maxWidthClass="max-w-[100px]"
-            triggerClassName={dragCtl}
-          />
-        ) : null}
-        {hasSubagentModel ? null : <div className="flex-1" />}
-        {!workspaceDocumentActive && activeTab === "git" && onExpandGitToOverlay && (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-            title={t`Maximize`}
-            onClick={onExpandGitToOverlay}
-          >
-            <Maximize2 className="size-3.5" />
-          </button>
-        )}
-        {!workspaceDocumentActive && activeTab === "files" && onExpandFilesToOverlay && (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-            title={t`Maximize`}
-            onClick={onExpandFilesToOverlay}
-          >
-            <Maximize2 className="size-3.5" />
-          </button>
-        )}
-        {!workspaceDocumentActive && activeTab === "browser" && onExpandBrowserToOverlay && (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-            title={t`Maximize`}
-            onClick={onExpandBrowserToOverlay}
-          >
-            <Maximize2 className="size-3.5" />
-          </button>
-        )}
-        {!workspaceDocumentActive && activeTab === "usage" ? usageHeaderActions : null}
-        <div className="mx-0.5 h-3 w-px bg-border" />
-        {tabs.map((tab) => {
-          if (!tab.visible) return null;
-          const Icon = tab.icon;
-          // Lit whenever the panel is painted somewhere — the active layer, the
-          // split half, or a bottom dock slot.
-          const onScreen = isTabOnScreen(tab.id);
-          const buttonClass = `${dragCtl} ${panelHeaderTabIconButtonClass(onScreen)}`;
-          const handlePress = () => {
-            if (tab.onOpen) tab.onOpen();
-            else onTabChange(tab.id);
-          };
-          if (DOCKABLE_PANEL_TABS.has(tab.id)) {
-            return (
-              <PanelTabDragButton
-                key={tab.id}
-                tab={tab.id}
-                label={tab.label}
-                className={buttonClass}
-                aria-pressed={onScreen}
-                onPress={handlePress}
-              >
-                <Icon className="size-3.5" />
-              </PanelTabDragButton>
-            );
-          }
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              className={buttonClass}
-              title={tab.label}
-              aria-pressed={onScreen}
-              onClick={handlePress}
-            >
-              <Icon className="size-3.5" />
-            </button>
-          );
-        })}
-        {onToggleFollowsThread ? (
-          <button
-            type="button"
-            className={`${dragCtl} ${panelHeaderTabIconButtonClass(followsThread)}`}
-            title={
-              followsThread
-                ? t`Unlock panel from the open thread`
-                : t`Lock panel to the open thread`
-            }
-            aria-pressed={followsThread}
-            onClick={onToggleFollowsThread}
-          >
-            {followsThread ? <Lock className="size-3.5" /> : <LockOpen className="size-3.5" />}
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-          title={t`Hide panel`}
-          onClick={onClose}
-        >
-          <PanelRightClose className="size-3.5" />
-        </button>
-      </div>
-      {workspaceTabs.length > 0 && onWorkspaceTabActivate && onWorkspaceTabClose ? (
-        <RightWorkspaceTabStrip
-          tabs={workspaceTabs}
-          activeTabId={activeWorkspaceTabId}
-          onActivate={onWorkspaceTabActivate}
-          onClose={onWorkspaceTabClose}
-          {...(onWorkspaceTabReorder ? { onReorder: onWorkspaceTabReorder } : {})}
-        />
-      ) : null}
+      <RightWorkspaceTabStrip
+        tabs={workspaceTabs}
+        activeTabId={activeWorkspaceTabId}
+        onActivate={(tabId) => onWorkspaceTabActivate?.(tabId)}
+        onClose={(tabId) => onWorkspaceTabClose?.(tabId)}
+        {...(onWorkspaceTabReorder ? { onReorder: onWorkspaceTabReorder } : {})}
+        actions={
+          <>
+            {hasSubagentModel ? (
+              <div className="min-w-0 max-w-40 truncate">{subagentModel}</div>
+            ) : null}
+            {!workspaceDocumentActive && activeTab === "usage" ? usageHeaderActions : null}
+            <RightWorkspaceActionsMenu
+              tools={tabs}
+              activeTool={workspaceDocumentActive ? null : activeTab}
+              {...(splitEntry ? { splitTool: splitEntry.id } : {})}
+              dockedTools={dockedTabs}
+              onToolChange={onTabChange}
+              {...(maximizeActiveTool ? { onMaximize: maximizeActiveTool } : {})}
+              followsThread={followsThread}
+              {...(onToggleFollowsThread ? { onToggleFollowsThread } : {})}
+              onHide={onClose}
+            />
+          </>
+        }
+      />
       {hasSubagentTitle ? (
         <div className="poracode-right-panel-subagent-meta flex h-6 shrink-0 items-center gap-2 border-b border-[color:var(--border)] px-3">
           <div className="min-w-0 flex-1">{subagentTitle}</div>

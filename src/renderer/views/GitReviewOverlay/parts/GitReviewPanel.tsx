@@ -185,7 +185,7 @@ export function GitReviewPanel(props: {
               <>
                 {statusKey ? (
                   <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <GitBranch className="size-3 shrink-0 text-muted/50" />
+                    <GitBranch className="size-3 shrink-0 text-muted" />
                     <Tooltip delay={300}>
                       <Tooltip.Trigger className="min-w-0 flex-1" tabIndex={-1} role="none">
                         <span className="block truncate text-muted">{gitStatus.branch}</span>
@@ -212,7 +212,7 @@ export function GitReviewPanel(props: {
                         className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded px-1.5 py-1 hover:bg-foreground/5"
                         aria-label={t`Switch branch`}
                       >
-                        <GitBranch className="size-3 shrink-0 text-muted/50" />
+                        <GitBranch className="size-3 shrink-0 text-muted" />
                         <span className="block flex-1 truncate text-left text-muted">
                           {gitStatus.branch}
                         </span>
@@ -221,7 +221,7 @@ export function GitReviewPanel(props: {
                   />
                 )}
                 {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
-                  <span className="shrink-0 text-muted/50">
+                  <span className="shrink-0 text-muted">
                     ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
                   </span>
                 )}
@@ -276,7 +276,7 @@ export function GitReviewPanel(props: {
               <>
                 {statusKey ? (
                   <>
-                    <GitBranch className="ml-1 size-3 shrink-0 text-muted/50" />
+                    <GitBranch className="ml-1 size-3 shrink-0 text-muted" />
                     <div className="min-w-0">
                       <Tooltip delay={300}>
                         <Tooltip.Trigger tabIndex={-1} role="none">
@@ -307,7 +307,7 @@ export function GitReviewPanel(props: {
                         className="ml-1 flex min-w-0 cursor-pointer items-center gap-1 rounded px-1.5 hover:bg-foreground/5"
                         aria-label={t`Switch branch`}
                       >
-                        <GitBranch className="size-3 shrink-0 text-muted/50" />
+                        <GitBranch className="size-3 shrink-0 text-muted" />
                         <span className="max-w-[200px] truncate text-muted">
                           {gitStatus.branch}
                         </span>
@@ -316,7 +316,7 @@ export function GitReviewPanel(props: {
                   />
                 )}
                 {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
-                  <span className="shrink-0 text-muted/50">
+                  <span className="shrink-0 text-muted">
                     ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
                   </span>
                 )}

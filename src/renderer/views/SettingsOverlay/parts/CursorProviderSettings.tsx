@@ -179,7 +179,7 @@ export function CursorProviderSettings(props: {
               {statusLine(sdkInstallState.sdkInstalled, sdkAuthState, "sdk", sdkAccountEmail)}
             </p>
             {sdkDetailLine ? (
-              <p className="mt-0.5 text-[11px] text-muted/80">{sdkDetailLine}</p>
+              <p className="mt-0.5 text-[11px] text-muted">{sdkDetailLine}</p>
             ) : null}
           </div>
           <div className="space-y-1.5 border-t border-border/10 px-3 py-2">{sdkSetup}</div>

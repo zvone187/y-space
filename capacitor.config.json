@@ -2,22 +2,22 @@
   "appId": "com.lightcodeapp.mobile",
   "appName": "Y Space",
   "webDir": "dist/mobile",
-  "backgroundColor": "#070709",
+  "backgroundColor": "#FFFFFF",
   "server": {
     "androidScheme": "https",
     "cleartext": true
   },
   "ios": {
-    "backgroundColor": "#070709",
+    "backgroundColor": "#FFFFFF",
     "contentInset": "never"
   },
   "android": {
     "allowMixedContent": true,
-    "backgroundColor": "#070709"
+    "backgroundColor": "#FFFFFF"
   },
   "plugins": {
     "SystemBars": {
-      "style": "DARK"
+      "style": "LIGHT"
     }
   }
 }

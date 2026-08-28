@@ -267,7 +267,7 @@ export function SpreadsheetPreview(props: SpreadsheetPreviewProps) {
               role="tab"
               aria-selected={isActive}
               tabIndex={isActive ? 0 : -1}
-              className={`max-w-48 shrink-0 truncate rounded-t-md border border-b-0 px-3 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-focus/50 ${
+              className={`max-w-48 shrink-0 truncate rounded-t-md border border-b-0 px-3 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                 isActive
                   ? "border-border/60 bg-surface text-foreground"
                   : "border-transparent text-muted hover:bg-default/20 hover:text-foreground"

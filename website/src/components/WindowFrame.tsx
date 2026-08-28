@@ -1,7 +1,7 @@
 /**
  * A premium macOS-style window frame for wrapping app screenshots / live mock
  * surfaces on the marketing site. Renders the traffic-light chrome, an optional
- * center title (Geist Mono), an optional browser URL bar, and a soft indigo
+ * center title (Geist Mono), an optional browser URL bar, and a soft orange
  * ambient glow + hairline so the framed media reads as a real floating window.
  */
 import type { ReactNode } from "react";
@@ -24,7 +24,7 @@ export function WindowFrame({
       {glow ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-10 -z-10 bg-[radial-gradient(55%_50%_at_50%_35%,rgba(139,123,255,0.22),transparent)] blur-2xl"
+          className="pointer-events-none absolute -inset-10 -z-10 bg-[radial-gradient(55%_50%_at_50%_35%,rgba(255,90,31,0.22),transparent)] blur-2xl"
         />
       ) : null}
       <div className="overflow-hidden rounded-xl border border-white/10 bg-tile shadow-[0_40px_120px_-30px_rgba(0,0,0,0.85)]">

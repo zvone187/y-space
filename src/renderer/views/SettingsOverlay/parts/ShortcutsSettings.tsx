@@ -206,7 +206,7 @@ export function ShortcutsSettings() {
                       onClick={() => jumpToSection(section.id)}
                     >
                       <span className="truncate">{resolveLabel(section.label)}</span>
-                      <span className="shrink-0 tabular-nums text-[10px] text-muted/70">
+                      <span className="shrink-0 tabular-nums text-[10px] text-muted">
                         {section.rows.length}
                       </span>
                     </button>
@@ -296,7 +296,7 @@ function ReadOnlyKeys(props: { keys: string[] }) {
       className="flex shrink-0 flex-wrap items-center justify-end gap-1"
       title={t`Built-in shortcut — can't be changed`}
     >
-      <Lock className="size-3 text-muted/60" aria-label={t`Built-in shortcut — can't be changed`} />
+      <Lock className="size-3 text-muted" aria-label={t`Built-in shortcut — can't be changed`} />
       {props.keys.map((key) => (
         <span
           key={key}
@@ -363,7 +363,7 @@ function RowKeybindingEditor(props: { editor: EditorApi; row: ShortcutRow }) {
       {row.bindings.length === 0 ? (
         <button
           type="button"
-          className="rounded border border-dashed border-[color:var(--border)] px-1.5 py-0.5 text-[11px] text-muted/70 hover:border-foreground/30 hover:text-foreground"
+          className="rounded border border-dashed border-[color:var(--border)] px-1.5 py-0.5 text-[11px] text-muted hover:border-foreground/30 hover:text-foreground"
           onClick={() => editor.startAdd(row)}
         >
           <Trans>Set shortcut</Trans>

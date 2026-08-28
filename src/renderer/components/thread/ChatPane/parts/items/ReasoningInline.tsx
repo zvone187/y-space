@@ -67,15 +67,15 @@ export const ReasoningInline = memo(function ReasoningInline({ item }: Reasoning
               isStreaming ? "poracode-brain-thinking" : ""
             }`}
           />
-          <code
+          <span
             ref={shimmerRef}
-            className={`shrink-0 font-mono !text-[color:var(--muted)] ${
+            className={`shrink-0 font-medium !text-[color:var(--muted)] ${
               isStreaming ? "poracode-thinking-text" : ""
             }`}
             {...shimmerData}
           >
             {title}
-          </code>
+          </span>
           {preview ? (
             <>
               <ChatRowMetaSeparator />

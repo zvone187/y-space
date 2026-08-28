@@ -30,7 +30,7 @@ import { RemoteHostUpdateControl } from "./RemoteHostUpdateControl";
 import { SshConnectionForm } from "./SshConnectionForm";
 
 const INPUT_CLASS =
-  "w-full rounded-lg border border-default-200 bg-default-50 px-2.5 py-1.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted/50 focus:border-default-400";
+  "w-full rounded-lg border border-default-200 bg-default-50 px-2.5 py-1.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-default-400";
 
 /** "http://172.16.21.25:49152/" → "172.16.21.25:49152". */
 function endpointHost(endpoint: string): string {
@@ -133,7 +133,7 @@ function ManageProjects({
           <Trans>Clone repo</Trans>
         </Button>
         {isOnline ? null : (
-          <span className="text-xs text-muted/70">
+          <span className="text-xs text-muted">
             <Trans>Reconnect the server to add projects.</Trans>
           </span>
         )}
@@ -153,7 +153,7 @@ function ManageProjects({
             onPress={() => setPickerTarget("folder")}
           >
             <FolderOpen className="size-4 shrink-0 text-muted" />
-            <span className={`min-w-0 flex-1 truncate ${folderPath ? "" : "text-muted/50"}`}>
+            <span className={`min-w-0 flex-1 truncate ${folderPath ? "" : "text-muted"}`}>
               {folderPath || t`Choose a folder…`}
             </span>
           </Button>
@@ -179,7 +179,7 @@ function ManageProjects({
             onPress={() => setPickerTarget("clone")}
           >
             <FolderOpen className="size-4 shrink-0 text-muted" />
-            <span className={`min-w-0 flex-1 truncate ${cloneParent ? "" : "text-muted/50"}`}>
+            <span className={`min-w-0 flex-1 truncate ${cloneParent ? "" : "text-muted"}`}>
               {cloneParent || t`Choose a folder…`}
             </span>
           </Button>
@@ -266,9 +266,9 @@ function RemoteServerRow({ server }: { readonly server: RemoteServerRecord }) {
             <span className="shrink-0 text-xs text-muted">{statusLabel}</span>
           ) : null}
           {server.remoteLabel && server.remoteLabel !== server.label ? (
-            <span className="truncate text-xs text-muted/70">{server.remoteLabel}</span>
+            <span className="truncate text-xs text-muted">{server.remoteLabel}</span>
           ) : null}
-          <span className="truncate text-xs text-muted/70">
+          <span className="truncate text-xs text-muted">
             {server.transport?.kind === "ssh"
               ? server.transport.connection.target
               : endpointHost(server.endpoint)}
@@ -349,7 +349,7 @@ function RemoteServerRow({ server }: { readonly server: RemoteServerRecord }) {
           {canManage ? (
             <ManageProjects desktopId={server.desktopId} isOnline={status === "online"} />
           ) : (
-            <p className="pl-5 pt-0.5 text-xs text-muted/70">
+            <p className="pl-5 pt-0.5 text-xs text-muted">
               <Trans>View-only — this connection can't manage projects.</Trans>
             </p>
           )}

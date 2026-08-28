@@ -194,7 +194,7 @@ const usageSettingsSchema = z.object({
    */
   showEstimatedCost: z.boolean().default(false),
   /** Show the per-provider usage circles in the sidebar (master toggle). */
-  showInSidebar: z.boolean().default(true),
+  showInSidebar: z.boolean().default(false),
   /**
    * Provider ids whose sidebar circle the user hid individually. The provider is
    * still tracked and still shown in the usage panel — only its sidebar ring is
@@ -622,7 +622,7 @@ export type SharedSettingsInput = Omit<
 >;
 
 export const defaultSharedSettings: SharedSettings = {
-  themeMode: "dark",
+  themeMode: "light",
   themePreset: "default",
   locale: "system",
   gitTextLanguage: "en",
@@ -746,7 +746,7 @@ export const defaultSharedSettings: SharedSettings = {
     refreshIntervalMinutes: 5,
     providerRefreshIntervals: {},
     showEstimatedCost: false,
-    showInSidebar: true,
+    showInSidebar: false,
     sidebarHiddenProviders: [],
     disabledProviders: [...DEFAULT_USAGE_DISABLED_PROVIDER_IDS],
     providerOrder: [],

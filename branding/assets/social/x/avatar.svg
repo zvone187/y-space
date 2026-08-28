@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <!-- Y Space profile picture. Full bleed because social clients apply their own crop. -->
-  <rect width="1024" height="1024" fill="#0E0E14"/>
-  <path fill="#EAF0FB" d="M278 270H430L512 414L594 270H746L582 550V760H442V550L278 270Z"/>
-  <circle cx="704" cy="704" r="46" fill="#8B7BFF"/>
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <path fill="#181816" d="M278 270H430L512 414L594 270H746L582 550V760H442V550L278 270Z"/>
+  <circle cx="704" cy="704" r="46" fill="#FF5A1F"/>
 </svg>

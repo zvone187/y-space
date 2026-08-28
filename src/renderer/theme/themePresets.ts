@@ -39,23 +39,25 @@ export const THEME_SPECS: AppThemeSpec[] = [
   {
     id: DEFAULT_THEME_ID,
     label: "Y Space",
-    // sRGB hex of the styles.css oklch values (anchors must be hex so muted can
-    // be contrast-derived). Preview-only — runtime clears overrides for default.
+    // Exact sRGB anchors from styles.css (anchors must be hex so muted can be
+    // contrast-derived). Preview-only — runtime clears overrides for default.
     light: {
-      bg: "#f1f1f4",
-      surface: "#fafafb",
-      fg: "#18181b",
-      accent: "#5f6cd9",
-      accentFg: "#ffffff",
-      border: "#cacace",
-      sidebar: "#ececef",
-      content: "#f6f6f9",
+      bg: "#ffffff",
+      surface: "#fbfbfa",
+      fg: "#181816",
+      accent: "#ff5a1f",
+      accentText: "#b43f00",
+      accentFg: "#181816",
+      border: "#eeede9",
+      sidebar: "#fbfbfa",
+      content: "#ffffff",
     },
     dark: {
       bg: "#070709",
       surface: "#0e0e14",
       fg: "#fafafa",
-      accent: "#8892ef",
+      accent: "#ff7a45",
+      accentText: "#ff9b73",
       accentFg: "#0a0a12",
       border: "#24242e",
       sidebar: "#0e0e14",

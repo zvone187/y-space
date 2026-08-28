@@ -84,7 +84,7 @@ export function ConflictGroup(props: {
         >
           {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
           <Trans>Conflicts</Trans>
-          <span className="font-normal text-muted/60">({files.length})</span>
+          <span className="font-normal text-muted">({files.length})</span>
         </button>
         <span className="ml-auto mr-1.5 flex items-center gap-0.5 text-[10px] leading-4 font-medium font-normal">
           {totalInsertions > 0 && <span className="text-success">+{totalInsertions}</span>}

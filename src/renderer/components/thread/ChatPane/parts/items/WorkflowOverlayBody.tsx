@@ -260,9 +260,9 @@ function AgentRow({
       onClick={() => onSelect(agent.agentId)}
     >
       <AgentStateIcon state={agent.state} />
-      <code className="min-w-0 flex-1 truncate font-mono text-[length:var(--lc-chat-font-size-meta)] text-foreground">
+      <span className="min-w-0 flex-1 truncate text-[length:var(--lc-chat-font-size-meta)] text-foreground">
         {labelDisplay}
-      </code>
+      </span>
       {stats.length > 0 ? (
         <span className="shrink-0 tabular-nums text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
           {stats.join(" · ")}
@@ -297,9 +297,9 @@ function AgentDetail({
     <div className="min-h-0 overflow-y-auto px-3 py-3 [scrollbar-gutter:stable]">
       <div className="flex items-center gap-2 pb-2">
         <Bot className="size-3.5 shrink-0 text-foreground-muted" />
-        <code className="min-w-0 flex-1 truncate font-mono text-[length:var(--lc-chat-font-size-command)] font-medium text-foreground">
+        <span className="min-w-0 flex-1 truncate text-[length:var(--lc-chat-font-size-command)] font-medium text-foreground">
           {labelDisplay}
-        </code>
+        </span>
         <AgentStateIcon state={agent.state} />
       </div>
       <p className="text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
@@ -349,7 +349,7 @@ function AgentDetailFallback({ agent }: { agent: WorkflowAgent }) {
           <h3 className="pb-1 text-[length:var(--lc-chat-font-size-meta)] font-medium text-foreground">
             <Trans>Prompt</Trans>
           </h3>
-          <pre className="whitespace-pre-wrap break-words rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1.5 font-mono text-[length:var(--lc-chat-font-size-meta)] text-foreground/90">
+          <pre className="whitespace-pre-wrap break-words rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground">
             {agent.promptPreview}
           </pre>
         </section>
@@ -359,7 +359,7 @@ function AgentDetailFallback({ agent }: { agent: WorkflowAgent }) {
           <h3 className="pb-1 text-[length:var(--lc-chat-font-size-meta)] font-medium text-foreground">
             <Trans>Outcome</Trans>
           </h3>
-          <pre className="whitespace-pre-wrap break-words rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1.5 font-mono text-[length:var(--lc-chat-font-size-meta)] text-foreground/90">
+          <pre className="whitespace-pre-wrap break-words rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground">
             {agent.resultPreview}
           </pre>
         </section>
@@ -377,17 +377,15 @@ function AgentDetailFallback({ agent }: { agent: WorkflowAgent }) {
               >
                 <div className="flex min-w-0 items-baseline gap-2 pb-1 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
                   <span className="shrink-0 font-medium capitalize">{entry.role}</span>
-                  {entry.title ? (
-                    <span className="min-w-0 truncate font-mono">{entry.title}</span>
-                  ) : null}
+                  {entry.title ? <span className="min-w-0 truncate">{entry.title}</span> : null}
                   {entry.timestamp ? (
-                    <span className="ml-auto shrink-0 tabular-nums opacity-70">
+                    <span className="ml-auto shrink-0 tabular-nums text-foreground-muted">
                       {formatChatTimestamp(entry.timestamp)}
                     </span>
                   ) : null}
                 </div>
                 {entry.text ? (
-                  <pre className="whitespace-pre-wrap break-words font-mono text-[length:var(--lc-chat-font-size-meta)] text-foreground/90">
+                  <pre className="whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size-meta)] text-foreground">
                     {entry.text}
                   </pre>
                 ) : null}
@@ -420,7 +418,7 @@ function UnphasedAgents({
           className="mr-2 inline-flex items-center gap-1 rounded px-1 py-0.5 hover:bg-foreground/5"
         >
           <AgentStateIcon state={agent.state} />
-          <code className="font-mono">{agent.label}</code>
+          <span>{agent.label}</span>
         </button>
       ))}
     </div>

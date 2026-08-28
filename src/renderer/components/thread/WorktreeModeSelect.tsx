@@ -153,7 +153,7 @@ export function WorktreeModeSelect(props: {
               <span className="truncate">{option.label}</span>
               <span className="truncate text-xs text-muted">{option.description}</span>
             </div>
-            {isSelected ? <Check className="size-4 shrink-0 text-accent" /> : null}
+            {isSelected ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
           </button>
         );
       })}

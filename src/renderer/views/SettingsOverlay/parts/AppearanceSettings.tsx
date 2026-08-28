@@ -3,11 +3,15 @@ import { ChevronDown, RotateCcw } from "lucide-react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Slider, SliderFill, SliderOutput, SliderThumb, SliderTrack } from "@heroui/react";
 import type { ThemeMode } from "@/shared/contracts";
-import { isMac, isRemoteSession } from "@/renderer/bridge";
+import { isRemoteSession } from "@/renderer/bridge";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useResolvedAppearance } from "@/renderer/components/ui/provider";
 import { getThemePreset } from "@/renderer/theme/themePresets";
-import { applySidebarGlassTint, sidebarGlassTintDefault } from "@/renderer/theme/sidebarGlass";
+import {
+  applySidebarGlassTint,
+  sidebarGlassTintDefault,
+  sidebarGlassTintMinimum,
+} from "@/renderer/theme/sidebarGlass";
 import { useNativeMaterialActive } from "@/renderer/hooks/useGlassState";
 import { Select, ToggleSwitch } from "@/renderer/components/common";
 import { SettingRow, SettingsPage } from "./SettingsForm";
@@ -44,24 +48,26 @@ export function AppearanceSettings() {
   const showGlassTintSlider = !remote && nativeMaterialActive;
   const glassTintOverride = sidebarGlassTint[appearance];
   const glassTintDefault = sidebarGlassTintDefault(appearance);
-  const [glassTint, setGlassTint] = useState(glassTintOverride ?? glassTintDefault);
+  const glassTintMinimum = sidebarGlassTintMinimum(appearance);
+  const resolvedGlassTint = Math.max(glassTintMinimum, glassTintOverride ?? glassTintDefault);
+  const [glassTint, setGlassTint] = useState(resolvedGlassTint);
   useEffect(() => {
-    setGlassTint(glassTintOverride ?? glassTintDefault);
-  }, [glassTintOverride, glassTintDefault]);
+    setGlassTint(resolvedGlassTint);
+  }, [resolvedGlassTint]);
   // HeroUI's Slider emits number | number[]; this control is single-thumb.
   const normalizeSliderValue = (value: number | number[]): number =>
-    Array.isArray(value) ? (value[0] ?? glassTint) : value;
+    Math.max(glassTintMinimum, Array.isArray(value) ? (value[0] ?? glassTint) : value);
   const previewGlassTint = (next: number | number[]) => {
     const pct = normalizeSliderValue(next);
     setGlassTint(pct);
     // Live preview through the same writer the provider uses, so there's one
     // place that knows how to set/clear the inline tint.
-    applySidebarGlassTint(document.documentElement, pct, true);
+    applySidebarGlassTint(document.documentElement, pct, true, appearance);
   };
   const resetGlassTint = () => {
     setGlassTint(glassTintDefault);
     // Clear the override so the styles.css per-platform default takes back over.
-    applySidebarGlassTint(document.documentElement, null, true);
+    applySidebarGlassTint(document.documentElement, null, true, appearance);
     startTransition(() => {
       setSidebarGlassTint(appearance, null);
     });
@@ -105,9 +111,7 @@ export function AppearanceSettings() {
               <Trans>Theme</Trans>
             </p>
             <p className="text-xs text-muted">
-              <Trans>
-                Popular editor themes adapted to Y Space. Each follows the light or dark mode above.
-              </Trans>
+              <Trans>Choose a polished color palette for light or dark mode.</Trans>
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2.5">
@@ -123,16 +127,11 @@ export function AppearanceSettings() {
 
       <SettingRow
         anchorId="appearance.guiChatFontSize"
-        title={t`GUI chat font size`}
-        description={
-          <Trans>
-            Agent chat (ACP / markdown). Command rows use this size minus 1&nbsp;px; tool and plan
-            lines minus 2&nbsp;px.
-          </Trans>
-        }
+        title={t`Chat text size`}
+        description={<Trans>Adjust the size of conversation text.</Trans>}
       >
         <Select
-          aria-label={t`GUI chat font size`}
+          aria-label={t`Chat text size`}
           className="w-[160px] shrink-0"
           options={fontSizeOptions}
           value={String(guiChatFontSize)}
@@ -148,11 +147,7 @@ export function AppearanceSettings() {
         <SettingRow
           anchorId="appearance.translucentSidebar"
           title={t`Translucent sidebar`}
-          description={
-            isMac()
-              ? t`Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported.`
-              : t`Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere.`
-          }
+          description={t`Add a soft frosted-glass effect to the sidebar.`}
         >
           <ToggleSwitch
             aria-label={t`Translucent sidebar`}
@@ -170,14 +165,14 @@ export function AppearanceSettings() {
         <SettingRow
           anchorId="appearance.sidebarFrosting"
           title={t`Sidebar frosting`}
-          description={t`Frosting of the ${appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind.`}
+          description={t`Control how much of the background shows through.`}
         >
           <Slider
             aria-label={t`Sidebar frosting`}
             className="w-[220px] shrink-0"
-            minValue={0}
+            minValue={glassTintMinimum}
             maxValue={100}
-            step={5}
+            step={appearance === "light" ? 1 : 5}
             value={glassTint}
             onChange={previewGlassTint}
             onChangeEnd={(next) => {

@@ -195,22 +195,7 @@ describe("GitBadge", () => {
     expect(icon).toHaveClass("lucide-git-branch");
   });
 
-  it("pads a glyph-only badge into a square, and only widens one carrying diff counts", () => {
-    useGitStore.setState({
-      worktreeStatuses: { "/wt/feature": makeStatus() },
-      prData: { "/wt/feature": basePr },
-    });
-
-    const { unmount } = render(
-      <GitBadge projectId="project-1" projectName="feature/pr" worktreePath="/wt/feature" />,
-    );
-
-    // PR icon only: an 18px square, matching the row's other icon buttons.
-    expect(screen.getByRole("button", { name: "Git status for feature/pr" })).toHaveClass(
-      "p-[3px]",
-    );
-    unmount();
-
+  it("keeps a dirty Git badge glyph-only instead of widening for diff counts", () => {
     useGitStore.setState({
       worktreeStatuses: {
         "/wt/feature": makeStatus({ totalInsertions: 12, totalDeletions: 3 }),
@@ -220,11 +205,13 @@ describe("GitBadge", () => {
     render(<GitBadge projectId="project-1" projectName="feature/pr" worktreePath="/wt/feature" />);
 
     const withCounts = screen.getByRole("button", { name: "Git status for feature/pr" });
-    expect(withCounts).toHaveClass("px-1");
-    expect(withCounts).not.toHaveClass("p-[3px]");
+    expect(withCounts).toHaveClass("p-[3px]");
+    expect(withCounts).not.toHaveClass("px-1");
+    expect(withCounts).not.toHaveTextContent("+12");
+    expect(withCounts).not.toHaveTextContent("-3");
   });
 
-  it("renders diff stats before the PR icon so the icon stays aligned with the timestamp", () => {
+  it("keeps the PR icon aligned without rendering ambient diff stats", () => {
     useGitStore.setState({
       worktreeStatuses: {
         "/wt/feature": makeStatus({ totalInsertions: 12, totalDeletions: 3 }),
@@ -237,13 +224,11 @@ describe("GitBadge", () => {
     render(<GitBadge projectId="project-1" projectName="feature/pr" worktreePath="/wt/feature" />);
 
     const badge = screen.getByRole("button", { name: "Git status for feature/pr" });
-    const insertion = screen.getByText("+12");
     const prIcon = badge.querySelector(".lucide-git-pull-request");
 
     expect(prIcon).not.toBeNull();
-    expect(
-      insertion.compareDocumentPosition(prIcon!) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(screen.queryByText("+12")).not.toBeInTheDocument();
+    expect(screen.queryByText("-3")).not.toBeInTheDocument();
   });
 
   it("does not show a stale project PR while fetching the current branch PR", async () => {

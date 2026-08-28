@@ -532,7 +532,7 @@ function DesktopBrowserToolbar(props: {
 
   const disabled = !activeTab;
   const keyboardButtonClass = `${desktopToolbarButtonClass} ${
-    props.typing ? "text-accent hover:text-accent" : ""
+    props.typing ? "text-accent-text hover:text-accent-text" : ""
   }`;
 
   const onSubmit = (event: FormEvent) => {

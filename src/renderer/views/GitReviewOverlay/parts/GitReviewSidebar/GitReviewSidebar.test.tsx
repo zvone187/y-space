@@ -823,7 +823,7 @@ describe("GitReviewSidebar", () => {
     const initButton = screen.getByRole("button", { name: "Initialize Repository" });
 
     expect(initButton).toHaveAttribute("data-variant", "tertiary");
-    expect(initButton).toHaveClass("text-white");
+    expect(initButton).not.toHaveClass("text-white");
 
     await act(async () => {
       fireEvent.click(initButton);

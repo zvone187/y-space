@@ -30,6 +30,6 @@ describe("AppearanceSettings", () => {
     render(<AppearanceSettings />);
 
     expect(screen.queryByText("Translucent sidebar")).not.toBeInTheDocument();
-    expect(screen.getByText("GUI chat font size")).toBeInTheDocument();
+    expect(screen.getByText("Chat text size")).toBeInTheDocument();
   });
 });

@@ -122,7 +122,7 @@ export function FileGroup(props: {
         >
           {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
           {title}
-          <span className="font-normal tabular-nums text-muted/60">({count})</span>
+          <span className="font-normal tabular-nums text-muted">({count})</span>
         </button>
         <span className="ml-auto flex items-center gap-0.5">
           {touch ? (

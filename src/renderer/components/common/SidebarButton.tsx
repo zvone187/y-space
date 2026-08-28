@@ -14,7 +14,7 @@ export function sidebarRowClass(
 ): string {
   const compact = options.density === "compact";
   const sizeClass = options.size === "xs" ? "text-xs" : "text-sm";
-  return `flex w-full shrink-0 cursor-default items-center gap-2 rounded-3xl px-2 ${
+  return `flex w-full shrink-0 cursor-default items-center gap-2 rounded-lg px-2 ${
     compact ? "py-1" : "py-1.5"
   } text-left ${sizeClass} text-muted outline-none transition-colors hover:bg-[var(--row-hover)] hover:text-foreground focus-visible:focus-ring`;
 }
@@ -30,7 +30,7 @@ export function sidebarIconButtonClass(options: { isActive?: boolean } = {}): st
   const stateClass = options.isActive
     ? "bg-[var(--row-active)] text-foreground"
     : "text-muted hover:bg-[var(--row-hover)] hover:text-foreground";
-  return `flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-3xl outline-none transition-colors focus-visible:focus-ring ${stateClass}`;
+  return `flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-lg outline-none transition-colors focus-visible:focus-ring ${stateClass}`;
 }
 
 export function SidebarButton(props: {
@@ -124,7 +124,7 @@ export function SidebarButton(props: {
           <button
             ref={ref as React.Ref<HTMLButtonElement>}
             aria-label={typeof label === "string" ? label : undefined}
-            className={`flex ${compact ? "h-7 w-7" : "h-8 w-8"} shrink-0 cursor-default items-center justify-center rounded-3xl outline-none transition-colors focus-visible:focus-ring ${stateClass} ${className ?? ""}`}
+            className={`flex ${compact ? "h-7 w-7" : "h-8 w-8"} shrink-0 cursor-default items-center justify-center rounded-lg outline-none transition-colors focus-visible:focus-ring ${stateClass} ${className ?? ""}`}
             disabled={isDisabled}
             onClick={onPress}
             onContextMenu={onContextMenu}
@@ -151,7 +151,7 @@ export function SidebarButton(props: {
       tabIndex={isDisabled ? -1 : 0}
       aria-disabled={isDisabled || undefined}
       aria-grabbed={isDragging}
-      className={`group relative flex w-full shrink-0 cursor-default items-center gap-2 ${compact ? "py-1" : "py-1.5"} rounded-3xl px-2 text-left ${sizeClass} outline-none transition-colors ${stateClass}${dragRowDim} ${className ?? ""}`}
+      className={`group relative flex w-full shrink-0 cursor-default items-center gap-2 ${compact ? "py-1" : "py-1.5"} rounded-lg px-2 text-left ${sizeClass} outline-none transition-colors ${stateClass}${dragRowDim} ${className ?? ""}`}
       onClick={isDisabled ? undefined : onPress}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}

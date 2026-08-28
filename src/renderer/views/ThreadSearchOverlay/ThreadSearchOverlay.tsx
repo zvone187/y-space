@@ -121,7 +121,7 @@ export function ThreadSearchOverlay(props: { onClose: () => void }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t`Search…`}
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted/70"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted"
             spellCheck={false}
             autoComplete="off"
           />
@@ -133,7 +133,7 @@ export function ThreadSearchOverlay(props: { onClose: () => void }) {
             </div>
           ) : (
             <div className="flex flex-col gap-0.5">
-              <div className="px-3 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted/70">
+              <div className="px-3 pb-0.5 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                 <Trans>Threads</Trans>
               </div>
               {results.map((thread, index) => (

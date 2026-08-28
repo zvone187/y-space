@@ -21,7 +21,7 @@ function Tile(props: { value: ReactNode; label: string; sub?: string }) {
         {props.value}
       </div>
       <div className="text-xs text-muted">{props.label}</div>
-      <div className="h-3.5 text-[10px] leading-none text-muted/60">{props.sub ?? ""}</div>
+      <div className="h-3.5 text-[10px] leading-none text-muted">{props.sub ?? ""}</div>
     </div>
   );
 }
@@ -85,7 +85,7 @@ export function StatStrip(props: {
         <Tile value={formatDaysLabel(totals.longestStreakDays, t)} label={t`Longest streak`} />
       </div>
       {tokens && tokens.unavailableProviders.length > 0 ? (
-        <p className="text-center text-[10px] text-muted/60">
+        <p className="text-center text-[10px] text-muted">
           <Trans>Token usage unavailable for: {unavailableLabels}</Trans>
         </p>
       ) : null}

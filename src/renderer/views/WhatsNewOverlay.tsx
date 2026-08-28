@@ -66,7 +66,7 @@ function WhatsNewBody() {
       <Modal.CloseTrigger />
       <Modal.Header>
         <div className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent-text">
             <Sparkles className="size-5" />
           </span>
           <div className="min-w-0">
@@ -90,7 +90,7 @@ function WhatsNewBody() {
         <Button variant="ghost" className="text-muted" onPress={viewFullChangelog}>
           <Trans>View full changelog</Trans>
         </Button>
-        <Button variant="tertiary" className="!text-white" onPress={dismiss}>
+        <Button variant="tertiary" onPress={dismiss}>
           <Trans>Got it</Trans>
         </Button>
       </Modal.Footer>

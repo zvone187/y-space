@@ -240,7 +240,7 @@ describe("DesktopWorkspacePanel", () => {
     expect(openFileInMobileEditor).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a temporary subagent tab beside the parent thread", () => {
+  it("shows a temporary subagent tab beside the parent thread", async () => {
     useDesktopPanelStore.getState().showSubAgent(thread.id, "parent-1");
 
     renderPanel();
@@ -261,13 +261,13 @@ describe("DesktopWorkspacePanel", () => {
     expect(screen.getByRole("button", { name: "Close subagent" }).parentElement).toHaveClass(
       "poracode-right-panel-subagent-meta",
     );
-    expect(
-      screen
-        .getAllByRole("button", { name: "Subagent" })
-        .some((element) => element instanceof HTMLButtonElement),
-    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Right panel" }));
+    expect(await screen.findByRole("menuitemcheckbox", { name: "Subagent" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "Hide panel" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Hide panel" }));
     expect(useDesktopPanelStore.getState()).toMatchObject({
       open: false,
       subAgentThreadId: thread.id,

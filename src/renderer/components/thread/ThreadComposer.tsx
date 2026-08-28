@@ -770,7 +770,11 @@ export function ThreadComposer(props: {
       <Button
         isIconOnly={!submitContent}
         aria-label={submitLabel}
-        className={submitContent ? "h-9 px-3" : "poracode-composer-send"}
+        className={
+          submitContent
+            ? "poracode-composer-send poracode-composer-send--labeled"
+            : "poracode-composer-send"
+        }
         isDisabled={submitDisabled || promptDisabled}
         isPending={submitPending}
         onPress={onSubmit}
@@ -865,9 +869,6 @@ export function ThreadComposer(props: {
         onDragLeave={handleAttachmentDragLeave}
         onDrop={handleAttachmentDrop}
       >
-        {/* Inert unless a shell-level rule lights it: desktop draft focus, or
-            the phone layout's expanded live composer. */}
-        <div className="poracode-composer-border-glow" />
         {isAttachmentDropActive ? (
           <div className="poracode-composer-drop-overlay">
             <Trans>Drop here to attach</Trans>

@@ -948,6 +948,10 @@ msgstr ".agents/skills または .poracode/skills にスキルを追加するか
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
 #~ msgstr ".agents/skills にスキルを追加するか、別のプロバイダーからインポートします。"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Add a soft frosted-glass effect to the sidebar."
+msgstr "サイドバーに柔らかなすりガラス効果を加えます。"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "ToDoを追加…"
@@ -1087,6 +1091,10 @@ msgstr "新しいターミナルパネルのシェルごとに渡す追加引数
 #~ msgid "Additional arguments passed to each new Windows shell. Quote values containing spaces."
 #~ msgstr "新しい各 Windows シェルに渡す追加引数です。スペースを含む値は引用符で囲んでください。"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Adjust the size of conversation text."
+msgstr "会話テキストのサイズを調整します。"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "カスタムのベースURLを通知します（例: リバースプロキシやトンネル）。空欄の場合は自動的に設定されます。"
@@ -1102,8 +1110,8 @@ msgid "Agent ({subagent}): {description}"
 msgstr "エージェント ({subagent}):{description}"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
-msgstr "エージェントチャット (ACP / マークダウン)。コマンド行はこのサイズから 1 px 小さく、ツール行とプラン行は 2 px 小さくなります。"
+#~ msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
+#~ msgstr "エージェントチャット (ACP / マークダウン)。コマンド行はこのサイズから 1 px 小さく、ツール行とプラン行は 2 px 小さくなります。"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2276,6 +2284,11 @@ msgstr "チャットコマンド"
 msgid "Chat starred"
 msgstr "チャットにスターを付けました"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Chat text size"
+msgstr "チャットの文字サイズ"
+
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "チャットのスターを外しました"
@@ -2389,6 +2402,11 @@ msgstr "実験用のローカルベースブランチを選択してください
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "親フォルダーを選択"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose a polished color palette for light or dark mode."
+msgstr "ライトモードまたはダークモードに合う洗練されたカラーパレットを選びます。"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Choose a project icon image"
@@ -2653,6 +2671,7 @@ msgid "Close"
 msgstr "閉じる"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Close {closeTarget}"
 msgstr "{closeTarget} を閉じる"
 
@@ -2898,8 +2917,8 @@ msgstr "エラーを折りたたむ"
 #~ msgstr "実験を折りたたむ"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Collapse footer"
-msgstr "フッターを折りたたむ"
+#~ msgid "Collapse footer"
+#~ msgstr "フッターを折りたたむ"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -3345,6 +3364,10 @@ msgstr "デスクトップのアドレスで続ける"
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Control desktop apps and complete visual workflows."
 msgstr "デスクトップアプリを操作し、視覚的なワークフローを完了します。"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Control how much of the background shows through."
+msgstr "背景の透け具合を調整します。"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -4357,8 +4380,8 @@ msgid "Development"
 msgstr "開発"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
-msgid "Development-only overrides. Only visible in the PORACODE DEV build."
-msgstr "開発専用の上書き。 PORACODE DEV ビルドでのみ表示されます。"
+msgid "Development-only overrides. Visible only in Y Space Dev builds."
+msgstr "開発専用の上書き。Y Space Dev ビルドでのみ表示されます。"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4593,7 +4616,7 @@ msgid "Downloading into “{0}”. This can take a moment for large repositories
 msgstr "「{0}」にダウンロード中です。大規模なリポジトリの場合、これには時間がかかることがあります。"
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Downloading update"
 msgstr "アップデートをダウンロード中"
@@ -5044,8 +5067,8 @@ msgstr "エラーを展開"
 #~ msgstr "実験を展開する"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Expand footer"
-msgstr "フッターを展開する"
+#~ msgid "Expand footer"
+#~ msgstr "フッターを展開する"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -5326,7 +5349,7 @@ msgstr "ファイルはサポートされていないエンコーディングを
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Files"
 msgstr "ファイル"
 
@@ -5344,8 +5367,8 @@ msgid "Files for {0}"
 msgstr "{0}のファイル"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Files for {projectName}"
-msgstr "{projectName}のファイル"
+#~ msgid "Files for {projectName}"
+#~ msgstr "{projectName}のファイル"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5505,8 +5528,8 @@ msgid "Flat list"
 msgstr "フラットリスト"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Focus browser"
-msgstr "ブラウザにフォーカス"
+#~ msgid "Focus browser"
+#~ msgstr "ブラウザにフォーカス"
 
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
@@ -5647,12 +5670,12 @@ msgid "From this project"
 msgstr "このプロジェクトから"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
-msgstr "システムのぼかし素材（vibrancy）でサイドバーをすりガラス調にし、最近のmacOSの質感を再現します。非対応の環境では半透明の色付けに切り替わります。"
+#~ msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
+#~ msgstr "システムのぼかし素材（vibrancy）でサイドバーをすりガラス調にし、最近のmacOSの質感を再現します。非対応の環境では半透明の色付けに切り替わります。"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
-msgstr "システムのぼかしの上に重ねる{appearance}モードのサイドバーのすりガラス効果です。値を高くするとテーマカラーが強く、低くすると背後がより透けて見えます。"
+#~ msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
+#~ msgstr "システムのぼかしの上に重ねる{appearance}モードのサイドバーのすりガラス効果です。値を高くするとテーマカラーが強く、低くすると背後がより透けて見えます。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Frozen worktree source is not a local branch: {branch}"
@@ -5739,7 +5762,7 @@ msgstr "タスクの取得"
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useProjectMenu.tsx
@@ -5922,8 +5945,8 @@ msgstr "プロジェクト別にグループ化"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "GUI chat font size"
-msgstr "GUIチャットのフォントサイズ"
+#~ msgid "GUI chat font size"
+#~ msgstr "GUIチャットのフォントサイズ"
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "GUI runtime"
@@ -5967,7 +5990,6 @@ msgid "Hidden resumable threads are swept every 5 minutes and unloaded after thi
 msgstr "非表示の再開可能なスレッドは 5 分ごとにスイープされ、このアイドル時間が経過するとアンロードされます。"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
 msgid "Hide"
 msgstr "隠す"
 
@@ -6005,7 +6027,7 @@ msgstr "{providerLabel} の MCP サーバーを非表示"
 msgid "Hide models you don't use from the model picker across every provider."
 msgstr "すべてのプロバイダーのモデル ピッカーから使用しないモデルを非表示にします。"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Hide panel"
 msgstr "パネルを非表示にする"
 
@@ -6039,7 +6061,6 @@ msgstr "履歴"
 #: src/renderer/views/HomeView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#: src/renderer/views/WelcomeOverlay.tsx
 msgid "Home"
 msgstr "ホーム"
 
@@ -6439,7 +6460,7 @@ msgid "Install the package to add its API key."
 msgstr "パッケージをインストールしてAPIキーを追加してください。"
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Install update"
 msgstr "アップデートをインストールする"
@@ -6449,7 +6470,7 @@ msgstr "アップデートをインストールする"
 msgid "Install v{0}"
 msgstr "v{0}をインストール"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Install v{updateVersion}"
 msgstr "v{updateVersion} をインストール"
 
@@ -6706,8 +6727,8 @@ msgid "List"
 msgstr "リスト"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "List options"
-msgstr "リストオプション"
+#~ msgid "List options"
+#~ msgstr "リストオプション"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "List packages"
@@ -6860,7 +6881,7 @@ msgstr "場所"
 msgid "Location glyph"
 msgstr "場所グリフ"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Lock panel to the open thread"
 msgstr "パネルを開いているスレッドに固定する"
 
@@ -6933,8 +6954,8 @@ msgid "Machine"
 msgstr "マシン"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
-msgstr "サイドバーを半透明にします。Windows 11ではシステムのぼかし素材を、それ以外では半透明の色付けを使用します。"
+#~ msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+#~ msgstr "サイドバーを半透明にします。Windows 11ではシステムのぼかし素材を、それ以外では半透明の色付けを使用します。"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Manage"
@@ -7083,7 +7104,7 @@ msgstr "大文字と小文字を区別"
 msgid "Match your system, or force light or dark."
 msgstr "システムに合わせたり、明暗を強制したりできます。"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize"
 msgstr "最大化する"
@@ -7430,6 +7451,7 @@ msgstr "モード"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "多い"
@@ -7519,6 +7541,7 @@ msgid "Move changes to a new worktree"
 msgstr "変更を新しいワークツリーに移動する"
 
 #: src/renderer/components/layout/PanelDock/PanelSectionHeader.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Move panel"
 msgstr "パネルを移動"
 
@@ -8374,7 +8397,7 @@ msgstr "未同期"
 
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "注意事項"
@@ -8413,6 +8436,7 @@ msgstr "オフ"
 
 #: src/renderer/components/git/PrAutomationSlider.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Off"
 msgstr "オフ"
@@ -8473,6 +8497,7 @@ msgstr "1回のみ"
 
 #: src/renderer/components/common/RemoteServerStatusDot.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Online"
 msgstr "オンライン"
@@ -8538,8 +8563,8 @@ msgid "Open as Panel"
 msgstr "パネルとして開く"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Open browser"
-msgstr "ブラウザを開く"
+#~ msgid "Open browser"
+#~ msgstr "ブラウザを開く"
 
 #: src/renderer/commands/registry.ts
 msgid "Open browser panel"
@@ -9272,8 +9297,8 @@ msgstr "このプロファイルを、カスタムの環境変数・モデル名
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
-msgstr "人気のエディター テーマを Y Space に適合させました。それぞれは上記のライト モードまたはダーク モードに従います。"
+#~ msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+#~ msgstr "人気のエディター テーマを Y Space に適合させました。それぞれは上記のライト モードまたはダーク モードに従います。"
 
 #: src/renderer/components/thread/MoveThreadToWorktreeDialog.tsx
 #~ msgid "poracode/my-branch"
@@ -10019,7 +10044,6 @@ msgstr "リモートアクセス"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Remote Access"
@@ -10616,6 +10640,10 @@ msgstr "PRをレビューする"
 msgid "Review PR #{prNumber} for {0}"
 msgstr "{0}の PR #{prNumber}を確認します"
 
+#: src/renderer/components/thread/ThreadChangesBubble.tsx
+msgid "Review PR #{prNumber} for {worktreeName}"
+msgstr "{worktreeName}の PR #{prNumber}を確認します"
+
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "レビュー表示"
@@ -10636,6 +10664,7 @@ msgstr "{name}を取り消す"
 msgid "Right"
 msgstr "右"
 
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Right panel"
 msgstr "右パネル"
@@ -11316,7 +11345,6 @@ msgstr "このセッションの開始時に確定されます — サーバー�
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
 msgstr "設定"
@@ -11481,7 +11509,7 @@ msgstr "ランタイムデバッグパネルを表示"
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsSidebar.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -11502,7 +11530,7 @@ msgstr "ソースを表示"
 msgid "Show the microphone button in the composer."
 msgstr "コンポーザーにマイクボタンを表示します。"
 
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Show thread tools"
 msgstr "スレッドのツールを表示する"
 
@@ -11982,6 +12010,7 @@ msgstr "{targetLabel}スレッドを開始しました"
 #. Button label while the microphone test is starting
 #: src/mobile/remoteConnectionState.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Starting"
@@ -12256,8 +12285,8 @@ msgid "Switch to the previous tab"
 msgstr "前のタブに切り替え"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
-msgid "Switch workspace"
-msgstr "ワークスペースを切り替え"
+#~ msgid "Switch workspace"
+#~ msgstr "ワークスペースを切り替え"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
@@ -12317,6 +12346,7 @@ msgid "tab"
 msgstr "タブ"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Tabs"
 msgstr "タブ"
 
@@ -12398,7 +12428,7 @@ msgstr "ターゲットプロバイダーに次に何をすべきかを伝えま
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -12416,8 +12446,8 @@ msgid "Terminal for {0}"
 msgstr "{0}用のターミナル"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Terminal for {projectName}"
-msgstr "{projectName}用のターミナル"
+#~ msgid "Terminal for {projectName}"
+#~ msgstr "{projectName}用のターミナル"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -13575,7 +13605,7 @@ msgstr "アイドル状態のスレッドをアンロードするまでの時間
 msgid "Unload Thread"
 msgstr "スレッドをアンロード"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Unlock panel from the open thread"
 msgstr "パネルの固定を解除する"
 
@@ -13784,6 +13814,7 @@ msgstr "URLは必須です。"
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Usage"
 msgstr "使用量"
 
@@ -14177,7 +14208,7 @@ msgid "What this server provides"
 msgstr "このサーバーが提供する機能"
 
 #: src/renderer/commands/registry.ts
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "What's New"
 msgstr "新着情報"
@@ -14361,6 +14392,7 @@ msgid "Working…"
 msgstr "実行中…"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspace"
@@ -14374,7 +14406,7 @@ msgstr "ワークスペースのMCPサーバーは同名のユーザーサーバ
 msgid "Workspace view"
 msgstr "ワークスペース表示"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspaces"

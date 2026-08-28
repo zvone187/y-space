@@ -1,5 +1,6 @@
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { Tooltip } from "@heroui/react";
+import { ArrowDownToLine, ArrowUpFromLine, RefreshCw } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { useShallow } from "zustand/shallow";
 import { useGitStore } from "@/renderer/state/gitStore";
@@ -46,6 +47,14 @@ export function SyncBadge(props: { projectId: string; worktreePath?: string }) {
       : syncAction === "pull"
         ? t`Pull ↓${behind}`
         : t`Sync ↓${behind} ↑${ahead}`;
+  const actionIcon =
+    syncAction === "push" ? (
+      <ArrowUpFromLine className="size-3" />
+    ) : syncAction === "pull" ? (
+      <ArrowDownToLine className="size-3" />
+    ) : (
+      <RefreshCw className="size-3" />
+    );
 
   async function handlePress() {
     if (isSyncing) return;
@@ -132,7 +141,7 @@ export function SyncBadge(props: { projectId: string; worktreePath?: string }) {
           aria-label={label}
           aria-busy={isSyncing || undefined}
           aria-disabled={isSyncing || undefined}
-          className="shrink-0 cursor-default rounded px-1 py-0.5 transition-colors text-muted/60 hover:bg-[var(--row-hover)] hover:text-foreground"
+          className="shrink-0 cursor-default rounded p-[3px] text-accent-text transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
           onClick={(e) => {
             e.stopPropagation();
             void handlePress();
@@ -141,15 +150,8 @@ export function SyncBadge(props: { projectId: string; worktreePath?: string }) {
             handleKeyActivate(e, () => void handlePress(), { stopPropagation: true })
           }
         >
-          <span className="flex items-center text-[10px] font-medium">
-            {isSyncing ? (
-              <PixelLoader size="xs" />
-            ) : (
-              <>
-                {behind > 0 ? <span className="tabular-nums text-accent">↓{behind}</span> : null}
-                {ahead > 0 ? <span className="tabular-nums text-accent">↑{ahead}</span> : null}
-              </>
-            )}
+          <span className="flex size-3 items-center justify-center">
+            {isSyncing ? <PixelLoader size="xs" /> : actionIcon}
           </span>
         </div>
       </Tooltip.Trigger>

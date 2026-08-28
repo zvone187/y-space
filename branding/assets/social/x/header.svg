@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" width="1500" height="500">
   <!-- Y Space social header. Keep the lockup clear of common avatar overlays. -->
-  <rect width="1500" height="500" fill="#070709"/>
-  <path fill="#EAF0FB" d="M654 78H704L750 158L796 78H846L774 200V286H726V200L654 78Z"/>
-  <circle cx="824" cy="254" r="15" fill="#8B7BFF"/>
+  <rect width="1500" height="500" fill="#FFFFFF"/>
+  <path fill="#181816" d="M654 78H704L750 158L796 78H846L774 200V286H726V200L654 78Z"/>
+  <circle cx="824" cy="254" r="15" fill="#FF5A1F"/>
   <text x="750" y="374" text-anchor="middle" font-family="Geist, Inter, system-ui, sans-serif"
-        font-weight="650" font-size="88" letter-spacing="-3" fill="#EAF0FB">Y Space</text>
+        font-weight="650" font-size="88" letter-spacing="-3" fill="#181816">Y Space</text>
   <text x="750" y="430" text-anchor="middle" font-family="Geist, Inter, system-ui, sans-serif"
-        font-weight="400" font-size="25" letter-spacing="0.2" fill="#9BA6BE">Your agents. One shared workspace.</text>
+        font-weight="400" font-size="25" letter-spacing="0.2" fill="#73716C">Your agents. One shared workspace.</text>
 </svg>

@@ -47,7 +47,7 @@ export function ThreadSearchResultRow(props: {
         {thread.title}
       </span>
       {project ? (
-        <span className="shrink-0 truncate text-xs text-muted/80">{project.name}</span>
+        <span className="shrink-0 truncate text-xs text-muted">{project.name}</span>
       ) : null}
     </div>
   );

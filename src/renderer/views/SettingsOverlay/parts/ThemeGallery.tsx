@@ -104,7 +104,7 @@ function ThemeCard(props: {
       </div>
       <div className="flex items-center justify-between gap-2 px-0.5">
         <span className="truncate text-xs font-medium text-foreground">{preset.label}</span>
-        {selected ? <Check className="size-3.5 shrink-0 text-accent" /> : null}
+        {selected ? <Check className="size-3.5 shrink-0 text-accent-text" /> : null}
       </div>
     </button>
   );

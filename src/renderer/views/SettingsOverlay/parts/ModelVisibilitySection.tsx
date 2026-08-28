@@ -87,7 +87,7 @@ function ModelVisibilityRow(props: {
         aria-selected={state === "all"}
         aria-checked={state === "all" ? "true" : state === "none" ? "false" : "mixed"}
         tabIndex={0}
-        className="poracode-menu-item group mx-1.5 flex h-6 cursor-default items-center pl-4 pr-2 text-[10px] font-normal italic tracking-normal text-muted/60"
+        className="poracode-menu-item group mx-1.5 flex h-6 cursor-default items-center pl-4 pr-2 text-[10px] font-normal italic tracking-normal text-muted"
         onClick={handleToggle}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -137,15 +137,15 @@ function ModelVisibilityRow(props: {
           <Zap
             role="img"
             aria-label={t`Supports Fast mode`}
-            className="size-3 shrink-0 text-muted/60"
+            className="size-3 shrink-0 text-muted"
           />
         ) : null}
         {mutedHint ? (
-          <span className="shrink-0 text-[10px] leading-none text-muted/60">· {mutedHint}</span>
+          <span className="shrink-0 text-[10px] leading-none text-muted">· {mutedHint}</span>
         ) : null}
       </span>
       {item.subProviderLabel ? (
-        <span className="ml-auto shrink-0 truncate text-[10px] text-muted/70">
+        <span className="ml-auto shrink-0 truncate text-[10px] text-muted">
           {item.subProviderLabel}
         </span>
       ) : null}
@@ -288,7 +288,7 @@ export function ModelVisibilitySection() {
                 onKeyDown={(event) => event.stopPropagation()}
               />
             </div>
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted/80">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted">
               <span className="tabular-nums">
                 <Trans>
                   {visibleCount} of {totalCount} visible

@@ -25,6 +25,7 @@ const TRANSIENT_NETWORK_CODES = new Set([
 ]);
 const DISK_ERROR_CODES = new Set(["ENOSPC", "EACCES", "EPERM", "EROFS"]);
 const UPDATE_MANIFEST_PATTERN = /(?:latest|nightly)(?:-[a-z0-9]+)?\.ya?ml/i;
+const NO_PUBLISHED_GITHUB_RELEASES_MESSAGE = "no published versions on github";
 const INTEGRITY_PATTERN =
   /(?:artifact[^.]*\b(?:corrupt|invalid|missing)|checksum|code signature|hash mismatch|integrity|sha512|signature)/i;
 
@@ -63,6 +64,14 @@ function errorMessage(error: unknown): string {
     .join(" ");
 }
 
+function isNoPublishedGitHubRelease(error: unknown, operation: UpdateOperation): boolean {
+  if (operation !== "check") return false;
+  return (
+    errorMessage(error).trim().replace(/\s+/g, " ").toLowerCase() ===
+    NO_PUBLISHED_GITHUB_RELEASES_MESSAGE
+  );
+}
+
 function errorStatus(error: unknown): number | null {
   for (const item of errorChain(error)) {
     if (typeof item !== "object" || item === null || !("statusCode" in item)) continue;
@@ -92,17 +101,20 @@ export function classifyUpdateFailure(
   if (hasTimeoutName(error)) {
     return { kind: "transient-network", retryable: true };
   }
-  if (isManifest404(error, operation)) {
-    return {
-      kind: channel === "nightly" ? "optional-manifest-missing" : "required-manifest-missing",
-      retryable: false,
-    };
-  }
   if (code && DISK_ERROR_CODES.has(code)) {
     return { kind: "disk", retryable: false };
   }
   if (INTEGRITY_PATTERN.test(message)) {
     return { kind: "artifact-integrity", retryable: false };
+  }
+  if (isNoPublishedGitHubRelease(error, operation)) {
+    return { kind: "optional-manifest-missing", retryable: false };
+  }
+  if (isManifest404(error, operation)) {
+    return {
+      kind: channel === "nightly" ? "optional-manifest-missing" : "required-manifest-missing",
+      retryable: false,
+    };
   }
   return { kind: "unexpected", retryable: false };
 }

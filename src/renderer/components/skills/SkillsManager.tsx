@@ -599,7 +599,7 @@ function SkillRow(props: {
         <p className="truncate text-xs text-muted">
           {(invalidReason ?? displayDescription) || t`No description`}
         </p>
-        <p className="truncate font-mono text-[10px] text-muted/70">{skill.absolutePath}</p>
+        <p className="truncate font-mono text-[10px] text-muted">{skill.absolutePath}</p>
       </div>
       {skill.mutable ? (
         <>

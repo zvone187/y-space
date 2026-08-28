@@ -71,409 +71,6 @@
   inherits: false;
 }
 
-@property --ring-angle-1 {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@property --ring-angle-2 {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes poracode-composer-border-spin {
-  from {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
-}
-
-@keyframes poracode-welcome-reveal {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 18px, 0) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes poracode-ring-spin-1 {
-  from {
-    --ring-angle-1: 0deg;
-  }
-  to {
-    --ring-angle-1: 360deg;
-  }
-}
-
-@keyframes poracode-ring-spin-2 {
-  from {
-    --ring-angle-2: 360deg;
-  }
-  to {
-    --ring-angle-2: 0deg;
-  }
-}
-
-@keyframes poracode-lightning-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--accent) 38%, transparent),
-      0 0 18px color-mix(in oklab, var(--accent) 22%, transparent),
-      0 0 32px color-mix(in oklab, var(--accent) 10%, transparent);
-  }
-  33% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--accent) 55%, transparent),
-      0 0 24px color-mix(in oklab, var(--accent) 30%, transparent),
-      0 0 40px color-mix(in oklab, var(--accent) 15%, transparent),
-      0 0 8px color-mix(in oklab, #fff 20%, transparent);
-  }
-  66% {
-    box-shadow:
-      0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent),
-      0 0 14px color-mix(in oklab, var(--accent) 24%, transparent),
-      0 0 28px color-mix(in oklab, var(--accent) 12%, transparent);
-  }
-}
-
-@keyframes poracode-welcome-orbit {
-  0% {
-    opacity: 0;
-    transform: rotateX(50deg) rotateY(-30deg) rotateZ(-360deg) scale(18);
-  }
-  15% {
-    opacity: 1;
-  }
-  65% {
-    transform: rotateX(20deg) rotateY(-10deg) rotateZ(180deg) scale(2);
-    opacity: 1;
-  }
-  85% {
-    transform: rotateX(0deg) rotateY(0deg) rotateZ(350deg) scale(0.01);
-    opacity: 1;
-  }
-  91%,
-  100% {
-    transform: rotateX(0deg) rotateY(0deg) rotateZ(360deg) scale(0);
-    opacity: 0;
-  }
-}
-
-@keyframes poracode-welcome-splash {
-  0%,
-  85% {
-    opacity: 0;
-    transform: scale(0.01);
-  }
-  90% {
-    opacity: 1;
-    transform: scale(2);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(6);
-  }
-}
-
-@keyframes poracode-welcome-light {
-  0%,
-  85% {
-    opacity: 0;
-    transform: scale(0.1);
-  }
-  90% {
-    opacity: 0.6;
-    transform: scale(0.8);
-  }
-  100% {
-    opacity: 0.2;
-    transform: scale(0.6);
-  }
-}
-
-.poracode-welcome-page {
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, var(--surface-secondary) 70%, transparent) 0%,
-      var(--background) 58%
-    ),
-    var(--background);
-}
-
-.poracode-welcome-stage {
-  transform: translate3d(0, -1.5vh, 0);
-}
-
-.poracode-welcome-reveal {
-  animation: poracode-welcome-reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: 2s;
-}
-
-.poracode-welcome-reveal-1 {
-  animation-delay: 2.2s;
-}
-
-.poracode-welcome-reveal-2 {
-  animation-delay: 2.4s;
-}
-
-.poracode-welcome-ring {
-  box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--accent) 38%, transparent),
-    0 0 18px color-mix(in oklab, var(--accent) 22%, transparent);
-  animation:
-    poracode-welcome-reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both,
-    poracode-lightning-glow 4s ease-in-out infinite;
-  animation-delay: 2s, 2.8s;
-  transform: translateZ(0);
-}
-
-.poracode-welcome-ring::before,
-.poracode-welcome-ring::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  padding: 2px;
-  border-radius: inherit;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  mix-blend-mode: screen;
-  pointer-events: none;
-}
-
-.poracode-welcome-ring::before {
-  background: conic-gradient(
-    from var(--ring-angle-1) at center,
-    transparent 0deg,
-    transparent 180deg,
-    color-mix(in oklab, var(--accent) 15%, transparent) 220deg,
-    var(--accent) 270deg,
-    #ffffff 295deg,
-    var(--accent) 320deg,
-    color-mix(in oklab, var(--accent) 15%, transparent) 350deg,
-    transparent 360deg
-  );
-  filter: blur(0.5px);
-  animation: poracode-ring-spin-1 6s linear infinite;
-  will-change: transform;
-}
-
-.poracode-welcome-ring::after {
-  background: conic-gradient(
-    from var(--ring-angle-2) at center,
-    transparent 0deg,
-    transparent 120deg,
-    color-mix(in oklab, var(--accent) 15%, transparent) 160deg,
-    var(--accent) 220deg,
-    #ffffff 250deg,
-    var(--accent) 280deg,
-    color-mix(in oklab, var(--accent) 15%, transparent) 320deg,
-    transparent 360deg
-  );
-  filter: blur(0.6px);
-  animation: poracode-ring-spin-2 4s linear infinite;
-  will-change: transform;
-}
-
-.poracode-welcome-light {
-  background: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.4) 0%,
-    rgba(255, 255, 255, 0.1) 40%,
-    transparent 70%
-  );
-  animation: poracode-welcome-light 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  transform-origin: center;
-  filter: blur(8px);
-}
-
-.poracode-welcome-orbit {
-  animation: poracode-welcome-orbit 2.2s cubic-bezier(0.2, 0.7, 0.3, 1) both;
-  transform-origin: center;
-  transform-style: preserve-3d;
-}
-
-.poracode-welcome-comet {
-  background: rgba(255, 255, 255, 1);
-  box-shadow:
-    0 0 6px 3px rgba(255, 255, 255, 1),
-    0 0 16px 8px rgba(255, 255, 255, 0.5),
-    0 0 32px 16px rgba(255, 255, 255, 0.2);
-  mix-blend-mode: screen;
-  filter: blur(1px);
-}
-
-.poracode-welcome-comet::before,
-.poracode-welcome-comet::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(
-    ellipse at center,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(255, 255, 255, 0.4) 30%,
-    transparent 80%
-  );
-}
-
-.poracode-welcome-comet::before {
-  width: 56px;
-  height: 2px;
-}
-
-.poracode-welcome-comet::after {
-  width: 2px;
-  height: 56px;
-}
-
-.poracode-welcome-splash {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: radial-gradient(
-    circle,
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(255, 255, 255, 0.1) 40%,
-    transparent 70%
-  );
-  animation: poracode-welcome-splash 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  filter: blur(4px);
-}
-
-.poracode-welcome-icon-glass {
-  background: color-mix(in oklab, var(--surface-secondary) 80%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 22px 80px color-mix(in oklab, var(--accent) 18%, transparent);
-}
-
-.poracode-welcome-button {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: scale(1);
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  border-radius: 0.75rem;
-}
-
-.poracode-welcome-button:hover,
-.poracode-welcome-button[data-hovered="true"] {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: scale(1.02);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
-
-.poracode-welcome-button:active,
-.poracode-welcome-button[data-pressed="true"] {
-  background: rgba(255, 255, 255, 0.02);
-  transform: scale(0.98);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-.poracode-welcome-bg-glow {
-  /* Isolate this full-viewport gradient's repaint so it can't invalidate the
-     sibling code wall or the z-10 stage content. */
-  contain: paint;
-  background:
-    radial-gradient(
-      150px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
-      rgba(255, 255, 255, 0.04) 0%,
-      transparent 100%
-    ),
-    radial-gradient(
-      250px circle at var(--comet-x, -1000px) var(--comet-y, -1000px),
-      rgba(255, 255, 255, 0.06) 0%,
-      transparent 100%
-    );
-}
-
-.poracode-welcome-code-wall {
-  /* Scope the masked glyph layer's repaint to itself (paint-only containment,
-     so the multi-column flow is unaffected). */
-  contain: paint;
-  mask-image:
-    radial-gradient(
-      200px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
-      rgba(0, 0, 0, 1) 0%,
-      rgba(0, 0, 0, 0.6) 40%,
-      transparent 100%
-    ),
-    radial-gradient(
-      300px circle at var(--comet-x, -1000px) var(--comet-y, -1000px),
-      rgba(0, 0, 0, 0.8) 0%,
-      rgba(0, 0, 0, 0.4) 40%,
-      transparent 100%
-    );
-  -webkit-mask-image:
-    radial-gradient(
-      200px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
-      rgba(0, 0, 0, 1) 0%,
-      rgba(0, 0, 0, 0.6) 40%,
-      transparent 100%
-    ),
-    radial-gradient(
-      300px circle at var(--comet-x, -1000px) var(--comet-y, -1000px),
-      rgba(0, 0, 0, 0.8) 0%,
-      rgba(0, 0, 0, 0.4) 40%,
-      transparent 100%
-    );
-  color: rgba(255, 255, 255, 0.8);
-  font-family:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
-    monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  column-width: 500px;
-  column-gap: 3rem;
-  user-select: none;
-}
-
-/* The welcome intro is otherwise unguarded for reduced motion. Hide the
-   decorative movers and stop the always-on ring animations — the reveal
-   elements stay visible (their steady state is opacity 1), and the JS glow
-   sampler already bails out under reduced motion. */
-@media (prefers-reduced-motion: reduce) {
-  .poracode-welcome-orbit,
-  .poracode-welcome-light,
-  .poracode-welcome-splash {
-    animation: none;
-    opacity: 0;
-  }
-  /* The infinite conic spins (poracode-ring-spin-1/2) live on the ring
-     PSEUDO-elements; `animation: none` on the base element does NOT reach
-     them. The base selector also stops the ring's infinite lightning-glow
-     box-shadow pulse. */
-  .poracode-welcome-ring,
-  .poracode-welcome-ring::before,
-  .poracode-welcome-ring::after {
-    animation: none;
-  }
-  /* Show the wordmark/CTAs immediately: the reveal's `both` fill otherwise
-     holds them hidden through its ~2s delay. */
-  .poracode-welcome-reveal {
-    animation: none;
-  }
-}
-
 /* Goal dock active indicator — rotates a soft accent arc around the
    target icon to suggest work in progress. The icon itself is already a
    bullseye, so a thin ring traveling around it reads as "shining in
@@ -543,8 +140,8 @@
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    var(--snow, white) 60deg,
-    var(--snow, white) 90deg,
+    var(--accent) 60deg,
+    var(--accent) 90deg,
     transparent 140deg,
     transparent 360deg
   );
@@ -563,8 +160,8 @@
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
-    color-mix(in oklab, var(--snow, white) 70%, transparent) 0%,
-    color-mix(in oklab, var(--snow, white) 35%, transparent) 45%,
+    color-mix(in oklab, var(--accent) 70%, transparent) 0%,
+    color-mix(in oklab, var(--accent) 35%, transparent) 45%,
     transparent 80%
   );
   z-index: -1;
@@ -591,26 +188,23 @@
   font-family: inherit;
 }
 
-/* Soften the default HeroUI focus rings globally */
+/* Keyboard focus must stay independently visible even when the surrounding
+   palette is intentionally pale. */
 @utility focus-ring {
-  @apply ring-1 ring-inset ring-focus/50 ring-offset-0 ring-offset-background outline-none;
+  @apply ring-2 ring-inset ring-focus ring-offset-0 ring-offset-background outline-none;
   --tw-ring-offset-width: 1px;
 }
 
 @utility focus-field-ring {
-  @apply ring-1 ring-focus/50 ring-offset-0 outline-none;
+  @apply ring-2 ring-focus ring-offset-0 outline-none;
   --tw-ring-offset-width: 0px;
 }
 
-/* HeroUI Link: suppress the default focus ring/outline globally. */
-.link,
+/* Links use a compact but fully opaque keyboard ring. */
 .link[data-focus-visible="true"],
-.link:focus,
 .link:focus-visible {
-  outline: none;
-  box-shadow: none;
-  --tw-ring-shadow: 0 0 #0000;
-  --tw-ring-offset-shadow: 0 0 #0000;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* Keep arbitrary toast content inside the viewport. HeroUI renders its Text
@@ -709,16 +303,13 @@
   cursor: default;
 }
 
-/* Buttons use neutral foregrounds across every app theme. HeroUI's stock
-   secondary variant uses --accent-soft-foreground, which makes ordinary
-   controls (including shared OptionMenu triggers) accent-colored by default.
-   Keep accent text opt-in and make all neutral action variants inherit the
-   theme foreground: off-white in dark themes and dark in light themes. */
+/* Primary actions carry the Y Space orange identity. Secondary and tertiary
+   controls stay neutral so the accent remains sparse and meaningful. */
 .button--primary {
-  --button-bg: var(--default);
-  --button-bg-hover: var(--default-hover);
-  --button-bg-pressed: var(--default-hover);
-  --button-fg: var(--foreground);
+  --button-bg: var(--accent);
+  --button-bg-hover: color-mix(in oklab, var(--accent) 90%, #fff);
+  --button-bg-pressed: color-mix(in oklab, var(--accent) 92%, #000);
+  --button-fg: var(--accent-foreground);
 }
 
 .button--secondary {
@@ -739,12 +330,10 @@
 }
 
 .light .button--tertiary,
-[data-theme="light"] .button--tertiary,
-.light .button--primary,
-[data-theme="light"] .button--primary {
-  --button-bg: color-mix(in oklab, var(--content-background) 89%, #000);
-  --button-bg-hover: color-mix(in oklab, var(--content-background) 84%, #000);
-  --button-bg-pressed: var(--button-bg-hover);
+[data-theme="light"] .button--tertiary {
+  --button-bg: color-mix(in oklab, var(--content-background) 96%, #000);
+  --button-bg-hover: color-mix(in oklab, var(--content-background) 93%, #000);
+  --button-bg-pressed: color-mix(in oklab, var(--content-background) 90%, #000);
 }
 
 /* Commit-message field. HeroUI's secondary textarea fills with --default, which
@@ -756,8 +345,8 @@
    placeholder is derived from the recessed fill to keep its contrast.
    Scoped to this field only (variant="secondary" + .lc-commit-message). */
 :where(.light, [data-theme="light"]) .lc-commit-message.textarea--secondary {
-  --textarea-bg: color-mix(in oklab, var(--content-background) 87%, #000);
-  --textarea-bg-hover: color-mix(in oklab, var(--content-background) 84%, #000);
+  --textarea-bg: color-mix(in oklab, var(--content-background) 94%, #000);
+  --textarea-bg-hover: color-mix(in oklab, var(--content-background) 91%, #000);
   --textarea-bg-focus: var(--textarea-bg);
   --field-placeholder: color-mix(in oklab, var(--textarea-bg) 68%, var(--foreground));
 }
@@ -910,14 +499,17 @@
   transition: none !important;
 }
 
-/* HeroUI radio: default unselected ring is too low-contrast on dark surfaces.
-   Bump the unselected border so the control is visible without changing the
-   selected-state styling (which still flows from the variant tokens). */
-.radio__control {
-  border-color: color-mix(in oklch, var(--muted) 70%, transparent);
+/* Interactive control boundaries stay separate from decorative hairlines.
+   HeroUI's zero-width defaults otherwise make unchecked controls disappear on
+   the white-first palette. */
+.radio__control,
+.checkbox__control {
+  border: 1px solid var(--control-border);
 }
 .radio[data-selected="true"] .radio__control,
-.radio--selected .radio__control {
+.radio--selected .radio__control,
+.checkbox[data-selected="true"] .checkbox__control,
+.checkbox--selected .checkbox__control {
   border-color: var(--primary);
 }
 
@@ -931,11 +523,17 @@
   --switch-control-bg: color-mix(in oklab, var(--surface) 70%, var(--foreground));
 }
 
+:where(.light, [data-theme="light"]) .switch {
+  --switch-control-bg: color-mix(in oklab, var(--surface) 87%, var(--foreground));
+}
+
+.switch:not([data-selected="true"]):not(.switch--selected) .switch__control {
+  box-shadow: inset 0 0 0 1px var(--control-border);
+}
+
 /* Switches and sliders are continuous controls, so their geometry stays pill-
-   shaped even though Poracode intentionally uses a sharp global --radius for
-   fields, menus, and cards. HeroUI derives rounded-xl/rounded-lg from that
-   global token; component-scoped radii preserve the pre-refactor controls
-   without softening the rest of the interface. */
+   shaped independently of the restrained rounded-rectangle geometry used by
+   fields, menus, and cards. */
 .switch__control,
 .switch__thumb,
 .slider .slider__track,
@@ -947,17 +545,19 @@
 @layer base {
   :root {
     /* Intentional overrides from HeroUI defaults */
-    --radius: 0.125rem;
-    --field-radius: calc(var(--radius) * 2);
-    --link: var(--accent);
+    --radius: 0.5rem;
+    --field-radius: 0.625rem;
+    --field-border-width: 1px;
+    --link: var(--accent-text);
     --focus: var(--foreground);
+    --control-border: color-mix(in oklab, var(--foreground) 48%, var(--background));
 
     /* Soft-accent text remains available for explicitly accent-tinted controls
        such as selected toggles, badges, and chips. Neutral buttons override
        their foreground above instead of inheriting this accent treatment. */
     --color-accent-soft-foreground: color-mix(in oklab, var(--accent) 65%, var(--foreground));
-    --surface-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
-    --overlay-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    --surface-shadow: 0 12px 36px rgb(24 20 16 / 0.06);
+    --overlay-shadow: 0 18px 48px rgb(24 20 16 / 0.12);
 
     /* App-specific variables (not HeroUI) */
     --working-tone: var(--success);
@@ -969,7 +569,7 @@
        is the *wallpaper*, not the theme color, so higher alpha keeps the sidebar
        reading as the theme (less wallpaper/grey showing); lower alpha shows more
        wallpaper blur (more glassy, but tinted by whatever's on the desktop). */
-    --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 35%, transparent);
+    --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 98%, transparent);
     --content-background: var(--background);
     /* Floating chrome that hovers over the conversation — thread tool rail,
        changes bubble, scroll-to-bottom. One shared surface so the three read as
@@ -986,6 +586,10 @@
     --window-header-background: var(--sidebar-background);
     --window-overlay-background: rgba(0, 0, 0, 0);
     --composer-surface: var(--surface);
+    --glass-surface: color-mix(in oklab, var(--overlay) 86%, transparent);
+    --glass-border: color-mix(in oklab, var(--foreground) 7%, transparent);
+    --glass-backdrop: blur(18px) saturate(150%);
+    --glass-shadow: 0 14px 40px rgb(24 20 16 / 0.1), inset 0 1px 0 rgb(255 255 255 / 0.72);
     --interactive-cursor: default;
     --cursor-interactive: default;
 
@@ -994,30 +598,34 @@
        white/[x] look) and a dark wash on light themes — where a white wash was
        invisible. Replaces hardcoded bg-white/[x] selection/hover and
        border-white/x hairlines so every surface follows the active theme. */
-    --row-hover: color-mix(in oklab, var(--foreground) 6%, transparent);
-    --row-active: color-mix(in oklab, var(--foreground) 11%, transparent);
-    --hairline: color-mix(in oklab, var(--foreground) 9%, transparent);
-    --hairline-strong: color-mix(in oklab, var(--foreground) 15%, transparent);
+    --row-hover: color-mix(in oklab, var(--foreground) 4%, transparent);
+    --row-active: color-mix(in oklab, var(--foreground) 7%, transparent);
+    --hairline: color-mix(in oklab, var(--foreground) 6%, transparent);
+    --hairline-strong: color-mix(in oklab, var(--foreground) 10%, transparent);
   }
 
   .light,
   [data-theme="light"] {
     color-scheme: light;
-    --background: oklch(0.96 0.004 286);
-    --foreground: oklch(0.21 0.006 286);
-    --surface: oklch(0.985 0.002 286);
-    --surface-secondary: oklch(0.955 0.003 286);
-    --surface-tertiary: oklch(0.94 0.003 286);
-    --overlay: oklch(0.99 0.002 286);
-    --muted: oklch(0.52 0.01 286);
-    --scrollbar: oklch(0.78 0.01 286);
+    --background: #ffffff;
+    --foreground: #181816;
+    --surface: #fbfbfa;
+    --surface-secondary: #f7f7f5;
+    --surface-tertiary: #f3f3f0;
+    --overlay: #ffffff;
+    --muted: #73716c;
+    --scrollbar: #d8d6d1;
     /* Neutral fill behind secondary/tertiary buttons, selects, chips, badges,
        toggle/checkbox/radio controls. Stepped darker than HeroUI's stock
        near-white default (~0.94) so these controls separate from the panel in
        light themes (~1.35:1 vs page) instead of vanishing into it. */
-    --default: oklch(0.86 0.004 286);
-    --accent: #5f6cd9;
-    --accent-foreground: var(--snow);
+    --default: #f1f0ed;
+    --accent: #ff5a1f;
+    /* Bright orange carries the brand in fills and graphics. Compact orange
+       text uses a deeper companion, while filled controls use dark ink, so
+       every small label remains readable without dulling the brand orange. */
+    --accent-text: #b43f00;
+    --accent-foreground: #181816;
     --success: oklch(0.45 0.16 150);
     --success-foreground: var(--snow);
     --warning: oklch(0.5 0.14 78);
@@ -1038,24 +646,26 @@
     --project-icon-blue: oklch(0.53 0.16 255);
     --project-icon-violet: oklch(0.53 0.19 292);
     --project-icon-pink: oklch(0.56 0.19 345);
-    --field-background: oklch(0.975 0.002 286);
-    --field-placeholder: oklch(0.55 0.01 286);
-    --field-border: oklch(0.84 0.006 286 / 0.7);
-    --segment: oklch(0.975 0.002 286);
-    --border: oklch(0.84 0.006 286 / 0.7);
-    --separator: oklch(0.88 0.004 286 / 0.9);
+    --field-background: #ffffff;
+    --field-placeholder: #747473;
+    --control-border: #929291;
+    --field-border: var(--control-border);
+    --segment: #fbfbfa;
+    --border: #eeede9;
+    --separator: color-mix(in oklab, #eeede9 78%, transparent);
 
     /* App-specific */
-    --sidebar-background: oklch(0.945 0.004 286);
-    --content-background: oklch(0.975 0.003 286);
+    --sidebar-background: #fbfbfa;
+    --content-background: #ffffff;
     --window-header-background: var(--sidebar-background);
-    --composer-surface: oklch(0.982 0.002 286);
+    --composer-surface: #ffffff;
+    --glass-surface: color-mix(in oklab, #ffffff 82%, transparent);
   }
 
   .dark,
   [data-theme="dark"] {
     color-scheme: dark;
-    /* Poracode "moonlight" — dark/cool surfaces, indigo accent. */
+    /* Y Space dark mode — dark/cool surfaces with the warm brand accent. */
     --background: #070709;
     /* Primary text is a neutral off-white (no blue/violet chroma) so active
        rows and chat prose read clean and "clear" like the Poracode Legacy
@@ -1078,10 +688,12 @@
     --muted: oklch(0.7 0.01 255);
     --scrollbar: #3a3a48;
     --default: #242429;
-    --accent: #8892ef;
+    --accent: #ff7a45;
+    /* Brightened for compact labels on the darkest raised surface. */
+    --accent-text: #ff9b73;
     --accent-foreground: #0a0a12;
     --danger: oklch(0.64 0.2 24.63);
-    --danger-foreground: var(--snow);
+    --danger-foreground: #0a0a12;
     /* Same project-icon hues, lifted for dark surfaces (see the light block). */
     --project-icon-red: oklch(0.7 0.18 25);
     --project-icon-orange: oklch(0.75 0.15 55);
@@ -1092,8 +704,9 @@
     --project-icon-violet: oklch(0.71 0.16 292);
     --project-icon-pink: oklch(0.74 0.16 345);
     --field-background: #18181b;
-    --field-placeholder: #6b6b7b;
-    --field-border: oklch(0.34 0.006 286 / 0.85);
+    --field-placeholder: #828284;
+    --control-border: #656567;
+    --field-border: var(--control-border);
     --segment: #2e2f33;
     --border: oklch(0.31 0.006 286 / 0.9);
     --separator: oklch(0.3 0.006 286 / 0.85);
@@ -1107,9 +720,12 @@
     --content-background: #0b0b11;
     /* Dark surfaces read muddier through heavy blur, so lean more on the theme
        color (higher alpha = less transparent) than the light default above. */
-    --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 65%, transparent);
+    --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 82%, transparent);
     --window-header-background: var(--sidebar-background);
     --composer-surface: #17171d;
+    --glass-surface: color-mix(in oklab, var(--overlay) 78%, transparent);
+    --glass-border: color-mix(in oklab, var(--foreground) 12%, transparent);
+    --glass-shadow: 0 16px 44px rgb(0 0 0 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.08);
   }
 
   * {
@@ -1168,19 +784,15 @@
   outline: none;
 }
 
-/* Remove focus rings from inputs and textareas */
-input:focus,
-input:focus-visible,
-textarea:focus,
-textarea:focus-visible {
-  outline: none !important;
-  box-shadow: none !important;
-  --tw-ring-shadow: 0 0 #0000 !important;
-}
-
 button,
 [role="button"] {
   cursor: var(--interactive-cursor);
+}
+
+/* The selectable profile palette is intentionally bright. A stable ink scrim
+   keeps white initials/checkmarks above 4.5:1 without muting the stored color. */
+.poracode-avatar-contrast {
+  background-image: linear-gradient(rgb(0 0 0 / 0.2), rgb(0 0 0 / 0.2));
 }
 
 html,
@@ -1191,10 +803,18 @@ body,
 }
 
 body {
-  font-family: "Geist", "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui,
+    sans-serif;
   background: var(--background);
   color: var(--foreground);
   overflow: hidden;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--field-placeholder);
+  opacity: 1;
 }
 
 html[data-window-kind="quickComposer"],
@@ -1444,7 +1064,7 @@ html[data-sidebar-glass="on"][data-theme="dark"]
      sidebar material show through while retaining separation from hover. */
   --row-active: color-mix(in oklab, var(--foreground) 12%, transparent);
 }
-/* Faint tint so sidebar text/icons stay legible over the live OS blur. The
+/* Contrast-safe tint so sidebar text/icons stay legible over the live OS blur. The
    sidebar header (shared .poracode-overlay-header class) is forced transparent
    so the aside's single tint layer shows through instead of stacking. */
 html[data-native-material="on"] .poracode-sidebar-aside {
@@ -1466,20 +1086,20 @@ html[data-native-material="on"] .poracode-sidebar-aside--overlay {
 html[data-native-material="on"] .poracode-sidebar-spacer {
   background: var(--sidebar-glass-tint);
 }
-/* Windows-only frosting bump. DWM acrylic blurs whatever sits behind the window,
+/* Windows-only frosting tuning. DWM acrylic blurs whatever sits behind the window,
    so the backdrop bleeds through the tint and drags the sidebar toward it: a dark
    theme over a bright window washes out toward grey, while a light theme over a
    dark backdrop goes too dark. Lean the tint more opaque on Windows so the sidebar
-   holds its own theme color regardless of what's behind. Dark leans heavier (85%)
-   since a dark surface over a bright backdrop swings the most; light needs less
-   (65%). macOS vibrancy composites its own adaptive material, so darwin is left
+   holds its own theme color regardless of what's behind. Both modes keep a
+   contrast-safe scrim; blur and saturation preserve the sense of material.
+   macOS vibrancy composites its own adaptive material, so darwin is left
    untouched; these rules are unlayered so they win over the @layer base token. */
 html[data-platform="win32"][data-native-material="on"] {
-  --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 65%, transparent);
+  --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 98%, transparent);
 }
 html[data-platform="win32"][data-native-material="on"].dark,
 html[data-platform="win32"][data-native-material="on"][data-theme="dark"] {
-  --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 85%, transparent);
+  --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 88%, transparent);
 }
 
 /* Platform frosting for the *floating chrome* (thread tool rail, changes bubble,
@@ -1493,8 +1113,8 @@ html[data-platform="win32"][data-native-material="on"][data-theme="dark"] {
    without the specular gradients or inset highlights of a raised glossy button.
    Windows remains slightly denser because Chromium's blur is visually weaker. */
 html[data-platform="darwin"] {
-  --floating-chrome-surface: color-mix(in oklab, var(--sidebar-background) 38%, transparent);
-  --floating-chrome-backdrop: blur(12px) saturate(140%);
+  --floating-chrome-surface: color-mix(in oklab, var(--sidebar-background) 76%, transparent);
+  --floating-chrome-backdrop: blur(16px) saturate(145%);
 }
 html[data-platform="darwin"].dark,
 html[data-platform="darwin"][data-theme="dark"] {
@@ -1502,8 +1122,8 @@ html[data-platform="darwin"][data-theme="dark"] {
   --floating-chrome-backdrop: blur(10px) saturate(135%);
 }
 html[data-platform="win32"] {
-  --floating-chrome-surface: color-mix(in oklab, var(--sidebar-background) 44%, transparent);
-  --floating-chrome-backdrop: blur(12px) saturate(135%);
+  --floating-chrome-surface: color-mix(in oklab, var(--sidebar-background) 82%, transparent);
+  --floating-chrome-backdrop: blur(16px) saturate(140%);
 }
 html[data-platform="win32"].dark,
 html[data-platform="win32"][data-theme="dark"] {
@@ -1515,7 +1135,7 @@ html:is([data-platform="darwin"], [data-platform="win32"]) .poracode-floating-ch
   background-image: none;
   backdrop-filter: var(--floating-chrome-backdrop);
   -webkit-backdrop-filter: var(--floating-chrome-backdrop);
-  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  box-shadow: 0 4px 18px rgb(24 20 16 / 0.08);
 }
 .poracode-floating-chrome--active {
   background-color: var(--floating-chrome-active-surface);
@@ -1528,8 +1148,8 @@ html:is([data-platform="darwin"], [data-platform="win32"]) .poracode-floating-ch
 html[data-sidebar-glass="on"]:not([data-native-material="on"]) .poracode-sidebar-aside {
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--sidebar-background) 90%, transparent) 0%,
-    color-mix(in oklab, var(--sidebar-background) 74%, transparent) 100%
+    color-mix(in oklab, var(--sidebar-background) 96%, transparent) 0%,
+    color-mix(in oklab, var(--sidebar-background) 90%, transparent) 100%
   );
   box-shadow:
     inset 1px 0 0 color-mix(in oklab, var(--foreground) 7%, transparent),
@@ -1544,6 +1164,30 @@ html[data-sidebar-glass="on"]:not([data-native-material="on"])
    so the faux-glass tint/blur used for the docked fallback would read muddy. */
 html[data-sidebar-glass="on"]:not([data-native-material="on"]) .poracode-sidebar-aside--overlay {
   background: var(--sidebar-background);
+}
+
+/* The global workspace strip, floating menus, and composer share one restrained
+   glass language. These are the only CSS-blurred desktop layers: keeping the
+   effect to stable chrome avoids multiplying compositor surfaces as browser or
+   document tabs are opened. */
+.poracode-workspace-tab-strip,
+.popover,
+.dropdown__popover,
+.poracode-composer-shell {
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+}
+
+.poracode-workspace-tab-strip {
+  border-color: var(--glass-border);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.54);
+}
+
+.popover,
+.dropdown__popover {
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 /* Overlays (settings, git review, file editor, …) reuse the same AppShell, so
@@ -1601,6 +1245,29 @@ html[data-native-material="on"]
     background-image: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+  .poracode-workspace-tab-strip,
+  .popover,
+  .dropdown__popover,
+  .poracode-composer-shell {
+    background: var(--overlay);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Ultra-light chrome keeps its structure when the OS requests stronger
+   contrast. This raises edges and interaction washes without changing the
+   regular near-white appearance. */
+@media (prefers-contrast: more) {
+  :where(.light, [data-theme="light"]) {
+    --border: #deddd8;
+    --separator: color-mix(in oklab, #deddd8 90%, transparent);
+    --row-hover: color-mix(in oklab, var(--foreground) 7%, transparent);
+    --row-active: color-mix(in oklab, var(--foreground) 12%, transparent);
+    --hairline: color-mix(in oklab, var(--foreground) 11%, transparent);
+    --hairline-strong: color-mix(in oklab, var(--foreground) 18%, transparent);
+    --glass-border: color-mix(in oklab, var(--foreground) 18%, transparent);
   }
 }
 
@@ -2222,12 +1889,17 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
 
 .poracode-composer-shell {
   position: relative;
-  /* Foreground-derived hairline (not --border) so the primary input stays
-     clearly outlined in every theme, including low-contrast light palettes. */
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-4xl);
-  background: var(--composer-surface);
-  transition: border-color 0.15s ease;
+  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
+  border-radius: 18px;
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  box-shadow:
+    0 8px 28px rgb(24 20 16 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.66);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .poracode-composer-drop-overlay {
@@ -2244,65 +1916,6 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
   font-size: 0.875rem;
   font-weight: 500;
   pointer-events: none;
-}
-
-/* Animated 1px border ring around the draft composer. The mask-composite cutout
-   keeps the inside of the shell fully transparent (so the underlying composer
-   surface shows through unchanged). The rotation is driven by `transform` on a
-   child disc — not by an `@property` CSS variable — so the conic gradient is
-   rasterized once and the animation stays on the compositor. The disc is sized
-   2× the shell's width as a square; that guarantees full coverage of the
-   wide-and-short shell shape under any rotation, so the ring never breaks.
-   Keep the rotation finite: draft inputs are auto-focused, so an infinite
-   focus animation would keep Chromium's GPU process rendering forever while
-   an untouched new-thread page is otherwise idle. */
-.poracode-composer-border-glow {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-  overflow: hidden;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  will-change: opacity;
-}
-
-.poracode-composer-border-glow::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 200%;
-  aspect-ratio: 1 / 1;
-  transform: translate(-50%, -50%);
-  background: conic-gradient(
-    transparent 0%,
-    var(--foreground) 15%,
-    var(--foreground) 35%,
-    transparent 50%,
-    var(--foreground) 65%,
-    var(--foreground) 85%,
-    transparent 100%
-  );
-  will-change: transform;
-}
-
-.poracode-composer-shell--draft:focus-within .poracode-composer-border-glow {
-  opacity: 0.7;
-  transition: opacity 0.3s ease;
-}
-
-.poracode-composer-shell--draft:focus-within .poracode-composer-border-glow::before {
-  animation: poracode-composer-border-spin 1.2s ease-out 1 both;
 }
 
 .poracode-composer-label-hideable.is-hidden {
@@ -2373,16 +1986,13 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
 }
 
 .poracode-composer-shell:focus-within {
-  border-color: color-mix(in oklab, var(--focus) 70%, transparent);
+  border-color: var(--accent);
   outline: none !important;
-  box-shadow: none !important;
+  box-shadow:
+    0 2px 8px rgb(0 0 0 / 0.07),
+    0 0 0 1px var(--accent) !important;
   --tw-ring-shadow: 0 0 #0000 !important;
   --tw-ring-offset-shadow: 0 0 #0000 !important;
-  transition: border-color 0.12s ease;
-}
-
-.poracode-composer-shell--draft:focus-within {
-  border-color: transparent;
 }
 
 .poracode-model-menu-listbox:focus-visible,
@@ -2618,17 +2228,24 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
 .poracode-composer-send {
   height: 2.25rem;
   width: 2.25rem;
-  background: color-mix(in oklab, var(--accent) 18%, var(--surface));
-  color: var(--foreground);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-foreground);
 }
 
 .poracode-composer-send:hover,
 .poracode-composer-send[data-hovered="true"] {
-  background: color-mix(in oklab, var(--accent) 28%, var(--surface));
+  background: color-mix(in oklab, var(--accent) 90%, #fff);
 }
 
 .poracode-composer-send[aria-disabled="true"] {
-  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  background: var(--default);
+  color: var(--muted);
+}
+
+.poracode-composer-send--labeled {
+  width: auto;
+  padding-inline: 0.75rem;
 }
 
 .poracode-composer-shell--preserve-disabled-controls
@@ -3485,7 +3102,7 @@ html[data-platform="darwin"] .poracode-sidebar-project-nudge {
 }
 
 .poracode-markdown-preview a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -3897,7 +3514,7 @@ html[data-poracode-drag-active="true"] [data-poracode-chat-scroller="true"] {
   padding: 0;
 }
 .lc-notes-prose a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: underline;
 }
 .lc-notes-prose hr {

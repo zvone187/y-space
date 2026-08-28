@@ -317,7 +317,7 @@ function ActiveSubAgentRow({
       {workflow && workflowRun ? (
         <WorkflowDockStats run={workflowRun} />
       ) : workflowIsLive ? (
-        <span className="shrink-0 text-foreground-muted opacity-80">
+        <span className="shrink-0 text-foreground-muted">
           <Trans>starting…</Trans>
         </span>
       ) : isRunning ? (
@@ -326,13 +326,13 @@ function ActiveSubAgentRow({
           liveLabel={liveLabel}
           stepCount={stepCount}
           includeStepCount
-          className="max-w-[45%] shrink-0 text-foreground-muted opacity-80"
+          className="max-w-[45%] shrink-0 text-foreground-muted"
           liveMaxClassName="max-w-[20ch]"
         />
       ) : hasSubAgentProgressMeta(progress) ? (
         <SubAgentProgressMeta
           progress={progress}
-          className="max-w-[45%] shrink-0 text-foreground-muted opacity-80"
+          className="max-w-[45%] shrink-0 text-foreground-muted"
         />
       ) : null}
     </ThreadDockActionRow>
@@ -358,7 +358,7 @@ function WorkflowDockStats({ run }: { run: WorkflowRun }) {
   if (run.totalTokens !== undefined) parts.push(`${formatTokenCount(run.totalTokens)} tok`);
   if (run.durationMs !== undefined) parts.push(formatDockDuration(run.durationMs));
   return (
-    <span className="flex shrink-0 items-center gap-1 tabular-nums text-foreground-muted opacity-80">
+    <span className="flex shrink-0 items-center gap-1 tabular-nums text-foreground-muted">
       {parts.map((part, index) => (
         <Fragment key={index}>
           {index > 0 ? <span aria-hidden="true">·</span> : null}

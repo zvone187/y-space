@@ -362,7 +362,7 @@ export function PrSection(props: {
                       className={`size-5 shrink-0 ${
                         isPendingChecksBlock
                           ? "text-warning data-[selected=true]:bg-warning data-[selected=true]:text-warning-foreground"
-                          : "text-danger data-[selected=true]:bg-danger data-[selected=true]:text-white"
+                          : "text-danger data-[selected=true]:bg-danger data-[selected=true]:text-danger-foreground"
                       }`}
                     >
                       <ShieldOff className="size-3" />

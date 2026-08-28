@@ -8,6 +8,7 @@ import "./installBridge";
 import "@/renderer/components/providers/bootstrap";
 import { RouterProvider } from "@tanstack/react-router";
 import { AppProvider } from "@/renderer/components/ui/provider";
+import { NativeSystemBarsAppearance } from "./NativeSystemBarsAppearance";
 import { router } from "./router";
 import { disableToastExitViewTransitionsInIosBrowser } from "./toastViewTransitions";
 
@@ -18,6 +19,7 @@ export { registerServiceWorker } from "./registerServiceWorker";
 export function MobileApp() {
   return (
     <AppProvider>
+      <NativeSystemBarsAppearance />
       <RouterProvider router={router} />
     </AppProvider>
   );

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 const HERE = fileURLToPath(new URL("./social/x/", import.meta.url));
+const SOCIAL_BACKGROUND = "#FFFFFF";
 
 async function png(sourceName, size) {
   return sharp(await readFile(`${HERE}${sourceName}`), { density: 512 })
@@ -15,7 +16,7 @@ async function png(sourceName, size) {
 async function jpeg(sourceName, size) {
   return sharp(await readFile(`${HERE}${sourceName}`), { density: 512 })
     .resize(size.width, size.height, { fit: "cover" })
-    .flatten({ background: "#070709" })
+    .flatten({ background: SOCIAL_BACKGROUND })
     .jpeg({ quality: 92, chromaSubsampling: "4:4:4" })
     .toBuffer();
 }

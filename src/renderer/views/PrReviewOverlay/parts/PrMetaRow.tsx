@@ -70,7 +70,7 @@ export function PrMetaRow(props: { prKey: string; cacheKey: string }) {
         <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px]">
           <span className="text-success">+{details.additions}</span>
           <span className="text-danger">−{details.deletions}</span>
-          <span className="text-muted/60">
+          <span className="text-muted">
             · <Plural value={details.changedFiles} one="# file" other="# files" />
           </span>
         </span>

@@ -4,16 +4,19 @@
   --font-sans: var(--font-geist-sans), "Inter", system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* Y Space brand palette — moonlight + ink + one cool accent.
-     See branding/BRAND.md §6. No orange, ever. */
+  /* Y Space brand palette — moonlight + ink + a restrained orange accent.
+     See branding/BRAND.md §6. */
   --color-night: #070709; /* page / canvas */
   --color-tile: #0e0e14; /* panels, raised surfaces */
   --color-tile-2: #14141c; /* slightly lifted panel */
   --color-moon: #eaf0fb; /* primary text / the Y on dark */
   --color-dim: #9ba6be; /* secondary text */
-  --color-accent: #8b7bff; /* indigo — the Y Space dot, links, active states */
-  --color-accent-soft: #b6acff;
-  --color-ice: #5ee6e0; /* secondary accent */
+  --color-accent: #ff5a1f; /* Y Space dot, fills, and graphics */
+  --color-accent-text-light: #b43f00; /* 5.75:1 on white */
+  --color-accent-text-dark: #ff9b73; /* 9.76:1 on night */
+  --color-accent-text: var(--color-accent-text-dark);
+  --color-accent-soft: #ff9b73;
+  --color-ice: #ff9b73; /* secondary warm accent */
 }
 
 :root {
@@ -57,19 +60,19 @@ body {
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:active {
-  background: rgba(139, 123, 255, 0.45);
+  background: rgba(255, 90, 31, 0.45);
   border: 3px solid transparent;
   background-clip: padding-box;
 }
 
-/* ---- The Y Space dot (motif): one round indigo dot, baseline-aligned ---- */
+/* ---- The Y Space dot (motif): one round orange dot, baseline-aligned ---- */
 .pora-dot {
   display: inline-block;
   border-radius: 9999px;
   background: var(--color-accent);
   box-shadow:
-    0 0 0.6em rgba(139, 123, 255, 0.55),
-    0 0 1.4em rgba(139, 123, 255, 0.35);
+    0 0 0.6em rgba(255, 90, 31, 0.55),
+    0 0 1.4em rgba(255, 90, 31, 0.35);
 }
 .pora-pulse {
   animation: pora-pulse 2.8s ease-in-out infinite;
@@ -175,7 +178,7 @@ body {
    (DotPeriod), never a clipped gradient. No `.brand-gradient-text` /
    `.brand-shimmer` helpers exist by design. */
 
-/* ---- Keyboard focus: a clear indigo ring on near-black surfaces ---- */
+/* ---- Keyboard focus: a clear orange ring on near-black surfaces ---- */
 a:focus-visible,
 button:focus-visible,
 summary:focus-visible,
@@ -195,7 +198,7 @@ summary:focus-visible,
   mask-image: radial-gradient(ellipse 75% 55% at 50% 0%, #000 20%, transparent 72%);
 }
 
-/* ---- Gradient hairline card: indigo edge-light on hover ---- */
+/* ---- Gradient hairline card: orange edge-light on hover ---- */
 .brand-card {
   position: relative;
   border-radius: 1rem;
@@ -211,12 +214,8 @@ summary:focus-visible,
     background 0.3s ease;
 }
 .brand-card:hover {
-  border-color: rgba(139, 123, 255, 0.4);
-  background: linear-gradient(
-    180deg,
-    rgba(139, 123, 255, 0.07) 0%,
-    rgba(234, 240, 251, 0.014) 100%
-  );
+  border-color: rgba(255, 90, 31, 0.4);
+  background: linear-gradient(180deg, rgba(255, 90, 31, 0.07) 0%, rgba(234, 240, 251, 0.014) 100%);
 }
 
 /* ---- Chip: tile pill with hairline border ---- */
@@ -233,8 +232,8 @@ summary:focus-visible,
     color 0.25s ease;
 }
 .brand-chip:hover {
-  border-color: rgba(139, 123, 255, 0.4);
-  background: rgba(139, 123, 255, 0.08);
+  border-color: rgba(255, 90, 31, 0.4);
+  background: rgba(255, 90, 31, 0.08);
 }
 
 @keyframes acp-marquee-forward {
@@ -261,7 +260,7 @@ summary:focus-visible,
 .brand-glow {
   box-shadow:
     0 0 0 1px rgba(234, 240, 251, 0.06),
-    0 24px 70px -28px rgba(139, 123, 255, 0.5);
+    0 24px 70px -28px rgba(255, 90, 31, 0.5);
 }
 
 /* Deeper lift for the phone docked over the §3b browser window — declared
@@ -270,7 +269,7 @@ summary:focus-visible,
   box-shadow:
     0 0 0 1px rgba(234, 240, 251, 0.07),
     0 32px 90px -24px rgba(0, 0, 0, 0.85),
-    0 24px 70px -28px rgba(139, 123, 255, 0.5);
+    0 24px 70px -28px rgba(255, 90, 31, 0.5);
 }
 
 /* ---- Blinking block cursor for the `y.space` CLI signature ---- */

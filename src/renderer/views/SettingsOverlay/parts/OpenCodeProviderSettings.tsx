@@ -172,7 +172,7 @@ export function OpenCodeProviderSettings(props: {
             <Disclosure.Content>
               <Disclosure.Body className="pt-2">
                 {providers.length === 0 ? (
-                  <p className="py-2 text-[11px] text-muted/60">
+                  <p className="py-2 text-[11px] text-muted">
                     <Trans>No providers connected yet.</Trans>
                   </p>
                 ) : (
@@ -194,7 +194,7 @@ export function OpenCodeProviderSettings(props: {
                               {provider.label}
                             </span>
                             {provider.detail ? (
-                              <span className="shrink-0 text-[11px] tabular-nums text-muted/60">
+                              <span className="shrink-0 text-[11px] tabular-nums text-muted">
                                 {provider.detail}
                               </span>
                             ) : null}
@@ -301,7 +301,7 @@ export function OpenCodeProviderSettings(props: {
                     <span className="text-xs tabular-nums text-muted">{draftCustomMcp.length}</span>
                   </div>
                   {draftCustomMcp.length === 0 ? (
-                    <p className="py-2 text-[11px] text-muted/60">
+                    <p className="py-2 text-[11px] text-muted">
                       <Trans>No configured MCP servers yet</Trans>
                     </p>
                   ) : (
@@ -311,8 +311,12 @@ export function OpenCodeProviderSettings(props: {
                           key={server.id}
                           title={server.name}
                           description={
-                            <span className="truncate font-mono text-[11px]">
-                              {server.description || mcpTransportSummary(server.transport)}
+                            <span className="truncate text-[11px]">
+                              {server.description || (
+                                <span className="font-mono">
+                                  {mcpTransportSummary(server.transport)}
+                                </span>
+                              )}
                             </span>
                           }
                           ariaLabel={

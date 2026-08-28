@@ -101,8 +101,8 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
   const isDark = options.appearance === "dark";
   // Base bg/symbol per appearance, matching styles.css and the runtime
   // setWindowChrome values, so the first frame doesn't flash a fixed palette.
-  const backgroundColor = isDark ? "#070709" : "#f1f1f4";
-  const symbolColor = isDark ? "#fafafa" : "#1f2937";
+  const backgroundColor = isDark ? "#070709" : "#ffffff";
+  const symbolColor = isDark ? "#fafafa" : "#181816";
   // macOS: always create the window transparent + vibrancy-capable so the glass
   // sidebar can be toggled live (the renderer reveals/hides it purely via CSS —
   // with glass off the opaque content simply covers the material). macOS can't

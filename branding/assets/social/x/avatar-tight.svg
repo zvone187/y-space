@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <!-- Tighter Y Space avatar for small profile chips and circular crops. -->
-  <rect width="1024" height="1024" fill="#0E0E14"/>
-  <path fill="#EAF0FB" d="M224 214H408L512 398L616 214H800L594 566V816H430V566L224 214Z"/>
-  <circle cx="738" cy="738" r="54" fill="#8B7BFF"/>
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <path fill="#181816" d="M224 214H408L512 398L616 214H800L594 566V816H430V566L224 214Z"/>
+  <circle cx="738" cy="738" r="54" fill="#FF5A1F"/>
 </svg>

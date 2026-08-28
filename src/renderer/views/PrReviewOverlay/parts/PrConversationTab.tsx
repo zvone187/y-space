@@ -29,7 +29,7 @@ const REVIEW_STATE_META: Record<
     Icon: ThumbsDown,
   },
   COMMENTED: { label: msg`commented`, toneClass: "text-muted", Icon: MessageSquare },
-  DISMISSED: { label: msg`dismissed review`, toneClass: "text-muted/60", Icon: MessageSquare },
+  DISMISSED: { label: msg`dismissed review`, toneClass: "text-muted", Icon: MessageSquare },
   PENDING: { label: msg`pending review`, toneClass: "text-warning", Icon: MessageSquare },
 };
 
@@ -108,7 +108,7 @@ export function PrConversationTab(props: {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-6 py-4">
           {entries.length === 0 ? (
-            <div className="py-6 text-center text-xs text-muted/60">
+            <div className="py-6 text-center text-xs text-muted">
               <Trans>No conversation yet. Be the first to comment.</Trans>
             </div>
           ) : (
@@ -140,7 +140,7 @@ export function PrConversationTab(props: {
           <Button
             variant="tertiary"
             size="sm"
-            className="h-8 shrink-0 self-start text-white"
+            className="h-8 shrink-0 self-start"
             onPress={() => void handlePost()}
             isDisabled={posting || composerValue.trim().length === 0}
             isPending={posting}
@@ -181,7 +181,7 @@ function CommentRow(props: { comment: PrComment }) {
           <Trans>commented</Trans>
         </span>
         {comment.createdAt && (
-          <span className="text-muted/60">· {formatShortDateTime(comment.createdAt)}</span>
+          <span className="text-muted">· {formatShortDateTime(comment.createdAt)}</span>
         )}
       </div>
       <div className="px-3 py-2 text-xs">
@@ -206,7 +206,7 @@ function ReviewRow(props: { review: PrReviewSummary }) {
           {t(meta.label)}
         </span>
         {review.submittedAt && (
-          <span className="text-muted/60">· {formatShortDateTime(review.submittedAt)}</span>
+          <span className="text-muted">· {formatShortDateTime(review.submittedAt)}</span>
         )}
       </div>
       {review.body && (

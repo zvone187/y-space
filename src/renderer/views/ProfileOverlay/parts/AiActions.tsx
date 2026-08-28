@@ -38,7 +38,7 @@ export function AiActions(props: { actions: ProfileAiAction[] }) {
                   <span className="truncate font-medium text-foreground">{action.label}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
-                  {via ? <span className="text-[11px] text-muted/70">{via}</span> : null}
+                  {via ? <span className="text-[11px] text-muted">{via}</span> : null}
                   <span className="font-medium tabular-nums text-foreground">
                     {action.count.toLocaleString()}
                   </span>

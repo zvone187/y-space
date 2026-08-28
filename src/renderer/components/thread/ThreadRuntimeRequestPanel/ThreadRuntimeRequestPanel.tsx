@@ -181,14 +181,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
       >
         <Trans>Cancel</Trans>
       </Button>
-      <Button
-        form={formId}
-        isDisabled={resolving}
-        size="sm"
-        type="submit"
-        variant="tertiary"
-        className="text-white"
-      >
+      <Button form={formId} isDisabled={resolving} size="sm" type="submit" variant="tertiary">
         <Trans>Submit</Trans>
       </Button>
     </div>

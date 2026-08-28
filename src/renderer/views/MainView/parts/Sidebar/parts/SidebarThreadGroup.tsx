@@ -233,7 +233,7 @@ export function SidebarThreadGroup(props: {
                     <span className={`truncate ${isDone ? "opacity-50 line-through" : ""}`}>
                       {entry.group.groupName}
                     </span>
-                    <span className={`shrink-0 text-muted/60 ${isDone ? "opacity-50" : ""}`}>
+                    <span className={`shrink-0 text-muted ${isDone ? "opacity-50" : ""}`}>
                       {entry.group.threads.length}
                     </span>
                     {props.projectTag}
@@ -247,7 +247,7 @@ export function SidebarThreadGroup(props: {
                     <button
                       type="button"
                       aria-label={t`Open all in group`}
-                      className={`flex h-[18px] shrink-0 items-center justify-center rounded text-muted/40 transition-[opacity,color,background-color] hover:bg-[var(--row-hover)] hover:text-foreground ${hiddenGroupActionClass}`}
+                      className={`flex h-[18px] shrink-0 items-center justify-center rounded text-muted transition-[opacity,color,background-color] hover:bg-[var(--row-hover)] hover:text-foreground ${hiddenGroupActionClass}`}
                       onClick={() => useAppStore.getState().openGroupView(entry.group.groupId)}
                     >
                       <Columns2 className="size-3" />
@@ -262,7 +262,7 @@ export function SidebarThreadGroup(props: {
                 <span className="relative w-[2.4ch] shrink-0">
                   <RelativeTime
                     iso={latestThreadUpdatedAt}
-                    className="block text-center font-mono text-[10px] tabular-nums text-muted group-hover:invisible"
+                    className="block text-center text-[10px] tabular-nums text-muted group-hover:invisible"
                   />
                   <div
                     role="button"
@@ -272,7 +272,7 @@ export function SidebarThreadGroup(props: {
                         ? t`Archive ${entry.group.groupName}`
                         : t`Delete ${entry.group.groupName}`
                     }
-                    className={`absolute inset-0 flex items-center justify-center rounded text-muted/55 opacity-0 transition group-hover:opacity-100 ${threadRemoveAction === "archive" ? "hover:text-warning" : "hover:text-danger"}`}
+                    className={`absolute inset-0 flex items-center justify-center rounded text-muted opacity-0 transition group-hover:opacity-100 ${threadRemoveAction === "archive" ? "hover:text-warning" : "hover:text-danger"}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       removeGroupThreads();

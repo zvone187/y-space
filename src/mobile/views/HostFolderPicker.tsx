@@ -128,7 +128,7 @@ export function HostFolderPicker(props: {
                   className="m-picker__row"
                   onClick={() => void browse(entry.path)}
                 >
-                  <Folder className="size-4 shrink-0 text-accent" />
+                  <Folder className="size-4 shrink-0 text-accent-text" />
                   <span className="m-picker__row-name">{entry.name}</span>
                   <ChevronRight className="size-4 shrink-0 text-muted" />
                 </button>

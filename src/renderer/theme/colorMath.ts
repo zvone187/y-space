@@ -76,6 +76,41 @@ export interface MutedDerivation {
 }
 
 /**
+ * Keeps as much of a brand/semantic color as possible while moving it toward
+ * the normal foreground until it is readable on every supplied surface.
+ */
+export function deriveReadableTextColor(
+  color: string,
+  toward: string,
+  targets: ContrastTarget[],
+): string {
+  for (let colorFraction = 1; colorFraction >= -1e-9; colorFraction -= 0.01) {
+    const candidate = mixHex(color, toward, Math.max(0, colorFraction));
+    if (targets.every((target) => contrastRatio(candidate, target.color) >= target.floor)) {
+      return candidate;
+    }
+  }
+  return toward;
+}
+
+/**
+ * Preserve an authored foreground when it is readable on a filled control;
+ * otherwise select the stronger of black or white. Theme accent colors span
+ * both light and dark palettes, so moving only toward the theme foreground can
+ * never guarantee a readable primary-button label.
+ */
+export function ensureReadableForeground(
+  preferred: string,
+  background: string,
+  floor = 4.5,
+): string {
+  if (contrastRatio(preferred, background) >= floor) return preferred;
+  const dark = "#000000";
+  const light = "#ffffff";
+  return contrastRatio(dark, background) >= contrastRatio(light, background) ? dark : light;
+}
+
+/**
  * Returns the *dimmest* blend of `fg` toward the first background that still
  * clears every target's contrast floor — keeping muted text as recessive as
  * the palette allows without dropping below readable. If the floors can't be

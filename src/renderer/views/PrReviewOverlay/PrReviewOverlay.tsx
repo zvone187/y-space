@@ -202,7 +202,7 @@ export function PrReviewOverlay(props: {
       contentHeaderChildren={
         <>
           <div className="flex min-w-0 shrink items-center gap-2 pl-1.5 leading-none">
-            <span className="shrink-0 font-mono text-[13px] font-medium tracking-tight text-muted">
+            <span className="shrink-0 text-[13px] font-medium tabular-nums tracking-tight text-muted">
               #{prNumber}
             </span>
             {prTitle && (

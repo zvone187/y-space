@@ -114,7 +114,7 @@ function TranscriptLine(props: { entry: JudgeTranscriptEntry; isCurrent: boolean
   return (
     <div className="flex items-start gap-2 text-sm">
       {isCurrent ? (
-        <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin text-accent" />
+        <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin text-accent-text" />
       ) : (
         <Check className="mt-0.5 size-3.5 shrink-0 text-success" />
       )}
@@ -139,7 +139,7 @@ function TranscriptLine(props: { entry: JudgeTranscriptEntry; isCurrent: boolean
         ) : entry.kind === "captured-response" ? (
           <>
             {entry.label}
-            {entry.details ? <span className="text-muted/80"> · {entry.details}</span> : null} —{" "}
+            {entry.details ? <span className="text-muted"> · {entry.details}</span> : null} —{" "}
             <span className="text-muted">
               <Plural value={entry.characters} one="# character" other="# characters" />
             </span>
@@ -147,7 +147,7 @@ function TranscriptLine(props: { entry: JudgeTranscriptEntry; isCurrent: boolean
         ) : (
           <>
             {entry.label}
-            {entry.details ? <span className="text-muted/80"> · {entry.details}</span> : null} —{" "}
+            {entry.details ? <span className="text-muted"> · {entry.details}</span> : null} —{" "}
             <span className="font-mono text-success">+{entry.insertions}</span>{" "}
             <span className="font-mono text-danger">−{entry.deletions}</span>{" "}
             <span className="text-muted">

@@ -58,19 +58,19 @@ export function PrAutomationSlider(props: {
         </Slider.Track>
       </Slider>
       <div aria-hidden="true" className="mt-1.5 grid grid-cols-3 text-[10px] leading-none">
-        <span className={draftMode === "off" ? "font-medium text-accent" : "text-muted"}>
+        <span className={draftMode === "off" ? "font-medium text-accent-text" : "text-muted"}>
           <Trans>Off</Trans>
         </span>
         <span
           className={`text-center ${
-            draftMode === "fix" ? "font-medium text-accent" : "text-muted"
+            draftMode === "fix" ? "font-medium text-accent-text" : "text-muted"
           }`}
         >
           <Trans>Auto Fix</Trans>
         </span>
         <span
           className={`text-right ${
-            draftMode === "merge" ? "font-medium text-accent" : "text-muted"
+            draftMode === "merge" ? "font-medium text-accent-text" : "text-muted"
           }`}
         >
           <Trans>Auto Merge</Trans>

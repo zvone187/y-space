@@ -70,7 +70,7 @@ function SortableProviderRow(props: {
         ref={handleRef}
         type="button"
         aria-label={t`Reorder ${agent.label}`}
-        className="flex size-4 shrink-0 cursor-grab items-center justify-center text-muted/60 transition-colors hover:text-foreground active:cursor-grabbing"
+        className="flex size-4 shrink-0 cursor-grab items-center justify-center text-muted transition-colors hover:text-foreground active:cursor-grabbing"
       >
         <GripVertical className="size-3.5" />
       </button>
@@ -81,7 +81,7 @@ function SortableProviderRow(props: {
         className="size-3.5 shrink-0"
       />
       <span className="truncate text-foreground">{agent.label}</span>
-      <span className="ml-auto shrink-0 tabular-nums text-muted/60">
+      <span className="ml-auto shrink-0 tabular-nums text-muted">
         {update.environments.length > 0
           ? update.environments
               .map((env) => `${env.label} ${env.version ? `v${env.version}` : "—"}`.trim())
@@ -163,7 +163,7 @@ export function ModelOrderSection() {
             type="button"
             onClick={() => setProviderOrder([])}
             aria-label={t`Reset model order`}
-            className="flex size-5 items-center justify-center rounded text-muted/70 transition-colors hover:bg-surface hover:text-foreground"
+            className="flex size-5 items-center justify-center rounded text-muted transition-colors hover:bg-surface hover:text-foreground"
           >
             <RotateCcw className="size-3" />
           </button>

@@ -8,7 +8,7 @@ const KIND_ORDER: ChangelogChangeKind[] = ["added", "improved", "fixed"];
 
 const KIND_ICON: Record<ChangelogChangeKind, { icon: LucideIcon; className: string }> = {
   added: { icon: Plus, className: "text-success" },
-  improved: { icon: ArrowUp, className: "text-accent" },
+  improved: { icon: ArrowUp, className: "text-accent-text" },
   fixed: { icon: Wrench, className: "text-muted" },
 };
 

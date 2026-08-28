@@ -24,9 +24,7 @@ export function PrCommitsTab(props: { cacheKey: string; prKey: string; loading: 
   }
 
   if (commits.length === 0) {
-    return (
-      <div className="px-6 py-6 text-center text-xs text-muted/60">{t`No commits found.`}</div>
-    );
+    return <div className="px-6 py-6 text-center text-xs text-muted">{t`No commits found.`}</div>;
   }
 
   return (
@@ -52,7 +50,7 @@ function PrCommitRow(props: { commit: PrCommitSummary; prUrl: string | undefined
   })();
   return (
     <li className="flex items-start gap-3 px-3 py-2 hover:bg-foreground/[0.03]">
-      <GitCommit className="mt-0.5 size-4 shrink-0 text-muted/70" />
+      <GitCommit className="mt-0.5 size-4 shrink-0 text-muted" />
       <div className="min-w-0 flex-1">
         <div
           className="truncate text-xs font-medium text-foreground"

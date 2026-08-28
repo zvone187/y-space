@@ -1,10 +1,8 @@
 import { forwardRef, type ReactNode } from "react";
-import { fireEvent, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import type { Project, Thread } from "@/shared/contracts";
-import { openFilesPanel } from "@/renderer/actions/panelActions";
-import { openTerminal } from "@/renderer/actions/terminalActions";
 import { SortableThreadItem } from "./SortableThreadItem";
 
 type MockContextMenuItem = {
@@ -360,7 +358,7 @@ describe("SortableThreadItem", () => {
     });
   });
 
-  it("shows project files, terminal, sync, and git controls on a flat-list main-branch thread row", () => {
+  it("keeps a flat-list thread row to one quiet line without project tool chrome", () => {
     render(
       <SortableThreadItem
         thread={makeThread()}
@@ -374,19 +372,17 @@ describe("SortableThreadItem", () => {
       />,
     );
 
-    expect(screen.getByTestId("sync-badge")).toHaveTextContent("project-1:project");
-    expect(screen.getByRole("button", { name: "Git status for Project" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Files for Project" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terminal for Project" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Files for Project" }));
-    fireEvent.click(screen.getByRole("button", { name: "Terminal for Project" }));
-
-    expect(openFilesPanel).toHaveBeenCalledWith("project-1");
-    expect(openTerminal).toHaveBeenCalledWith("project-1");
+    expect(screen.getByText("Thread 1")).toBeInTheDocument();
+    expect(screen.queryByText("Project")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sync-badge")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Git status for Project" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Files for Project" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Terminal for Project" })).not.toBeInTheDocument();
   });
 
-  it("keeps the flat-list row metadata while renaming only its title", () => {
+  it("keeps a flat-list row minimal while renaming its title", () => {
     render(
       <SortableThreadItem
         thread={makeThread()}
@@ -401,11 +397,13 @@ describe("SortableThreadItem", () => {
     );
 
     expect(screen.getByRole("textbox", { name: "Rename thread" })).toHaveValue("Thread 1");
-    expect(screen.getByText("Project")).toBeInTheDocument();
-    expect(screen.getByTestId("sync-badge")).toHaveTextContent("project-1:project");
-    expect(screen.getByRole("button", { name: "Git status for Project" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Files for Project" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terminal for Project" })).toBeInTheDocument();
+    expect(screen.queryByText("Project")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sync-badge")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Git status for Project" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Files for Project" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Terminal for Project" })).not.toBeInTheDocument();
   });
 
   it("omits project-scoped row chrome in grouped lists, where the project header carries it", () => {

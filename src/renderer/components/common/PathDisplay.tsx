@@ -30,7 +30,7 @@ function MeasuredPathDisplay({
   path,
   className,
   basenameClassName = "text-foreground",
-  dirClassName = "text-muted/60",
+  dirClassName = "text-muted",
   trailing,
   title,
 }: PathDisplayProps) {
@@ -124,7 +124,7 @@ function CssPathDisplay({
   path,
   className,
   basenameClassName = "text-foreground",
-  dirClassName = "text-muted/60",
+  dirClassName = "text-muted",
   trailing,
   title,
 }: PathDisplayProps) {

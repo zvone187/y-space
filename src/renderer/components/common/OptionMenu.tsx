@@ -157,7 +157,7 @@ export function OptionMenu(props: OptionMenuProps) {
           {option.icon}
           <span className="flex-1 truncate">{option.label}</span>
           {option.hint ? <span className="shrink-0 text-xs text-muted">{option.hint}</span> : null}
-          {option.id === value ? <Check className="size-4 shrink-0 text-accent" /> : null}
+          {option.id === value ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
         </button>
       ))}
     </div>

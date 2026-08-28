@@ -234,7 +234,7 @@ export function StructuredElicitationForm(props: {
     <div className="space-y-2 border-t border-[color:var(--border)] px-2 py-1.5">
       {params.mode === "url" ? (
         <a
-          className="text-xs font-medium text-[color:var(--accent)] underline-offset-4 hover:underline"
+          className="text-xs font-medium text-accent-text underline-offset-4 hover:underline"
           href={params.url}
           rel="noreferrer"
           target="_blank"

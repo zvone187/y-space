@@ -4,17 +4,17 @@ import type { DragSourceData } from "@/renderer/dnd";
 import type { RightPanelTab } from "@/renderer/state/panelStore";
 
 /**
- * Right-panel toolbar icon that both activates its tab on click and can be
- * dragged into a `PanelDockDropZone` to split the right panel or dock beside
- * the bottom terminal. Mirrors `SidebarPanelDragButton` (div + role="button"
- * so dnd-kit's 5px activation distance keeps plain clicks working).
+ * Shared right-panel drag source. The default button form activates its tool;
+ * `variant="handle"` supplies a non-interactive grip inside another accessible
+ * control such as the compact workspace menu.
  */
 export function PanelTabDragButton(props: {
   tab: RightPanelTab;
   label: string;
   className: string;
   "aria-pressed"?: boolean;
-  onPress: () => void;
+  onPress?: () => void;
+  variant?: "button" | "handle";
   children: ReactNode;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
@@ -25,6 +25,20 @@ export function PanelTabDragButton(props: {
     data: { type: "panel-tab", tab: props.tab } satisfies DragSourceData,
     element: elementRef,
   });
+
+  if (props.variant === "handle") {
+    return (
+      <div
+        ref={elementRef}
+        aria-hidden="true"
+        data-panel-tool-drag-handle={props.tab}
+        title={props.label}
+        className={props.className}
+      >
+        {props.children}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -37,13 +51,13 @@ export function PanelTabDragButton(props: {
       className={props.className}
       onClick={(event) => {
         event.stopPropagation();
-        props.onPress();
+        props.onPress?.();
       }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           event.stopPropagation();
-          props.onPress();
+          props.onPress?.();
         }
       }}
     >

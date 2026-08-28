@@ -85,12 +85,12 @@ function showcaseSvg({ width, height, title, subtitle }) {
   <rect width="${width}" height="${height}" fill="#070709"/>
   <rect x="${panelX}" y="${panelY}" width="${panelWidth}" height="${panelHeight}" rx="${unit * 0.04}" fill="#0E0E14" stroke="#242430" stroke-width="${Math.max(2, unit * 0.002)}"/>
   <path d="M${panelX + unit * 0.08} ${panelY + unit * 0.12}H${panelX + panelWidth - unit * 0.08}" stroke="#242430" stroke-width="${Math.max(2, unit * 0.002)}"/>
-  <circle cx="${panelX + unit * 0.04}" cy="${panelY + unit * 0.06}" r="${unit * 0.009}" fill="#8B7BFF"/>
+  <circle cx="${panelX + unit * 0.04}" cy="${panelY + unit * 0.06}" r="${unit * 0.009}" fill="#FF5A1F"/>
   <circle cx="${panelX + unit * 0.07}" cy="${panelY + unit * 0.06}" r="${unit * 0.009}" fill="#343442"/>
   <circle cx="${panelX + unit * 0.1}" cy="${panelY + unit * 0.06}" r="${unit * 0.009}" fill="#343442"/>
   <g transform="translate(${centerX - markSize / 2} ${markTop}) scale(${markSize / 1024})">
     <path fill="#EAF0FB" d="M278 270H430L512 414L594 270H746L582 550V760H442V550L278 270Z"/>
-    <circle cx="704" cy="704" r="46" fill="#8B7BFF"/>
+    <circle cx="704" cy="704" r="46" fill="#FF5A1F"/>
   </g>
   <text x="${centerX}" y="${centerY + markSize * 0.32}" text-anchor="middle" font-family="Geist, Inter, system-ui, sans-serif" font-weight="650" font-size="${titleSize}" letter-spacing="-${titleSize * 0.035}" fill="#EAF0FB">${escapeXml(title)}</text>
   <text x="${centerX}" y="${centerY + markSize * 0.7}" text-anchor="middle" font-family="Geist, Inter, system-ui, sans-serif" font-weight="400" font-size="${subtitleSize}" fill="#9BA6BE">${escapeXml(subtitle)}</text>

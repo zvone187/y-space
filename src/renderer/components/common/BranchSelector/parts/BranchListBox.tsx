@@ -138,7 +138,7 @@ export function BranchListBox(props: {
                 className="!bg-transparent !cursor-default !opacity-100 !p-0 h-7 flex items-center"
                 textValue={headerLabel}
               >
-                <Header className="px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+                <Header className="px-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
                   {headerLabel}
                 </Header>
               </ListBox.Item>
@@ -298,7 +298,7 @@ function BranchRowBody(props: {
             <button
               type="button"
               aria-label={t`Delete ${branch.name}`}
-              className="flex items-center justify-center rounded border-0 bg-transparent p-0 text-muted/55 opacity-0 transition hover:text-danger group-hover:opacity-100 [@media(hover:none)]:opacity-100 [@media(pointer:coarse)]:opacity-100"
+              className="flex items-center justify-center rounded border-0 bg-transparent p-0 text-muted opacity-0 transition hover:text-danger group-hover:opacity-100 [@media(hover:none)]:opacity-100 [@media(pointer:coarse)]:opacity-100"
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => e.stopPropagation()}
               onClick={(e) => {

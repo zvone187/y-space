@@ -94,12 +94,10 @@ export function Select(props: SelectProps) {
                 <div className="flex min-w-0 flex-1 flex-col items-start text-left">
                   <span className="min-w-0 truncate">{option.label}</span>
                   {option.detail ? (
-                    <span className="min-w-0 truncate font-mono text-[11px] text-muted/70">
-                      {option.detail}
-                    </span>
+                    <span className="min-w-0 truncate text-[11px] text-muted">{option.detail}</span>
                   ) : null}
                 </div>
-                {selected ? <Check className="size-4 shrink-0 text-accent" /> : null}
+                {selected ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
               </button>
             );
           })}
@@ -129,7 +127,7 @@ export function Select(props: SelectProps) {
                   {option.label}
                 </Label>
                 {option.detail ? (
-                  <Description className="truncate font-mono text-[11px] text-muted">
+                  <Description className="truncate text-[11px] text-muted">
                     {option.detail}
                   </Description>
                 ) : null}

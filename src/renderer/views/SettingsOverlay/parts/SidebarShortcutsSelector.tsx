@@ -56,7 +56,7 @@ function SortableShortcutRow(props: {
         ref={handleRef}
         type="button"
         aria-label={t`Reorder ${shortcut.label}`}
-        className="flex size-5 shrink-0 cursor-grab items-center justify-center rounded text-muted/50 transition-colors hover:text-foreground active:cursor-grabbing"
+        className="flex size-5 shrink-0 cursor-grab items-center justify-center rounded text-muted transition-colors hover:text-foreground active:cursor-grabbing"
         onClick={(event) => event.stopPropagation()}
       >
         <GripVertical className="size-3.5" />
@@ -140,7 +140,7 @@ export function SidebarShortcutsSelector() {
       </Popover.Trigger>
       <Popover.Content placement="bottom end" className="w-64 p-0">
         <Popover.Dialog className="flex flex-col overflow-hidden !p-0">
-          <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted/80">
+          <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted">
             <span className="tabular-nums">
               <Trans>
                 {visibleCount} of {totalCount} visible

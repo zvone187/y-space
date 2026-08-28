@@ -77,12 +77,12 @@ export function SidebarProjectHeader(props: {
             {/* Own span rather than the shared chip: the machine name has to
                 undo the project name's `font-semibold` beside it. */}
             {remote.serverName ? (
-              <span className="max-w-24 truncate text-[10px] font-normal text-muted/60">
+              <span className="max-w-24 truncate text-[10px] font-normal text-muted">
                 {remote.serverName}
               </span>
             ) : null}
             {project.location.kind === "wsl" && (
-              <TuxIcon className="h-3 w-auto shrink-0 text-muted/60" />
+              <TuxIcon className="h-3 w-auto shrink-0 text-muted" />
             )}
           </span>
         }
@@ -110,8 +110,8 @@ export function SidebarProjectHeader(props: {
                 ariaLabel={t`Files for ${project.name}`}
                 className={`${panelButtonBaseClass} ${
                   isActiveFilesPanel
-                    ? "w-[18px] p-0.5 text-accent"
-                    : `text-muted/60 ${hiddenPanelButtonClass}`
+                    ? "w-[18px] p-0.5 text-accent-text"
+                    : `text-muted ${hiddenPanelButtonClass}`
                 }`}
                 onPress={() => openFilesPanel(project.id)}
               >
@@ -123,10 +123,10 @@ export function SidebarProjectHeader(props: {
                 ariaLabel={t`Terminal for ${project.name}`}
                 className={`${panelButtonBaseClass} ${
                   isActiveTerminal
-                    ? "w-[18px] p-0.5 text-accent"
+                    ? "w-[18px] p-0.5 text-accent-text"
                     : hasTerminal
                       ? "w-[18px] p-0.5 text-foreground"
-                      : `text-muted/60 ${hiddenPanelButtonClass}`
+                      : `text-muted ${hiddenPanelButtonClass}`
                 }`}
                 onPress={() => openTerminal(project.id)}
               >

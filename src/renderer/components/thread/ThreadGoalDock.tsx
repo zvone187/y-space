@@ -61,7 +61,7 @@ export function ThreadGoalDock({ threadId, state, onDismiss }: ThreadGoalDockPro
     : isFailed
       ? "text-danger"
       : isActive
-        ? "text-white"
+        ? "text-accent-text"
         : "text-foreground-muted";
   return (
     <ThreadDockSection ariaLabel={t`Thread goal dock`} className="px-2 py-1">

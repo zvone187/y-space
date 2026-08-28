@@ -30,7 +30,7 @@ export function AgentInstallEnvironmentRow(props: {
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2 text-sm font-medium">
           <span className="shrink-0 text-foreground/90">{env || t`Default`}</span>
-          <span className="shrink-0 tabular-nums text-muted/60 font-normal text-xs">
+          <span className="shrink-0 text-xs font-normal tabular-nums text-muted">
             <Trans>Not installed</Trans>
           </span>
         </div>
@@ -47,7 +47,7 @@ export function AgentInstallEnvironmentRow(props: {
         </Button>
       </div>
       <div className="flex min-w-0 h-4 items-center">
-        <span className="min-w-0 truncate text-[11px] font-normal text-muted/60">
+        <span className="min-w-0 truncate text-[11px] font-normal text-muted">
           {env ? t`Install ${props.agentLabel} for ${env}.` : t`Install ${props.agentLabel}.`}
         </span>
       </div>
@@ -170,7 +170,7 @@ export function AgentEnvironmentRow(props: {
           {props.isRedetecting ? (
             <PixelLoader size="xs" />
           ) : (
-            <span className="shrink-0 tabular-nums text-muted/60 font-normal text-xs">
+            <span className="shrink-0 text-xs font-normal tabular-nums text-muted">
               {installedVer ? `v${installedVer}` : "—"}
             </span>
           )}
@@ -284,15 +284,15 @@ export function AgentEnvironmentRow(props: {
       </div>
       <div className="flex flex-col min-w-0 h-4 justify-center">
         {props.pendingMessage ? (
-          <span className="min-w-0 truncate text-[11px] font-normal text-muted/60 italic">
+          <span className="min-w-0 truncate text-[11px] font-normal italic text-muted">
             {props.pendingMessage}
           </span>
         ) : metadataSummary ? (
-          <span className="min-w-0 truncate text-[11px] font-normal text-muted/60 group-hover/env:text-muted/80 transition-colors">
+          <span className="min-w-0 truncate text-[11px] font-normal text-muted transition-colors">
             {metadataSummary}
           </span>
         ) : description ? (
-          <p className="text-[10px] text-muted/50 truncate">{description}</p>
+          <p className="truncate text-[10px] text-muted">{description}</p>
         ) : null}
       </div>
     </div>

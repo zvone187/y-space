@@ -23,7 +23,7 @@ export function ExperimentGroupHeader(props: {
   const { t } = useLingui();
   const hiddenPanelButtonClass =
     "w-0 -mr-[3px] overflow-hidden p-0 opacity-0 pointer-events-none group-hover:w-[18px] group-hover:mr-0 group-hover:p-0.5 group-hover:opacity-100 group-hover:pointer-events-auto focus-visible:w-[18px] focus-visible:mr-0 focus-visible:p-0.5 focus-visible:opacity-100 focus-visible:pointer-events-auto";
-  const actionButtonClass = `flex h-[18px] shrink-0 items-center justify-center rounded text-muted/60 transition-[opacity,color,background-color] hover:bg-[var(--row-hover)] hover:text-foreground ${hiddenPanelButtonClass}`;
+  const actionButtonClass = `flex h-[18px] shrink-0 items-center justify-center rounded text-muted transition-[opacity,color,background-color] hover:bg-[var(--row-hover)] hover:text-foreground ${hiddenPanelButtonClass}`;
 
   return (
     <SidebarButton
@@ -39,7 +39,7 @@ export function ExperimentGroupHeader(props: {
         ) : (
           <FlaskConical
             className={`size-3.5 shrink-0 transition-colors ${
-              props.isCollapsed ? "text-muted/60" : "text-foreground"
+              props.isCollapsed ? "text-muted" : "text-foreground"
             }`}
           />
         )
@@ -106,13 +106,13 @@ export function ExperimentGroupHeader(props: {
             <span className="relative w-[2.4ch] shrink-0">
               <RelativeTime
                 iso={props.updatedAt}
-                className="block text-center font-mono text-[10px] tabular-nums text-muted group-hover:invisible"
+                className="block text-center text-[10px] tabular-nums text-muted group-hover:invisible"
               />
               <div
                 role="button"
                 tabIndex={0}
                 aria-label={t`Discard ${props.title}`}
-                className="absolute inset-0 flex items-center justify-center rounded text-muted/55 opacity-0 transition hover:text-danger group-hover:opacity-100"
+                className="absolute inset-0 flex items-center justify-center rounded text-muted opacity-0 transition hover:text-danger group-hover:opacity-100"
                 onClick={(event) => {
                   event.stopPropagation();
                   props.onDiscard();

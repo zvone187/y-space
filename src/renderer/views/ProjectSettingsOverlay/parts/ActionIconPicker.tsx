@@ -27,7 +27,7 @@ export function ActionIconPicker(props: { value: string; onChange: (name: string
                 type="button"
                 className={`flex size-8 items-center justify-center rounded-md transition-colors ${
                   entry.name === value
-                    ? "bg-accent/20 text-accent"
+                    ? "bg-accent/20 text-accent-text"
                     : "text-muted hover:bg-[var(--row-active)] hover:text-foreground"
                 }`}
                 aria-label={entry.name}

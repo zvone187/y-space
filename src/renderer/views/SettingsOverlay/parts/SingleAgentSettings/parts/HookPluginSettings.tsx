@@ -65,7 +65,7 @@ function HookPluginEnvironmentRow(props: {
     <div className="flex items-center justify-between gap-4 py-1.5">
       <div className="flex min-w-0 items-center gap-2 text-sm">
         <span className="shrink-0 font-medium text-foreground/90">{hookEnvLabel(status.env)}</span>
-        <span className="shrink-0 tabular-nums text-xs text-muted/60">{versionText}</span>
+        <span className="shrink-0 tabular-nums text-xs text-muted">{versionText}</span>
         {isOutdated ? (
           <span className="shrink-0 text-[10px] text-warning">
             <Trans>v{status.bundledVersion} available</Trans>

@@ -61,7 +61,7 @@ export function TodoList(props: { projectId: string }) {
           <Trans>To-dos</Trans>
         </span>
         {todos.length > 0 ? (
-          <span className="text-[11px] text-muted/70">
+          <span className="text-[11px] text-muted">
             <Plural value={remaining} one="# open" other="# open" />
           </span>
         ) : null}
@@ -85,9 +85,9 @@ export function TodoList(props: { projectId: string }) {
         </DragDropProvider>
         {/* The add-to-do field is the final row of the list, styled like a to-do. */}
         <div className="lc-notes-todo-add-row mt-0.5 flex items-center gap-2 rounded pl-1 pr-2 py-1">
-          <Plus className="size-3.5 shrink-0 text-muted/70" />
+          <Plus className="size-3.5 shrink-0 text-muted" />
           <input
-            className="m-0 h-5 min-w-0 flex-1 border-0 bg-transparent p-0 text-xs leading-5 text-foreground placeholder:text-muted/60 outline-none"
+            className="m-0 h-5 min-w-0 flex-1 border-0 bg-transparent p-0 text-xs leading-5 text-foreground placeholder:text-muted outline-none"
             placeholder={t`Add a to-do…`}
             enterKeyHint="done"
             value={draft}

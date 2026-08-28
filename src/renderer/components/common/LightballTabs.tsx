@@ -140,8 +140,8 @@ export function LightballTabs<K extends string>(props: {
               disabled={tab.disabled}
               onClick={() => selectTab(tab.id)}
               onKeyDown={handleKey}
-              className={`relative ${equalWidth ? "flex-1" : ""} flex h-full items-center justify-center gap-1.5 ${tabRadiusClass} px-3 text-[11px] font-semibold tracking-tight outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-focus/50 ${
-                litText ? "text-foreground" : "text-muted/60"
+              className={`relative ${equalWidth ? "flex-1" : ""} flex h-full items-center justify-center gap-1.5 ${tabRadiusClass} px-3 text-[11px] font-semibold tracking-tight outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-focus ${
+                litText ? "text-foreground" : "text-muted"
               }`}
             >
               <span className="relative z-10 flex items-center gap-1.5">
