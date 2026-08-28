@@ -108,10 +108,10 @@ export function WorkspaceChip(props: {
       {isRepo ? (
         <span className="m-ws-chip__meta">
           {summary.ahead > 0 ? (
-            <span className="shrink-0 text-accent">↑{summary.ahead}</span>
+            <span className="shrink-0 text-accent-text">↑{summary.ahead}</span>
           ) : null}
           {summary.behind > 0 ? (
-            <span className="shrink-0 text-accent">↓{summary.behind}</span>
+            <span className="shrink-0 text-accent-text">↓{summary.behind}</span>
           ) : null}
           <DiffCounts summary={summary} />
           <PrGlyph summary={summary} withNumber />

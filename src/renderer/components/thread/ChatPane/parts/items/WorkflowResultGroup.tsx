@@ -123,14 +123,12 @@ function WorkflowResultShell({
           <Disclosure.Trigger className={`${chatRowClass} gap-2 ${chatRowHoverClass}`}>
             <span className="flex shrink-0 items-center gap-1 text-[color:var(--muted)]">
               <GitBranch className="size-3" />
-              <code className="font-mono !text-[color:var(--muted)]">{label}</code>
+              <span className="font-medium !text-[color:var(--muted)]">{label}</span>
             </span>
             {countLabel ? (
               <>
                 <ChatRowMetaSeparator />
-                <code className="font-mono tabular-nums !text-[color:var(--muted)]">
-                  {countLabel}
-                </code>
+                <span className="tabular-nums !text-[color:var(--muted)]">{countLabel}</span>
               </>
             ) : null}
             <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
@@ -174,7 +172,7 @@ function WorkflowResultRow({
         <Disclosure.Heading>
           <Disclosure.Trigger className="flex w-full min-w-0 items-baseline gap-2 py-0.5 text-left">
             {label ? (
-              <code className="shrink-0 font-mono !text-[color:var(--foreground)]">{label}</code>
+              <span className="shrink-0 font-medium !text-[color:var(--foreground)]">{label}</span>
             ) : null}
             {detail ? (
               <span className="min-w-0 flex-1 truncate text-[color:var(--muted)]">{detail}</span>

@@ -4,7 +4,6 @@ import { Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useDraggable } from "@dnd-kit/react";
 import { readBridge } from "@/renderer/bridge";
-import { DiffStat } from "@/renderer/components/common/DiffStat";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { buildBranchPrKey } from "@/renderer/state/gitSelectors";
@@ -21,16 +20,14 @@ import {
 import type { DragSourceData } from "@/renderer/dnd";
 
 const gitBadgeButtonClass =
-  "shrink-0 cursor-grab rounded text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground active:cursor-grabbing";
+  "shrink-0 cursor-grab rounded text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground active:cursor-grabbing";
 
 /**
  * A glyph-only badge is an 18px square around its 12px glyph — the same box as
  * every other icon button in these rows, so its background can't read as a
- * different-sized chip and its glyph shares their column. Only a badge carrying
- * diff counts takes extra horizontal room for the text.
+ * different-sized chip and its glyph shares their column.
  */
 const gitBadgeIconPaddingClass = "p-[3px]";
-const gitBadgeTextPaddingClass = "px-1 py-0.5";
 
 /**
  * "Its Git panel is open" is a persistent accent wash behind the badge, at
@@ -94,8 +91,7 @@ export function GitBadge(props: {
     branch,
     remotePlatform,
     ghAvailable,
-    totalInsertions,
-    totalDeletions,
+    hasChanges,
     prState,
     checksStatus,
     reviewDecision,
@@ -123,8 +119,7 @@ export function GitBadge(props: {
         branch: currentBranch,
         remotePlatform: gitStatus?.remoteInfo?.platform,
         ghAvailable: s.ghAvailable[props.projectId] ?? false,
-        totalInsertions: gitStatus?.totalInsertions ?? 0,
-        totalDeletions: gitStatus?.totalDeletions ?? 0,
+        hasChanges: (gitStatus?.totalInsertions ?? 0) > 0 || (gitStatus?.totalDeletions ?? 0) > 0,
         prState: pr?.state,
         checksStatus: combineChecksStatus(detailsStatus, pr?.checksStatus),
         reviewDecision: pr?.reviewDecision,
@@ -176,7 +171,6 @@ export function GitBadge(props: {
     remotePlatform,
   ]);
 
-  const hasChanges = totalInsertions > 0 || totalDeletions > 0;
   const isWorktree = props.worktreePath !== undefined;
   if (hasStatus && !isRepo) {
     return (
@@ -258,24 +252,16 @@ export function GitBadge(props: {
       role="button"
       tabIndex={0}
       aria-label={t`Git status for ${props.projectName}`}
-      className={`${gitBadgeButtonClass} ${
-        hasChanges ? gitBadgeTextPaddingClass : gitBadgeIconPaddingClass
-      } ${props.isActive ? activeGitBadgeClass : ""}`}
+      className={`${gitBadgeButtonClass} ${gitBadgeIconPaddingClass} ${
+        props.isActive ? activeGitBadgeClass : ""
+      }`}
       onClick={(e) => {
         e.stopPropagation();
         props.onPress?.();
       }}
       onKeyDown={(e) => handleKeyActivate(e, () => props.onPress?.(), { stopPropagation: true })}
     >
-      <span className="flex items-center gap-1 text-[10px] font-medium">
-        {hasChanges && (
-          <DiffStat
-            animated
-            className="flex items-center gap-0.5"
-            insertions={totalInsertions}
-            deletions={totalDeletions}
-          />
-        )}
+      <span className="flex items-center">
         {showPrIcon && <GitPullRequest className={`size-3 shrink-0 ${prIconColor}`} />}
         {showWorktreeFork && (
           <Tooltip delay={150}>
@@ -288,6 +274,9 @@ export function GitBadge(props: {
               <Trans>Worktree: {props.projectName}</Trans>
             </Tooltip.Content>
           </Tooltip>
+        )}
+        {hasChanges && !showPrIcon && !showWorktreeFork && (
+          <GitBranch className="size-3 shrink-0" />
         )}
       </span>
     </div>

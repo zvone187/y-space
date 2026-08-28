@@ -181,7 +181,7 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
       ) : null}
       {thinkingToggle ? (
         <div className={columnCount > 0 ? "border-t border-border" : ""}>
-          <Header className="block border-b border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted/80">
+          <Header className="block border-b border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
             <Trans>Options</Trans>
           </Header>
           {thinkingToggle}
@@ -247,7 +247,7 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
 
 function MobileSectionHeader(props: { label: string }) {
   return (
-    <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80">
+    <div className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">
       {props.label}
     </div>
   );
@@ -272,7 +272,7 @@ function MobileSection(props: {
           onClick={() => onSelect(option.id)}
         >
           <span className="flex-1 truncate">{option.label}</span>
-          {option.id === value ? <Check className="size-4 shrink-0 text-accent" /> : null}
+          {option.id === value ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
         </button>
       ))}
     </div>
@@ -289,7 +289,7 @@ function Column(props: {
   const { label, options, value, hasNeighbor, onSelect } = props;
   return (
     <div className={hasNeighbor ? "border-r border-border" : ""}>
-      <Header className="block border-b border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted/80">
+      <Header className="block border-b border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
         {label}
       </Header>
       <ListBox

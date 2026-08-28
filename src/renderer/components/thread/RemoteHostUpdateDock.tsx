@@ -59,7 +59,7 @@ export function RemoteHostUpdateDock({ desktopId }: { readonly desktopId: string
     <ThreadDockSection placement="composer" collapsed={false} ariaLabel={title}>
       <ThreadDockHeader
         icon={Download}
-        iconClassName="text-accent"
+        iconClassName="text-accent-text"
         title={title}
         actions={
           isInstalling ? (

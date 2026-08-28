@@ -96,7 +96,7 @@ export function ThreadDockIconButton({
           size="sm"
           variant="ghost"
           aria-label={label}
-          className={`h-6 w-6 min-w-0 shrink-0 text-muted/70 ${
+          className={`h-6 w-6 min-w-0 shrink-0 text-muted ${
             danger
               ? "hover:bg-danger-500/10 hover:text-danger-500"
               : "hover:bg-foreground/5 hover:text-foreground"
@@ -236,7 +236,7 @@ export function ThreadDockActionRow({
           event.stopPropagation();
           onAction();
         }}
-        className="poracode-subagent-dismiss absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded p-0.5 text-muted/70 opacity-0 transition-opacity duration-150 hover:bg-danger-500/10 hover:text-danger-500 focus:opacity-100 group-hover:opacity-100 disabled:pointer-events-none disabled:opacity-40"
+        className="poracode-subagent-dismiss absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded p-0.5 text-muted opacity-0 transition-opacity duration-150 hover:bg-danger-500/10 hover:text-danger-500 focus:opacity-100 group-hover:opacity-100 disabled:pointer-events-none disabled:opacity-40"
       >
         {action}
       </button>

@@ -44,7 +44,7 @@ export const PR_CHECK_TONE_TEXT_CLASS: Record<PrCheckTone, string> = {
   success: "text-success",
   danger: "text-danger",
   warning: "text-warning",
-  neutral: "text-muted/70",
+  neutral: "text-muted",
 };
 
 export function getPrCheckPresentation(check: PrCheck): {

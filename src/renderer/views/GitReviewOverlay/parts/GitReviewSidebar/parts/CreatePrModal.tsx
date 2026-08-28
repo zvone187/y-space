@@ -75,7 +75,7 @@ export function CreatePrModal(props: {
               <Dropdown>
                 <Button variant="tertiary" className="h-5 min-w-0 px-1.5 text-xs">
                   {prTargetBranch || defaultTargetBranch || "..."}
-                  <ChevronDown className="size-3 text-muted/60" />
+                  <ChevronDown className="size-3 text-muted" />
                 </Button>
                 <Dropdown.Popover placement="bottom start" className="max-h-60">
                   <Dropdown.Menu

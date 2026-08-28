@@ -92,7 +92,7 @@ function ChecksGlyph(props: { readonly status: string | undefined }) {
   if (status === "SUCCESS") return <CheckCircle2 className="size-4 text-success" />;
   if (status === "FAILURE" || status === "ERROR") return <XCircle className="size-4 text-danger" />;
   if (status === "PENDING") return <Clock className="size-4 text-warning" />;
-  return <CheckCircle2 className="size-4 text-muted/70" />;
+  return <CheckCircle2 className="size-4 text-muted" />;
 }
 
 /** Builds the `SheetMenu` trigger button for the merge-method menu, capturing

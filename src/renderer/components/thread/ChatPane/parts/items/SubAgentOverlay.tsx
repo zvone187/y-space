@@ -333,7 +333,7 @@ function Shell({
             <button
               type="button"
               aria-label={closeLabel ?? t`Close subagent`}
-              className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
+              className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
               onClick={onClose}
             >
               <X className="size-3.5" />
@@ -656,7 +656,7 @@ function WorkflowOverlayHeader({
         <WorkflowProgressLine progress={progress} />
       ) : null}
       {workflow.runId ? (
-        <p className="font-mono text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted/80">
+        <p className="font-mono text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
           <Trans>Run {workflow.runId}</Trans>
         </p>
       ) : null}

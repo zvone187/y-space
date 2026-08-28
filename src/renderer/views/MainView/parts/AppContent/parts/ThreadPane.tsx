@@ -137,7 +137,6 @@ export function ThreadPane(props: {
   return (
     <ThreadView
       thread={thread}
-      projectName={project.name}
       agentStatus={agentStatus}
       isWsl={project.location.kind === "wsl"}
       showCloseButton

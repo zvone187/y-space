@@ -567,7 +567,7 @@ export function SettingsSidebar(props: {
                   key={group.id}
                   className={groupIndex > 0 ? "space-y-0.5 pt-2.5" : "space-y-0.5"}
                 >
-                  <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+                  <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
                     {group.label}
                   </p>
                   {group.hasTree &&
@@ -589,7 +589,7 @@ export function SettingsSidebar(props: {
                             <button
                               type="button"
                               aria-label={t`Refresh detected agents`}
-                              className="flex size-5 shrink-0 cursor-default items-center justify-center text-muted/70 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:text-muted/40"
+                              className="flex size-5 shrink-0 cursor-default items-center justify-center text-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:text-muted/40"
                               disabled={isRefreshingAgents}
                               onClick={(e) => {
                                 e.stopPropagation();

@@ -136,7 +136,7 @@ function UsageTooltipBody(props: {
         <div className="text-muted">{message ? t(message) : null}</div>
       )}
       {swappable ? (
-        <div className="pt-0.5 text-[10px] text-muted/70">
+        <div className="pt-0.5 text-[10px] text-muted">
           <Trans>Right-click to switch ring</Trans>
         </div>
       ) : null}
@@ -292,7 +292,7 @@ function UsageRailRow(props: { providers: readonly UsageProvider[]; onReorder: R
   // `px-2` aligns the circles with the footer button icons.
   return (
     <div className="px-2">
-      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
         <Trans>Usage</Trans>
       </p>
       <div ref={rowRef}>

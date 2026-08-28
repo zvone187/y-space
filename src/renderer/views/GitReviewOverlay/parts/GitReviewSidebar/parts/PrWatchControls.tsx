@@ -189,7 +189,7 @@ export function PrWatchControls(props: {
               </Trans>
             </p>
             {watch?.activeThreadId ? (
-              <p className="text-[11px] text-accent">
+              <p className="text-[11px] text-accent-text">
                 <Trans>An agent is fixing this PR.</Trans>
               </p>
             ) : watch?.lastError ? (

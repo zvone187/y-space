@@ -68,7 +68,7 @@ export function StatusIndicator(props: {
       : tone === "danger"
         ? "text-danger"
         : tone === "accent"
-          ? "text-accent"
+          ? "text-accent-text"
           : tone === "warning"
             ? "text-warning"
             : "text-muted"

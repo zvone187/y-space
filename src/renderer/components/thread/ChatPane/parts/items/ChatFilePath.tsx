@@ -36,7 +36,7 @@ export function ChatFilePath({
   path,
   className,
   basenameClassName = "text-foreground",
-  dirClassName = "text-muted/60",
+  dirClassName = "text-muted",
 }: ChatFilePathProps) {
   const projectLocation = useChatPaneActions()?.projectLocation;
   const displayPath = projectLocation ? toProjectRelativeDisplayPath(path, projectLocation) : path;

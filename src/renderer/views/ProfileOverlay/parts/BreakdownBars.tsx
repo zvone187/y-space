@@ -45,7 +45,7 @@ export function BreakdownBars(props: {
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
-        {caption ? <span className="text-[11px] text-muted/70">{caption}</span> : null}
+        {caption ? <span className="text-[11px] text-muted">{caption}</span> : null}
       </div>
       {loading ? (
         <div className="flex flex-col gap-3">
@@ -63,7 +63,7 @@ export function BreakdownBars(props: {
                 <span className="truncate font-medium text-foreground">{entry.label}</span>
                 <span className="flex shrink-0 items-baseline gap-1.5 tabular-nums">
                   <span className="text-muted">{formatValue(entry.count)}</span>
-                  <span className="text-muted/50">{entry.percent}%</span>
+                  <span className="text-muted">{entry.percent}%</span>
                 </span>
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/10">

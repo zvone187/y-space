@@ -150,7 +150,7 @@ export function FileRow(props: {
           trailing={
             <>
               {isLockFile(path) && (
-                <Lock className="ml-1 inline-block size-2 shrink-0 text-muted/40" />
+                <Lock className="ml-1 inline-block size-2 shrink-0 text-muted" />
               )}
               <FileStatusBadge status={file.status} />
             </>

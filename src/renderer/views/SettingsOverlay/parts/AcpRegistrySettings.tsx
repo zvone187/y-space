@@ -72,7 +72,7 @@ function NativeAgentVersionLabel(props: {
     return (
       <span>
         v{props.latestNpmVersion}{" "}
-        <span className="text-muted/60">
+        <span className="text-muted">
           <Trans>available</Trans>
         </span>
       </span>
@@ -695,7 +695,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                       <span className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted">
                         <CheckCircle2 className="size-3.5 text-success" />
                         <Trans>
-                          Detected <span className="text-muted/70">(local)</span>
+                          Detected <span className="text-muted">(local)</span>
                         </Trans>
                       </span>
                     ) : null}
@@ -707,7 +707,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                         <CheckCircle2 className="size-3.5 text-success" />
                         <Trans>
                           Detected{" "}
-                          <span className="text-muted/70">
+                          <span className="text-muted">
                             {status.envDistro ? `WSL (${status.envDistro})` : "WSL"}
                           </span>
                         </Trans>
@@ -876,7 +876,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                     <Button
                       size="sm"
                       variant="tertiary"
-                      className="text-danger hover:bg-danger hover:text-white"
+                      className="text-danger hover:bg-danger hover:text-danger-foreground"
                       isPending={isAgentPending}
                       onPress={() => removeAgent(agent.id)}
                     >
@@ -898,7 +898,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                         <CheckCircle2 className="size-3.5 text-success" />
                         <Trans>
                           Detected{" "}
-                          <span className="text-muted/70">({detectionScopeLabel(status)})</span>
+                          <span className="text-muted">({detectionScopeLabel(status)})</span>
                         </Trans>
                       </span>
                     ))}

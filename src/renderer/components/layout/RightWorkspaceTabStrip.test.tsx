@@ -40,7 +40,7 @@ describe("RightWorkspaceTabStrip", () => {
       />,
     );
 
-    expect(screen.getByRole("tablist", { name: "Workspace tabs" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Tabs" })).toBeInTheDocument();
     const renderedTabs = screen.getAllByRole("tab");
     expect(renderedTabs).toHaveLength(3);
     expect(renderedTabs.filter((tab) => tab.getAttribute("aria-selected") === "true")).toEqual([
@@ -51,6 +51,29 @@ describe("RightWorkspaceTabStrip", () => {
     ]);
     expect(screen.getByRole("tab", { name: "Files" })).toHaveAttribute("tabindex", "-1");
     expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("uses one flat strip with an orange selected indicator and embedded actions", () => {
+    render(
+      <RightWorkspaceTabStrip
+        tabs={tabs}
+        activeTabId="tool:git"
+        onActivate={vi.fn<(tabId: string) => void>()}
+        onClose={vi.fn<(tabId: string) => void>()}
+        actions={<button type="button">Open workspace tools</button>}
+      />,
+    );
+
+    expect(screen.getAllByRole("tablist")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Open workspace tools" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Git" }).parentElement).toHaveClass(
+      "border-b-2",
+      "border-[var(--accent)]",
+      "rounded-none",
+    );
+    expect(screen.getByRole("tab", { name: "Files" }).parentElement).not.toHaveClass(
+      "border-[var(--accent)]",
+    );
   });
 
   it("moves focus and requests activation with Arrow, Home, and End keys", () => {

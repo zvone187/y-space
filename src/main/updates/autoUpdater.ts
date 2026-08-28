@@ -68,7 +68,7 @@ export function createAutoUpdaterController(
 
   function reportClassifiedFailure(operation: UpdateOperation, outcome: UpdateFailureKind): void {
     if (outcome === "optional-manifest-missing") {
-      console.warn("[poracode] optional nightly update manifest is not available.");
+      console.warn("[y-space] update feed is not published yet.");
       return;
     }
     if (outcome === "transient-network") {

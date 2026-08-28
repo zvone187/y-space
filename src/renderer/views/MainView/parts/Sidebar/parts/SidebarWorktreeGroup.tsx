@@ -75,7 +75,7 @@ export function SidebarWorktreeGroup(props: {
       id: `action:${action.id}`,
       label: action.name,
       icon: isRunning ? (
-        <Loader2 className="size-3.5 animate-spin text-accent" aria-hidden />
+        <Loader2 className="size-3.5 animate-spin text-accent-text" aria-hidden />
       ) : (
         resolveActionIcon(action.icon)
       ),

@@ -50,7 +50,7 @@ export function buildLocalPairingPageHtml(input: { readonly httpBaseUrl: string 
       --line: rgba(255, 255, 255, 0.12);
       --text: #eaf0fb;
       --muted: #9ba6be;
-      --accent: #8892ef;
+      --accent: #ff5a1f;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: var(--bg);
       color: var(--text);
@@ -384,7 +384,7 @@ export function buildLocalPairingServiceWorkerJs(
 const PAIRING_ICON_GLYPH = `  <path fill-rule="evenodd" fill="__GLYPH__"
     d="M352,300 H556 A152,152 0 0 1 556,604 H472 V730 H352 Z
        M472,392 H548 A60,60 0 0 1 548,512 H472 Z"/>
-  <circle cx="636" cy="694" r="46" fill="#8B7BFF"/>`;
+  <circle cx="636" cy="694" r="46" fill="#FF5A1F"/>`;
 
 const PAIRING_ICON_TILE: Record<
   PoracodeChannel,

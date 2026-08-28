@@ -1,10 +1,9 @@
 import { useShallow } from "zustand/shallow";
 import { Tooltip } from "@heroui/react";
-import { GitFork, GitPullRequest } from "lucide-react";
+import { FileDiff, GitFork, GitPullRequest } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { getBasename } from "@/shared/pathUtils";
 import { closeGitPanel, showGitReviewPanel } from "@/renderer/actions/panelActions";
-import { DiffStat } from "@/renderer/components/common";
 import {
   floatingGlassActiveClass,
   floatingGlassSurfaceClass,
@@ -34,8 +33,7 @@ export function ThreadChangesBubble(props: {
 }) {
   const { t } = useLingui();
   const {
-    insertions,
-    deletions,
+    hasChanges,
     prNumber,
     prState,
     checksStatus,
@@ -50,8 +48,7 @@ export function ThreadChangesBubble(props: {
       const pr = s.prData[resolvePrKey(props.projectId, props.worktreePath)];
       const details = pr?.number ? s.prDetails[`${props.projectId}#${pr.number}`] : undefined;
       return {
-        insertions: status?.totalInsertions ?? 0,
-        deletions: status?.totalDeletions ?? 0,
+        hasChanges: (status?.totalInsertions ?? 0) > 0 || (status?.totalDeletions ?? 0) > 0,
         prNumber: pr?.number,
         prState: pr?.state,
         reviewDecision: pr?.reviewDecision,
@@ -76,7 +73,6 @@ export function ThreadChangesBubble(props: {
   );
   const isOpen = isScoped && gitWorkspaceActive;
 
-  const hasChanges = insertions > 0 || deletions > 0;
   const hasVisiblePr =
     prNumber !== undefined &&
     prState !== "closed" &&
@@ -92,11 +88,10 @@ export function ThreadChangesBubble(props: {
       {...(!worktreeName ? { title: isOpen ? t`Close changes` : t`Review changes` } : {})}
       aria-label={isOpen ? t`Close changes` : t`Review changes`}
       aria-pressed={isOpen}
-      /* Sized to a 28px pill — same height as the scroll-to-bottom circle and the
-         rail's icon buttons, so the floating chrome shares one scale. */
-      className={`${floatingGlassSurfaceClass} flex h-7 items-center gap-1.5 rounded-full text-xs font-medium transition-colors ${
-        hasChanges || hasVisiblePr ? "px-3" : "w-7 justify-center px-0"
-      } ${isOpen ? floatingGlassActiveClass : "hover:border-border/30"}`}
+      /* Sized to the same 28px icon-only circle as the nearby floating actions. */
+      className={`${floatingGlassSurfaceClass} flex h-7 w-7 items-center justify-center rounded-full px-0 text-xs font-medium transition-colors ${
+        isOpen ? floatingGlassActiveClass : "hover:border-border/30"
+      }`}
       onClick={() => {
         if (isOpen) {
           closeGitPanel();
@@ -106,16 +101,14 @@ export function ThreadChangesBubble(props: {
       }}
     >
       {hasVisiblePr ? (
-        <>
-          <GitPullRequest
-            className={`size-3.5 shrink-0 ${PR_TONE_TEXT_CLASS[getPrStatusTone(prState, checksStatus, { reviewDecision, mergeable, mergeStateStatus })]}`}
-          />
-          <span>#{prNumber}</span>
-        </>
+        <GitPullRequest
+          className={`size-3.5 shrink-0 ${PR_TONE_TEXT_CLASS[getPrStatusTone(prState, checksStatus, { reviewDecision, mergeable, mergeStateStatus })]}`}
+        />
       ) : props.worktreePath ? (
         <GitFork className="size-3.5 shrink-0 text-muted" />
-      ) : null}
-      <DiffStat animated insertions={insertions} deletions={deletions} />
+      ) : (
+        <FileDiff className="size-3.5 shrink-0 text-muted" />
+      )}
     </button>
   );
 
@@ -126,7 +119,9 @@ export function ThreadChangesBubble(props: {
       {worktreeName ? (
         <Tooltip delay={0}>
           <Tooltip.Trigger>{bubble}</Tooltip.Trigger>
-          <Tooltip.Content placement="top">{worktreeName}</Tooltip.Content>
+          <Tooltip.Content placement="top">
+            {hasVisiblePr ? t`Review PR #${prNumber} for ${worktreeName}` : worktreeName}
+          </Tooltip.Content>
         </Tooltip>
       ) : (
         bubble

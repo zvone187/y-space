@@ -174,7 +174,7 @@ describe("SidebarProjectHeader", () => {
     renderHeader();
 
     const files = screen.getByRole("button", { name: `Files for ${project.name}` });
-    expect(files).toHaveClass("w-[18px]", "p-0.5", "text-accent");
+    expect(files).toHaveClass("w-[18px]", "p-0.5", "text-accent-text");
     expect(files).not.toHaveClass("w-0");
   });
 

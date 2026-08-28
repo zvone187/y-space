@@ -8,11 +8,7 @@ import { ThreadProviderIcon } from "@/renderer/components/providers/ThreadProvid
 import { ThreadContextMenu } from "@/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu";
 import { DraftIndicator } from "../DraftIndicator";
 import { InlineRenameInput } from "../InlineRenameInput";
-import {
-  ThreadItemBottomSuffix,
-  ThreadItemSuffix,
-  ThreadItemTopSuffix,
-} from "./parts/ThreadItemSuffix";
+import { ThreadItemSuffix, ThreadItemTimeSuffix } from "./parts/ThreadItemSuffix";
 import {
   useIsCurrentThread,
   useThreadHasBackgroundActivity,
@@ -72,7 +68,7 @@ export function SortableThreadItem(props: {
   const hasBackgroundActivity = useThreadHasBackgroundActivity(thread.id);
   const statusTone = getStatusTone(thread, { hasBackgroundActivity });
 
-  const stacked = projectTag != null;
+  const isFlatRow = projectTag != null;
   const isEditing = editingThreadId === thread.id;
   const titleNode = thread.done ? (
     <span className="opacity-50 line-through">{thread.title}</span>
@@ -84,10 +80,6 @@ export function SortableThreadItem(props: {
     showWorktreeBadge,
     showWorktreeFilesButton,
     isExperimentCandidate,
-    // Stacked rows are flat cross-project list rows: no project header carries
-    // files/terminal/git chrome, so a main-branch thread shows them inline.
-    showProjectBadge: stacked,
-    projectName: project.name,
   };
   const titleContent = isEditing ? (
     <InlineRenameInput
@@ -108,43 +100,18 @@ export function SortableThreadItem(props: {
         thread={thread}
         project={project}
         onRename={() => props.setEditingThreadId(thread.id)}
-        showProjectActions={stacked}
+        showProjectActions={isFlatRow}
       >
         <SidebarButton
           ref={handleRef}
           size="xs"
-          density={stacked ? "compact" : "default"}
+          density={isFlatRow ? "compact" : "default"}
           statusTone={statusTone}
           icon={
             <ThreadProviderIcon thread={thread} tone={statusTone} className="size-3.5 shrink-0" />
           }
           label={
-            stacked ? (
-              // Two-line flat-list row: each line owns its right-side cluster,
-              // so the bottom badges never reserve width from the title line.
-              // Line heights match the text (16px title, 14px meta).
-              // pr-0.5 keeps the badges' hover background clear of the label's
-              // overflow clip — SidebarButton wraps the label in a `truncate`
-              // span, so anything flush with its right edge gets cut.
-              <span className="flex flex-col gap-0.5 pr-0.5">
-                <span className="flex h-[18px] items-center gap-1.5">
-                  <span className="min-w-0 flex-1 truncate">{titleContent}</span>
-                  {hasDraft && <DraftIndicator />}
-                  {/* No padding here: the time slot carries the 2px inset that
-                      matches the git badge's own p-0.5, so both rows' icon
-                      columns share the same offset from the row's right edge. */}
-                  <span className="flex shrink-0 items-center gap-[3px]">
-                    <ThreadItemTopSuffix {...suffixProps} />
-                  </span>
-                </span>
-                <span className="flex h-[18px] items-center gap-1.5">
-                  {projectTag}
-                  <span className="flex shrink-0 items-center gap-[3px]">
-                    <ThreadItemBottomSuffix {...suffixProps} />
-                  </span>
-                </span>
-              </span>
-            ) : isEditing ? (
+            isEditing ? (
               titleContent
             ) : (
               <span className="flex items-center gap-1.5">
@@ -154,13 +121,19 @@ export function SortableThreadItem(props: {
             )
           }
           tooltip={
-            isEditing ? undefined : stacked ? `${thread.title} — ${project.name}` : thread.title
+            isEditing ? undefined : isFlatRow ? `${thread.title} — ${project.name}` : thread.title
           }
           isActive={isCurrentThread}
           onPress={() => openThread(thread.id)}
           onDoubleClick={() => props.setEditingThreadId(thread.id)}
           isDragging={isDragging}
-          {...(stacked ? {} : { suffix: <ThreadItemSuffix {...suffixProps} /> })}
+          suffix={
+            isFlatRow ? (
+              <ThreadItemTimeSuffix thread={thread} isExperimentCandidate={isExperimentCandidate} />
+            ) : (
+              <ThreadItemSuffix {...suffixProps} />
+            )
+          }
         />
       </ThreadContextMenu>
     </div>

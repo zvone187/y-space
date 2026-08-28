@@ -127,7 +127,7 @@ function DesktopRowButton(props: {
       </span>
       {props.isActive ? (
         <span className="m-thread-row__side">
-          <Check className="size-4 shrink-0 text-accent" aria-label={t`Active`} />
+          <Check className="size-4 shrink-0 text-accent-text" aria-label={t`Active`} />
         </span>
       ) : null}
     </button>
@@ -208,7 +208,7 @@ function SshPairingForm(props: {
     return (
       <div className="m-form">
         <div className="m-card">
-          <ShieldCheck className="size-5 text-accent" />
+          <ShieldCheck className="size-5 text-accent-text" />
           <div>
             <strong>
               <Trans>Verify SSH host key</Trans>

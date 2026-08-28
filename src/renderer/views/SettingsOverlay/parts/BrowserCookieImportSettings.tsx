@@ -65,7 +65,7 @@ export function BrowserCookieImportSettings() {
       className="scroll-mt-4 border-t border-border/15 pt-5"
     >
       <div className="mb-4 flex items-start gap-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent-text">
           <ShieldCheck className="size-4" aria-hidden="true" />
         </span>
         <div className="min-w-0">
@@ -271,10 +271,10 @@ export function BrowserCookieImportSettings() {
                   autoCorrect="off"
                   disabled={isBusy || Boolean(model.pairing) || hasBlockingRequest}
                   placeholder="https://example.com"
-                  className="mt-1 block w-full resize-y rounded-lg border border-border/25 bg-background/50 px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted/40 focus:border-accent/60 disabled:opacity-50"
+                  className="mt-1 block w-full resize-y rounded-lg border border-border/25 bg-background/50 px-2.5 py-2 font-mono text-xs text-foreground outline-none placeholder:text-muted focus:border-accent/60 disabled:opacity-50"
                   onChange={(event) => model.setTargetInput(event.currentTarget.value)}
                 />
-                <span className="mt-1 flex flex-wrap items-center justify-between gap-2 font-normal text-muted/75">
+                <span className="mt-1 flex flex-wrap items-center justify-between gap-2 font-normal text-muted">
                   <span>
                     <Trans>One exact HTTP(S) origin per line, up to 12.</Trans>
                   </span>
@@ -283,7 +283,7 @@ export function BrowserCookieImportSettings() {
                   !hasBlockingRequest ? (
                     <button
                       type="button"
-                      className="text-accent hover:underline disabled:opacity-50"
+                      className="text-accent-text hover:underline disabled:opacity-50"
                       disabled={isBusy}
                       onClick={model.useActiveOrigin}
                     >

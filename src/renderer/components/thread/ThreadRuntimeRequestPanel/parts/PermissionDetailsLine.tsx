@@ -66,7 +66,7 @@ export function PlanFileLine(props: { path: string }) {
         path={path}
         className="min-w-0 flex-1 font-mono text-[11px]"
         basenameClassName="text-foreground/80"
-        dirClassName="text-muted/60"
+        dirClassName="text-muted"
       />
     </div>
   );

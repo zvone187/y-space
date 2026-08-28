@@ -662,7 +662,7 @@ function ConfiguredServerRow(props: {
           {mcpTransportSummary(server.transport)}
         </p>
         {server.description ? (
-          <p className="truncate text-xs text-muted/80">{server.description}</p>
+          <p className="truncate text-xs text-muted">{server.description}</p>
         ) : null}
         <McpServerProbeStatus state={props.probeState} onViewTools={props.onViewTools} />
       </div>

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 200" width="760" height="200">
   <!-- Y Space wordmark. Internal filename is retained for packaging compatibility. -->
-  <text x="84" y="150" font-family="Geist, Inter, system-ui, sans-serif" font-weight="700" font-size="150" letter-spacing="-5" fill="#EAF0FB">Y</text>
-  <circle cx="188" cy="43" r="12" fill="#8B7BFF"/>
-  <text x="214" y="150" font-family="Geist, Inter, system-ui, sans-serif" font-weight="600" font-size="150" letter-spacing="-5" fill="#EAF0FB">Space</text>
+  <text x="84" y="150" font-family="Geist, Inter, system-ui, sans-serif" font-weight="700" font-size="150" letter-spacing="-5" fill="#181816">Y</text>
+  <circle cx="188" cy="43" r="12" fill="#FF5A1F"/>
+  <text x="214" y="150" font-family="Geist, Inter, system-ui, sans-serif" font-weight="600" font-size="150" letter-spacing="-5" fill="#181816">Space</text>
 </svg>

@@ -57,7 +57,7 @@ function UsageCadenceField(props: { id: string; label: string }) {
           if (e.key === "Enter") e.currentTarget.blur();
           else if (e.key === "Escape") setDraft(null);
         }}
-        className="w-[28px] shrink-0 bg-transparent p-0 text-right text-xs tabular-nums text-muted outline-none transition-colors hover:text-foreground focus:text-foreground placeholder:text-muted/40"
+        className="w-[28px] shrink-0 bg-transparent p-0 text-right text-xs tabular-nums text-muted outline-none transition-colors hover:text-foreground focus:text-foreground placeholder:text-muted"
       />
       <Trans comment="Unit suffix: minutes">min</Trans>
     </span>

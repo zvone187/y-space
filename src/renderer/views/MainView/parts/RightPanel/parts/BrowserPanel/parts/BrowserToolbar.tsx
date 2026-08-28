@@ -79,7 +79,7 @@ export function BrowserToolbar(props: {
     props.pickerActive ? "text-foreground hover:text-foreground" : ""
   }`;
   const consoleButtonClass = `${toolbarButtonClass} ${
-    activeTab?.devToolsOpen ? "text-accent hover:text-accent" : ""
+    activeTab?.devToolsOpen ? "text-accent-text hover:text-accent-text" : ""
   }`;
   const pickerLabel = props.pickerActive ? t`Cancel picker` : t`Pick element`;
 
@@ -235,7 +235,7 @@ export function BrowserToolbar(props: {
       />
       <button
         type="button"
-        className={`${toolbarButtonClass} ${bookmarked ? "text-accent hover:text-accent" : ""}`}
+        className={`${toolbarButtonClass} ${bookmarked ? "text-accent-text hover:text-accent-text" : ""}`}
         title={bookmarked ? t`Remove bookmark` : t`Bookmark this page`}
         aria-label={bookmarked ? t`Remove bookmark` : t`Bookmark this page`}
         disabled={disabled}
@@ -362,7 +362,7 @@ export function BrowserToolbar(props: {
                     textValue={bookmarked ? t`Remove bookmark` : t`Bookmark this page`}
                   >
                     <span
-                      className={`size-4 shrink-0 ${bookmarked ? "text-accent" : "text-muted"}`}
+                      className={`size-4 shrink-0 ${bookmarked ? "text-accent-text" : "text-muted"}`}
                     >
                       <Star className={`size-4 ${bookmarked ? "fill-current" : ""}`} />
                     </span>

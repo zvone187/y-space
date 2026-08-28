@@ -113,7 +113,7 @@ export function ExperimentDraftTargets(props: {
                 />
                 <span className="min-w-0 flex-1 truncate leading-5 text-foreground">{title}</span>
                 {details ? (
-                  <span className="max-w-[55%] shrink-0 truncate text-foreground-muted opacity-80">
+                  <span className="max-w-[55%] shrink-0 truncate text-foreground-muted">
                     {details}
                   </span>
                 ) : null}

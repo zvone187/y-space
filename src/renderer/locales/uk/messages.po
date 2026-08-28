@@ -949,6 +949,10 @@ msgstr "Додайте навичку до .agents/skills або .poracode/skill
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
 #~ msgstr "Додайте навичку до .agents/skills або імпортуйте її від іншого провайдера."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Add a soft frosted-glass effect to the sidebar."
+msgstr "Додайте бічній панелі м’який ефект матового скла."
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "Додати завдання…"
@@ -1088,6 +1092,10 @@ msgstr "Додаткові аргументи для кожної нової о�
 #~ msgid "Additional arguments passed to each new Windows shell. Quote values containing spaces."
 #~ msgstr "Додаткові аргументи, що передаються кожній новій оболонці Windows. Значення з пробілами беріть у лапки."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Adjust the size of conversation text."
+msgstr "Налаштуйте розмір тексту розмов."
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "Оголосіть власний базовий URL, наприклад зворотний проксі або тунель. Залиште порожнім для автоматичного режиму."
@@ -1103,8 +1111,8 @@ msgid "Agent ({subagent}): {description}"
 msgstr "Агент ({subagent}): {description}"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
-msgstr "Чат агента (ACP / markdown). Рядки команд використовують цей розмір мінус 1 px; рядки інструментів і планів — мінус 2 px."
+#~ msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
+#~ msgstr "Чат агента (ACP / markdown). Рядки команд використовують цей розмір мінус 1 px; рядки інструментів і планів — мінус 2 px."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2277,6 +2285,11 @@ msgstr "Команди чату"
 msgid "Chat starred"
 msgstr "Чат позначено зіркою"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Chat text size"
+msgstr "Розмір тексту чату"
+
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Позначку зірки знято з чату"
@@ -2390,6 +2403,11 @@ msgstr "Виберіть локальну базову гілку для екс�
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "Виберіть батьківську папку"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose a polished color palette for light or dark mode."
+msgstr "Виберіть вишукану палітру кольорів для світлого або темного режиму."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Choose a project icon image"
@@ -2654,6 +2672,7 @@ msgid "Close"
 msgstr "Закрити"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Close {closeTarget}"
 msgstr "Закрыть {closeTarget}"
 
@@ -2899,8 +2918,8 @@ msgstr "Згорнути помилку"
 #~ msgstr "Згорнути експеримент"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Collapse footer"
-msgstr "Згорнути нижню частину бічної панелі"
+#~ msgid "Collapse footer"
+#~ msgstr "Згорнути нижню частину бічної панелі"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -3346,6 +3365,10 @@ msgstr "Продовжити за адресою десктопа"
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Control desktop apps and complete visual workflows."
 msgstr "Керуйте настільними застосунками та виконуйте візуальні сценарії."
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Control how much of the background shows through."
+msgstr "Налаштуйте, наскільки видно тло."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -4358,8 +4381,8 @@ msgid "Development"
 msgstr "Розробка"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
-msgid "Development-only overrides. Only visible in the PORACODE DEV build."
-msgstr "Перевизначення лише для розробки. Видимі лише у збірці PORACODE DEV."
+msgid "Development-only overrides. Visible only in Y Space Dev builds."
+msgstr "Перевизначення лише для розробки. Видимі лише у збірках Y Space Dev."
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4594,7 +4617,7 @@ msgid "Downloading into “{0}”. This can take a moment for large repositories
 msgstr "Завантаження до «{0}». Для великих репозиторіїв це може зайняти деякий час."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Downloading update"
 msgstr "Завантаження оновлення"
@@ -5045,8 +5068,8 @@ msgstr "Розгорнути помилку"
 #~ msgstr "Розгорнути експеримент"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Expand footer"
-msgstr "Розгорнути нижню частину бічної панелі"
+#~ msgid "Expand footer"
+#~ msgstr "Розгорнути нижню частину бічної панелі"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -5327,7 +5350,7 @@ msgstr "Файл використовує непідтримуване коду�
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Files"
 msgstr "Файли"
 
@@ -5345,8 +5368,8 @@ msgid "Files for {0}"
 msgstr "Файли для {0}"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Files for {projectName}"
-msgstr "Файли для {projectName}"
+#~ msgid "Files for {projectName}"
+#~ msgstr "Файли для {projectName}"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5506,8 +5529,8 @@ msgid "Flat list"
 msgstr "Плоский список"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Focus browser"
-msgstr "Сфокусувати браузер"
+#~ msgid "Focus browser"
+#~ msgstr "Сфокусувати браузер"
 
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
@@ -5648,12 +5671,12 @@ msgid "From this project"
 msgstr "З цього проєкту"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
-msgstr "Зробіть бічну панель матовою за допомогою системного розмиття (vibrancy) у стилі сучасної macOS. Там, де це не підтримується, застосовується напівпрозоре тонування."
+#~ msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
+#~ msgstr "Зробіть бічну панель матовою за допомогою системного розмиття (vibrancy) у стилі сучасної macOS. Там, де це не підтримується, застосовується напівпрозоре тонування."
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
-msgstr "Матовість бічної панелі в режимі «{appearance}» поверх системного розмиття. Вище значення зберігає колір теми; нижче — більше показує те, що позаду."
+#~ msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
+#~ msgstr "Матовість бічної панелі в режимі «{appearance}» поверх системного розмиття. Вище значення зберігає колір теми; нижче — більше показує те, що позаду."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Frozen worktree source is not a local branch: {branch}"
@@ -5740,7 +5763,7 @@ msgstr "Отримати завдання"
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useProjectMenu.tsx
@@ -5923,8 +5946,8 @@ msgstr "Групування за проєктами"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "GUI chat font size"
-msgstr "Розмір шрифту чату GUI"
+#~ msgid "GUI chat font size"
+#~ msgstr "Розмір шрифту чату GUI"
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "GUI runtime"
@@ -5968,7 +5991,6 @@ msgid "Hidden resumable threads are swept every 5 minutes and unloaded after thi
 msgstr "Приховані відновлювані треди перевіряються кожні 5 хвилин і вивантажуються після цього часу простою."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
 msgid "Hide"
 msgstr "Сховати"
 
@@ -6006,7 +6028,7 @@ msgstr "Сховати MCP-сервери з {providerLabel}"
 msgid "Hide models you don't use from the model picker across every provider."
 msgstr "Приховує моделі, які ви не використовуєте, з вибору моделі для всіх провайдерів."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Hide panel"
 msgstr "Сховати панель"
 
@@ -6040,7 +6062,6 @@ msgstr "Історія"
 #: src/renderer/views/HomeView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#: src/renderer/views/WelcomeOverlay.tsx
 msgid "Home"
 msgstr "Головна"
 
@@ -6440,7 +6461,7 @@ msgid "Install the package to add its API key."
 msgstr "Встановіть пакет, щоб додати його API-ключ."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Install update"
 msgstr "Встановити оновлення"
@@ -6450,7 +6471,7 @@ msgstr "Встановити оновлення"
 msgid "Install v{0}"
 msgstr "Установити v{0}"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Install v{updateVersion}"
 msgstr "Встановити v{updateVersion}"
 
@@ -6707,8 +6728,8 @@ msgid "List"
 msgstr "Список"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "List options"
-msgstr "Параметри списку"
+#~ msgid "List options"
+#~ msgstr "Параметри списку"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "List packages"
@@ -6861,7 +6882,7 @@ msgstr "Розташування"
 msgid "Location glyph"
 msgstr "Символ розташування"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Lock panel to the open thread"
 msgstr "Закріпити панель за відкритим тредом"
 
@@ -6934,8 +6955,8 @@ msgid "Machine"
 msgstr "Комп’ютер"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
-msgstr "Зробіть бічну панель напівпрозорою — системне розмиття у Windows 11 і напівпрозоре тонування в інших системах."
+#~ msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+#~ msgstr "Зробіть бічну панель напівпрозорою — системне розмиття у Windows 11 і напівпрозоре тонування в інших системах."
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Manage"
@@ -7084,7 +7105,7 @@ msgstr "Враховувати регістр"
 msgid "Match your system, or force light or dark."
 msgstr "Підлаштовуватися під систему або примусово світла чи темна."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize"
 msgstr "Розгорнути"
@@ -7432,6 +7453,7 @@ msgstr "Режими"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "Більше"
@@ -7521,6 +7543,7 @@ msgid "Move changes to a new worktree"
 msgstr "Перемістити зміни в новий worktree"
 
 #: src/renderer/components/layout/PanelDock/PanelSectionHeader.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Move panel"
 msgstr "Перемістити панель"
 
@@ -8376,7 +8399,7 @@ msgstr "Не синхронізується"
 
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "Нотатки"
@@ -8415,6 +8438,7 @@ msgstr "вимк"
 
 #: src/renderer/components/git/PrAutomationSlider.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Off"
 msgstr "Вимк."
@@ -8475,6 +8499,7 @@ msgstr "Один раз"
 
 #: src/renderer/components/common/RemoteServerStatusDot.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Online"
 msgstr "Онлайн"
@@ -8540,8 +8565,8 @@ msgid "Open as Panel"
 msgstr "Відкрити як панель"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Open browser"
-msgstr "Відкрити браузер"
+#~ msgid "Open browser"
+#~ msgstr "Відкрити браузер"
 
 #: src/renderer/commands/registry.ts
 msgid "Open browser panel"
@@ -9274,8 +9299,8 @@ msgstr "Спрямуйте цей профіль на провайдера, ві
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
-msgstr "Популярні теми редакторів, адаптовані для Y Space. Кожна слідує за світлим чи темним режимом вище."
+#~ msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+#~ msgstr "Популярні теми редакторів, адаптовані для Y Space. Кожна слідує за світлим чи темним режимом вище."
 
 #: src/renderer/components/thread/MoveThreadToWorktreeDialog.tsx
 #~ msgid "poracode/my-branch"
@@ -10021,7 +10046,6 @@ msgstr "Віддалений доступ"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Remote Access"
@@ -10618,6 +10642,10 @@ msgstr "Переглянути PR"
 msgid "Review PR #{prNumber} for {0}"
 msgstr "Переглянути PR #{prNumber} для {0}"
 
+#: src/renderer/components/thread/ThreadChangesBubble.tsx
+msgid "Review PR #{prNumber} for {worktreeName}"
+msgstr "Переглянути PR #{prNumber} для {worktreeName}"
+
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "Відображення рев'ю"
@@ -10638,6 +10666,7 @@ msgstr "Відкликати {name}"
 msgid "Right"
 msgstr "Праворуч"
 
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Right panel"
 msgstr "Права панель"
@@ -11318,7 +11347,6 @@ msgstr "Зафіксовано під час запуску цієї сесії 
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
 msgstr "Налаштування"
@@ -11483,7 +11511,7 @@ msgstr "Показати панель налагодження середови�
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsSidebar.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -11504,7 +11532,7 @@ msgstr "Показати джерело"
 msgid "Show the microphone button in the composer."
 msgstr "Показувати кнопку мікрофона в полі вводу."
 
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Show thread tools"
 msgstr "Показати інструменти треда"
 
@@ -11984,6 +12012,7 @@ msgstr "Тред {targetLabel} запущено"
 #. Button label while the microphone test is starting
 #: src/mobile/remoteConnectionState.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Starting"
@@ -12258,8 +12287,8 @@ msgid "Switch to the previous tab"
 msgstr "Перейти до попередньої вкладки"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
-msgid "Switch workspace"
-msgstr "Змінити робочу область"
+#~ msgid "Switch workspace"
+#~ msgstr "Змінити робочу область"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
@@ -12319,6 +12348,7 @@ msgid "tab"
 msgstr "вкладку"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Tabs"
 msgstr "Вкладки"
 
@@ -12400,7 +12430,7 @@ msgstr "Укажіть цільовому провайдеру, що робит�
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -12418,8 +12448,8 @@ msgid "Terminal for {0}"
 msgstr "Термінал для {0}"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Terminal for {projectName}"
-msgstr "Термінал для {projectName}"
+#~ msgid "Terminal for {projectName}"
+#~ msgstr "Термінал для {projectName}"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -13577,7 +13607,7 @@ msgstr "Вивантажувати неактивні треди через (х�
 msgid "Unload Thread"
 msgstr "Вивантажити тред"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Unlock panel from the open thread"
 msgstr "Відкріпити панель від відкритого треда"
 
@@ -13786,6 +13816,7 @@ msgstr "Потрібно вказати URL."
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Usage"
 msgstr "Використання"
 
@@ -14179,7 +14210,7 @@ msgid "What this server provides"
 msgstr "Що надає цей сервер"
 
 #: src/renderer/commands/registry.ts
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "What's New"
 msgstr "Що нового"
@@ -14363,6 +14394,7 @@ msgid "Working…"
 msgstr "Виконується…"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspace"
@@ -14376,7 +14408,7 @@ msgstr "Сервери MCP робочої області перевизнача�
 msgid "Workspace view"
 msgstr "Подання робочої області"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspaces"

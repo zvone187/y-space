@@ -15,7 +15,7 @@
         <item name="android:background">@null</item>
         <!-- Shown in the safe-area strips whenever the WebView cannot draw
              edge-to-edge (Capacitor SystemBars fallback on WebView < 140);
-             keep in sync with the app background (#070709). -->
+             keep in sync with the app background (#FFFFFF). -->
         <item name="android:windowBackground">@color/windowBackground</item>
     </style>
 

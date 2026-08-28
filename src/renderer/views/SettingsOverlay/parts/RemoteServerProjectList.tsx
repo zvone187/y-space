@@ -28,17 +28,13 @@ function RemoteProjectRow(props: {
 
   return (
     <div className="group flex items-center gap-2 rounded-md py-0.5 pl-5">
-      <Folder className={`size-3.5 shrink-0 ${isSynced ? "text-muted" : "text-muted/40"}`} />
-      <span className={`truncate text-sm ${isSynced ? "text-foreground" : "text-muted/60"}`}>
+      <Folder className="size-3.5 shrink-0 text-muted" />
+      <span className={`truncate text-sm ${isSynced ? "text-foreground" : "text-muted"}`}>
         {project.name}
       </span>
-      <span
-        className={`min-w-0 flex-1 truncate text-xs ${isSynced ? "text-muted/70" : "text-muted/40"}`}
-      >
-        {projectPath(project)}
-      </span>
+      <span className="min-w-0 flex-1 truncate text-xs text-muted">{projectPath(project)}</span>
       {isSynced ? null : (
-        <span className="shrink-0 text-xs text-muted/50">
+        <span className="shrink-0 text-xs text-muted">
           <Trans>Not synced</Trans>
         </span>
       )}

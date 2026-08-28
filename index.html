@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark" data-theme="dark">
+<html lang="en" class="light" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -60,13 +60,14 @@
             var mode = settings && settings.themeMode;
             var prefersDark =
               !window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches;
+            // prettier-ignore
             appearance =
-              mode === "light"
-                ? "light"
-                : mode === "dark"
-                  ? "dark"
-                  : prefersDark
-                    ? "dark"
+              mode === "dark"
+                ? "dark"
+                : mode === "system"
+                    ? prefersDark
+                      ? "dark"
+                      : "light"
                     : "light";
           }
           root.classList.remove("light", "dark");

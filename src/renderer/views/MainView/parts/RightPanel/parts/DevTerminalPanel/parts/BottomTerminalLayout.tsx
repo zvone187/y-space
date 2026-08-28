@@ -134,15 +134,17 @@ export function BottomTerminalLayout(props: {
                             <>
                               {runningTabs[tab.id] ? (
                                 <Loader2
-                                  className="size-3 shrink-0 animate-spin text-accent"
+                                  className="size-3 shrink-0 animate-spin text-accent-text"
                                   aria-hidden
                                 />
                               ) : (
-                                <Play className="size-3 shrink-0 text-accent" aria-hidden />
+                                <Play className="size-3 shrink-0 text-accent-text" aria-hidden />
                               )}
                             </>
                           ) : null}
-                          {isSplit ? <Columns2 className="size-3 shrink-0 text-accent" /> : null}
+                          {isSplit ? (
+                            <Columns2 className="size-3 shrink-0 text-accent-text" />
+                          ) : null}
                         </span>
                       </ContextMenu>
                       <button

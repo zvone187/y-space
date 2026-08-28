@@ -19,7 +19,7 @@ import {
 } from "@/renderer/utils/projectIconColors";
 
 /** Fallback for the custom picker when the project has no custom colour yet. */
-const CUSTOM_COLOR_SEED = "#5f6cd9";
+const CUSTOM_COLOR_SEED = "#ff5a1f";
 
 /**
  * Colour changes are committed while dragging, so the write is trailed: a drag

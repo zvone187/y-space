@@ -180,13 +180,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     section: "appearance",
     anchor: "appearance.theme",
     title: msg`Theme`,
-    description: msg`Popular editor themes adapted to Y Space. Each follows the light or dark mode above.`,
+    description: msg`Choose a polished color palette for light or dark mode.`,
     keywords: "color preset editor theme gallery swatch palette",
   },
   {
     section: "appearance",
     anchor: "appearance.guiChatFontSize",
-    title: msg`GUI chat font size`,
+    title: msg`Chat text size`,
     keywords: "text size typography zoom larger smaller readability chat markdown",
   },
   {

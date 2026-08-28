@@ -179,7 +179,7 @@ export function AppProvider(props: {
       .setWindowChrome({
         backgroundColor:
           styles.getPropertyValue("--window-overlay-background").trim() || "rgba(0, 0, 0, 0)",
-        symbolColor: appearance === "dark" ? "#fafafa" : "#1f2937",
+        symbolColor: appearance === "dark" ? "#fafafa" : "#181816",
         materialEnabled: wantMaterial,
         appearance,
       })
@@ -204,6 +204,7 @@ export function AppProvider(props: {
       document.documentElement,
       sidebarGlassTint[appearance],
       effectiveGlassEnabled && contentReady,
+      appearance,
     );
   }, [appearance, effectiveGlassEnabled, contentReady, sidebarGlassTint]);
 

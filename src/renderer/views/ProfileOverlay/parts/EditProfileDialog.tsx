@@ -61,7 +61,7 @@ export function EditProfileDialog(props: {
           <div className="flex flex-col gap-5 p-5">
             <div className="flex items-center gap-3">
               <div
-                className="flex size-12 items-center justify-center rounded-full text-lg font-semibold text-white"
+                className="poracode-avatar-contrast flex size-12 items-center justify-center rounded-full text-lg font-semibold text-white"
                 style={{ backgroundColor: avatarColor }}
               >
                 {initialsFor(name || identity.name)}
@@ -106,7 +106,7 @@ export function EditProfileDialog(props: {
                     type="button"
                     aria-label={t`Avatar color ${color}`}
                     onClick={() => setAvatarColor(color)}
-                    className="flex size-7 items-center justify-center rounded-full transition-transform hover:scale-105"
+                    className="poracode-avatar-contrast flex size-7 items-center justify-center rounded-full transition-transform hover:scale-105"
                     style={{ backgroundColor: color }}
                   >
                     {avatarColor === color ? <Check className="size-3.5 text-white" /> : null}

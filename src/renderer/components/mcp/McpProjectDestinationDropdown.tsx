@@ -68,7 +68,7 @@ export function McpProjectDropdownTriggerContent(props: { project: McpProjectDes
       )}
       <span className="min-w-0 truncate">{props.project.name}</span>
       {remote.serverName ? (
-        <span className="min-w-0 shrink truncate text-xs text-muted/60">{remote.serverName}</span>
+        <span className="min-w-0 shrink truncate text-xs text-muted">{remote.serverName}</span>
       ) : null}
     </span>
   );

@@ -167,7 +167,7 @@ export function ModelVisibilityPopover(props: {
               onKeyDown={(event) => event.stopPropagation()}
             />
           </div>
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted/80">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted">
             <span className="tabular-nums">
               {props.summaryKind === "usable" ? (
                 <Trans>
@@ -294,7 +294,7 @@ function ModelVisibilityRow(props: {
         textValue={item.label}
         isDisabled={isProviderUnchecked === true}
         {...checkAria(state)}
-        className={`poracode-menu-item group mx-1.5 mb-1 flex h-7 cursor-default items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80${uncheckedClass}`}
+        className={`poracode-menu-item group mx-1.5 mb-1 flex h-7 cursor-default items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted${uncheckedClass}`}
       >
         {checkGlyph(state)}
         <span className="ml-1 min-w-0 truncate">{item.label}</span>
@@ -308,7 +308,7 @@ function ModelVisibilityRow(props: {
         id={item.id}
         textValue={t(item.label)}
         isDisabled
-        className="mx-1.5 mb-1 flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80 data-[disabled=true]:opacity-100"
+        className="mx-1.5 mb-1 flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted data-[disabled=true]:opacity-100"
       >
         {t(item.label)}
       </ListBox.Item>
@@ -320,7 +320,7 @@ function ModelVisibilityRow(props: {
         id={item.id}
         textValue={item.label}
         {...(providerState ? checkAria(providerState) : { isDisabled: true })}
-        className={`mx-1.5 mb-1 flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80 data-[disabled=true]:opacity-100 ${providerState ? "poracode-menu-item group cursor-default" : ""}`}
+        className={`mx-1.5 mb-1 flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted data-[disabled=true]:opacity-100 ${providerState ? "poracode-menu-item group cursor-default" : ""}`}
       >
         {providerState ? checkGlyph(providerState) : null}
         <ProviderIcon
@@ -357,15 +357,15 @@ function ModelVisibilityRow(props: {
           <Zap
             role="img"
             aria-label={t`Supports Fast mode`}
-            className="size-3 shrink-0 text-muted/60"
+            className="size-3 shrink-0 text-muted"
           />
         ) : null}
         {mutedHint ? (
-          <span className="shrink-0 text-[10px] leading-none text-muted/60">· {mutedHint}</span>
+          <span className="shrink-0 text-[10px] leading-none text-muted">· {mutedHint}</span>
         ) : null}
       </span>
       {item.subProviderLabel ? (
-        <span className="ml-auto shrink-0 truncate text-[10px] text-muted/70">
+        <span className="ml-auto shrink-0 truncate text-[10px] text-muted">
           {item.subProviderLabel}
         </span>
       ) : null}

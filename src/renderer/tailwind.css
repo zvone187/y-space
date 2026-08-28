@@ -3,6 +3,10 @@
 @import "@xterm/xterm/css/xterm.css";
 @import "./styles.css";
 
+@theme inline {
+  --color-accent-text: var(--accent-text);
+}
+
 @source "./**/*.{ts,tsx}";
 @source not "./**/*.{test,spec}.{ts,tsx}";
 @source "../../index.html";

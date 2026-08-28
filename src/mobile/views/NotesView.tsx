@@ -109,7 +109,7 @@ export function NotesView(props: {
           <ChevronLeft className="size-5" />
         </button>
         <span className="m-git-head__title">
-          <NotebookPen className="size-3.5 shrink-0 text-muted/60" />
+          <NotebookPen className="size-3.5 shrink-0 text-muted" />
           <span className="m-git-head__project">{props.projectName}</span>
           <span className="m-git-head__sep">/</span>
           <span className="m-git-head__branch">{t`Notes & to-dos`}</span>

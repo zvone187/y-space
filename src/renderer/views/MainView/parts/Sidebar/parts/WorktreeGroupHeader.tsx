@@ -67,8 +67,8 @@ export function WorktreeGroupHeader(props: {
         ariaLabel={t`Files for ${props.worktreeBranch}`}
         className={`flex h-[18px] shrink-0 cursor-grab items-center justify-center rounded transition-[opacity,color,background-color] hover:bg-[var(--row-hover)] hover:text-foreground active:cursor-grabbing ${
           props.isActiveFiles
-            ? "w-[18px] p-0.5 text-accent"
-            : `text-muted/60 ${hiddenPanelButtonClass}`
+            ? "w-[18px] p-0.5 text-accent-text"
+            : `text-muted ${hiddenPanelButtonClass}`
         }`}
         onPress={props.onOpenFiles}
       >
@@ -81,10 +81,10 @@ export function WorktreeGroupHeader(props: {
         ariaLabel={t`Terminal for ${props.worktreeBranch}`}
         className={`flex h-[18px] shrink-0 cursor-grab items-center justify-center rounded transition-[opacity,color,background-color] hover:bg-[var(--row-hover)] hover:text-foreground active:cursor-grabbing ${
           props.isActiveTerminal
-            ? "w-[18px] p-0.5 text-accent"
+            ? "w-[18px] p-0.5 text-accent-text"
             : props.hasTerminal
               ? "w-[18px] p-0.5 text-foreground"
-              : `text-muted/60 ${hiddenPanelButtonClass}`
+              : `text-muted ${hiddenPanelButtonClass}`
         }`}
         onPress={props.onOpenTerminal}
       >
@@ -111,7 +111,7 @@ export function WorktreeGroupHeader(props: {
       role="button"
       tabIndex={0}
       aria-label={t`Delete worktree ${props.worktreeBranch}`}
-      className={`absolute inset-0 flex items-center justify-center rounded text-muted/55 opacity-0 transition group-hover:opacity-100 ${stacked ? "hover:bg-[var(--row-hover)] hover:text-danger" : "hover:text-danger"}`}
+      className={`absolute inset-0 flex items-center justify-center rounded text-muted opacity-0 transition group-hover:opacity-100 ${stacked ? "hover:bg-[var(--row-hover)] hover:text-danger" : "hover:text-danger"}`}
       onClick={(event) => {
         event.stopPropagation();
         props.onDeleteWorktree();
@@ -133,7 +133,7 @@ export function WorktreeGroupHeader(props: {
     <span className="relative flex h-[18px] w-[18px] shrink-0 items-center justify-center">
       <RelativeTime
         iso={props.updatedAt}
-        className="block font-mono text-[10px] leading-none tabular-nums text-muted group-hover:invisible"
+        className="block text-[10px] leading-none tabular-nums text-muted group-hover:invisible"
       />
       {deleteButton}
     </span>
@@ -141,7 +141,7 @@ export function WorktreeGroupHeader(props: {
     <span className="relative w-[2.4ch] shrink-0">
       <RelativeTime
         iso={props.updatedAt}
-        className="block text-center font-mono text-[10px] tabular-nums text-muted group-hover:invisible"
+        className="block text-center text-[10px] tabular-nums text-muted group-hover:invisible"
       />
       {deleteButton}
     </span>
@@ -169,7 +169,7 @@ export function WorktreeGroupHeader(props: {
                 ? "text-[oklch(0.82_0.12_260)]"
                 : props.collapsedStatusTone === "working"
                   ? "text-success"
-                  : "text-muted/60"
+                  : "text-muted"
             }`}
           />
         )

@@ -138,7 +138,7 @@ describe("SubAgentContent", () => {
     expect(header).not.toHaveClass("bg-[var(--composer-surface)]");
 
     const closeButton = within(dialog).getByRole("button", { name: "Close subagent" });
-    expect(closeButton).toHaveClass("rounded", "p-1", "text-muted/60");
+    expect(closeButton).toHaveClass("rounded", "p-1", "text-muted");
 
     const icons = header.querySelectorAll("svg");
     expect(icons).toHaveLength(2);

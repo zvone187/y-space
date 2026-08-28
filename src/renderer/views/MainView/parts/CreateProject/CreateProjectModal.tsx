@@ -195,7 +195,7 @@ function CreateProjectForm() {
                   )}
                   {runtimeLabel}
                 </span>
-                <ChevronDown className="size-3.5 text-muted/60" />
+                <ChevronDown className="size-3.5 text-muted" />
               </Button>
               <Dropdown.Popover className="min-w-[--trigger-width]">
                 <Dropdown.Menu

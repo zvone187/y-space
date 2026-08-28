@@ -127,7 +127,7 @@ function ProjectRowMenuButton(props: {
       role="button"
       tabIndex={0}
       aria-label={t`Project actions for ${props.project.name}`}
-      className={`${props.className ?? ""} -mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted/60 hover:bg-[var(--row-hover)] hover:text-foreground`}
+      className={`${props.className ?? ""} -mr-1 flex size-5 shrink-0 items-center justify-center rounded text-muted hover:bg-[var(--row-hover)] hover:text-foreground`}
       onPointerDown={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -203,7 +203,7 @@ function ProjectOverflowMenu(props: {
  *
  * The trigger is a sidebar row labelled with the current selection; the menu
  * is a desktop dropdown and a bottom sheet in the mobile PWA, mirroring
- * {@link SidebarWorkspaceSwitcher}.
+ * the workspace section inside the sidebar's More menu.
  */
 export function SidebarProjectFilter(props: {
   /** Projects offered in the menu, including unavailable projects with actions. */
@@ -287,7 +287,7 @@ export function SidebarProjectFilter(props: {
   const label: React.ReactNode = soleMachine ? (
     <>
       {baseLabel}
-      <span className="text-muted/60"> · {soleMachine}</span>
+      <span className="text-muted"> · {soleMachine}</span>
     </>
   ) : (
     baseLabel
@@ -345,7 +345,7 @@ export function SidebarProjectFilter(props: {
             <span className="flex-1 truncate">
               <Trans>All projects</Trans>
             </span>
-            {isAll ? <Check className="size-4 shrink-0 text-accent" /> : null}
+            {isAll ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
           </button>
           {filterableProjects.map((project) => {
             const selected = selectedProjects.has(project.id);
@@ -361,14 +361,14 @@ export function SidebarProjectFilter(props: {
                 <ProjectSelectorIcon project={project} remote={remote} />
                 <span className="min-w-0 flex-1 truncate">{project.name}</span>
                 {remote.serverName ? (
-                  <span className="max-w-24 shrink-0 truncate text-xs text-muted/60">
+                  <span className="max-w-24 shrink-0 truncate text-xs text-muted">
                     {remote.serverName}
                   </span>
                 ) : null}
                 <span className="shrink-0 text-xs text-muted">
                   {props.threadCounts.get(project.id) ?? 0}
                 </span>
-                {selected ? <Check className="size-4 shrink-0 text-accent" /> : null}
+                {selected ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
               </button>
             );
           })}
@@ -379,7 +379,7 @@ export function SidebarProjectFilter(props: {
                 <ProjectSelectorIcon project={project} remote={remote} />
                 <span className="min-w-0 flex-1 truncate">{project.name}</span>
                 {remote.serverName ? (
-                  <span className="max-w-24 shrink-0 truncate text-xs text-muted/60">
+                  <span className="max-w-24 shrink-0 truncate text-xs text-muted">
                     {remote.serverName}
                   </span>
                 ) : null}

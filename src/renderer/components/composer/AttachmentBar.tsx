@@ -41,7 +41,7 @@ export function McpChip(props: {
         <Tooltip.Trigger>
           <button
             type="button"
-            className="poracode-overlay-header__controls shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
+            className="poracode-overlay-header__controls shrink-0 rounded p-1 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
             aria-label={title}
             onClick={(e) => e.stopPropagation()}
           >

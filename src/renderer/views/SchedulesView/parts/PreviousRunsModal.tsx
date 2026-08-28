@@ -19,7 +19,9 @@ interface PreviousRunsModalProps {
 
 function RunStatusIcon({ status, label }: { status: ScheduledTaskRun["status"]; label: string }) {
   if (status === "running") {
-    return <Loader2 className="size-3.5 shrink-0 animate-spin text-accent" aria-label={label} />;
+    return (
+      <Loader2 className="size-3.5 shrink-0 animate-spin text-accent-text" aria-label={label} />
+    );
   }
   if (status === "succeeded") {
     return <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label={label} />;

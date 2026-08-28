@@ -459,7 +459,7 @@ export function GitReviewSidebar(props: {
               )}
               {gitStatus && !gitStatus.isRepo && (
                 <div
-                  className={`absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-xs text-muted/60 ${mode === "panel" ? "px-4" : "px-2"}`}
+                  className={`absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-xs text-muted ${mode === "panel" ? "px-4" : "px-2"}`}
                 >
                   <span>
                     <Trans>Not a git repository</Trans>
@@ -468,7 +468,7 @@ export function GitReviewSidebar(props: {
                     <Button
                       size="sm"
                       variant="tertiary"
-                      className="justify-center text-white [&_svg]:text-white"
+                      className="justify-center"
                       isDisabled={isInitializingRepo}
                       isPending={isInitializingRepo}
                       onPress={() => void handleInitRepository()}
@@ -493,7 +493,7 @@ export function GitReviewSidebar(props: {
                 gitStatus.unstaged.length === 0 &&
                 !mergeConflicting && (
                   <div
-                    className={`absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-xs text-muted/60 ${mode === "panel" ? "px-4" : "px-2"}`}
+                    className={`absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-xs text-muted ${mode === "panel" ? "px-4" : "px-2"}`}
                   >
                     <span className="text-foreground/80">
                       <Trans>Working tree clean</Trans>
@@ -509,7 +509,7 @@ export function GitReviewSidebar(props: {
                       <Button
                         size="sm"
                         variant="tertiary"
-                        className="mt-2 justify-center text-white [&_svg]:text-white"
+                        className="mt-2 justify-center"
                         onPress={() => setAddRemoteOpen(true)}
                       >
                         <Link2 className="size-3.5" />
@@ -696,7 +696,7 @@ export function GitReviewSidebar(props: {
                         <input
                           id="git-add-remote-name"
                           aria-label={t`Remote name`}
-                          className="h-8 rounded-md border border-[color:var(--border)] bg-surface px-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted/50 focus:border-foreground/40"
+                          className="h-8 rounded-md border border-[color:var(--border)] bg-surface px-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted focus:border-foreground/40"
                           value={remoteName}
                           onChange={(event) => setRemoteName(event.target.value)}
                         />
@@ -711,7 +711,7 @@ export function GitReviewSidebar(props: {
                         <input
                           id="git-add-remote-url"
                           aria-label={t`Remote URL`}
-                          className="h-8 rounded-md border border-[color:var(--border)] bg-surface px-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted/50 focus:border-foreground/40"
+                          className="h-8 rounded-md border border-[color:var(--border)] bg-surface px-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted focus:border-foreground/40"
                           placeholder="git@github.com:owner/repo.git"
                           value={remoteUrl}
                           onChange={(event) => setRemoteUrl(event.target.value)}

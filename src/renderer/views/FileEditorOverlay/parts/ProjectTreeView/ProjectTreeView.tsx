@@ -369,9 +369,7 @@ function SearchResultRow(props: { entry: ProjectTreeEntry; onOpen: () => void })
       />
       <span className="min-w-0 truncate">{entry.name}</span>
       {dirPath && (
-        <span className="min-w-0 flex-1 truncate text-right text-[11px] text-muted/70">
-          {dirPath}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-right text-[11px] text-muted">{dirPath}</span>
       )}
     </button>
   );

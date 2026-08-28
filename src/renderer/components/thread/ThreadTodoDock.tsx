@@ -146,7 +146,7 @@ function StatusIcon({ status }: { status: ThreadTodoStepStatus }) {
       );
     default:
       return (
-        <Hourglass aria-label={t`pending`} className="size-3.5 shrink-0 text-foreground-muted/50" />
+        <Hourglass aria-label={t`pending`} className="size-3.5 shrink-0 text-foreground-muted" />
       );
   }
 }

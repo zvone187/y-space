@@ -448,7 +448,7 @@ export function SheetMenu(props: {
           {item.icon}
           <span className="flex-1 truncate">{item.label}</span>
           {item.hint ? <span className="shrink-0 text-xs text-muted">{item.hint}</span> : null}
-          {item.selected ? <Check className="size-4 shrink-0 text-accent" /> : null}
+          {item.selected ? <Check className="size-4 shrink-0 text-accent-text" /> : null}
         </button>
       ))}
     </div>

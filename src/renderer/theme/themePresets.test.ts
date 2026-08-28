@@ -8,10 +8,13 @@ import { MANAGED_THEME_VARS } from "./themeTokens";
 // (strict), while muted on panels (surface/sidebar) gets a relaxed floor so it
 // lands dimmer there and keeps a clear gap from the active foreground.
 const BG_FLOOR = 4.5;
-const PANEL_FLOOR = 4.0;
+const PANEL_FLOOR = 4.5;
 // Muted must also stay visibly dimmer than the active foreground (hierarchy);
 // foregrounds in low-contrast palettes are brightened/darkened to hold this.
-const MUTED_FG_GAP_FLOOR = 1.9;
+// A few light editor palettes cannot simultaneously hold 4.5:1 muted text on
+// every panel and the former 1.9 hierarchy gap. 1.8 keeps a clear distinction
+// without sacrificing actual text readability.
+const MUTED_FG_GAP_FLOOR = 1.8;
 const UI_BOUNDARY_FLOOR = 3.0;
 const UI_FILL_FLOOR = 1.25;
 
@@ -96,12 +99,17 @@ describe("theme presets", () => {
         const sidebar = v["--sidebar-background"]!;
         const muted = v["--muted"]!;
         const fg = v["--foreground"]!;
+        const placeholder = v["--field-placeholder"]!;
+        const field = v["--field-background"]!;
         const checks: [string, string, string, number][] = [
           ["muted/bg", muted, bg, BG_FLOOR],
           ["muted/surface", muted, surface, PANEL_FLOOR],
           ["muted/sidebar", muted, sidebar, PANEL_FLOOR],
           ["fg/bg", fg, bg, BG_FLOOR],
           ["fg/surface", fg, surface, BG_FLOOR],
+          ["placeholder/field", placeholder, field, BG_FLOOR],
+          ["placeholder/bg", placeholder, bg, BG_FLOOR],
+          ["placeholder/surface", placeholder, surface, BG_FLOOR],
         ];
         for (const [pair, a, b, floor] of checks) {
           const ratio = contrastRatio(a, b);
@@ -157,6 +165,9 @@ describe("theme presets", () => {
         const content = v["--content-background"]!;
         const fg = v["--foreground"]!;
         const accent = v["--accent"]!;
+        const accentForeground = v["--accent-foreground"]!;
+        const controlBorder = v["--control-border"]!;
+        const field = v["--field-background"]!;
         const sem = semanticHex[mode];
         // git-branch is a fixed tone in light; in dark it's the themed --muted.
         const gitBranch = mode === "light" ? semanticHex.light.gitBranch : v["--muted"]!;
@@ -195,6 +206,10 @@ describe("theme presets", () => {
             : []),
           ["tertiary text/bg", fg, buttonBg, BG_FLOOR],
           ["tertiary text/hover", fg, buttonHover, BG_FLOOR],
+          ["primary text/accent", accentForeground, accent, BG_FLOOR],
+          ["control border/field", controlBorder, field, UI_BOUNDARY_FLOOR],
+          ["control border/content", controlBorder, content, UI_BOUNDARY_FLOOR],
+          ["control border/surface", controlBorder, surface, UI_BOUNDARY_FLOOR],
           ["soft-accent label/accent-soft", softLabel, accentSoftFill, UI_BOUNDARY_FLOOR],
           ["soft-accent label/default", softLabel, defaultFill, UI_BOUNDARY_FLOOR],
         ];

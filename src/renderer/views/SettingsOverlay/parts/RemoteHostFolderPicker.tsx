@@ -106,7 +106,7 @@ export function RemoteHostFolderPicker(props: {
                         className="group h-auto justify-start gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-normal"
                         onPress={() => void browse(entry.path)}
                       >
-                        <Folder className="size-4 shrink-0 text-accent" />
+                        <Folder className="size-4 shrink-0 text-accent-text" />
                         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
                         <ChevronRight className="size-4 shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
                       </Button>

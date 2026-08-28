@@ -14,7 +14,12 @@
  * (success/warning/danger) stay on the base values.
  */
 
-import { deriveMutedColor, mixHex } from "./colorMath";
+import {
+  deriveMutedColor,
+  deriveReadableTextColor,
+  ensureReadableForeground,
+  mixHex,
+} from "./colorMath";
 
 export type ThemeVariantVars = Record<string, string>;
 
@@ -27,6 +32,8 @@ export interface ThemeSpec {
   fg: string;
   /** Accent / primary action color. */
   accent: string;
+  /** Optional accent-hued text color with 4.5:1 contrast on app surfaces. */
+  accentText?: string;
   /** Text rendered on top of `accent`. */
   accentFg: string;
   /** Hairline border / separator base color. */
@@ -52,11 +59,10 @@ export interface ThemeSpec {
  * from the active foreground without over-brightening it.
  */
 const MUTED_BG_FLOOR = 4.5;
-const MUTED_PANEL_FLOOR = 4.0;
+const MUTED_PANEL_FLOOR = 4.5;
 const MUTED_MIN_FRACTION = 0.3;
 const MUTED_MAX_FRACTION = 0.85;
-/** Placeholder text sits this much dimmer (toward bg) than muted. */
-const PLACEHOLDER_DROP = 0.14;
+const CONTROL_BOUNDARY_FLOOR = 3.0;
 
 /**
  * Every CSS custom property this module sets on the document root. Switching to
@@ -74,11 +80,13 @@ export const MANAGED_THEME_VARS = [
   "--scrollbar",
   "--default",
   "--accent",
+  "--accent-text",
   "--accent-foreground",
   "--field-background",
   "--field-foreground",
   "--field-placeholder",
   "--field-border",
+  "--control-border",
   "--segment",
   "--border",
   "--separator",
@@ -99,22 +107,48 @@ export function buildVariant(spec: ThemeSpec, mode: "light" | "dark"): ThemeVari
   const sidebar = spec.sidebar ?? surface;
   const content = spec.content ?? bg;
 
-  // Derive readable secondary text from fg→bg with a contrast floor. Placeholder
-  // sits a step dimmer than muted; the scrollbar is a translucent muted.
+  // Derive readable secondary text from fg→bg with a contrast floor. Fields,
+  // placeholders, and interactive boundaries get their own independent floors;
+  // pale separators remain free to stay visually quiet.
+  const fieldBackground = mixHex(surface, fg, 0.95);
   const muted = deriveMutedColor(
     fg,
     [
       { color: bg, floor: MUTED_BG_FLOOR },
       { color: surface, floor: MUTED_PANEL_FLOOR },
       { color: sidebar, floor: MUTED_PANEL_FLOOR },
+      { color: content, floor: MUTED_BG_FLOOR },
     ],
     { minFraction: MUTED_MIN_FRACTION, maxFraction: MUTED_MAX_FRACTION },
   );
-  const placeholder = mixHex(
+  const placeholder = deriveMutedColor(
     fg,
-    bg,
-    Math.max(MUTED_MIN_FRACTION, muted.fraction - PLACEHOLDER_DROP),
-  );
+    [
+      { color: fieldBackground, floor: 4.5 },
+      { color: bg, floor: 4.5 },
+      { color: surface, floor: 4.5 },
+      { color: content, floor: 4.5 },
+    ],
+    { minFraction: MUTED_MIN_FRACTION, maxFraction: 0.92 },
+  ).hex;
+  const controlBorder = deriveMutedColor(
+    fg,
+    [
+      { color: fieldBackground, floor: CONTROL_BOUNDARY_FLOOR },
+      { color: bg, floor: CONTROL_BOUNDARY_FLOOR },
+      { color: surface, floor: CONTROL_BOUNDARY_FLOOR },
+      { color: content, floor: CONTROL_BOUNDARY_FLOOR },
+    ],
+    { minFraction: 0.1, maxFraction: 0.85 },
+  ).hex;
+  const accentText =
+    spec.accentText ??
+    deriveReadableTextColor(accent, fg, [
+      { color: bg, floor: 4.5 },
+      { color: surface, floor: 4.5 },
+      { color: sidebar, floor: 4.5 },
+      { color: content, floor: 4.5 },
+    ]);
 
   return {
     "--background": bg,
@@ -136,13 +170,15 @@ export function buildVariant(spec: ThemeSpec, mode: "light" | "dark"): ThemeVari
     // over-stepping would lighten the fill into the (light) accent label.
     "--default": mix(surface, mode === "light" ? 82 : 86, fg),
     "--accent": accent,
-    "--accent-foreground": accentFg,
+    "--accent-text": accentText,
+    "--accent-foreground": ensureReadableForeground(accentFg, accent),
     // Fields sit a step lighter than the surface/overlay (below) so they read
     // as raised cards on panels and floating chrome in both modes.
-    "--field-background": mix(surface, 95, fg),
+    "--field-background": fieldBackground,
     "--field-foreground": fg,
     "--field-placeholder": placeholder,
-    "--field-border": fade(border, 70),
+    "--field-border": controlBorder,
+    "--control-border": controlBorder,
     "--segment": surface,
     "--border": border,
     "--separator": fade(border, 75),

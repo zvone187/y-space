@@ -9,7 +9,7 @@ import { useLongPress } from "@/renderer/hooks/useLongPress";
 import { openTodoActions } from "./todoActions";
 
 const todoActionButtonClass =
-  "flex size-[18px] shrink-0 items-center justify-center rounded text-muted/55 transition group-hover/todo:opacity-100 focus-visible:opacity-100";
+  "flex size-[18px] shrink-0 items-center justify-center rounded text-muted transition group-hover/todo:opacity-100 focus-visible:opacity-100";
 
 export function TodoRow(props: {
   todo: NotesTodoItem;

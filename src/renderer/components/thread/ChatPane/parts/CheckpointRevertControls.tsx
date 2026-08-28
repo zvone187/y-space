@@ -38,7 +38,7 @@ export function CheckpointRevertButton(props: {
         <button
           type="button"
           aria-label={t`Revert to this checkpoint`}
-          className="flex size-5 items-center justify-center rounded text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+          className="flex size-5 items-center justify-center rounded text-muted transition-colors hover:bg-foreground/5 hover:text-foreground"
           onClick={(event) => {
             event.stopPropagation();
             props.onRequestRevert(props.itemId);

@@ -29,7 +29,7 @@ export function PrCheckStatusText(props: { check: PrCheck; className?: string | 
     <span
       className={`whitespace-nowrap ${PR_CHECK_TONE_TEXT_CLASS[presentation.tone]} ${className ?? ""}`}
     >
-      {duration && <span className="text-muted/70 tabular-nums">{duration} · </span>}
+      {duration && <span className="text-muted tabular-nums">{duration} · </span>}
       {t(PR_CHECK_STATUS_LABEL[presentation.status])}
     </span>
   );

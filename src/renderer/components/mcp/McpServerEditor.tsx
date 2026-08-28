@@ -398,7 +398,7 @@ export function McpServerEditor(props: {
             <Button variant="ghost" size="sm" onPress={props.onCancel}>
               <Trans>Cancel</Trans>
             </Button>
-            <Button variant="tertiary" size="sm" className="text-white" onPress={save}>
+            <Button variant="tertiary" size="sm" onPress={save}>
               {props.server ? <Trans>Save</Trans> : <Trans>Add</Trans>}
             </Button>
           </Modal.Footer>

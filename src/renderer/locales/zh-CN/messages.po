@@ -949,6 +949,10 @@ msgstr "将技能添加到 .agents/skills 或 .poracode/skills，或从其他提
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
 #~ msgstr "将技能添加到 .agents/skills，或从其他提供商导入技能。"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Add a soft frosted-glass effect to the sidebar."
+msgstr "为侧边栏添加柔和的磨砂玻璃效果。"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "添加待办事项..."
@@ -1088,6 +1092,10 @@ msgstr "传递给每个新终端面板 shell 的附加参数。包含空格的�
 #~ msgid "Additional arguments passed to each new Windows shell. Quote values containing spaces."
 #~ msgstr "传递给每个新 Windows shell 的其他参数。包含空格的值请用引号括起来。"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Adjust the size of conversation text."
+msgstr "调整对话文本的大小。"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "公布自定义基础 URL，例如反向代理或隧道。留空则自动设置。"
@@ -1103,8 +1111,8 @@ msgid "Agent ({subagent}): {description}"
 msgstr "代理 ({subagent})：{description}"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
-msgstr "代理聊天（ACP / markdown）。命令行使用此大小减去 1 像素；工具和计划线减去 2 像素。"
+#~ msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
+#~ msgstr "代理聊天（ACP / markdown）。命令行使用此大小减去 1 像素；工具和计划线减去 2 像素。"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2277,6 +2285,11 @@ msgstr "聊天命令"
 msgid "Chat starred"
 msgstr "已为聊天加星标"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Chat text size"
+msgstr "聊天文字大小"
+
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "已取消聊天星标"
@@ -2390,6 +2403,11 @@ msgstr "请选择实验使用的本地基准分支。"
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "选择父文件夹"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose a polished color palette for light or dark mode."
+msgstr "为浅色或深色模式选择精致的配色。"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Choose a project icon image"
@@ -2654,6 +2672,7 @@ msgid "Close"
 msgstr "关闭"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Close {closeTarget}"
 msgstr "关闭 {closeTarget}"
 
@@ -2899,8 +2918,8 @@ msgstr "折叠错误"
 #~ msgstr "折叠实验"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Collapse footer"
-msgstr "折叠侧边栏底部"
+#~ msgid "Collapse footer"
+#~ msgstr "折叠侧边栏底部"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -3346,6 +3365,10 @@ msgstr "在桌面地址上继续"
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Control desktop apps and complete visual workflows."
 msgstr "控制桌面应用并完成可视化工作流。"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Control how much of the background shows through."
+msgstr "控制背景的透出程度。"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -4358,8 +4381,8 @@ msgid "Development"
 msgstr "开发"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
-msgid "Development-only overrides. Only visible in the PORACODE DEV build."
-msgstr "仅开发覆盖。仅在 PORACODE DEV 版本中可见。"
+msgid "Development-only overrides. Visible only in Y Space Dev builds."
+msgstr "仅开发覆盖。仅在 Y Space Dev 版本中可见。"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4594,7 +4617,7 @@ msgid "Downloading into “{0}”. This can take a moment for large repositories
 msgstr "下载到“{0}”。对于大型存储库，这可能需要一些时间。"
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Downloading update"
 msgstr "正在下载更新"
@@ -5045,8 +5068,8 @@ msgstr "展开错误"
 #~ msgstr "展开实验"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Expand footer"
-msgstr "展开侧边栏底部"
+#~ msgid "Expand footer"
+#~ msgstr "展开侧边栏底部"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -5327,7 +5350,7 @@ msgstr "文件使用不受支持的编码。"
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Files"
 msgstr "文件"
 
@@ -5345,8 +5368,8 @@ msgid "Files for {0}"
 msgstr "{0}的文件"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Files for {projectName}"
-msgstr "{projectName}的文件"
+#~ msgid "Files for {projectName}"
+#~ msgstr "{projectName}的文件"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5506,8 +5529,8 @@ msgid "Flat list"
 msgstr "扁平列表"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Focus browser"
-msgstr "聚焦浏览器"
+#~ msgid "Focus browser"
+#~ msgstr "聚焦浏览器"
 
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
@@ -5648,12 +5671,12 @@ msgid "From this project"
 msgstr "来自本项目"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
-msgstr "使用系统模糊材质（vibrancy）为侧边栏添加磨砂效果，呼应新版macOS。不支持时回退为半透明着色。"
+#~ msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
+#~ msgstr "使用系统模糊材质（vibrancy）为侧边栏添加磨砂效果，呼应新版macOS。不支持时回退为半透明着色。"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
-msgstr "在系统模糊之上为{appearance}模式侧边栏添加磨砂效果。数值越高越保留主题色；越低则越多透出背后内容。"
+#~ msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
+#~ msgstr "在系统模糊之上为{appearance}模式侧边栏添加磨砂效果。数值越高越保留主题色；越低则越多透出背后内容。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Frozen worktree source is not a local branch: {branch}"
@@ -5740,7 +5763,7 @@ msgstr "获取任务"
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useProjectMenu.tsx
@@ -5923,8 +5946,8 @@ msgstr "按项目分组"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "GUI chat font size"
-msgstr "GUI聊天字体大小"
+#~ msgid "GUI chat font size"
+#~ msgstr "GUI聊天字体大小"
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "GUI runtime"
@@ -5968,7 +5991,6 @@ msgid "Hidden resumable threads are swept every 5 minutes and unloaded after thi
 msgstr "隐藏的可恢复线程每 5 分钟清理一次，并在此空闲期限后卸载。"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
 msgid "Hide"
 msgstr "隐藏"
 
@@ -6006,7 +6028,7 @@ msgstr "隐藏 {providerLabel} 的 MCP 服务器"
 msgid "Hide models you don't use from the model picker across every provider."
 msgstr "从每个提供商的模型选择器中隐藏您不使用的模型。"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Hide panel"
 msgstr "隐藏面板"
 
@@ -6040,7 +6062,6 @@ msgstr "历史记录"
 #: src/renderer/views/HomeView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#: src/renderer/views/WelcomeOverlay.tsx
 msgid "Home"
 msgstr "首页"
 
@@ -6440,7 +6461,7 @@ msgid "Install the package to add its API key."
 msgstr "安装该包后即可添加其 API 密钥。"
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Install update"
 msgstr "安装更新"
@@ -6450,7 +6471,7 @@ msgstr "安装更新"
 msgid "Install v{0}"
 msgstr "安装 v{0}"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Install v{updateVersion}"
 msgstr "安装 v{updateVersion}"
 
@@ -6707,8 +6728,8 @@ msgid "List"
 msgstr "列表"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "List options"
-msgstr "列表选项"
+#~ msgid "List options"
+#~ msgstr "列表选项"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "List packages"
@@ -6861,7 +6882,7 @@ msgstr "位置"
 msgid "Location glyph"
 msgstr "位置图标"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Lock panel to the open thread"
 msgstr "将面板锁定到打开的线程"
 
@@ -6934,8 +6955,8 @@ msgid "Machine"
 msgstr "设备"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
-msgstr "将侧边栏设为半透明——在Windows 11上使用系统模糊材质，在其他平台上使用半透明着色。"
+#~ msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+#~ msgstr "将侧边栏设为半透明——在Windows 11上使用系统模糊材质，在其他平台上使用半透明着色。"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Manage"
@@ -7084,7 +7105,7 @@ msgstr "区分大小写"
 msgid "Match your system, or force light or dark."
 msgstr "匹配您的系统，或强制使用浅色或深色。"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize"
 msgstr "最大化"
@@ -7431,6 +7452,7 @@ msgstr "模式"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "多"
@@ -7520,6 +7542,7 @@ msgid "Move changes to a new worktree"
 msgstr "将更改移至新工作树"
 
 #: src/renderer/components/layout/PanelDock/PanelSectionHeader.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Move panel"
 msgstr "移动面板"
 
@@ -8375,7 +8398,7 @@ msgstr "未同步"
 
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "注释"
@@ -8414,6 +8437,7 @@ msgstr "关闭"
 
 #: src/renderer/components/git/PrAutomationSlider.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Off"
 msgstr "关闭"
@@ -8474,6 +8498,7 @@ msgstr "仅一次"
 
 #: src/renderer/components/common/RemoteServerStatusDot.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Online"
 msgstr "在线"
@@ -8539,8 +8564,8 @@ msgid "Open as Panel"
 msgstr "作为面板打开"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Open browser"
-msgstr "打开浏览器"
+#~ msgid "Open browser"
+#~ msgstr "打开浏览器"
 
 #: src/renderer/commands/registry.ts
 msgid "Open browser panel"
@@ -9273,8 +9298,8 @@ msgstr "将此配置指向非Anthropic服务商（z.ai，…），并自定义�
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
-msgstr "流行的编辑器主题适应 Y Space。每个都遵循上面的浅色或深色模式。"
+#~ msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+#~ msgstr "流行的编辑器主题适应 Y Space。每个都遵循上面的浅色或深色模式。"
 
 #: src/renderer/components/thread/MoveThreadToWorktreeDialog.tsx
 #~ msgid "poracode/my-branch"
@@ -10020,7 +10045,6 @@ msgstr "远程访问"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Remote Access"
@@ -10617,6 +10641,10 @@ msgstr "审查 PR"
 msgid "Review PR #{prNumber} for {0}"
 msgstr "查看{0}的 PR #{prNumber}"
 
+#: src/renderer/components/thread/ThreadChangesBubble.tsx
+msgid "Review PR #{prNumber} for {worktreeName}"
+msgstr "查看{worktreeName}的 PR #{prNumber}"
+
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "评审显示"
@@ -10637,6 +10665,7 @@ msgstr "撤销 {name}"
 msgid "Right"
 msgstr "右"
 
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Right panel"
 msgstr "右面板"
@@ -11317,7 +11346,6 @@ msgstr "在本会话启动时已固定 — 如需更改服务器，请开始新�
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
 msgstr "设置"
@@ -11482,7 +11510,7 @@ msgstr "显示运行时调试面板"
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsSidebar.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -11503,7 +11531,7 @@ msgstr "显示来源"
 msgid "Show the microphone button in the composer."
 msgstr "在编辑器中显示麦克风按钮。"
 
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Show thread tools"
 msgstr "显示线程工具"
 
@@ -11983,6 +12011,7 @@ msgstr "开始{targetLabel}线程"
 #. Button label while the microphone test is starting
 #: src/mobile/remoteConnectionState.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Starting"
@@ -12257,8 +12286,8 @@ msgid "Switch to the previous tab"
 msgstr "切换到上一个选项卡"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
-msgid "Switch workspace"
-msgstr "切换工作区"
+#~ msgid "Switch workspace"
+#~ msgstr "切换工作区"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
@@ -12318,6 +12347,7 @@ msgid "tab"
 msgstr "标签页"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Tabs"
 msgstr "标签页"
 
@@ -12399,7 +12429,7 @@ msgstr "告诉目标提供商下一步该做什么..."
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -12417,8 +12447,8 @@ msgid "Terminal for {0}"
 msgstr "{0}的终端"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Terminal for {projectName}"
-msgstr "{projectName}的终端"
+#~ msgid "Terminal for {projectName}"
+#~ msgstr "{projectName}的终端"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -13576,7 +13606,7 @@ msgstr "在以下分钟数后卸载空闲线程"
 msgid "Unload Thread"
 msgstr "卸载线程"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Unlock panel from the open thread"
 msgstr "解除面板与打开线程的锁定"
 
@@ -13785,6 +13815,7 @@ msgstr "URL 为必填项。"
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Usage"
 msgstr "用量"
 
@@ -14178,7 +14209,7 @@ msgid "What this server provides"
 msgstr "此服务器提供的功能"
 
 #: src/renderer/commands/registry.ts
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "What's New"
 msgstr "新功能"
@@ -14362,6 +14393,7 @@ msgid "Working…"
 msgstr "工作…"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspace"
@@ -14375,7 +14407,7 @@ msgstr "工作区 MCP 服务器会覆盖同名的用户服务器，并且仅在�
 msgid "Workspace view"
 msgstr "工作区视图"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspaces"

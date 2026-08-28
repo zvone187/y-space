@@ -131,7 +131,7 @@ export function PromptOptions(props: {
             </kbd>
             <span className="font-medium">{option.label}</span>
             {option.description ? (
-              <span className="text-xs text-muted/60">{option.description}</span>
+              <span className="text-xs text-muted">{option.description}</span>
             ) : null}
           </button>
         );

@@ -36,7 +36,7 @@ export function CopyTextButton({ text, label }: CopyTextButtonProps) {
         <button
           type="button"
           aria-label={copyState === "copied" ? t`Copied` : label}
-          className="flex size-5 items-center justify-center rounded text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+          className="flex size-5 items-center justify-center rounded text-muted transition-colors hover:bg-foreground/5 hover:text-foreground"
           onClick={(event) => {
             event.stopPropagation();
             navigator.clipboard

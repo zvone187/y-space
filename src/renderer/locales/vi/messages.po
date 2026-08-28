@@ -949,6 +949,10 @@ msgstr "Thêm skill vào .agents/skills hoặc .poracode/skills, hoặc nhập t
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
 #~ msgstr "Thêm một skill vào .agents/skills hoặc nhập skill từ nhà cung cấp khác."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Add a soft frosted-glass effect to the sidebar."
+msgstr "Thêm hiệu ứng kính mờ nhẹ cho thanh bên."
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/TodoList.tsx
 msgid "Add a to-do…"
 msgstr "Thêm việc cần làm…"
@@ -1088,6 +1092,10 @@ msgstr "Các đối số bổ sung được truyền cho mỗi shell mới của
 #~ msgid "Additional arguments passed to each new Windows shell. Quote values containing spaces."
 #~ msgstr "Các đối số bổ sung được truyền cho mỗi shell Windows mới. Đặt các giá trị có khoảng trắng trong dấu ngoặc kép."
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Adjust the size of conversation text."
+msgstr "Điều chỉnh kích thước chữ trong cuộc trò chuyện."
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Advertise a custom base URL, e.g. a reverse proxy or tunnel. Leave empty for automatic."
 msgstr "Công bố một URL cơ sở tùy chỉnh, ví dụ một reverse proxy hoặc tunnel. Để trống để dùng tự động."
@@ -1103,8 +1111,8 @@ msgid "Agent ({subagent}): {description}"
 msgstr "Tác nhân ({subagent}): {description}"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
-msgstr "Trò chuyện tác nhân (ACP / markdown). Các hàng lệnh dùng kích thước này trừ 1 px; dòng công cụ và dòng kế hoạch trừ 2 px."
+#~ msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
+#~ msgstr "Trò chuyện tác nhân (ACP / markdown). Các hàng lệnh dùng kích thước này trừ 1 px; dòng công cụ và dòng kế hoạch trừ 2 px."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -2277,6 +2285,11 @@ msgstr "Lệnh trò chuyện"
 msgid "Chat starred"
 msgstr "Đã gắn sao cuộc trò chuyện"
 
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Chat text size"
+msgstr "Cỡ chữ trò chuyện"
+
 #: src/renderer/commands/registry.ts
 msgid "Chat unstarred"
 msgstr "Đã bỏ gắn sao cuộc trò chuyện"
@@ -2390,6 +2403,11 @@ msgstr "Chọn một nhánh cơ sở cục bộ cho thử nghiệm."
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Choose a parent folder"
 msgstr "Chọn một thư mục cha"
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+msgid "Choose a polished color palette for light or dark mode."
+msgstr "Chọn bảng màu tinh tế cho chế độ sáng hoặc tối."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Choose a project icon image"
@@ -2654,6 +2672,7 @@ msgid "Close"
 msgstr "Đóng"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Close {closeTarget}"
 msgstr "Đóng {closeTarget}"
 
@@ -2899,8 +2918,8 @@ msgstr "Thu gọn lỗi"
 #~ msgstr "Thu gọn thí nghiệm"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Collapse footer"
-msgstr "Thu gọn chân thanh bên"
+#~ msgid "Collapse footer"
+#~ msgstr "Thu gọn chân thanh bên"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -3346,6 +3365,10 @@ msgstr "Tiếp tục trên địa chỉ của desktop"
 #: src/renderer/components/plugins/pluginCopy.ts
 msgid "Control desktop apps and complete visual workflows."
 msgstr "Điều khiển ứng dụng máy tính và hoàn thành quy trình trực quan."
+
+#: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
+msgid "Control how much of the background shows through."
+msgstr "Điều chỉnh mức độ hiển thị của nền."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "Control the desktop."
@@ -4358,8 +4381,8 @@ msgid "Development"
 msgstr "Phát triển"
 
 #: src/renderer/views/SettingsOverlay/parts/DevSettings.tsx
-msgid "Development-only overrides. Only visible in the PORACODE DEV build."
-msgstr "Ghi đè chỉ dành cho phát triển. Chỉ hiển thị trong bản dựng PORACODE DEV."
+msgid "Development-only overrides. Visible only in Y Space Dev builds."
+msgstr "Ghi đè chỉ dành cho phát triển. Chỉ hiển thị trong các bản dựng Y Space Dev."
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -4594,7 +4617,7 @@ msgid "Downloading into “{0}”. This can take a moment for large repositories
 msgstr "Đang tải xuống “{0}”. Việc này có thể mất một chút thời gian đối với các kho lưu trữ lớn."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Downloading update"
 msgstr "Đang tải xuống bản cập nhật"
@@ -5045,8 +5068,8 @@ msgstr "Mở rộng lỗi"
 #~ msgstr "Mở rộng thí nghiệm"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-msgid "Expand footer"
-msgstr "Mở rộng chân thanh bên"
+#~ msgid "Expand footer"
+#~ msgstr "Mở rộng chân thanh bên"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
@@ -5327,7 +5350,7 @@ msgstr "Tệp sử dụng mã hóa không được hỗ trợ."
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/mobile/views/WorkspaceView.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Files"
 msgstr "Tập tin"
 
@@ -5345,8 +5368,8 @@ msgid "Files for {0}"
 msgstr "Tập tin cho {0}"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Files for {projectName}"
-msgstr "Tập tin cho {projectName}"
+#~ msgid "Files for {projectName}"
+#~ msgstr "Tập tin cho {projectName}"
 
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -5506,8 +5529,8 @@ msgid "Flat list"
 msgstr "Danh sách phẳng"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Focus browser"
-msgstr "Chuyển tiêu điểm đến trình duyệt"
+#~ msgid "Focus browser"
+#~ msgstr "Chuyển tiêu điểm đến trình duyệt"
 
 #: src/renderer/commands/registry.ts
 msgid "Focus browser address bar"
@@ -5648,12 +5671,12 @@ msgid "From this project"
 msgstr "Từ dự án này"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
-msgstr "Làm mờ thanh bên bằng hiệu ứng làm mờ của hệ thống (vibrancy), gợi nhớ macOS gần đây. Sẽ dùng lớp màu mờ trong suốt nếu không được hỗ trợ."
+#~ msgid "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
+#~ msgstr "Làm mờ thanh bên bằng hiệu ứng làm mờ của hệ thống (vibrancy), gợi nhớ macOS gần đây. Sẽ dùng lớp màu mờ trong suốt nếu không được hỗ trợ."
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
-msgstr "Độ mờ của thanh bên ở chế độ {appearance} trên nền làm mờ hệ thống. Cao hơn giữ màu chủ đề; thấp hơn để lộ nhiều hơn phần phía sau."
+#~ msgid "Frosting of the {appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind."
+#~ msgstr "Độ mờ của thanh bên ở chế độ {appearance} trên nền làm mờ hệ thống. Cao hơn giữ màu chủ đề; thấp hơn để lộ nhiều hơn phần phía sau."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Frozen worktree source is not a local branch: {branch}"
@@ -5740,7 +5763,7 @@ msgstr "Nhận nhiệm vụ"
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorktreeGroup.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useProjectMenu.tsx
@@ -5923,8 +5946,8 @@ msgstr "Nhóm theo dự án"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "GUI chat font size"
-msgstr "Kích thước phông chữ trò chuyện GUI"
+#~ msgid "GUI chat font size"
+#~ msgstr "Kích thước phông chữ trò chuyện GUI"
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 msgid "GUI runtime"
@@ -5968,7 +5991,6 @@ msgid "Hidden resumable threads are swept every 5 minutes and unloaded after thi
 msgstr "Các chủ đề tiếp tục ẩn sẽ được quét 5 phút một lần và được dỡ bỏ sau độ tuổi nhàn rỗi này."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
 msgid "Hide"
 msgstr "Ẩn"
 
@@ -6006,7 +6028,7 @@ msgstr "Ẩn máy chủ MCP từ {providerLabel}"
 msgid "Hide models you don't use from the model picker across every provider."
 msgstr "Ẩn các mô hình bạn không sử dụng khỏi bộ chọn mô hình trên mọi nhà cung cấp."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Hide panel"
 msgstr "Ẩn bảng điều khiển"
 
@@ -6040,7 +6062,6 @@ msgstr "Lịch sử"
 #: src/renderer/views/HomeView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#: src/renderer/views/WelcomeOverlay.tsx
 msgid "Home"
 msgstr "Trang chủ"
 
@@ -6440,7 +6461,7 @@ msgid "Install the package to add its API key."
 msgstr "Cài đặt gói để thêm khóa API của nó."
 
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Install update"
 msgstr "Cài đặt bản cập nhật"
@@ -6450,7 +6471,7 @@ msgstr "Cài đặt bản cập nhật"
 msgid "Install v{0}"
 msgstr "Cài đặt v{0}"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/UpdateButtons.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Install v{updateVersion}"
 msgstr "Cài đặt v{updateVersion}"
 
@@ -6707,8 +6728,8 @@ msgid "List"
 msgstr "Danh sách"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "List options"
-msgstr "Tùy chọn danh sách"
+#~ msgid "List options"
+#~ msgstr "Tùy chọn danh sách"
 
 #: src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
 msgid "List packages"
@@ -6861,7 +6882,7 @@ msgstr "Vị trí"
 msgid "Location glyph"
 msgstr "Ký tự vị trí"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Lock panel to the open thread"
 msgstr "Ghim bảng vào luồng đang mở"
 
@@ -6934,8 +6955,8 @@ msgid "Machine"
 msgstr "Máy"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
-msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
-msgstr "Làm thanh bên trong suốt — hiệu ứng làm mờ của hệ thống trên Windows 11, lớp màu mờ trong suốt ở nơi khác."
+#~ msgid "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+#~ msgstr "Làm thanh bên trong suốt — hiệu ứng làm mờ của hệ thống trên Windows 11, lớp màu mờ trong suốt ở nơi khác."
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Manage"
@@ -7084,7 +7105,7 @@ msgstr "Phân biệt chữ hoa/thường"
 msgid "Match your system, or force light or dark."
 msgstr "Theo hệ thống của bạn, hoặc buộc dùng giao diện sáng hoặc tối."
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
 msgid "Maximize"
 msgstr "Tối đa hóa"
@@ -7432,6 +7453,7 @@ msgstr "Chế độ"
 
 #: src/mobile/NarrowShell.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
+#: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "Nhiều"
@@ -7521,6 +7543,7 @@ msgid "Move changes to a new worktree"
 msgstr "Di chuyển các thay đổi sang một cây làm việc mới"
 
 #: src/renderer/components/layout/PanelDock/PanelSectionHeader.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Move panel"
 msgstr "Di chuyển bảng điều khiển"
 
@@ -8376,7 +8399,7 @@ msgstr "Chưa đồng bộ"
 
 #: src/mobile/views/DesktopWorkspacePanel.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 msgid "Notes"
 msgstr "Ghi chú"
@@ -8415,6 +8438,7 @@ msgstr "tắt"
 
 #: src/renderer/components/git/PrAutomationSlider.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Off"
 msgstr "Tắt"
@@ -8475,6 +8499,7 @@ msgstr "Một lần"
 
 #: src/renderer/components/common/RemoteServerStatusDot.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Online"
 msgstr "Trực tuyến"
@@ -8540,8 +8565,8 @@ msgid "Open as Panel"
 msgstr "Mở dưới dạng bảng điều khiển"
 
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
-msgid "Open browser"
-msgstr "Mở trình duyệt"
+#~ msgid "Open browser"
+#~ msgstr "Mở trình duyệt"
 
 #: src/renderer/commands/registry.ts
 msgid "Open browser panel"
@@ -9274,8 +9299,8 @@ msgstr "Trỏ hồ sơ này tới nhà cung cấp ngoài Anthropic (z.ai, …) v
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
-msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
-msgstr "Các chủ đề biên tập phổ biến được điều chỉnh cho phù hợp với Y Space. Mỗi cái đều theo chế độ sáng hoặc tối ở trên."
+#~ msgid "Popular editor themes adapted to Y Space. Each follows the light or dark mode above."
+#~ msgstr "Các chủ đề biên tập phổ biến được điều chỉnh cho phù hợp với Y Space. Mỗi cái đều theo chế độ sáng hoặc tối ở trên."
 
 #: src/renderer/components/thread/MoveThreadToWorktreeDialog.tsx
 #~ msgid "poracode/my-branch"
@@ -10021,7 +10046,6 @@ msgstr "Truy cập từ xa"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Remote Access"
@@ -10618,6 +10642,10 @@ msgstr "Xem xét PR"
 msgid "Review PR #{prNumber} for {0}"
 msgstr "Xem lại PR #{prNumber} cho {0}"
 
+#: src/renderer/components/thread/ThreadChangesBubble.tsx
+msgid "Review PR #{prNumber} for {worktreeName}"
+msgstr "Xem lại PR #{prNumber} cho {worktreeName}"
+
 #: src/mobile/settingsSections.ts
 msgid "Review presentation"
 msgstr "Hiển thị đánh giá"
@@ -10638,6 +10666,7 @@ msgstr "Thu hồi {name}"
 msgid "Right"
 msgstr "Phải"
 
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Right panel"
 msgstr "Bảng bên phải"
@@ -11318,7 +11347,6 @@ msgstr "Được cố định khi phiên này bắt đầu — hãy tạo luồn
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
 msgstr "Cài đặt"
@@ -11483,7 +11511,7 @@ msgstr "Hiển thị bảng gỡ lỗi thời gian chạy"
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsSidebar.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
-#: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
@@ -11504,7 +11532,7 @@ msgstr "Hiển thị nguồn"
 msgid "Show the microphone button in the composer."
 msgstr "Hiển thị nút micrô trong trình soạn thảo."
 
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 msgid "Show thread tools"
 msgstr "Hiện công cụ luồng"
 
@@ -11984,6 +12012,7 @@ msgstr "Đã bắt đầu chủ đề {targetLabel}"
 #. Button label while the microphone test is starting
 #: src/mobile/remoteConnectionState.ts
 #: src/renderer/views/MainView/parts/Sidebar/parts/RemoteAccessSidebarIcon.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Starting"
@@ -12258,8 +12287,8 @@ msgid "Switch to the previous tab"
 msgstr "Chuyển đến tab trước"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
-msgid "Switch workspace"
-msgstr "Chuyển không gian làm việc"
+#~ msgid "Switch workspace"
+#~ msgstr "Chuyển không gian làm việc"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ThreadContextMenu.tsx
@@ -12319,6 +12348,7 @@ msgid "tab"
 msgstr "thẻ"
 
 #: src/mobile/views/BrowserView.tsx
+#: src/renderer/components/layout/RightWorkspaceTabStrip.tsx
 msgid "Tabs"
 msgstr "Thẻ"
 
@@ -12400,7 +12430,7 @@ msgstr "Cho nhà cung cấp mục tiêu biết phải làm gì tiếp theo..."
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
 #: src/renderer/components/thread/ThreadComposerSection.tsx
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
-#: src/renderer/components/thread/ThreadToolRail.tsx
+#: src/renderer/components/thread/ThreadToolsMenu.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -12418,8 +12448,8 @@ msgid "Terminal for {0}"
 msgstr "Thiết bị đầu cuối cho {0}"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
-msgid "Terminal for {projectName}"
-msgstr "Thiết bị đầu cuối cho {projectName}"
+#~ msgid "Terminal for {projectName}"
+#~ msgstr "Thiết bị đầu cuối cho {projectName}"
 
 #: src/mobile/TerminalAccessory.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -13577,7 +13607,7 @@ msgstr "Gỡ bỏ các chủ đề không hoạt động sau (phút)"
 msgid "Unload Thread"
 msgstr "Dỡ bỏ chủ đề"
 
-#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/components/layout/RightWorkspaceActionsMenu.tsx
 msgid "Unlock panel from the open thread"
 msgstr "Bỏ ghim bảng khỏi luồng đang mở"
 
@@ -13786,6 +13816,7 @@ msgstr "Bắt buộc phải có URL."
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 msgid "Usage"
 msgstr "Mức sử dụng"
 
@@ -14179,7 +14210,7 @@ msgid "What this server provides"
 msgstr "Nội dung mà máy chủ này cung cấp"
 
 #: src/renderer/commands/registry.ts
-#: src/renderer/views/MainView/parts/Sidebar/parts/WhatsNewButton.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "What's New"
 msgstr "Có gì mới"
@@ -14363,6 +14394,7 @@ msgid "Working…"
 msgstr "Đang làm việc…"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspace"
@@ -14376,7 +14408,7 @@ msgstr "Máy chủ MCP trong không gian làm việc sẽ ghi đè máy chủ ng
 msgid "Workspace view"
 msgstr "Chế độ xem không gian làm việc"
 
-#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarWorkspaceSwitcher.tsx
+#: src/renderer/views/MainView/parts/Sidebar/parts/SidebarFooterNav.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 #: src/renderer/views/SettingsOverlay/parts/WorkspacesSettings.tsx
 msgid "Workspaces"

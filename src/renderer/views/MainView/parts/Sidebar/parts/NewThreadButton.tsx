@@ -88,7 +88,7 @@ export function NewThreadButton(props: {
         <div ref={newThreadRef} className="flex shrink-0 items-center">
           <button
             type="button"
-            className={`poracode-flat-new-thread-full flex h-8 shrink-0 cursor-grab items-center gap-1.5 rounded-3xl px-2 text-xs outline-none transition-colors active:cursor-grabbing focus-visible:focus-ring ${stateClass}`}
+            className={`poracode-flat-new-thread-full flex h-8 shrink-0 cursor-grab items-center gap-1.5 rounded-lg px-2 text-xs outline-none transition-colors active:cursor-grabbing focus-visible:focus-ring ${stateClass}`}
             onClick={props.onPress}
           >
             <Plus className="size-3.5" />

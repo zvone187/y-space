@@ -152,10 +152,10 @@ export function TerminalView(props: {
           <ChevronLeft className="size-5" />
         </button>
         <span className="m-git-head__title">
-          <Terminal className="size-3.5 shrink-0 text-muted/60" />
+          <Terminal className="size-3.5 shrink-0 text-muted" />
           <span className="m-git-head__branch">{activeTab.title}</span>
           {activeTab.exitCode !== undefined ? (
-            <span className="shrink-0 text-xs text-muted/70">
+            <span className="shrink-0 text-xs text-muted">
               {activeTab.exitCode === null ? t`exited` : t`exited (${activeTab.exitCode})`}
             </span>
           ) : null}

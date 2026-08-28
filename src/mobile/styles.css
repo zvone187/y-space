@@ -2869,7 +2869,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 .m-terminal-accessory__input:focus-within {
   box-shadow: 0 0 0 1px var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .m-terminal-accessory__keys {
@@ -3170,7 +3170,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-browser__nav-btn[data-active="true"] {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .m-browser__nav-plus {
@@ -3726,6 +3726,10 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   box-shadow: none;
 }
 
+:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock .poracode-composer-shell:focus-within {
+  box-shadow: 0 0 0 2px var(--accent) !important;
+}
+
 /* The workspace entry — the single tap target into the unified Code panel. */
 .m-ws-chip {
   display: flex;
@@ -3948,7 +3952,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 .m-desktop-tool-rail__button[data-active="true"] {
   background: var(--row-active, var(--row-hover));
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .m-desktop-tool-rail__button:disabled {
@@ -3957,7 +3961,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-desktop-tool-rail__button:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--accent) 70%, transparent);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -4018,7 +4022,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 .m-desktop-workspace__resize:hover::after,
 .m-desktop-workspace__resize:focus-visible::after {
-  background: color-mix(in oklab, var(--accent) 45%, transparent);
+  background: var(--accent);
 }
 
 /* GitView's phone drill-down normally covers the viewport. Inside the desktop
@@ -4804,7 +4808,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-tab-row[data-active="true"] .m-tab-row__main > svg {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .m-browser__surface {
@@ -4853,7 +4857,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-browser__typing input:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--accent) 60%, transparent);
+  outline: 2px solid var(--accent) !important;
   outline-offset: 1px;
 }
 
@@ -5614,7 +5618,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-card__hint--accent {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .m-form {
@@ -5653,7 +5657,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-field input:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--accent) 60%, transparent);
+  outline: 2px solid var(--accent) !important;
   outline-offset: 1px;
 }
 

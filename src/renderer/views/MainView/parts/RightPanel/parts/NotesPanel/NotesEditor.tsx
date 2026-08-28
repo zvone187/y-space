@@ -79,7 +79,7 @@ export function NotesEditor(props: { projectId: string }) {
       >
         <button
           type="button"
-          className={`${bubbleButtonClass} ${editor.isActive("bold") ? "text-accent" : ""}`}
+          className={`${bubbleButtonClass} ${editor.isActive("bold") ? "text-accent-text" : ""}`}
           title={t`Bold`}
           onClick={() => editor.chain().focus().toggleBold().run()}
         >
@@ -87,7 +87,7 @@ export function NotesEditor(props: { projectId: string }) {
         </button>
         <button
           type="button"
-          className={`${bubbleButtonClass} ${editor.isActive("italic") ? "text-accent" : ""}`}
+          className={`${bubbleButtonClass} ${editor.isActive("italic") ? "text-accent-text" : ""}`}
           title={t`Italic`}
           onClick={() => editor.chain().focus().toggleItalic().run()}
         >

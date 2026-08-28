@@ -66,10 +66,10 @@ function statusLabel(status: AgentStatus | undefined): {
   label: MessageDescriptor;
   toneClass: string;
 } {
-  if (!status) return { label: msg`Searching...`, toneClass: "text-muted/60" };
+  if (!status) return { label: msg`Searching...`, toneClass: "text-muted" };
   const badge = readyBadge(status);
   if (badge) return badge;
-  return { label: msg`Not found`, toneClass: "text-muted/55" };
+  return { label: msg`Not found`, toneClass: "text-muted" };
 }
 
 export function AgentDiscoveryScreen(props: {
@@ -177,7 +177,7 @@ export function AgentDiscoveryScreen(props: {
 
       <div className="flex w-full min-h-0 max-w-[42rem] flex-col overflow-hidden rounded border border-border/60 bg-background/25 text-left">
         <div
-          className="grid shrink-0 grid-cols-[minmax(11rem,1fr)_repeat(var(--agent-target-count),minmax(7rem,8rem))] border-b border-border/60 px-3 py-2 text-[0.6875rem] font-medium uppercase text-muted/70"
+          className="grid shrink-0 grid-cols-[minmax(11rem,1fr)_repeat(var(--agent-target-count),minmax(7rem,8rem))] border-b border-border/60 px-3 py-2 text-[0.6875rem] font-medium uppercase text-muted"
           style={matrixGridStyle}
         >
           <div>
@@ -223,7 +223,7 @@ export function AgentDiscoveryScreen(props: {
         </div>
       </div>
 
-      <div className="shrink-0 text-xs text-muted/70" aria-live="polite">
+      <div className="shrink-0 text-xs text-muted" aria-live="polite">
         {useMatrixLayout
           ? renderCombinedStatusLine(discovered)
           : renderStatusLine(discovered.length, installedCount, wslDistro)}

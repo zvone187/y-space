@@ -34,14 +34,14 @@ export function CursorRuntimeCard(props: {
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-foreground">{props.label}</span>
             {props.isSelected ? (
-              <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+              <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-text">
                 <Trans>Current</Trans>
               </span>
             ) : null}
           </div>
           <p className="mt-1 text-xs text-muted">{props.statusLine}</p>
           {props.detailLine ? (
-            <p className="mt-0.5 text-[11px] text-muted/80">{props.detailLine}</p>
+            <p className="mt-0.5 text-[11px] text-muted">{props.detailLine}</p>
           ) : null}
         </Radio.Content>
       </Radio>

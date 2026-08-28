@@ -65,7 +65,7 @@ export function ProfileHeader(props: {
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <div
-        className="flex size-20 items-center justify-center rounded-full text-2xl font-semibold text-white shadow-sm"
+        className="poracode-avatar-contrast flex size-20 items-center justify-center rounded-full text-2xl font-semibold text-white shadow-sm"
         style={{ backgroundColor: identity.avatarColor }}
       >
         {initialsFor(identity.name)}

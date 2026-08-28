@@ -133,7 +133,7 @@ function IconGridCell(props: {
       data-project-icon-cell=""
       className={`flex size-8 items-center justify-center rounded-md outline-none transition-colors focus-visible:focus-ring ${
         props.selected
-          ? "bg-accent/20 text-accent"
+          ? "bg-accent/20 text-accent-text"
           : "text-muted hover:bg-[var(--row-active)] hover:text-foreground"
       }`}
       title={hoverText}

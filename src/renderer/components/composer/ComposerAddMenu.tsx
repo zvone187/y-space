@@ -93,7 +93,7 @@ function InfoHint(props: { text: string }) {
     <Tooltip delay={300}>
       <Tooltip.Trigger
         aria-label={props.text}
-        className="shrink-0 cursor-help text-muted/70 hover:text-foreground"
+        className="shrink-0 cursor-help text-muted hover:text-foreground"
         onClick={(event) => event.stopPropagation()}
         onPointerDown={(event) => event.stopPropagation()}
       >

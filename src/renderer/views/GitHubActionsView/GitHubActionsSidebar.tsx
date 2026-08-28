@@ -125,7 +125,7 @@ export function GitHubActionsSidebar(props: {
                   <ProjectSelectorIcon project={selectedProject} remote={selectedRemote} />
                   <span className="min-w-0 truncate">{selectedProject.name}</span>
                   {selectedRemote.serverName ? (
-                    <span className="min-w-0 shrink truncate text-xs text-muted/60">
+                    <span className="min-w-0 shrink truncate text-xs text-muted">
                       {selectedRemote.serverName}
                     </span>
                   ) : null}
@@ -168,7 +168,7 @@ export function GitHubActionsSidebar(props: {
                   <UserRound className="size-4 shrink-0" />
                   <span className="min-w-0 truncate">{effectiveAccount.login}</span>
                   {accountHostIsAmbiguous ? (
-                    <span className="min-w-0 shrink truncate text-xs text-muted/60">
+                    <span className="min-w-0 shrink truncate text-xs text-muted">
                       {effectiveAccount.host}
                     </span>
                   ) : null}
@@ -221,7 +221,7 @@ export function GitHubActionsSidebar(props: {
                       variant="ghost"
                       className={`size-7 min-w-0 ${workflowIconButtonHoverClass} ${
                         isPinned
-                          ? "text-accent"
+                          ? "text-accent-text"
                           : "text-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-foreground"
                       }`}
                       aria-label={isPinned ? t`Unpin workflow` : t`Pin workflow`}

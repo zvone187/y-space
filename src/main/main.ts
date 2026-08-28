@@ -308,7 +308,7 @@ function resolveWindowChromeOptions(): {
   appearance: "light" | "dark";
   sidebarTranslucency: boolean;
 } {
-  let mode: "system" | "light" | "dark" = "dark";
+  let mode: "system" | "light" | "dark" = "light";
   let wantGlass = false;
   if (poracodePaths) {
     try {
@@ -316,7 +316,7 @@ function resolveWindowChromeOptions(): {
       mode = settings.themeMode;
       wantGlass = settings.sidebarTranslucency === true;
     } catch {
-      // Fall back to dark / opaque.
+      // Fall back to the fresh-profile light / opaque appearance.
     }
   }
   return {

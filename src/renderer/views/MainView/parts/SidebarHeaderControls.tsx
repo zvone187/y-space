@@ -1,4 +1,4 @@
-import { FolderPlus, Globe, Search } from "lucide-react";
+import { Ellipsis, FolderPlus, Globe, Search } from "lucide-react";
 import { Button, Dropdown, Label, Separator, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useIsPanelTabVisible } from "@/renderer/state/panelDockSelectors";
@@ -56,28 +56,37 @@ export function SidebarHeaderControls() {
       <Dropdown>
         <Button
           isIconOnly
-          aria-label={t`List options`}
+          aria-label={t`More`}
           size="sm"
           variant="ghost"
           className="size-6 min-w-0 text-muted hover:text-foreground"
         >
-          {(() => {
-            const Icon =
-              threadListLayout === "flat" ? listLayoutIcon.flat : sortModeIcon[threadSortMode];
-            return <Icon className="size-3.5" />;
-          })()}
+          <Ellipsis className="size-3.5" />
         </Button>
         <Dropdown.Popover>
           <Dropdown.Menu
             aria-label={t`Thread list options`}
             selectionMode="multiple"
-            selectedKeys={[threadSortMode, threadListLayout]}
+            selectedKeys={[
+              ...(browserVisible ? ["browser"] : []),
+              threadSortMode,
+              threadListLayout,
+            ]}
             onAction={(key) => {
               const state = usePanelStore.getState();
-              if (key === "grouped" || key === "flat") state.setThreadListLayout(key);
+              if (key === "browser") toggleBrowserPanel();
+              else if (key === "grouped" || key === "flat") state.setThreadListLayout(key);
               else state.setThreadSortMode(key as ThreadSortMode);
             }}
           >
+            <Dropdown.Item id="browser" textValue={t`Browser`}>
+              <Globe className="size-4 shrink-0 text-muted" />
+              <Label>
+                <Trans>Browser</Trans>
+              </Label>
+              <Dropdown.ItemIndicator />
+            </Dropdown.Item>
+            <Separator />
             {sortModeOrder.map((mode) => {
               const Icon = sortModeIcon[mode];
               const label = t(sortModeLabel[mode]);
@@ -104,23 +113,6 @@ export function SidebarHeaderControls() {
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
-      <Tooltip delay={150}>
-        <Tooltip.Trigger>
-          <Button
-            isIconOnly
-            aria-label={browserVisible ? t`Focus browser` : t`Open browser`}
-            size="sm"
-            variant="ghost"
-            className="size-6 min-w-0 text-muted hover:text-foreground"
-            onPress={toggleBrowserPanel}
-          >
-            <Globe className="size-3.5" />
-          </Button>
-        </Tooltip.Trigger>
-        <Tooltip.Content placement="bottom">
-          <Trans>Browser</Trans>
-        </Tooltip.Content>
-      </Tooltip>
     </div>
   );
 }

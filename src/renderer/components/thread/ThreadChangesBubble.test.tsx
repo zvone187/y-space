@@ -73,7 +73,7 @@ describe("ThreadChangesBubble", () => {
     expect(screen.getByRole("tooltip")).toHaveTextContent("poracode/fix-pwa-worktree-setup");
   });
 
-  it("shows worktree changes beside the icon and opens Git review for that worktree", () => {
+  it("keeps worktree changes icon-only and opens Git review for that worktree", () => {
     const worktreePath = "C:\\repo-worktrees\\calm-viper";
     useGitStore.setState({
       worktreeStatuses: {
@@ -85,8 +85,9 @@ describe("ThreadChangesBubble", () => {
 
     const bubble = screen.getByRole("button", { name: "Review changes" });
 
-    expect(bubble).toHaveTextContent("+42");
-    expect(bubble).toHaveTextContent("-7");
+    expect(bubble).toHaveClass("w-7");
+    expect(bubble).not.toHaveTextContent("+42");
+    expect(bubble).not.toHaveTextContent("-7");
     expect(screen.getByRole("tooltip")).toHaveTextContent("calm-viper");
 
     fireEvent.click(bubble);
@@ -98,7 +99,7 @@ describe("ThreadChangesBubble", () => {
     expect(usePanelStore.getState().gitReviewAsPanel).toBe(true);
   });
 
-  it("shows the PR number beside its status-colored icon in the Git bubble", () => {
+  it("shows PR status through an icon without rendering the PR number", () => {
     const worktreePath = "C:\\repo-worktrees\\calm-viper";
     useGitStore.setState({
       worktreeStatuses: {
@@ -123,8 +124,8 @@ describe("ThreadChangesBubble", () => {
     const bubble = screen.getByRole("button", { name: "Review changes" });
     const prIcon = bubble.querySelector(".lucide-git-pull-request");
 
-    expect(bubble).toHaveClass("px-3");
-    expect(bubble).toHaveTextContent("#427");
+    expect(bubble).toHaveClass("w-7");
+    expect(bubble).not.toHaveTextContent("#427");
     expect(prIcon).toHaveClass("text-warning");
     expect(bubble.querySelector(".lucide-git-fork")).toBeNull();
   });

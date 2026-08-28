@@ -175,7 +175,7 @@ export function TreeEntryRow(props: {
             {isDirectory ? (
               entry.hasChildren ? (
                 <ChevronRight
-                  className={`size-3.5 text-muted/70 transition-transform ${
+                  className={`size-3.5 text-muted transition-transform ${
                     isExpanded ? "rotate-90" : ""
                   }`}
                 />

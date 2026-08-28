@@ -1,15 +1,66 @@
 // Renders the Y Space SVG masters into production icon assets. Legacy master
 // filenames remain stable so downstream packaging scripts do not need migration.
 // Uses the repo's `sharp` for SVG->PNG plus small PNG-in-ICNS/ICO packers.
-// Outputs to branding/assets/out/. Run from repo root:
+// Stages canonical renders in branding/assets/out/ and synchronizes the
+// production copies used by desktop packaging, the PWA, and the website.
+// Run from repo root:
 //   node branding/assets/build-icons.mjs
 import sharp from "sharp";
-import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { padToMacSafeArea } from "./macSafeAreaIcon.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
+const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const OUT = `${HERE}out`;
+
+const PRODUCTION_FILES = {
+  build: [
+    "icon.png",
+    "icon-mac.png",
+    "icon.ico",
+    "icon.icns",
+    "icon-nightly.png",
+    "icon-nightly-mac.png",
+    "icon-nightly.ico",
+    "icon-nightly.icns",
+    "tray-icon.ico",
+    "tray-icon-dark.ico",
+    "tray-icon-nightly.ico",
+    "tray-icon-nightly-dark.ico",
+    "tray-icon-mac.png",
+    "tray-icon-mac@2x.png",
+  ],
+  website: [
+    "favicon-48x48.png",
+    "favicon-96x96.png",
+    "favicon.ico",
+    "icon-192.png",
+    "icon-512.png",
+    "icon.png",
+  ],
+  pwa: [
+    "apple-touch-icon.png",
+    "apple-touch-icon-nightly.png",
+    "icon-192.png",
+    "icon-512.png",
+    "icon-maskable-512.png",
+    "icon-nightly-192.png",
+    "icon-nightly-512.png",
+    "icon-nightly-maskable-512.png",
+  ],
+};
+
+async function syncProductionFiles(section, destination) {
+  const source = `${OUT}/${section}`;
+  await mkdir(destination, { recursive: true });
+  await Promise.all(
+    PRODUCTION_FILES[section].map((file) =>
+      copyFile(`${source}/${file}`, `${destination}/${file}`),
+    ),
+  );
+  console.log(`  ✓ synced ${PRODUCTION_FILES[section].length} production files`);
+}
 
 async function png(svg, size) {
   return sharp(svg, { density: 512 }).resize(size, size, { fit: "contain" }).png().toBuffer();
@@ -24,14 +75,15 @@ async function macPng(svg, size) {
     .toBuffer();
 }
 
-// Tray glyph colors follow the brand tokens (BRAND.md §6): moon Y on dark
-// shells, ink Y on light shells. Ice is too faint against a light taskbar, so
-// the nightly accent deepens for the ink variant.
+// Tray glyph colors follow the brand tokens (BRAND.md §6): white Y with the
+// lifted orange on dark shells, ink Y with the primary orange on light shells.
+// Ice is too faint against a light taskbar, so the nightly accent deepens for
+// the ink variant.
 const TRAY_VARIANTS = [
-  { name: "tray-icon", glyph: "#EAF0FB", accent: "#8B7BFF" },
-  { name: "tray-icon-dark", glyph: "#0E0E14", accent: "#8B7BFF" },
-  { name: "tray-icon-nightly", glyph: "#EAF0FB", accent: "#5EE6E0" },
-  { name: "tray-icon-nightly-dark", glyph: "#0E0E14", accent: "#0E9C97" },
+  { name: "tray-icon", glyph: "#FFFFFF", accent: "#FF9B73" },
+  { name: "tray-icon-dark", glyph: "#181816", accent: "#FF5A1F" },
+  { name: "tray-icon-nightly", glyph: "#FFFFFF", accent: "#5EE6E0" },
+  { name: "tray-icon-nightly-dark", glyph: "#181816", accent: "#0E9C97" },
 ];
 
 async function trayPng(svg, size, { glyph, accent }) {
@@ -41,7 +93,7 @@ async function trayPng(svg, size, { glyph, accent }) {
       'viewBox="256 254 522 522" width="522" height="522"',
     )
     .replace('fill="currentColor"', `fill="${glyph}"`)
-    .replace("#8B7BFF", accent);
+    .replace("#FF5A1F", accent);
   return sharp(Buffer.from(source), { density: 512 })
     .resize(size, size, { fit: "contain" })
     .png()
@@ -58,7 +110,7 @@ async function trayMacTemplatePng(svg, size) {
       'viewBox="256 254 522 522" width="522" height="522"',
     )
     .replace('fill="currentColor"', 'fill="#000000"')
-    .replace("#8B7BFF", "#000000");
+    .replace("#FF5A1F", "#000000");
   // macOS menu-bar template: the canvas point size matches the bar height, but the
   // glyph must sit inside it with margin so it doesn't tower over neighbouring
   // status items. Render the glyph at ~76% and center it on a transparent canvas.
@@ -234,11 +286,21 @@ async function main() {
     await buildVariant("icon", `${HERE}poracode-icon.svg`, `${OUT}/build`);
     await buildVariant("icon-nightly", `${HERE}poracode-icon-nightly.svg`, `${OUT}/build`);
     await buildTrayIcons(`${OUT}/build`);
+    await syncProductionFiles("build", `${ROOT}build`);
   }
 
-  if (wants("tray")) {
+  // A full build already renders and synchronizes tray assets with the app
+  // icons. The standalone filter is useful when only menu-bar/taskbar art
+  // changed.
+  if (only === "tray") {
     console.log("build/ (tray icons):");
     await buildTrayIcons(`${OUT}/build`);
+    const trayFiles = PRODUCTION_FILES.build.filter((file) => file.startsWith("tray-icon"));
+    await mkdir(`${ROOT}build`, { recursive: true });
+    await Promise.all(
+      trayFiles.map((file) => copyFile(`${OUT}/build/${file}`, `${ROOT}build/${file}`)),
+    );
+    console.log(`  ✓ synced ${trayFiles.length} production files`);
   }
 
   if (wants("website")) {
@@ -263,6 +325,7 @@ async function main() {
       ),
     );
     console.log("  ✓ favicons + favicon.ico");
+    await syncProductionFiles("website", `${ROOT}website/public`);
   }
 
   if (wants("pwa")) {
@@ -270,6 +333,7 @@ async function main() {
     const pwa = `${OUT}/pwa`;
     await mkdir(pwa, { recursive: true });
     for (const variant of PWA_VARIANTS) await buildPwaVariant(pwa, variant);
+    await syncProductionFiles("pwa", `${ROOT}public/icons`);
   }
 
   console.log(`\nDone → ${OUT}`);

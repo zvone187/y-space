@@ -11,7 +11,7 @@ export function LandingFaq() {
     <section id="faq" className="relative z-10 border-t border-white/[0.06] px-5 py-24 sm:px-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-10 text-center">
-          <p className="mb-3 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+          <p className="mb-3 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent-text">
             <span className="pora-dot h-1.5 w-1.5" />
             {t("faq.eyebrow")}
           </p>
@@ -30,7 +30,7 @@ export function LandingFaq() {
               <summary className="cursor-pointer list-none text-base font-semibold text-moon marker:hidden">
                 <span className="flex items-center justify-between gap-4">
                   {t(item.questionKey)}
-                  <span className="text-xl leading-none text-accent transition-transform duration-200 group-open:rotate-45">
+                  <span className="text-xl leading-none text-accent-text transition-transform duration-200 group-open:rotate-45">
                     +
                   </span>
                 </span>

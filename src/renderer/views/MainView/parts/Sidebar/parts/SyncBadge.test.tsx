@@ -88,11 +88,13 @@ describe("SyncBadge", () => {
 
     render(<SyncBadge projectId={project.id} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Pull ↓1" }));
+    const badge = screen.getByRole("button", { name: "Pull ↓1" });
+    fireEvent.click(badge);
 
     await waitFor(() => {
       expect(toastMock.danger).toHaveBeenCalledWith("remote rejected");
     });
+    expect(badge).not.toHaveTextContent("↓1");
   });
 
   it("shares in-flight state across duplicate project badges", async () => {

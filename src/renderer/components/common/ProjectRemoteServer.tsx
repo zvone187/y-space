@@ -103,7 +103,7 @@ export function ProjectRemoteServerIcon(props: {
   if (!info.isRemote && !info.serverName) return null;
   return (
     <span className="relative flex shrink-0">
-      <Server className={props.className ?? "size-3 text-muted/60"} />
+      <Server className={props.className ?? "size-3 text-muted"} />
       {info.serverName ? (
         <RemoteServerStatusDot
           status={info.status ?? "offline"}
@@ -189,11 +189,11 @@ export function ProjectSelectorIcon(props: {
 
 const CHIP_SIZE = {
   /** The flat list's 10px row tags, where even the dense glyph reads heavy. */
-  xs: { icon: "size-2.5 text-muted/60", dot: "size-1", name: "max-w-20 text-muted/60" },
+  xs: { icon: "size-2.5 text-muted", dot: "size-1", name: "max-w-20 text-muted" },
   /** Dense sidebar rows, where the chip inherits a 10px tag. */
-  sm: { icon: "size-3 text-muted/60", dot: "size-1.5", name: "max-w-20 text-muted/60" },
+  sm: { icon: "size-3 text-muted", dot: "size-1.5", name: "max-w-20 text-muted" },
   /** Menu rows: own type scale for the name, but the same compact glyph. */
-  md: { icon: "size-2.5 text-muted/60", dot: "size-1", name: "max-w-24 text-xs text-muted/60" },
+  md: { icon: "size-2.5 text-muted", dot: "size-1", name: "max-w-24 text-xs text-muted" },
 } as const;
 
 /**

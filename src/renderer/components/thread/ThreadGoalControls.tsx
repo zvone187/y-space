@@ -124,7 +124,6 @@ export function ThreadGoalControls({ threadId, state, onDismiss }: ThreadGoalCon
                 <Button
                   variant="tertiary"
                   size="sm"
-                  className="text-white"
                   isDisabled={!normalizedObjective || normalizedObjective === state.objective}
                   isPending={pendingAction === "edit"}
                   onPress={() => void saveObjective()}

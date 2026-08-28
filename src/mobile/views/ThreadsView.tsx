@@ -146,7 +146,7 @@ function ThreadRow(props: {
         {thread.starred && <Star className="size-3 shrink-0 fill-current" aria-label={t`Pinned`} />}
         <RelativeTime
           iso={thread.updatedAt}
-          className="block shrink-0 text-center font-mono text-[10px] tabular-nums text-muted"
+          className="block shrink-0 text-center text-[10px] tabular-nums text-muted"
         />
       </span>
     </button>
@@ -216,7 +216,7 @@ function ThreadGroupHeader(props: {
       </span>
       <RelativeTime
         iso={groupLatestUpdatedAt(threads)}
-        className="block shrink-0 font-mono text-[10px] tabular-nums text-muted"
+        className="block shrink-0 text-[10px] tabular-nums text-muted"
       />
     </button>
   );

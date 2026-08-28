@@ -117,6 +117,27 @@ describe("createAutoUpdaterController", () => {
     expect(reportError).not.toHaveBeenCalled();
   });
 
+  it("treats an unpublished GitHub release feed as no update on stable", async () => {
+    const sendStatus = vi.fn<(status: { type: string; message?: string }) => void>();
+    const reportError = vi.fn<(error: unknown, tags?: Record<string, string>) => void>();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const controller = createAutoUpdaterController(sendStatus, "stable", false, reportError);
+    controller.initialize();
+
+    const failure = new Error("No published versions on GitHub");
+    autoUpdaterMock.checkForUpdates.mockImplementationOnce(async () => {
+      autoUpdaterMock.emit("error", failure);
+      throw failure;
+    });
+
+    await expect(controller.checkForUpdate()).resolves.toBeUndefined();
+
+    expect(sendStatus).toHaveBeenCalledWith({ type: "update-not-available" });
+    expect(reportError).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith("[y-space] update feed is not published yet.");
+    warn.mockRestore();
+  });
+
   it("keeps a missing stable manifest observable with normalized tags", async () => {
     const reportError = vi.fn<(error: unknown, tags?: Record<string, string>) => void>();
     const controller = createAutoUpdaterController(vi.fn(), "stable", false, reportError);

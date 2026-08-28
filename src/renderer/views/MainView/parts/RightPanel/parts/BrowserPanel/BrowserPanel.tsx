@@ -414,9 +414,9 @@ function BrowserDeviceCodeButton() {
           onClick={copyDeviceCode}
         >
           {copied ? (
-            <Check className="size-3 shrink-0 text-accent" />
+            <Check className="size-3 shrink-0 text-accent-text" />
           ) : (
-            <Copy className="size-3 shrink-0 text-accent" />
+            <Copy className="size-3 shrink-0 text-accent-text" />
           )}
           <span className="shrink-0 text-muted">
             <Trans>Paste</Trans>

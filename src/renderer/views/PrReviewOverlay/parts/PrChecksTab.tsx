@@ -38,7 +38,7 @@ export function PrChecksTab(props: { cacheKey: string; loading: boolean; project
 
   if (!checks || checks.length === 0) {
     return (
-      <div className="px-6 py-6 text-center text-xs text-muted/60">
+      <div className="px-6 py-6 text-center text-xs text-muted">
         <Trans>No checks reported for this PR.</Trans>
       </div>
     );

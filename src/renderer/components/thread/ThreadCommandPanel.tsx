@@ -59,7 +59,7 @@ export function ThreadCommandPanel(props: ThreadCommandPanelProps) {
               <div key={headingId} role="group" aria-labelledby={headingId}>
                 <div
                   id={headingId}
-                  className="px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase text-muted/70"
+                  className="px-2 pb-1 pt-2 text-[0.68rem] font-semibold uppercase text-muted"
                 >
                   {groupLabel}
                 </div>
@@ -99,12 +99,12 @@ export function ThreadCommandPanel(props: ThreadCommandPanelProps) {
                           </span>
                         )}
                         {cmd.section === "skills" && cmd.skillProvider ? (
-                          <span className="shrink-0 text-xs text-muted/60">
+                          <span className="shrink-0 text-xs text-muted">
                             {cmd.skillProvider} ·{" "}
                             {cmd.skillScope === "project" ? t`Project` : t`Global`}
                           </span>
                         ) : cmd.argumentHint ? (
-                          <span className="shrink-0 text-muted/60">{cmd.argumentHint}</span>
+                          <span className="shrink-0 text-muted">{cmd.argumentHint}</span>
                         ) : null}
                       </button>
                     </div>

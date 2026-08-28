@@ -122,7 +122,7 @@ export function UsagePanel(props: { onOpenUsageSettings?: (() => void) | undefin
               <button
                 type="button"
                 onClick={openSettings}
-                className="text-xs text-accent underline-offset-2 hover:underline"
+                className="text-xs text-accent-text underline-offset-2 hover:underline"
               >
                 <Trans>Enable providers in settings</Trans>
               </button>
@@ -148,7 +148,7 @@ export function UsagePanel(props: { onOpenUsageSettings?: (() => void) | undefin
 
       {lastUpdated > 0 ? (
         <div className="shrink-0 border-t border-[color:var(--separator)] px-3 py-1.5">
-          <p className="text-[11px] text-muted/70">
+          <p className="text-[11px] text-muted">
             <Trans>Updated {formatUpdatedAgo(lastUpdated, nowTick, t)}</Trans>
           </p>
         </div>

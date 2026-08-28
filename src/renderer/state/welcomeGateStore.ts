@@ -23,13 +23,12 @@ interface WelcomeGateStore {
    * True once it is safe to start deferred first-launch background work — most
    * importantly the agent-detection sweep kicked off by `getAgentStatuses`,
    * whose cold process spawns and `agent-detected` re-render churn would
-   * otherwise starve the welcome animation's first paint and make it snap
-   * straight to its final frame.
+   * otherwise compete with the welcome surface's first paint.
    *
    * Seeded through {@link isWelcomeSeen} so returning users and isolated manual
    * test launches are released on the very first render and never delayed. On a
    * genuine first launch it starts `false`; the welcome overlay flips it once
-   * the intro animation has settled or the user dismisses it.
+   * the first frame has settled or the user dismisses it.
    */
   backgroundWorkReleased: boolean;
   releaseBackgroundWork: () => void;
