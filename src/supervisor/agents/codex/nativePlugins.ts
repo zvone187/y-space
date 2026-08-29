@@ -7,7 +7,7 @@ import {
   quotePosixShellArg,
   readCommandOutputAsync,
 } from "../base";
-import { getCodexPluginPaths } from "./plugin/install";
+import { getCodexPluginPaths, resolveCodexSqliteHome } from "./plugin/install";
 
 interface CodexPluginListDocument {
   installed?: Array<{
@@ -39,9 +39,10 @@ export async function listNativeCodexPlugins(
   ctx: AgentEnvContext,
 ): Promise<readonly AgentNativePlugin[]> {
   const paths = getCodexPluginPaths(ctx);
+  const sqliteHomeDir = await resolveCodexSqliteHome(ctx);
   if (ctx.envKind === "wsl" && ctx.wslDistro) {
     const homePrefix = paths.codexHomeDir
-      ? `if [ -d ${quotePosixShellArg(paths.codexHomeDir)} ]; then export CODEX_HOME=${quotePosixShellArg(paths.codexHomeDir)}; fi; `
+      ? `if [ -d ${quotePosixShellArg(paths.codexHomeDir)} ]; then export CODEX_HOME=${quotePosixShellArg(paths.codexHomeDir)}; export CODEX_SQLITE_HOME=${quotePosixShellArg(sqliteHomeDir)}; fi; `
       : "";
     const [result] = await batchWslCommandsAsync(ctx.wslDistro, [
       `${homePrefix}codex plugin list --json`,
@@ -53,7 +54,11 @@ export async function listNativeCodexPlugins(
   const command = buildAgentCommand(location, "codex", ["plugin", "list", "--json"]);
   const env =
     paths.codexHomeDir && existsSync(paths.codexHomeDir)
-      ? { ...command.env, CODEX_HOME: paths.codexHomeDir }
+      ? {
+          ...command.env,
+          CODEX_HOME: paths.codexHomeDir,
+          CODEX_SQLITE_HOME: sqliteHomeDir,
+        }
       : command.env;
   const result = await readCommandOutputAsync(command.command, command.args, {
     ...(command.cwd ? { cwd: command.cwd } : {}),

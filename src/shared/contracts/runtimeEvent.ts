@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH,
+  MAX_BROWSER_EVIDENCE_TITLE_LENGTH,
+  MAX_BROWSER_EVIDENCE_URL_LENGTH,
+  Y_SPACE_BROWSER_EVIDENCE_SOURCE,
+} from "../browserMcpEvidence";
 
 /**
  * Canonical chat-runtime events.
@@ -294,6 +300,19 @@ export const toolCallPayloadSchema = z.object({
   isCrossagent: z.boolean().optional(),
   crossagentStatus: z.enum(["running", "completed", "failed", "cancelled"]).optional(),
   workflow: toolCallWorkflowSchema.optional(),
+  /**
+   * App-owned proof that this exact successful action crossed the embedded
+   * Browser MCP ingress. Provider-authored MCP rows intentionally omit it.
+   */
+  browserEvidence: z
+    .object({
+      source: z.literal(Y_SPACE_BROWSER_EVIDENCE_SOURCE),
+      occurredAt: z.number().int().nonnegative(),
+      tabId: z.string().max(MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH).optional(),
+      url: z.string().max(MAX_BROWSER_EVIDENCE_URL_LENGTH).optional(),
+      title: z.string().max(MAX_BROWSER_EVIDENCE_TITLE_LENGTH).optional(),
+    })
+    .optional(),
 });
 export type ToolCallPayload = z.infer<typeof toolCallPayloadSchema>;
 

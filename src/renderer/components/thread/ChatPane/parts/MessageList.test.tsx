@@ -15,6 +15,7 @@ import { clearTimelineMeasurementCache } from "./timelineMeasurementCache";
 type MockLegendProps = {
   data: readonly ChatTimelineEntry[];
   dataKey: string;
+  extraData?: unknown;
   drawDistance?: number;
   estimatedItemSize: number;
   getFixedItemSize: (item: ChatTimelineEntry, index: number, type: string) => number | undefined;
@@ -230,6 +231,20 @@ describe("MessageList", () => {
     props.onStartReached?.();
     expect(onStartReached).toHaveBeenCalledOnce();
     expect(props.recycleItems).toBe(false);
+  });
+
+  it("invalidates virtual rows when Find reveals a different nested item", () => {
+    const entries = makeEntries(["item-1"]);
+    const view = render(<MessageList threadId="thread-1" entries={entries} />);
+    const before = (latestLegendProps.current as MockLegendProps).extraData;
+
+    view.rerender(
+      <MessageList threadId="thread-1" entries={entries} revealedItemId="reasoning-1" />,
+    );
+
+    const after = (latestLegendProps.current as MockLegendProps).extraData;
+    expect(after).not.toBe(before);
+    expect(String(after)).toContain("reasoning-1");
   });
 
   it("keeps long assistant rows out of short-message size estimates", () => {
@@ -622,6 +637,7 @@ describe("MessageList", () => {
         <MessageList
           threadId={threadId}
           entries={makeEntries(["assistant-1"])}
+          isTurnActive
           onLiveVirtualizerLayoutChange={onLiveVirtualizerLayoutChange}
         />,
       );

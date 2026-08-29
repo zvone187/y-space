@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProjectLocation } from "@/shared/contracts";
+import { cleanupTrackedWslLaunchEnvironmentFiles } from "../base";
 import {
   spawnCursorSdkWorker,
   terminateCursorSdkWorkerTree,
@@ -19,6 +20,7 @@ const nativeProjectLocation = (path: string): ProjectLocation =>
 
 afterEach(() => {
   for (const child of children.splice(0)) child.kill();
+  cleanupTrackedWslLaunchEnvironmentFiles();
   for (const directory of tempDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   }
@@ -119,11 +121,19 @@ describe("spawnCursorSdkWorker", () => {
       const [call] = calls;
       expect(call!.args).toEqual(expect.arrayContaining(["-d", "Ubuntu", "--cd", "/work/repo"]));
       const serializedArgv = JSON.stringify(call!.args);
+      const script = String(call!.args.at(-1));
       expect(serializedArgv).toContain("/home/user/.nvm/node");
       expect(serializedArgv).toContain("/tmp/poracode-test/cursor-sdk/cursor-sdk-worker.mjs");
-      expect(serializedArgv).toContain("PORACODE_SAFE_TEST_VALUE");
+      expect(serializedArgv).not.toContain("PORACODE_SAFE_TEST_VALUE");
+      expect(serializedArgv).not.toContain("visible");
       expect(serializedArgv).not.toContain("must-not-appear-in-command");
       expect(serializedArgv).not.toContain("override-pipedream-project");
+      expect(script).toContain("__y_space_launch_env_file");
+      expect(script).toContain('/bin/rm -f -- "$1"');
+      expect(script).toContain('/bin/rmdir -- "$2"');
+      expect(script).toContain(
+        "exec '/home/user/.nvm/node' '/tmp/poracode-test/cursor-sdk/cursor-sdk-worker.mjs'",
+      );
       expect(call!.options.env?.CURSOR_API_KEY).toBeUndefined();
       expect(call!.options.env?.PIPEDREAM_CLIENT_SECRET).toBeUndefined();
       expect(call!.options.env?.PIPEDREAM_PROJECT_ID).toBeUndefined();

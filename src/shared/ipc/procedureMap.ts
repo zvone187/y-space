@@ -79,6 +79,28 @@ export type IpcProcedurePayload<Name extends IpcProcedureName> =
 export type IpcProcedureResult<Name extends IpcProcedureName> =
   IpcProcedureMap[Name]["__types"]["result"];
 
+/**
+ * Supervisor RPCs used only by trusted main-process services. They remain in
+ * the canonical procedure map so `SupervisorClient.call` stays typed, but
+ * must never be registered on Electron renderer IPC or exposed by preload.
+ */
+export const SUPERVISOR_INTERNAL_PROCEDURE_NAMES = [
+  "resolveMcpCallerIdentity",
+  "recordBrowserMcpToolCall",
+] as const satisfies readonly IpcProcedureName[];
+
+export type SupervisorInternalProcedureName = (typeof SUPERVISOR_INTERNAL_PROCEDURE_NAMES)[number];
+export type RendererIpcProcedureName = Exclude<IpcProcedureName, SupervisorInternalProcedureName>;
+
+const supervisorInternalProcedureNames = new Set<IpcProcedureName>(
+  SUPERVISOR_INTERNAL_PROCEDURE_NAMES,
+);
+
+/** Exact public procedure surface shared by preload and main IPC registration. */
+export const RENDERER_IPC_PROCEDURE_NAMES = (
+  Object.keys(ipcProcedureMap) as IpcProcedureName[]
+).filter((name): name is RendererIpcProcedureName => !supervisorInternalProcedureNames.has(name));
+
 export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "pickFolder",
   "pickFiles",

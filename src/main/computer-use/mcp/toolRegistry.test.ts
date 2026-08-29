@@ -76,4 +76,127 @@ describe("computer-use toolRegistry", () => {
     ).rejects.toThrow("click_count must be 1 or 2");
     expect(driver.click).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["launch_app", { app: "Google Chrome" }, "launchApp"],
+    ["activate_window", { window: { app: "Safari", id: 1 } }, "activateWindow"],
+    ["click", { window: { app: "Brave Browser", id: 2 }, x: 10, y: 20 }, "click"],
+    ["click", { window: { app: "Y Space", id: 3 }, x: 10, y: 20 }, "click"],
+  ] as const)(
+    "rejects %s for a native browser while managed Y Space Browser is connected",
+    async (tool, args, driverMethod) => {
+      const driver = createDriver();
+
+      await expect(
+        dispatchTool(tool, args, { driver, managedBrowserConnected: true }),
+      ).rejects.toThrow(/Y Space Browser/iu);
+      expect(driver[driverMethod]).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    "https://example.test",
+    "http://localhost:3000",
+    "file:///tmp/browser-bypass.html",
+    "ftp://example.test/browser-bypass.html",
+    "about:blank",
+    "data:text/html,<h1>browser bypass</h1>",
+    "/tmp/page.html",
+    "C:\\tmp\\page.html",
+    "/tmp/page.HTM?preview=1#section",
+    "C:\\tmp\\page.XHTML#section",
+    "/tmp/page.mhtml",
+    "C:\\tmp\\page.WEBARCHIVE?preview=1",
+    "/usr/bin/google-chrome",
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "/Applications/Safari.app",
+  ])("rejects browser-capable launch_app input %s before calling the driver", async (app) => {
+    const driver = createDriver();
+
+    await expect(
+      dispatchTool("launch_app", { app }, { driver, managedBrowserConnected: true }),
+    ).rejects.toThrow(/Y Space Browser/iu);
+    expect(driver.launchApp).not.toHaveBeenCalled();
+  });
+
+  it.each(["/Applications/Calculator.app", "C:\\Windows\\System32\\notepad.exe"])(
+    "allows explicit non-browser app path %s under browser exclusivity",
+    async (app) => {
+      const launchApp = vi.fn<ComputerUseDriver["launchApp"]>().mockResolvedValue({ ok: true });
+      const driver = createDriver({ launchApp });
+
+      await expect(
+        dispatchTool("launch_app", { app }, { driver, managedBrowserConnected: true }),
+      ).resolves.toEqual({ ok: true });
+      expect(launchApp).toHaveBeenCalledWith({ app });
+    },
+  );
+
+  it("preserves non-browser Computer Use control under browser exclusivity", async () => {
+    const driver = createDriver({
+      launchApp: vi.fn<ComputerUseDriver["launchApp"]>().mockResolvedValue({ ok: true }),
+      click: vi.fn<ComputerUseDriver["click"]>().mockResolvedValue({
+        ok: true,
+        mode: "interactive",
+      }),
+    });
+    const ctx = { driver, managedBrowserConnected: true };
+
+    await expect(dispatchTool("launch_app", { app: "Calculator" }, ctx)).resolves.toEqual({
+      ok: true,
+    });
+    await expect(
+      dispatchTool("click", { window: { app: "Calculator", id: 1 }, x: 10, y: 20 }, ctx),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
+  it("hides external browsers and the Y Space host window from passive listings", async () => {
+    const driver = createDriver({
+      listApps: vi.fn<ComputerUseDriver["listApps"]>().mockResolvedValue([
+        {
+          id: "com.google.Chrome",
+          displayName: "Google Chrome",
+          windows: [{ app: "Google Chrome", id: 1 }],
+        },
+        {
+          id: "calculator",
+          displayName: "Calculator",
+          windows: [
+            { app: "Calculator", id: 2 },
+            { app: "Y Space", id: 3 },
+          ],
+        },
+      ]),
+      listWindows: vi.fn<ComputerUseDriver["listWindows"]>().mockResolvedValue([
+        { app: "Safari", id: 4 },
+        { app: "Y Space", id: 5 },
+        { app: "Calculator", id: 6 },
+      ]),
+    });
+    const ctx = { driver, managedBrowserConnected: true };
+
+    await expect(dispatchTool("list_apps", {}, ctx)).resolves.toEqual([
+      {
+        id: "calculator",
+        displayName: "Calculator",
+        windows: [{ app: "Calculator", id: 2 }],
+      },
+    ]);
+    await expect(dispatchTool("list_windows", {}, ctx)).resolves.toEqual([
+      { app: "Calculator", id: 6 },
+    ]);
+  });
+
+  it("post-validates an id-only get_window result", async () => {
+    const driver = createDriver({
+      getWindow: vi.fn<ComputerUseDriver["getWindow"]>().mockResolvedValue({
+        app: "Microsoft Edge",
+        id: 7,
+      }),
+    });
+
+    await expect(
+      dispatchTool("get_window", { id: 7 }, { driver, managedBrowserConnected: true }),
+    ).rejects.toThrow(/Y Space Browser/iu);
+  });
 });

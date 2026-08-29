@@ -30,9 +30,9 @@ describe("effectiveLaunchConfig — single gate for built-in MCP disables", () =
     });
   });
 
-  it("preserves an explicit Browser opt-out", () => {
+  it("forces the embedded Browser on despite a per-launch opt-out", () => {
     expect(effectiveLaunchConfig({ model: "test-model", browserMcp: false }, [])).toMatchObject({
-      browserMcp: false,
+      browserMcp: true,
     });
   });
 
@@ -116,6 +116,24 @@ describe("workspaceLaunchConfig — Home scope unrestricted for every agent", ()
     ).toEqual(config);
   });
 
+  it("does not force Browser on for an adapter without exclusive Browser routing", () => {
+    const config: ThreadConfig = { model: "cursor/model" };
+    expect(workspaceLaunchConfig({ kind: "windows", path: "C:\\repo" }, config, adapter, [])).toBe(
+      config,
+    );
+  });
+
+  it("forces Browser on for adapters that implement exclusive Browser routing", () => {
+    const config: ThreadConfig = { model: "codex/model", browserMcp: false };
+    const exclusiveAdapter = {
+      ...adapter,
+      browserRouting: { terminal: "exclusive", gui: "exclusive" },
+    } as const;
+    expect(
+      workspaceLaunchConfig({ kind: "windows", path: "C:\\repo" }, config, exclusiveAdapter, []),
+    ).toMatchObject({ browserMcp: true });
+  });
+
   it("forces each provider's unrestricted posture in Home", () => {
     const config = { ...baseConfig, approvalPolicy: "default", sandboxMode: "workspace-write" };
     expect(
@@ -142,6 +160,15 @@ describe("applyAgentSettingsMcpFlags", () => {
   it("enables provider-level Crossagents when trusted routing is available", () => {
     const result = applyAgentSettingsMcpFlags(baseConfig, { crossagentMcp: true }, [], true);
     expect(result.crossagentMcp).toBe(true);
+  });
+
+  it("keeps Browser on when provider settings opt out unless it is globally disabled", () => {
+    expect(applyAgentSettingsMcpFlags(baseConfig, { browserMcp: false }, [], false)).toMatchObject({
+      browserMcp: true,
+    });
+    expect(
+      applyAgentSettingsMcpFlags(baseConfig, { browserMcp: false }, ["browser"], false),
+    ).toMatchObject({ browserMcp: false });
   });
 
   it("keeps globally disabled servers off when provider settings enable them", () => {
@@ -207,6 +234,73 @@ describe("usesProviderSessionCrossagentRouting", () => {
 });
 
 describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
+  it("fails closed on native and WSL launches when mandatory Browser cannot connect", async () => {
+    const previousUrl = process.env.PORACODE_BROWSER_MCP_URL;
+    const previousToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
+    delete process.env.PORACODE_BROWSER_MCP_URL;
+    delete process.env.PORACODE_BROWSER_MCP_TOKEN;
+    const pipeline = new SpawnPipeline({
+      options: {},
+      resolveAgentSettings: () => ({ browserMcp: true }),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+    const snapshot: McpLaunchSnapshot = { mcpServers: [], disabledBuiltInMcpServerIds: [] };
+
+    try {
+      await expect(
+        pipeline.resolveBrowserMcpForLaunch(
+          { kind: "posix", path: "/repo" },
+          { model: "test-model", browserMcp: true },
+          snapshot,
+          { threadId: "native-thread" },
+        ),
+      ).rejects.toThrow(/Y Space Browser.{0,80}(?:required|unavailable)/iu);
+      await expect(
+        pipeline.resolveBrowserMcpForLaunch(
+          {
+            kind: "wsl",
+            distro: "Ubuntu",
+            linuxPath: "/repo",
+            uncPath: "\\\\wsl.localhost\\Ubuntu\\repo",
+          },
+          { model: "test-model", browserMcp: true },
+          snapshot,
+          { threadId: "wsl-thread" },
+        ),
+      ).rejects.toThrow(/Y Space Browser.{0,80}(?:required|unavailable)/iu);
+    } finally {
+      if (previousUrl === undefined) delete process.env.PORACODE_BROWSER_MCP_URL;
+      else process.env.PORACODE_BROWSER_MCP_URL = previousUrl;
+      if (previousToken === undefined) delete process.env.PORACODE_BROWSER_MCP_TOKEN;
+      else process.env.PORACODE_BROWSER_MCP_TOKEN = previousToken;
+    }
+  });
+
+  it("permits an absent Browser only when explicitly disabled", async () => {
+    const pipeline = new SpawnPipeline({
+      options: {},
+      resolveAgentSettings: () => ({ browserMcp: true }),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+    const location = { kind: "posix" as const, path: "/repo" };
+    const identity = { threadId: "disabled-browser-thread" };
+
+    await expect(
+      pipeline.resolveBrowserMcpForLaunch(
+        location,
+        { model: "test-model", browserMcp: false },
+        { mcpServers: [], disabledBuiltInMcpServerIds: [] },
+        identity,
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      pipeline.resolveBrowserMcpForLaunch(
+        location,
+        { model: "test-model", browserMcp: true },
+        { mcpServers: [], disabledBuiltInMcpServerIds: ["browser"] },
+        identity,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it("keeps OpenCode terminal Browser calls bound to their concrete thread", async () => {
     const previousUrl = process.env.PORACODE_BROWSER_MCP_URL;
     const previousToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
@@ -220,6 +314,8 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
       } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
       const adapter = {
         kind: "opencode",
+        label: "OpenCode",
+        browserRouting: { terminal: "exclusive", gui: "exclusive" },
         capabilities: {
           presentationMode: "terminal",
           mcpConfigSource: "agentSettings",
@@ -276,6 +372,8 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
       } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
       const adapter = {
         kind: "opencode",
+        label: "OpenCode",
+        browserRouting: { terminal: "exclusive", gui: "exclusive" },
         capabilities: {
           presentationMode: "gui",
           mcpConfigSource: "agentSettings",
@@ -354,7 +452,7 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
     const servers = await pipeline.resolveMcpServersForLaunch({
       location: { kind: "posix", path: "/repo/shared" },
       config: { model: "opencode/big-pickle" },
-      mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: [] },
+      mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: ["browser"] },
       identity: { threadId: "thread-gui", title: "GUI caller" },
       crossagentThreadId: "thread-gui",
       adapter,
@@ -368,6 +466,136 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
       url: "http://127.0.0.1:43212/mcp",
       headers: { Authorization: "Bearer thread-crossagents-token" },
     });
+  });
+
+  it("fails closed before launch resolution when an agent mode is not Browser-exclusive", async () => {
+    const pipeline = new SpawnPipeline({
+      options: {},
+      resolveAgentSettings: () => ({}),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+    const unsupported = {
+      kind: "cursor",
+      label: "Cursor",
+      capabilities: { presentationMode: "terminal" },
+    } as unknown as AgentAdapter;
+
+    await expect(
+      pipeline.resolveMcpServersForLaunch({
+        location: { kind: "posix", path: "/repo" },
+        config: { model: "cursor/model", browserMcp: true },
+        mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: [] },
+        identity: { threadId: "unsupported-thread" },
+        adapter: unsupported,
+        presentationMode: "terminal",
+      }),
+    ).rejects.toThrow(/does not provide an exclusive embedded Browser connection/iu);
+
+    const terminalOnly = {
+      ...unsupported,
+      browserRouting: { terminal: "exclusive" },
+    } as unknown as AgentAdapter;
+    await expect(
+      pipeline.resolveMcpServersForLaunch({
+        location: { kind: "posix", path: "/repo" },
+        config: { model: "cursor/model", browserMcp: true },
+        mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: [] },
+        identity: { threadId: "wrong-lane-thread" },
+        adapter: terminalOnly,
+        presentationMode: "gui",
+      }),
+    ).rejects.toThrow(/does not provide an exclusive embedded Browser connection/iu);
+  });
+
+  it("allows an unsupported agent mode only when Browser is globally disabled", async () => {
+    const pipeline = new SpawnPipeline({
+      options: {},
+      resolveAgentSettings: () => ({}),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+    const unsupported = {
+      kind: "cursor",
+      label: "Cursor",
+      capabilities: { presentationMode: "terminal" },
+    } as unknown as AgentAdapter;
+
+    await expect(
+      pipeline.resolveMcpServersForLaunch({
+        location: { kind: "posix", path: "/repo" },
+        config: { model: "cursor/model", browserMcp: false },
+        mcpLaunchSnapshot: { mcpServers: [], disabledBuiltInMcpServerIds: ["browser"] },
+        identity: { threadId: "browser-disabled-thread" },
+        adapter: unsupported,
+        presentationMode: "terminal",
+      }),
+    ).resolves.not.toEqual(expect.arrayContaining([expect.objectContaining({ id: "browser" })]));
+  });
+
+  it("filters browser-driving Pipedream servers after adding the canonical Y Space Browser", async () => {
+    const previousUrl = process.env.PORACODE_BROWSER_MCP_URL;
+    const previousToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
+    process.env.PORACODE_BROWSER_MCP_URL = "http://127.0.0.1:43213";
+    process.env.PORACODE_BROWSER_MCP_TOKEN = "browser-pipedream-token";
+
+    try {
+      const resolvePipedreamMcpServers = vi.fn<
+        (input: {
+          threadId: string;
+          providerBindingId?: string;
+          projectLocation: ProjectLocation;
+        }) => Promise<ResolvedMcpServer[]>
+      >(async () => [
+        {
+          id: "pipedream-playwright",
+          name: "playwright",
+          timeoutMs: 15_000,
+          transport: { type: "http", url: "https://playwright.example/mcp", headers: {} },
+        },
+        {
+          id: "pipedream-slack",
+          name: "slack",
+          timeoutMs: 15_000,
+          transport: { type: "http", url: "https://slack.example/mcp", headers: {} },
+        },
+      ]);
+      const prepareMcpToolFilters = vi.fn<
+        (
+          servers: McpLaunchSnapshot["mcpServers"],
+          location: ProjectLocation,
+          browserExclusive?: boolean,
+        ) => Promise<McpLaunchSnapshot["mcpServers"]>
+      >(async (servers) => servers);
+      const pipeline = new SpawnPipeline({
+        options: { resolvePipedreamMcpServers, prepareMcpToolFilters },
+        resolveAgentSettings: () => ({ browserMcp: true }),
+      } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+
+      const servers = await pipeline.resolveMcpServersForLaunch({
+        location: { kind: "posix", path: "/repo" },
+        config: { model: "test-model", browserMcp: true },
+        mcpLaunchSnapshot: {
+          mcpServers: [],
+          disabledBuiltInMcpServerIds: ["crossagents", "computer-use", "app-controls"],
+        },
+        identity: { threadId: "thread-pipedream-filter" },
+      });
+
+      expect(servers.map(({ id }) => id)).toEqual(["browser", "pipedream-slack"]);
+      expect(prepareMcpToolFilters).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            id: "pipedream-slack",
+            description: "",
+            enabled: true,
+          }),
+        ],
+        { kind: "posix", path: "/repo" },
+        true,
+      );
+    } finally {
+      if (previousUrl === undefined) delete process.env.PORACODE_BROWSER_MCP_URL;
+      else process.env.PORACODE_BROWSER_MCP_URL = previousUrl;
+      if (previousToken === undefined) delete process.env.PORACODE_BROWSER_MCP_TOKEN;
+      else process.env.PORACODE_BROWSER_MCP_TOKEN = previousToken;
+    }
   });
 
   it("uses a stable same-directory Pipedream binding for OpenCode GUI reloads", async () => {
@@ -446,5 +674,275 @@ describe("composeResolvedMcpServers", () => {
 
     expect(servers.map((server) => server.name)).toEqual(["custom", "browser", "crossagents"]);
     expect(servers[2]).toMatchObject({ timeoutMs: 300_000, approvalMode: "approve" });
+  });
+
+  it("drops competing external browser servers while retaining unrelated MCPs and Y Space Browser", () => {
+    const servers = composeResolvedMcpServers(
+      {
+        mcpServers: [
+          {
+            id: "playwright-provider",
+            name: "playwright",
+            description: "Browser automation",
+            enabled: true,
+            timeoutMs: 15_000,
+            transport: {
+              type: "stdio",
+              command: "npx",
+              args: ["-y", "@playwright/mcp@latest"],
+              env: {},
+            },
+          },
+          {
+            id: "chrome-devtools",
+            name: "chrome_devtools",
+            description: "Chrome DevTools",
+            enabled: true,
+            timeoutMs: 15_000,
+            transport: { type: "http", url: "http://chrome-mcp.test/mcp", headers: {} },
+          },
+          ...[
+            "puppeteer",
+            "selenium",
+            "gstack",
+            "stagehand",
+            "browserbase",
+            "browserstack",
+            "browserless",
+            "firefox",
+            "webkit",
+            "node_repl",
+          ].map((name) => ({
+            id: `${name}-external`,
+            name,
+            description: "External page automation",
+            enabled: true,
+            timeoutMs: 15_000,
+            transport: {
+              type: "http" as const,
+              url: `https://${name}.test/mcp`,
+              headers: {},
+            },
+          })),
+          {
+            id: "github",
+            name: "github",
+            description: "Source control",
+            enabled: true,
+            timeoutMs: 15_000,
+            transport: { type: "http", url: "https://mcp.github.test", headers: {} },
+          },
+          {
+            id: "pipedream",
+            name: "pipedream",
+            description: "App integrations for projects that may include browser work",
+            enabled: true,
+            timeoutMs: 15_000,
+            transport: {
+              type: "stdio",
+              command: "node",
+              args: ["pipedream-server.js"],
+              cwd: "/repo/y-space-browser-default-collapse",
+              env: {},
+            },
+          },
+        ],
+        disabledBuiltInMcpServerIds: [],
+      },
+      { url: "http://browser/mcp", token: "b", headers: { Authorization: "Bearer b" } },
+      undefined,
+      undefined,
+      undefined,
+    );
+
+    expect(servers.map(({ name }) => name)).toEqual(["github", "pipedream", "browser"]);
+    expect(servers.find(({ id }) => id === "browser")?.transport).toMatchObject({
+      type: "http",
+      url: "http://browser/mcp",
+    });
+
+    const hardDisabled = composeResolvedMcpServers(
+      {
+        mcpServers: [
+          {
+            id: "playwright-provider",
+            name: "playwright",
+            description: "Browser automation",
+            enabled: true,
+            timeoutMs: 15_000,
+            transport: {
+              type: "stdio",
+              command: "npx",
+              args: ["-y", "@playwright/mcp@latest"],
+              env: {},
+            },
+          },
+          {
+            id: "github",
+            name: "github",
+            description: "Source control",
+            enabled: true,
+            timeoutMs: 15_000,
+            transport: { type: "http", url: "https://mcp.github.test", headers: {} },
+          },
+        ],
+        disabledBuiltInMcpServerIds: ["browser"],
+      },
+      { url: "http://browser/mcp", token: "b", headers: { Authorization: "Bearer b" } },
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(hardDisabled.map(({ name }) => name)).toEqual(["playwright", "github"]);
+  });
+
+  it("preserves user browser MCPs when canonical Y Space Browser is unavailable", () => {
+    const externalBrowser: McpLaunchSnapshot["mcpServers"][number] = {
+      id: "playwright-provider",
+      name: "playwright",
+      description: "Browser automation",
+      enabled: true,
+      timeoutMs: 15_000,
+      transport: {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "@playwright/mcp@latest"],
+        env: {},
+      },
+    };
+
+    expect(
+      composeResolvedMcpServers(
+        { mcpServers: [externalBrowser], disabledBuiltInMcpServerIds: [] },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      ),
+    ).toEqual([externalBrowser]);
+  });
+});
+
+describe("launch-resource cleanup", () => {
+  it("rejects a provider-declared non-exclusive root mode before creating a session", async () => {
+    const createStructuredSession = vi.fn<NonNullable<AgentAdapter["createStructuredSession"]>>(
+      async () => undefined,
+    );
+    const buildLaunchArgv = vi.fn<AgentAdapter["buildLaunchArgv"]>(() => ({
+      binary: "cursor",
+      args: [],
+    }));
+    const buildResumeArgv = vi.fn<AgentAdapter["buildResumeArgv"]>(() => ({
+      binary: "cursor",
+      args: [],
+    }));
+    const adapter = {
+      kind: "cursor",
+      label: "Cursor",
+      browserRouting: { gui: "exclusive" },
+      capabilities: {
+        presentationMode: "terminal",
+        liveInputMode: "terminal",
+      },
+      createStructuredSession,
+      buildLaunchArgv,
+      buildResumeArgv,
+    } as unknown as AgentAdapter;
+    const pipeline = new SpawnPipeline({
+      options: { adapters: new Map([["cursor", adapter]]) },
+      sessions: new Map(),
+      pendingStartInterrupts: new Set(),
+      pendingStartAborts: new Set(),
+      closeThread: vi.fn<() => Promise<void>>(async () => {}),
+      resolveAgentSettings: () => ({}),
+      beginMcpLaunchAuthorization: vi.fn<() => void>(),
+      activateMcpLaunchAuthorization: vi.fn<() => void>(),
+      revokeMcpLaunchAuthorization: vi.fn<() => void>(),
+      emitOptimisticUserMessage: vi.fn<() => string>(() => "unused"),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+
+    await expect(
+      pipeline.startThreadInner({
+        threadId: "unsupported-root-launch",
+        agentKind: "cursor",
+        projectLocation: {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/work/project",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\work\\project",
+        },
+        config: { model: "cursor/model" },
+        prompt: "",
+        initialSize: { cols: 120, rows: 30 },
+        presentationMode: "terminal",
+        disabledBuiltInMcpServerIds: ["crossagents", "computer-use", "app-controls"],
+      }),
+    ).rejects.toThrow(/does not provide an exclusive embedded Browser connection/iu);
+
+    expect(createStructuredSession).not.toHaveBeenCalled();
+    expect(buildLaunchArgv).not.toHaveBeenCalled();
+    expect(buildResumeArgv).not.toHaveBeenCalled();
+  });
+
+  it("cleans argv-owned resources when pre-launch structured disposal rejects", async () => {
+    const cleanup = vi.fn<() => void>();
+    const disposeError = new Error("structured dispose failed");
+    const dispose = vi.fn<() => Promise<void>>(async () => {
+      throw disposeError;
+    });
+    const adapter = {
+      kind: "claude",
+      capabilities: {
+        presentationMode: "terminal",
+        liveInputMode: "terminal",
+      },
+      createStructuredSession: async () => ({
+        launchOptions: {},
+        setListener: () => {},
+        dispose,
+      }),
+      buildLaunchArgv: () => ({ binary: "claude", args: [], cleanup }),
+      buildResumeArgv: () => ({ binary: "claude", args: [], cleanup }),
+    } as unknown as AgentAdapter;
+    const pipeline = new SpawnPipeline({
+      options: {
+        adapters: new Map([["claude", adapter]]),
+      },
+      sessions: new Map(),
+      pendingStartInterrupts: new Set(),
+      pendingStartAborts: new Set(),
+      closeThread: vi.fn<() => Promise<void>>(async () => {}),
+      resolveAgentSettings: () => ({}),
+      beginMcpLaunchAuthorization: vi.fn<() => void>(),
+      activateMcpLaunchAuthorization: vi.fn<() => void>(),
+      revokeMcpLaunchAuthorization: vi.fn<() => void>(),
+      emitOptimisticUserMessage: vi.fn<() => string>(() => "unused"),
+      cliHookPlugin: {
+        resolveCliHookPluginExtras: vi.fn<
+          () => Promise<{ env: Record<string, string>; extraArgs: string[] }>
+        >(async () => ({ env: {}, extraArgs: [] })),
+      },
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+
+    await expect(
+      pipeline.startThreadInner({
+        threadId: "thread-cleanup",
+        agentKind: "claude",
+        projectLocation: {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/work/project",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\work\\project",
+        },
+        config: { model: "claude-sonnet-4-6" },
+        prompt: "",
+        initialSize: { cols: 120, rows: 30 },
+        presentationMode: "terminal",
+        disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+      }),
+    ).rejects.toBe(disposeError);
+
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 });

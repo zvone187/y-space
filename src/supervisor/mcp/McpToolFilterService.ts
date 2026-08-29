@@ -1,23 +1,32 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { McpServer, ProjectLocation } from "@/shared/contracts";
 import { resolveNodeForDistro } from "../wsl/runtime";
 import { deployFilesToWslTempBase, resolveWslHelpersDir } from "../wsl/wslDeploy";
 
-const CONFIG_ENV = "PORACODE_MCP_FILTER_CONFIG";
+const CONFIG_ENV_PREFIX = "PORACODE_MCP_FILTER_CONFIG_";
 
-function filterConfig(server: McpServer): string {
+function filterConfig(server: McpServer, browserExclusive: boolean): string {
   return Buffer.from(
-    JSON.stringify({ server, disabledTools: server.disabledTools ?? [] }),
+    JSON.stringify({ server, disabledTools: server.disabledTools ?? [], browserExclusive }),
     "utf8",
   ).toString("base64url");
+}
+
+function filterConfigEnvName(encodedConfig: string): string {
+  return `${CONFIG_ENV_PREFIX}${createHash("sha256").update(encodedConfig).digest("hex").slice(0, 24).toUpperCase()}`;
 }
 
 export async function prepareMcpToolFilters(
   servers: readonly McpServer[],
   location: ProjectLocation,
+  browserExclusive = false,
 ): Promise<McpServer[]> {
-  if (!servers.some((server) => (server.disabledTools?.length ?? 0) > 0)) return [...servers];
+  if (servers.length === 0) return [];
+  if (!browserExclusive && !servers.some((server) => (server.disabledTools?.length ?? 0) > 0)) {
+    return [...servers];
+  }
 
   const helpersDir = resolveWslHelpersDir();
   const workerSource = helpersDir ? join(helpersDir, "mcp-filter.mjs") : "";
@@ -41,14 +50,16 @@ export async function prepareMcpToolFilters(
   }
 
   return servers.map((server) => {
-    if ((server.disabledTools?.length ?? 0) === 0) return server;
+    if (!browserExclusive && (server.disabledTools?.length ?? 0) === 0) return server;
+    const encodedConfig = filterConfig(server, browserExclusive);
+    const configEnvName = filterConfigEnvName(encodedConfig);
     return {
       ...server,
       transport: {
         type: "stdio",
         command,
-        args: [workerPath],
-        env: { ...baseEnv, [CONFIG_ENV]: filterConfig(server) },
+        args: [workerPath, configEnvName],
+        env: { ...baseEnv, [configEnvName]: encodedConfig },
         ...(location.kind === "wsl" ? { cwd: location.linuxPath } : { cwd: location.path }),
       },
     };

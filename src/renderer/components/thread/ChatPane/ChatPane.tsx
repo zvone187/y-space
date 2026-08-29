@@ -39,8 +39,8 @@ import {
 } from "./ChatTurnElapsed";
 import {
   selectMostRecentDisplayableCompletedTurn,
-  selectVisibleThreadTimelineEntries,
-  type ChatTimelineEntry,
+  selectCompactThreadTimelineEntries,
+  type ChatDisplayTimelineEntry,
 } from "./chatPaneSelectors";
 import { shouldMarkUserScrollIntentFromPointerTarget } from "./chatScrollGeometry";
 import { normalizeChatProjectPath } from "./chatPathUtils";
@@ -99,7 +99,14 @@ export function ChatPane(props: ChatPaneProps) {
     checkpointProjectLocation,
   } = props;
   const { id: threadId, projectId, status, worktreePath, worktreeBranch } = thread;
+  const isLive = isThreadTurnActive(status);
   const isRemoteThread = thread.remoteServerId !== undefined;
+  const hasBackgroundActivity = useThreadHasBackgroundActivity(threadId);
+  // Native subagents and detached workflows can outlive the provider's
+  // foreground turn. Keep every transcript consumer on the same effective
+  // activity signal so work does not settle, expose final-answer actions, or
+  // become revertible until the background operation actually finishes.
+  const isTranscriptTurnActive = isLive || hasBackgroundActivity;
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollToIndexRef = useRef<ScrollToIndex | null>(null);
   const registerScrollToIndex = (handler: ScrollToIndex | null) => {
@@ -112,12 +119,15 @@ export function ChatPane(props: ChatPaneProps) {
   const [initialScrollSettledThreadId, setInitialScrollSettledThreadId] = useState<string | null>(
     null,
   );
+  const [revealedFindItemId, setRevealedFindItemId] = useState<string | null>(null);
   const isInitialScrollSettled = initialScrollSettledThreadId === threadId;
 
   const scrollControlsRef = useRef<ChatScrollControlsHandle>(null);
   const virtualScrollToBottomRef = useRef<(() => void) | null>(null);
   const timelineEntries = useAppStore(
-    useShallow((s) => selectVisibleThreadTimelineEntries(s, threadId, hiddenRuntimeItemId)),
+    useShallow((s) =>
+      selectCompactThreadTimelineEntries(s, threadId, hiddenRuntimeItemId, isTranscriptTurnActive),
+    ),
   );
   const project = useAppStore((s) => s.projects.find((p) => p.id === projectId));
   const branch = resolveWorktreeBranch(projectId, worktreePath ?? "", worktreeBranch);
@@ -279,7 +289,6 @@ export function ChatPane(props: ChatPaneProps) {
   }, [completedTurns, fileCheckpoints, fileCheckpointTurns, isHomeScope, targetContext, threadId]);
 
   const isEmpty = timelineEntries.length === 0 && !hasSupplementaryContent;
-  const isLive = isThreadTurnActive(status);
   const isWorktreeProvisioning = useAppStore(
     (s) => s.provisioningWorktreeThreadIds[threadId] === true && status === "launching",
   );
@@ -288,8 +297,7 @@ export function ChatPane(props: ChatPaneProps) {
   // foreground turn settles. Treat that as "still working" for the tail-loader
   // timer (so it keeps ticking "Working for ...") without touching `status` -
   // composer interrupt/steer and notifications stay on the raw status.
-  const hasBackgroundActivity = useThreadHasBackgroundActivity(threadId);
-  const showWorkingTimer = isLive || hasBackgroundActivity;
+  const showWorkingTimer = isTranscriptTurnActive;
   const hasOpenRuntimeRequest = useAppStore(
     (s) => (s.runtimeRequestsByThread[threadId]?.length ?? 0) > 0,
   );
@@ -324,7 +332,7 @@ export function ChatPane(props: ChatPaneProps) {
   // request before that round-trip completes, leaving status stuck at
   // `needs_approval` even though the user has already answered.
   const isTurnPaused = hasOpenRuntimeRequest;
-  const showEmptyHint = isEmpty && !isLive && !isConnecting;
+  const showEmptyHint = isEmpty && !isTranscriptTurnActive && !isConnecting;
   // The tail loader displays the most recent completed turn's frozen elapsed
   // time when the thread is idle and no newer timeline row exists. Once an
   // optimistic next prompt is appended, keep the completed indicator inline at
@@ -362,7 +370,7 @@ export function ChatPane(props: ChatPaneProps) {
             threadId={threadId}
             threadConfig={thread.config}
             entries={timelineEntries}
-            isTurnActive={isLive}
+            isTurnActive={isTranscriptTurnActive}
             setScrollContainer={setScrollContainer}
             scrollContentRef={contentRef}
             onContentHeightChange={() => scrollControlsRef.current?.onContentHeightChange()}
@@ -433,13 +441,14 @@ export function ChatPane(props: ChatPaneProps) {
             }}
             registerScrollToIndex={registerScrollToIndex}
             suppressInlineTurnAnchorId={suppressInlineTurnAnchorId}
-            canRevertCheckpoints={!isLive && !isHomeScope}
+            canRevertCheckpoints={!isTranscriptTurnActive && !isHomeScope}
             checkpointGuard={checkpointGuard}
             checkpointActions={checkpointActions}
             projectLocation={
               checkpointProjectLocation ??
               (isHomeScope ? undefined : targetContext?.projectLocation)
             }
+            revealedItemId={revealedFindItemId}
           />
           <ChatScrollControls
             key={`scroll:${threadId}`}
@@ -472,8 +481,11 @@ export function ChatPane(props: ChatPaneProps) {
           />
           <ChatFindBar
             threadId={threadId}
+            hiddenItemId={hiddenRuntimeItemId}
+            isTurnActive={isTranscriptTurnActive}
             scrollToIndexRef={scrollToIndexRef}
             scrollElement={scrollEl}
+            onActiveMatchItemIdChange={setRevealedFindItemId}
           />
         </div>
       </div>
@@ -541,7 +553,7 @@ function collectPathAncestors(path: string): string[] {
 
 function isCompletedTurnAnchorAtTimelineTail(
   anchorItemId: string | null,
-  entries: readonly ChatTimelineEntry[],
+  entries: readonly ChatDisplayTimelineEntry[],
 ): boolean {
   if (anchorItemId === null || entries.length === 0) return true;
   const lastEntry = entries[entries.length - 1]!;

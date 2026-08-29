@@ -25,6 +25,11 @@ const mockProcessTree = vi.hoisted(() => ({
   terminateChildProcessTree: vi.fn<(child: unknown) => void>(),
 }));
 
+const mockBase = vi.hoisted(() => ({
+  readWslLoginShellCommandOutputAsync:
+    vi.fn<typeof import("../base").readWslLoginShellCommandOutputAsync>(),
+}));
+
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: mockSdk.query,
 }));
@@ -38,6 +43,14 @@ vi.mock("node:child_process", async () => {
 });
 
 vi.mock("@/shared/processTree", () => mockProcessTree);
+
+vi.mock("../base", async () => {
+  const actual = await vi.importActual<typeof import("../base")>("../base");
+  return {
+    ...actual,
+    readWslLoginShellCommandOutputAsync: mockBase.readWslLoginShellCommandOutputAsync,
+  };
+});
 
 import {
   claudeCapabilitiesFromCliVersion,
@@ -111,6 +124,7 @@ beforeEach(() => {
   mockChildProcess.spawn.mockReset();
   mockChildProcess.spawn.mockImplementation(() => makeSpawnedProcess());
   mockProcessTree.terminateChildProcessTree.mockReset();
+  mockBase.readWslLoginShellCommandOutputAsync.mockReset();
 });
 
 afterEach(() => {
@@ -300,8 +314,25 @@ describe("Claude SDK probe process handling", () => {
       const params = input as {
         options?: {
           spawnClaudeCodeProcess?: (options: SpawnOptions) => SpawnedProcess;
+          env?: Record<string, string>;
+          settingSources?: string[];
+          strictMcpConfig?: boolean;
+          mcpServers?: Record<string, unknown>;
+          tools?: string[];
+          allowedTools?: string[];
         };
       };
+      expect(params.options).toMatchObject({
+        settingSources: [],
+        strictMcpConfig: true,
+        mcpServers: {},
+        tools: [],
+        allowedTools: [],
+      });
+      expect(params.options?.env).toMatchObject({
+        CLAUDE_CONFIG_DIR: "/private/y-space/claude-probe/config",
+        CLAUDE_SECURESTORAGE_CONFIG_DIR: "",
+      });
       const spawnForProbe = params.options?.spawnClaudeCodeProcess;
       expect(spawnForProbe).toEqual(expect.any(Function));
 
@@ -317,14 +348,25 @@ describe("Claude SDK probe process handling", () => {
       return createProbeQuery();
     });
 
-    const result = await probeClaudeCapabilities({
-      location: { kind: "posix", path: "/tmp" },
-      executablePath: "claude",
-      version: "2.1.154",
-    });
+    const result = await probeClaudeCapabilities(
+      {
+        location: { kind: "posix", path: "/tmp" },
+        executablePath: "claude",
+        version: "2.1.154",
+      },
+      {
+        env: {
+          CLAUDE_CONFIG_DIR: "/private/y-space/claude-probe/config",
+          CLAUDE_SECURESTORAGE_CONFIG_DIR: "",
+        },
+      },
+    );
 
     expect(result?.slashCommands).toEqual([
       { id: "help", label: "help — Show help", description: "Show help" },
+    ]);
+    expect(result?.authMethods).toEqual([
+      { type: "terminal", id: "claude-login", name: "Claude login", args: ["auth", "login"] },
     ]);
     expect(mockChildProcess.spawn).toHaveBeenCalledWith(
       "claude",
@@ -334,6 +376,43 @@ describe("Claude SDK probe process handling", () => {
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       }),
+    );
+  });
+
+  it("forwards the private environment to the isolated WSL SDK worker", async () => {
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    mockBase.readWslLoginShellCommandOutputAsync.mockResolvedValue({
+      ok: true,
+      stdout: JSON.stringify({ slashCommands: [{ id: "help", label: "help" }] }),
+      stderr: "",
+    });
+    const env = {
+      CLAUDE_CONFIG_DIR: "/home/demo/.poracode/cache/claude-probes/default/config",
+      CLAUDE_SECURESTORAGE_CONFIG_DIR: "",
+    };
+
+    const result = await probeClaudeCapabilities(
+      {
+        location: {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/tmp",
+          uncPath: "\\\\wsl$\\Ubuntu",
+        },
+        executablePath: "/home/demo/.local/bin/claude",
+        version: "2.1.219",
+      },
+      { env },
+    );
+
+    expect(result?.slashCommands).toEqual([{ id: "help", label: "help" }]);
+    expect(mockSdk.query).not.toHaveBeenCalled();
+    expect(mockBase.readWslLoginShellCommandOutputAsync).toHaveBeenCalledWith(
+      "Ubuntu",
+      "/tmp",
+      "node",
+      expect.arrayContaining(["/home/demo/.local/bin/claude"]),
+      expect.objectContaining({ env }),
     );
   });
 

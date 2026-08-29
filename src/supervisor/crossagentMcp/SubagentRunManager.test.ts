@@ -1,5 +1,5 @@
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   AgentCapability,
   ProjectLocation,
@@ -91,6 +91,8 @@ function makeHarness(options?: {
   deferCreate?: boolean;
   interruptError?: string;
   baseSpawnEnv?: Record<string, string>;
+  browserExclusive?: boolean;
+  parentBrowserMcp?: boolean;
 }): Harness {
   const handles: FakeHandle[] = [];
   const inputs: CreateStructuredSessionInput[] = [];
@@ -106,6 +108,9 @@ function makeHarness(options?: {
   const adapter = {
     kind: "codex",
     label: options?.providerLabel ?? "Codex",
+    ...(options?.browserExclusive === false
+      ? {}
+      : { browserRouting: { terminal: "exclusive", gui: "exclusive" } }),
     ...(options?.baseSpawnEnv ? { baseSpawnEnv: options.baseSpawnEnv } : {}),
     capabilities: {
       models: options?.models ?? [{ id: "gpt-5.5", label: "GPT-5.5" }],
@@ -147,7 +152,7 @@ function makeHarness(options?: {
               model: "parent-model",
               approvalPolicy: "never",
               sandboxMode: "workspace-write",
-              browserMcp: true,
+              browserMcp: options?.parentBrowserMcp ?? true,
               crossagentMcp: true,
               computerUse: true,
             },
@@ -837,6 +842,28 @@ describe("SubagentRunManager", () => {
     );
   });
 
+  it("rejects a Browser-enabled structured child before MCP or session creation", () => {
+    const h = makeHarness({ browserExclusive: false });
+
+    expect(() => h.manager.spawn(PARENT, { agent: "codex", prompt: "go" })).toThrow(
+      /does not provide an exclusive embedded Browser connection/iu,
+    );
+    expect(h.mcpTargets).toEqual([]);
+    expect(h.inputs).toEqual([]);
+    expect(h.appended).toEqual([]);
+  });
+
+  it("permits a non-exclusive structured child when Browser is globally disabled", async () => {
+    const h = makeHarness({ browserExclusive: false, parentBrowserMcp: false });
+
+    h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+
+    expect(h.mcpTargets).toEqual(["codex"]);
+    expect(h.inputs).toHaveLength(1);
+    expect(h.inputs[0]!.config.browserMcp).not.toBe(true);
+  });
+
   it("rejects selections that are not advertised by the structured composer surface", () => {
     const h = makeHarness();
     expect(() =>
@@ -940,6 +967,45 @@ describe("SubagentRunManager", () => {
           e.type === "item.completed" && e.itemId === `sub:${runId}`,
       );
     expect(tileDone?.payload).toMatchObject({ status: "success", result: "done work" });
+  });
+
+  it("rejects a Browser-enabled one-shot child before building or spawning its command", () => {
+    const buildSubagentOneShotCommand = vi.fn<
+      NonNullable<AgentAdapter["buildSubagentOneShotCommand"]>
+    >(() => ({
+      command: process.execPath,
+      args: ["-e", "process.exit(99)"],
+      stdin: "",
+    }));
+    const adapter = {
+      kind: "commandcode",
+      label: "Command Code",
+      capabilities: {
+        models: [{ id: "cc-1", label: "CC One" }],
+        efforts: [],
+        approvalPolicies: [],
+        sandboxModes: [],
+        bypassPermissions: { approvalPolicy: "yolo" },
+      },
+      buildSubagentOneShotCommand,
+    } as unknown as AgentAdapter;
+    const appended: Array<{ threadId: string; event: RuntimeEvent }> = [];
+    const manager = new SubagentRunManager({
+      adapters: new Map([["commandcode" as never, adapter]]),
+      host: {
+        getParentContext: () => ({
+          projectLocation: PROJECT,
+          config: { model: "parent", browserMcp: true },
+        }),
+        appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
+      },
+    });
+
+    expect(() => manager.spawn(PARENT, { agent: "commandcode", prompt: "go" })).toThrow(
+      /does not provide an exclusive embedded Browser connection/iu,
+    );
+    expect(buildSubagentOneShotCommand).not.toHaveBeenCalled();
+    expect(appended).toEqual([]);
   });
 
   it("throws for unknown agents and missing prompts", () => {

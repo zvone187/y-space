@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { McpServer } from "@/shared/contracts";
 import {
   buildAcpMcpServers,
+  buildClaudeMcpLaunchConfig,
   buildClaudeMcpServers,
   buildCodexMcp,
   buildCursorSdkMcpServers,
@@ -112,6 +113,13 @@ describe("custom MCP translators", () => {
     expect(localName).toMatch(/^local_tools_[a-f0-9]{8}$/u);
     expect(built.args).toContain(`mcp_servers.${localName}.command="node"`);
     expect(built.args).toContain(`mcp_servers.${localName}.tool_timeout_sec=45`);
+    expect(built.args).toContain(`mcp_servers.${localName}.env_vars=["MODE"]`);
+    expect(built.config).toMatchObject({
+      [`mcp_servers.${localName}`]: { env_vars: ["MODE"] },
+    });
+    expect(built.env.MODE).toBe("test");
+    expect(JSON.stringify(built.args)).not.toContain('"MODE" = "test"');
+    expect(JSON.stringify(built.config)).not.toContain('"MODE":"test"');
     expect(built.args).toContain('mcp_servers.remote.url="https://example.test/mcp"');
     expect(built.args).not.toContain("experimental_use_rmcp_client=true");
     expect(built.config).not.toHaveProperty("experimental_use_rmcp_client");
@@ -123,6 +131,64 @@ describe("custom MCP translators", () => {
     expect(built.env).toMatchObject({ [envName]: "secret" });
     expect(Object.values(built.env)).toContain("yes");
     expect(built.args.some((arg) => arg.includes("env_http_headers"))).toBe(true);
+  });
+
+  it("keeps the managed Browser required and directly visible to Codex models", () => {
+    const built = buildCodexMcp([
+      {
+        id: "browser",
+        name: "browser",
+        timeoutMs: 30_000,
+        transport: {
+          type: "http",
+          url: "http://127.0.0.1:4321/mcp",
+          headers: { Authorization: "Bearer scoped-browser-token" },
+        },
+      },
+      {
+        id: "optional-tools",
+        name: "optional-tools",
+        timeoutMs: 30_000,
+        transport: { type: "http", url: "https://example.test/mcp", headers: {} },
+      },
+    ]);
+
+    expect(built.args).toContain("mcp_servers.browser.required=true");
+    expect(built.args).toContain('mcp_servers.browser.omit_tools_from=["deferred"]');
+    expect(built.config).toMatchObject({
+      "mcp_servers.browser": {
+        required: true,
+        omit_tools_from: ["deferred"],
+      },
+    });
+    expect(built.args).not.toContain("mcp_servers.optional-tools.required=true");
+    expect(built.args).not.toContain('mcp_servers.optional-tools.omit_tools_from=["deferred"]');
+  });
+
+  it("fails closed when two Codex stdio servers require different values for one env name", () => {
+    const first = servers[0]!;
+    const second: McpServer = {
+      ...first,
+      id: "second-stdio-id",
+      name: "second-local",
+      transport: {
+        type: "stdio",
+        command: "node",
+        args: ["server.js"],
+        env: { MODE: "production" },
+        cwd: "/repo",
+      },
+    };
+
+    let message = "";
+    try {
+      buildCodexMcp([first, second]);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/different values for environment variable MODE/iu);
+    expect(message).not.toContain("test");
+    expect(message).not.toContain("production");
   });
 
   it("keeps normalized Codex MCP names distinct", () => {
@@ -189,8 +255,26 @@ describe("custom MCP translators", () => {
   });
 
   it("keeps OpenCode launch credentials out of the inline config", () => {
-    const launch = buildOpenCodeMcpLaunchConfig(servers);
+    const launch = buildOpenCodeMcpLaunchConfig(
+      [
+        ...servers,
+        {
+          id: "browser",
+          name: "browser",
+          description: "",
+          enabled: true,
+          timeoutMs: 30_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:4321/mcp",
+            headers: {},
+          },
+        },
+      ],
+      ["e2e"],
+    );
     const config = JSON.parse(launch.configContent) as {
+      permission?: { bash?: Record<string, string> };
       mcp: Record<
         string,
         { environment?: Record<string, string>; headers?: Record<string, string> }
@@ -201,6 +285,30 @@ describe("custom MCP translators", () => {
     expect(launch.configContent).not.toContain('"MODE":"test"');
     expect(config.mcp["local.tools"]?.environment?.MODE).toMatch(/^\{env:PORACODE_MCP_/u);
     expect(config.mcp.remote?.headers?.Authorization).toMatch(/^\{env:PORACODE_MCP_/u);
+    expect(config.mcp.e2e).toEqual({ enabled: false });
+    expect(config.permission?.bash).toMatchObject({
+      "*playwright*": "deny",
+      "*open -a*Safari*": "deny",
+    });
+    expect(Object.values(launch.env)).toEqual(
+      expect.arrayContaining(["test", "Bearer secret", "yes"]),
+    );
+  });
+
+  it("keeps Claude launch credentials out of the MCP config passed to the CLI", () => {
+    const launch = buildClaudeMcpLaunchConfig(servers);
+    const serialized = JSON.stringify({ mcpServers: launch.mcpServers });
+
+    expect(serialized).not.toContain("Bearer secret");
+    expect(serialized).not.toContain('"MODE":"test"');
+    expect(launch.mcpServers["local.tools"]).toMatchObject({
+      env: { MODE: expect.stringMatching(/^\$\{PORACODE_MCP_CLAUDE_/u) },
+    });
+    expect(launch.mcpServers.remote).toMatchObject({
+      headers: {
+        Authorization: expect.stringMatching(/^\$\{PORACODE_MCP_CLAUDE_/u),
+      },
+    });
     expect(Object.values(launch.env)).toEqual(
       expect.arrayContaining(["test", "Bearer secret", "yes"]),
     );

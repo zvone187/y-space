@@ -194,6 +194,7 @@ export const claudeDetectionSpec: DetectionSpec = {
     brew: "claude",
     winget: "Anthropic.ClaudeCode",
   },
-  statusProbe: probeClaudeStatus,
-  capabilitiesProbe: (ctx) => probeClaudeCapabilities(ctx),
+  statusProbe: (ctx) => probeClaudeStatus(ctx, ctx.probeEnv ? { env: ctx.probeEnv } : undefined),
+  capabilitiesProbe: (ctx) =>
+    probeClaudeCapabilities(ctx, ctx.probeEnv ? { env: ctx.probeEnv } : undefined),
 };

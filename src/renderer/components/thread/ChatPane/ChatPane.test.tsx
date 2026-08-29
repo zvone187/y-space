@@ -993,6 +993,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     const trigger = screen.getByText("Check · npm run test").closest("button");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
@@ -1011,6 +1012,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     fireEvent.click(screen.getByText("Git · git status --short").closest("button")!);
 
@@ -1030,6 +1032,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     expect(await screen.findByText("Opus")).toBeInTheDocument();
     expect(screen.getByText("336K tok")).toBeInTheDocument();
@@ -1061,6 +1064,7 @@ describe("ChatPane", () => {
 
     const view = renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     expect(
       view.container.querySelectorAll('[data-poracode-shimmer-text="Agent · protocol specialist"]'),
@@ -1097,6 +1101,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     const resultToggle = await screen.findByRole("button", { name: "Subagent Result" });
     expect(document.body).toHaveTextContent("Agent · protocol specialist·GPT 5.6 Sol");
@@ -1137,6 +1142,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     expect(await screen.findByRole("button", { name: "Crossagent Result" })).toBeInTheDocument();
     expect(document.body).toHaveTextContent("Crossagent · protocol specialist");
@@ -1171,6 +1177,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     const row = await screen.findByRole("button", {
       name: "Open Crossagent: Crossagent: cancel probe",
@@ -1211,6 +1218,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     const row = await screen.findByRole("button", { name: /Open subagent:/ });
     expect(row).toHaveTextContent(terminal.label);
@@ -1234,6 +1242,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     expect((await screen.findByText("5 steps")).parentElement).toHaveTextContent("·5 steps");
   });
@@ -1594,6 +1603,7 @@ describe("ChatPane", () => {
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+    expandFirstTurnActivity();
 
     const trigger = screen.getByText("Check · npm run test").closest("button");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
@@ -1612,7 +1622,7 @@ describe("ChatPane", () => {
     expect(screen.queryByText(/streamed output/)).not.toBeInTheDocument();
   });
 
-  it("expands the live tool-call group at the timeline tail and collapses it on click", async () => {
+  it("keeps live turn work and its nested tool group closed until requested", async () => {
     const thread = makeThread();
     seedCommandItem(thread.id, "cmd-1", "echo one", "one");
     seedCommandItem(thread.id, "cmd-2", "echo two", "two");
@@ -1620,12 +1630,13 @@ describe("ChatPane", () => {
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    const trigger = screen.getByText(byTextContent("2 commands")).closest("button");
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    const activityTrigger = getTurnActivityTrigger();
+    expect(activityTrigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(activityTrigger);
+    expect(activityTrigger).toHaveAttribute("aria-expanded", "true");
 
-    fireEvent.click(trigger!);
-
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const toolTrigger = screen.getByText(byTextContent("2 commands")).closest("button");
+    expect(toolTrigger).toHaveAttribute("aria-expanded", "false");
   });
 
   it("keeps following virtual rows aligned through repeated tool-group toggles", async () => {
@@ -1638,7 +1649,7 @@ describe("ChatPane", () => {
     const { container } = renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    const trigger = screen.getByText(byTextContent("2 commands")).closest("button");
+    const trigger = getTurnActivityTrigger();
     const groupRow = trigger?.closest<HTMLElement>("[data-chat-virtual-row='true']");
     const assistantRow = container.querySelector<HTMLElement>(
       "[data-chat-virtual-row='true'][data-item-id='assistant-after-group']",
@@ -1673,7 +1684,7 @@ describe("ChatPane", () => {
     }
   });
 
-  it("collapses the tool-call group automatically once a non-group item arrives after it", async () => {
+  it("keeps manually expanded live work open when an assistant candidate arrives", async () => {
     const thread = makeThread();
     seedCommandItem(thread.id, "cmd-1", "echo one", "one");
     seedCommandItem(thread.id, "cmd-2", "echo two", "two");
@@ -1681,7 +1692,9 @@ describe("ChatPane", () => {
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    const trigger = screen.getByText(byTextContent("2 commands")).closest("button");
+    const trigger = getTurnActivityTrigger();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     act(() => {
@@ -1700,7 +1713,7 @@ describe("ChatPane", () => {
       });
     });
 
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 
   it("uses the persisted live turn start when reopening a working thread", () => {
@@ -1783,6 +1796,59 @@ describe("ChatPane", () => {
 
     expect(screen.getByText("Working for 2m 00s")).toBeInTheDocument();
     expect(screen.queryByText("Worked for 1m 15s")).not.toBeInTheDocument();
+  });
+
+  it("keeps the compact transcript active until background agent work actually finishes", async () => {
+    const thread = { ...makeThread(), status: "idle" as const };
+    seedUserMessage(thread.id, "Audit the browser flow");
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "agent-background",
+      itemType: "tool_call",
+      payload: {
+        name: "Agent",
+        status: "running",
+        isSubAgent: true,
+        args: { description: "browser audit" },
+      },
+    });
+    seedAssistantMessage(thread.id, "The browser audit is still running.");
+    completeAssistantMessage(thread.id);
+
+    renderChatPane(thread);
+
+    const trigger = getTurnActivityTrigger();
+    const finalResponse = screen
+      .getByText("The browser audit is still running.")
+      .closest(".surface");
+    if (!(finalResponse instanceof HTMLElement)) throw new Error("missing final response surface");
+    expect(trigger).toHaveTextContent("Working…");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(finalResponse.querySelector('button[aria-label="Copy message"]')).toBeNull();
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+
+    act(() => {
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "item.completed",
+        threadId: thread.id,
+        itemId: "agent-background",
+        payload: {
+          name: "Agent",
+          status: "success",
+          isSubAgent: true,
+          args: { description: "browser audit" },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(trigger).toHaveTextContent("Worked · 1 step");
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+    });
+    expect(finalResponse.querySelector('button[aria-label="Copy message"]')).not.toBeNull();
   });
 
   it("suppresses the anchored completed turn while background work keeps the timer live", () => {
@@ -2172,6 +2238,20 @@ function renderChatPane(thread: Thread, props: Partial<Parameters<typeof ChatPan
       <ChatPane {...chatPaneProps(thread)} {...props} />
     </AppProvider>,
   );
+}
+
+function getTurnActivityTrigger(index = 0): HTMLElement {
+  const trigger = screen.getAllByRole("button", {
+    name: /^(?:Working…|Worked · \d+ steps?)$/,
+  })[index];
+  if (!trigger) throw new Error("missing turn activity disclosure");
+  return trigger;
+}
+
+function expandFirstTurnActivity(): HTMLElement {
+  const trigger = getTurnActivityTrigger();
+  if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger);
+  return trigger;
 }
 
 function chatPaneProps(thread: Thread): Parameters<typeof ChatPane>[0] {

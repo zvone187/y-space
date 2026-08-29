@@ -125,6 +125,11 @@ msgstr "{0, plural, one {# tool} other {# tools}}"
 msgid "{0, plural, one {# use} other {# uses}}"
 msgstr "{0, plural, one {# use} other {# uses}}"
 
+#. placeholder {0}: state.actionCount
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "{0, plural, one {Browser verified · # action} other {Browser verified · # actions}}"
+msgstr "{0, plural, one {Browser verified · # action} other {Browser verified · # actions}}"
+
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "{0, plural, one {Candidate (#)} other {Candidates (#)}}"
@@ -400,6 +405,10 @@ msgstr "{0}/{1} selected"
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0}mo ago"
 msgstr "{0}mo ago"
+
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
+msgid "{activityCount, plural, one {Worked · # step} other {Worked · # steps}}"
+msgstr "{activityCount, plural, one {Worked · # step} other {Worked · # steps}}"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{agent} reported authentication success, but Y Space could not verify it. Configure {agent} directly, then try again."
@@ -942,8 +951,12 @@ msgid "Add a project to use GitHub Actions."
 msgstr "Add a project to use GitHub Actions."
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
-msgstr "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
+msgid "Add a skill from your workspace or import one from another provider."
+msgstr "Add a skill from your workspace or import one from another provider."
+
+#: src/renderer/components/skills/SkillsManager.tsx
+#~ msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
+#~ msgstr "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
@@ -1209,8 +1222,8 @@ msgstr "Agents classify delegated work with task tags. Manual task routes rank f
 #~ msgstr "AI"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
-msgstr "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
+#~ msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
+#~ msgstr "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
 
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
@@ -1967,7 +1980,6 @@ msgstr "Browse, inspect, and test websites in Y Space's isolated in-app browser.
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Browser"
 msgstr "Browser"
@@ -1995,6 +2007,10 @@ msgstr "Browser MCP enabled for this thread"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Browser menu"
 msgstr "Browser menu"
+
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "Browser not verified"
+msgstr "Browser not verified"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13875,8 +13891,12 @@ msgstr "Use letters, numbers, dots, dashes, or underscores without spaces."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
-msgstr "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
+msgid "Use one global folder, or keep each project's worktrees with that project."
+msgstr "Use one global folder, or keep each project's worktrees with that project."
+
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#~ msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
+#~ msgstr "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
@@ -14390,6 +14410,7 @@ msgid "Working tree clean"
 msgstr "Working tree clean"
 
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
 msgid "Working…"
 msgstr "Working…"
 
@@ -14583,8 +14604,12 @@ msgstr "Y Space will restart, back up its current data, and replace it with a co
 #~ msgstr "Y Space will restart, back up its current data, and replace it with a complete copy of your Y Space data."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Y Space's built-in browser tools."
-msgstr "Y Space's built-in browser tools."
+#~ msgid "Y Space's built-in browser tools."
+#~ msgstr "Y Space's built-in browser tools."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Your focused workspace for agents, files, and the web."
+msgstr "Your focused workspace for agents, files, and the web."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

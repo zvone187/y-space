@@ -737,6 +737,13 @@ export interface AgentAdapter
     Partial<AgentAcpAuth>,
     Partial<AgentCliHookPluginSupport>,
     Partial<AgentNativePluginSupport> {
+  /**
+   * Presentation lanes that route all browser work through the app-owned
+   * embedded Browser MCP and suppress competing provider/browser routes.
+   * Browser-enabled launches fail closed unless their lane is explicitly
+   * declared `exclusive`; absence is intentionally unsupported.
+   */
+  readonly browserRouting?: Partial<Record<ThreadPresentationMode, "exclusive">>;
   readonly skillSupport?: AgentSkillSupport;
 }
 

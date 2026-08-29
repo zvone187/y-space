@@ -3,19 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space Minimal Branding — Readiness Report</title>
+    <title>Y Space — Embedded Browser &amp; Compact Turns Readiness</title>
     <style>
       :root {
         --canvas: #f6f2e8;
-        --ink: #172026;
-        --muted: #65727a;
-        --border: #2c3338;
         --paper: #ffffff;
-        --blue: #d9ecff;
+        --ink: #172026;
+        --muted: #66737b;
+        --line: #2d353a;
+        --orange: #ffdfc9;
         --green: #dff5df;
+        --blue: #d9ecff;
         --yellow: #fff1b8;
         --pink: #ffe2eb;
-        --orange: #ffdfc9;
         --shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
         font-family:
           Inter,
@@ -31,23 +31,22 @@
       }
       body {
         margin: 0;
+        color: var(--ink);
+        line-height: 1.45;
         background:
           linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
           linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px), var(--canvas);
         background-size: 28px 28px;
-        color: var(--ink);
-        line-height: 1.45;
       }
       main {
         width: min(1240px, 100%);
         margin: 0 auto;
-        padding: 30px 22px 52px;
+        padding: 30px 22px 56px;
       }
       header {
         display: grid;
-        grid-template-columns: 1.4fr 0.8fr;
+        grid-template-columns: 1.45fr 0.75fr;
         gap: 18px;
-        margin-bottom: 22px;
       }
       h1,
       h2,
@@ -56,47 +55,64 @@
         margin: 0;
       }
       h1 {
-        font-size: clamp(2rem, 5vw, 4.4rem);
+        font-size: clamp(2.1rem, 5vw, 4.5rem);
         line-height: 0.96;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.045em;
       }
       h2 {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         text-transform: uppercase;
+        letter-spacing: 0.04em;
       }
-      a {
-        color: #0f5f85;
-        font-weight: 750;
-        text-decoration: none;
+      h3 {
+        font-size: 1.05rem;
+        margin-bottom: 8px;
       }
       code {
-        border: 1px solid rgba(47, 58, 66, 0.24);
+        border: 1px solid rgba(47, 58, 66, 0.23);
         border-radius: 6px;
-        background: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.75);
         padding: 2px 5px;
       }
       .hero,
       .card,
-      details,
-      .sticky {
-        border: 2px solid var(--border);
+      .note,
+      details {
+        border: 2px solid var(--line);
+        background: var(--paper);
         box-shadow: var(--shadow);
       }
       .hero,
       .card,
       details {
         border-radius: 16px;
-        background: var(--paper);
       }
       .hero {
         padding: 26px;
       }
       .hero p {
-        max-width: 760px;
-        margin-top: 12px;
+        max-width: 780px;
+        margin-top: 13px;
         color: var(--muted);
       }
-      .meta-stack,
+      .tag,
+      .status {
+        display: inline-flex;
+        border: 2px solid var(--line);
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 0.77rem;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+      .tag {
+        margin-bottom: 12px;
+        background: var(--orange);
+      }
+      .status {
+        background: var(--green);
+      }
+      .stack,
       .grid {
         display: grid;
         gap: 14px;
@@ -113,35 +129,18 @@
       .card small {
         display: block;
         color: var(--muted);
-        font-size: 0.78rem;
+        font-size: 0.76rem;
         font-weight: 850;
         text-transform: uppercase;
       }
       .card strong {
         display: block;
-        margin-top: 4px;
-        font-size: 1.22rem;
+        margin-top: 5px;
+        font-size: 1.18rem;
         line-height: 1.15;
       }
-      .tag,
-      .pill {
-        display: inline-flex;
-        border: 2px solid var(--border);
-        border-radius: 999px;
-        padding: 5px 9px;
-        font-size: 0.78rem;
-        font-weight: 900;
-        text-transform: uppercase;
-      }
-      .tag {
-        margin-bottom: 12px;
-        background: var(--orange);
-      }
-      .pill {
-        margin: 0 6px 6px 0;
-      }
-      .board-section {
-        margin-top: 24px;
+      section {
+        margin-top: 25px;
       }
       .section-title {
         display: flex;
@@ -152,47 +151,68 @@
       .pin {
         width: 16px;
         height: 16px;
-        border: 2px solid var(--border);
+        border: 2px solid var(--line);
         border-radius: 50%;
         background: #ff5a1f;
       }
-      .sticky {
-        min-height: 128px;
+      .note {
+        min-height: 130px;
         border-radius: 3px;
         padding: 16px;
-        transform: rotate(-0.4deg);
+        transform: rotate(-0.35deg);
       }
-      .sticky:nth-child(even) {
-        transform: rotate(0.4deg);
+      .note:nth-child(even) {
+        transform: rotate(0.35deg);
       }
-      .sticky h3 {
-        margin-bottom: 8px;
-        font-size: 1.08rem;
-      }
-      .sticky p,
-      .sticky li {
-        color: #334148;
+      .note p,
+      .note li {
+        color: #344149;
         font-size: 0.93rem;
       }
-      .sticky ul,
-      .sticky ol {
+      .note ul,
+      .note ol {
         margin: 8px 0 0;
-        padding-left: 18px;
+        padding-left: 19px;
       }
-      .bg-blue {
-        background: var(--blue);
+      .orange {
+        background: var(--orange);
       }
-      .bg-green {
+      .green {
         background: var(--green);
       }
-      .bg-yellow {
+      .blue {
+        background: var(--blue);
+      }
+      .yellow {
         background: var(--yellow);
       }
-      .bg-pink {
+      .pink {
         background: var(--pink);
       }
-      .bg-orange {
-        background: var(--orange);
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 2px solid var(--line);
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+      th,
+      td {
+        padding: 11px 12px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--yellow);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+      }
+      td {
+        font-size: 0.9rem;
+      }
+      details {
+        margin-bottom: 12px;
       }
       summary {
         cursor: pointer;
@@ -206,21 +226,20 @@
       summary::before {
         content: "+";
         display: inline-block;
-        width: 14px;
-        margin-right: 10px;
-        font-weight: 900;
+        width: 16px;
+        margin-right: 8px;
       }
       details[open] summary::before {
         content: "−";
       }
-      .detail-body {
-        border-top: 2px solid var(--border);
+      .detail {
+        border-top: 2px solid var(--line);
         padding: 14px 16px 16px;
-        color: #334148;
+        color: #344149;
       }
-      .detail-body ul {
-        margin: 8px 0 0;
-        padding-left: 18px;
+      .detail ul {
+        margin: 7px 0 0;
+        padding-left: 20px;
       }
       @media (max-width: 900px) {
         header,
@@ -234,331 +253,283 @@
   <body>
     <main>
       <header>
-        <section class="hero" aria-labelledby="title">
-          <span class="tag">Pre-implementation readiness</span>
-          <h1 id="title">Y Space, minimal by design</h1>
+        <div class="hero">
+          <span class="tag">Pre-implementation report</span>
+          <h1>Embedded browser by default. Quiet turns by default.</h1>
           <p>
-            Ready for implementation: yes. The green browser/integrations build is isolated in a
-            fresh worktree, the visual contract is explicit, and six targeted test files now fail
-            only on the old dark/indigo/count-heavy presentation.
+            The exact failing OpenCode task had Y Space Browser connected but selected a discovered
+            gstack browser and separate headless Chromium. The visible embedded page never changed.
+            This implementation will make Y Space Browser the sole launch-scoped browser route and
+            present every turn as one closed work row plus the final answer.
           </p>
-        </section>
-        <aside class="meta-stack" aria-label="Report metadata">
-          <div class="card bg-green">
-            <small>Status</small><strong>Ready for implementation: yes</strong>
+        </div>
+        <div class="stack">
+          <div class="card green"><small>Readiness</small><strong>Ready to implement</strong></div>
+          <div class="card blue">
+            <small>Branch</small><strong>y-space-browser-default-collapse</strong>
           </div>
-          <div class="card bg-blue">
-            <small>Worktree</small><strong>y-space-minimal-branding</strong>
-          </div>
-          <div class="card bg-orange">
-            <small>Branch</small><strong>y-space-minimal-branding</strong>
-          </div>
-          <div class="card bg-yellow"><small>Date</small><strong>2026-08-28</strong></div>
-        </aside>
+          <div class="card yellow"><small>Base</small><strong>5cff3e06</strong></div>
+        </div>
       </header>
 
-      <section class="board-section">
+      <section>
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Fast Answer</h2>
+          <h2>Readiness gates</h2>
         </div>
         <div class="grid three">
-          <div class="sticky bg-pink">
-            <h3>Current state</h3>
+          <article class="note green">
+            <h3>Environment clean</h3>
             <p>
-              The shipped UI is dark-first with indigo accents, two-line task rows, visible Git line
-              counts, sync counts, usage rings, and two stacked right-panel chrome rows.
+              A new matching worktree and branch were created from
+              <code>fork/y-space-minimal-branding</code>. Dependencies and Husky are installed. The
+              ignored <code>.env.pipedream</code> remains mode 0600 and its values were never
+              printed.
             </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Selected direction</h3>
+          </article>
+          <article class="note blue">
+            <h3>Baseline green</h3>
             <p>
-              White canvas, warm gray hierarchy, accessible dark orange, one-line task rows, one
-              global strip, one calm composer, and technical detail only on demand.
+              Serialized Node 24.13.0 baseline: 887 passed files, 5 skipped files, 9,926 passed
+              tests, and 85 skipped tests. Native server preparation also passed.
             </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>Main risk</h3>
+          </article>
+          <article class="note yellow">
+            <h3>Fail-first captured</h3>
             <p>
-              Minimalism must not hide capability. Every demoted action stays reachable by
-              hover/focus, tooltip, context/overflow menu, or dedicated global tab.
+              Eleven focused files fail for the missing behavior: 17 failed, 241 passed, 1 skipped.
+              The failures cover provider isolation, chronology, compact projection, whole-turn
+              disclosure, and live group collapse.
             </p>
-          </div>
+          </article>
         </div>
       </section>
 
-      <section class="board-section">
+      <section>
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Environment Ready</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-green">
-            <h3>Git isolation</h3>
-            <ul>
-              <li>Base fetched from <code>fork/y-space-browser-integrations</code>.</li>
-              <li>Remote and source both at <code>f56ff21d</code>.</li>
-              <li>No existing branch was switched.</li>
-            </ul>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>Setup</h3>
-            <ul>
-              <li>Ignored mode-600 <code>.env.pipedream</code> copied without exposing values.</li>
-              <li><code>pnpm install --frozen-lockfile</code> passed.</li>
-              <li>
-                Husky <code>prepare</code> completed; pre-commit remains lint-staged + typecheck.
-              </li>
-            </ul>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Healthy baseline</h3>
-            <ul>
-              <li>Cold worktree race was resolved by one serial native preparation.</li>
-              <li>879 test files passed / 5 skipped.</li>
-              <li>9,896 tests passed / 85 skipped.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Pass Criteria</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-orange">
-            <h3>Visual foundation</h3>
-            <p>
-              Fresh launch is white without a black flash. Default anchors are <code>#FFF</code>,
-              <code>#FBFBFA</code>, <code>#181816</code>, <code>#EEEDE9</code>, and accessible
-              <code>#FF5A1F</code>.
-            </p>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>Quiet chrome</h3>
-            <p>
-              No visible <code>+N/-N</code>, sync count, PR number, branch/path, usage ring, or
-              always-visible tool rail in idle task/composer chrome.
-            </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Capability preserved</h3>
-            <p>
-              Exactly one global tablist; every browser page, tool, and document remains a peer.
-              Agent/browser ownership, LRU limits, and all existing workflows stay unchanged.
-            </p>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>Conversation</h3>
-            <p>
-              One quiet title/status header and one white composer. Orange highlights Send/Stop and
-              focus; attachments, submit, stop, review, docks, and narrow layouts still work.
-            </p>
-          </div>
-          <div class="sticky bg-orange">
-            <h3>Entire brand</h3>
-            <p>
-              Owned stable SVGs, wordmark, public icon, manifest, icon generators, native/PWA
-              outputs, and brand guide use white/dark/orange with no stable <code>#8B7BFF</code>.
-            </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>Final gate</h3>
-            <p>
-              Targeted/full tests, typecheck, lint, format, i18n, builds, codesign, 1440×900 and
-              1024×768 clicking, and proportional browser lifecycle sampling all pass.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Failing Tests First</h2>
+          <h2>Observed defect and invariant</h2>
         </div>
         <div class="grid two">
-          <div class="sticky bg-pink">
-            <h3>Expected red state captured</h3>
+          <article class="note pink">
+            <h3>Live proof</h3>
             <ul>
-              <li>Six targeted files: 13 failed, 23 passed.</li>
+              <li>OpenCode loaded <code>/browse</code> from the discovered gstack skills.</li>
               <li>
-                Every failure identifies old presentation: dark default, cool/indigo tokens, dark
-                first paint, legacy brand assets, visible Git/sync/PR counts, two-line task rows,
-                boxed tabs, and missing in-strip actions.
+                It ran a separate headless Chromium and saved screenshots under <code>/tmp</code>.
               </li>
+              <li>No Y Space Browser MCP event appeared, although the MCP was connected.</li>
               <li>
-                Sync in-flight regression remains independently green after isolating its expected
-                visual failure.
+                The visible Y Space page stayed on Claude Login while the transcript claimed browser
+                testing.
               </li>
             </ul>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Tests created or reversed</h3>
+          </article>
+          <article class="note orange">
+            <h3>New invariant</h3>
             <ul>
-              <li><code>minimalBrandContract.test.ts</code></li>
-              <li><code>GitBadge.test.tsx</code></li>
-              <li><code>SyncBadge.test.tsx</code></li>
-              <li><code>ThreadChangesBubble.test.tsx</code></li>
-              <li><code>SortableThreadItem.test.tsx</code></li>
-              <li><code>RightWorkspaceTabStrip.test.tsx</code></li>
+              <li>
+                Y Space Browser is forced on unless the global Browser hard-disable is active.
+              </li>
+              <li>
+                When present, it is the sole model-visible route for browser navigation,
+                interaction, inspection, and screenshots.
+              </li>
+              <li>Policy overlays are per launch and never mutate normal provider profiles.</li>
+              <li>Unrelated MCPs, explicit Y Space skills, and Pipedream remain intact.</li>
             </ul>
-          </div>
+          </article>
         </div>
       </section>
 
-      <section class="board-section">
+      <section>
         <div class="section-title">
           <span class="pin"></span>
-          <h2>End-To-End Verification Plan</h2>
+          <h2>Implementation boundaries</h2>
         </div>
-        <div class="grid two">
-          <div class="sticky bg-orange">
-            <h3>YS-BRAND-E2E-001 · Pending</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Boundary</th>
+              <th>Required change</th>
+              <th>Fail-first proof</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Shared spawn pipeline</td>
+              <td>
+                Force Browser on, honor only the global hard-disable, classify and remove competing
+                browser MCP descriptors.
+              </td>
+              <td>3 failures</td>
+            </tr>
+            <tr>
+              <td>OpenCode CLI + SDK</td>
+              <td>
+                Disable native web tools and provider Skill discovery, deny external browser tool
+                namespaces after wildcard allow rules, and keep Y Space Browser.
+              </td>
+              <td>3 failures</td>
+            </tr>
+            <tr>
+              <td>Claude CLI + SDK</td>
+              <td>
+                Use strict MCP, no Chrome, no slash commands/provider skills, WebFetch/WebSearch
+                denial, and sole-browser guidance.
+              </td>
+              <td>2 failures</td>
+            </tr>
+            <tr>
+              <td>Codex TUI + app-server</td>
+              <td>
+                Disable native/in-app/external browser features, live web search, browser-backed
+                MCPs, and browser skills while preserving unrelated skills.
+              </td>
+              <td>2 failures</td>
+            </tr>
+            <tr>
+              <td>OpenCode mapping</td>
+              <td>
+                Map text part A → tool → text part B to separate canonical assistant items in
+                provider chronology.
+              </td>
+              <td>1 failure</td>
+            </tr>
+            <tr>
+              <td>Transcript projection</td>
+              <td>
+                Project each user turn into one work disclosure and an optional visible tail
+                assistant response.
+              </td>
+              <td>4 failures + missing component suite</td>
+            </tr>
+            <tr>
+              <td>Disclosure behavior</td>
+              <td>
+                Start live tool/work groups closed, retain manual live expansion, unmount closed
+                bodies, and auto-close on settlement.
+              </td>
+              <td>2 failures + missing component suite</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>End-to-end verification plan</h2>
+        </div>
+        <div class="grid three">
+          <article class="note blue">
+            <h3>OpenCode</h3>
             <p>
-              <strong>Fresh-profile visual baseline.</strong> Launch isolated packaged profiles at
-              1440×900 and 1024×768; prove white first paint, warm-neutral hierarchy, sparse orange,
-              no indigo, and accessible controls.
+              Run two configured models in the exact unsigned package. Each must visibly navigate
+              and mutate a localhost page, enumerate the global browser tabs, reuse a tab, and close
+              a disposable peer without gstack, Playwright, native web tools, or an external browser
+              process.
             </p>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>YS-BRAND-E2E-002 · Pending</h3>
+          </article>
+          <article class="note green">
+            <h3>Codex</h3>
             <p>
-              <strong>Minimal task rows.</strong> Exercise clean/dirty/sync/PR/draft/done/running
-              rows through idle, hover, focus, and context menus; prove no ambient counts and
-              retained advanced access.
+              Repeat in GUI and terminal presentation. Record the visible embedded state, Browser
+              MCP events, launch overrides, and unchanged normal profile. Native browser/search
+              routes must not appear.
             </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>YS-BRAND-E2E-003 · Pending</h3>
+          </article>
+          <article class="note pink">
+            <h3>Claude</h3>
             <p>
-              <strong>One global strip.</strong> Open Files, Git, Notes, Usage, Terminal, two
-              browser pages, source, PDF, and XLSX; click, keyboard, reorder, close, and prove
-              browser state survives.
+              Verify terminal and SDK launch contracts while logged out. Live inference remains an
+              explicit user-authentication gate; after login, repeat the same visible localhost
+              scenario without entering credentials on the user's behalf.
             </p>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>YS-BRAND-E2E-004 · Pending</h3>
+          </article>
+          <article class="note yellow">
+            <h3>Streaming turn</h3>
             <p>
-              <strong>Header and composer.</strong> Send, stop, attach, review, resize, and inspect
-              idle/running states; prove one clear surface and no visible diff/PR counts.
+              Confirm one initially closed Working row, no mounted heavy body, persistent manual
+              expansion, a visible tail answer candidate, and correct demotion of that candidate
+              when a later tool arrives.
             </p>
-          </div>
-          <div class="sticky bg-orange">
-            <h3>YS-BRAND-E2E-005 · Pending</h3>
+          </article>
+          <article class="note orange">
+            <h3>Settled turn</h3>
             <p>
-              <strong>Package identity.</strong> Inspect app/dock/menu/manifest/generated assets,
-              scan for retired indigo, verify ad-hoc signature/architecture/hash, and prove clean
-              quit.
+              Confirm the row auto-closes and only the final answer remains expanded. Reopen it,
+              inspect retained chronology, search hidden text, and verify questions/user messages
+              stay outside.
             </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>YS-BRAND-E2E-006 · Pending</h3>
+          </article>
+          <article class="note green">
+            <h3>Cleanup</h3>
             <p>
-              <strong>Persistence and lifecycle.</strong> Compare fresh light with explicit saved
-              dark, cross the six-live-browser threshold, close/restart, and prove bounded renderers
-              and zero surviving helpers.
+              Repeat browser-tab churn in an isolated profile. Enforce six live ordinary guests and
+              thirty metadata entries, return to baseline after cleanup, leave no helper after quit,
+              and restore no disposable pages.
             </p>
-          </div>
+          </article>
         </div>
       </section>
 
-      <section class="board-section">
+      <section>
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Open The Cards</h2>
+          <h2>Risks and controls</h2>
         </div>
         <details open>
-          <summary>Implementation order</summary>
-          <div class="detail-body">
-            <ol>
-              <li>
-                Make the theme/default/first-paint/brand tests green and regenerate owned assets.
-              </li>
-              <li>
-                Remove ambient Git/sync/PR counts and simplify flat sidebar rows while retaining
-                accessible behavior.
-              </li>
-              <li>
-                Move workspace actions into the sole global strip, flatten tab styling, then
-                simplify thread header/footer/composer chrome.
-              </li>
-              <li>
-                Run targeted tests continuously, then i18n, full suite, build/package, Computer Use
-                visual QA, and browser lifecycle regression.
-              </li>
-            </ol>
+          <summary>Provider configuration precedence</summary>
+          <div class="detail">
+            Prompt steering alone is insufficient. Enforcement must occur after provider/global
+            discovery and after permissive wildcard rules, with tests for both terminal and
+            structured launch paths.
           </div>
         </details>
         <details>
-          <summary>Architecture and file scope</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                Theme: <code>src/shared/settings.ts</code>, <code>index.html</code>,
-                <code>src/renderer/styles.css</code>, <code>themePresets.ts</code>.
-              </li>
-              <li>
-                Sidebar: <code>SortableThreadItem</code>, <code>GitBadge</code>,
-                <code>SyncBadge</code>, usage rail default, header/footer controls.
-              </li>
-              <li>
-                Conversation: <code>ThreadView</code>, <code>ThreadChangesBubble</code>,
-                <code>ThreadComposer</code>/<code>ThreadComposerSection</code>.
-              </li>
-              <li>
-                Workspace: <code>UnifiedRightPanel</code> and <code>RightWorkspaceTabStrip</code>;
-                state/browser managers remain untouched.
-              </li>
-              <li>
-                Brand: <code>branding/</code>, <code>public/</code>, generated desktop/PWA/native
-                outputs, and brand documentation.
-              </li>
-            </ul>
+          <summary>Transcript virtualization and Find</summary>
+          <div class="detail">
+            The compact display type stays separate from the raw canonical timeline. Group rows
+            expose stable IDs and underlying item IDs so measurement, completion anchors, search
+            mapping, subagents, and history remain correct.
           </div>
         </details>
         <details>
-          <summary>Constraints and safety</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                No new dependencies; reuse existing HeroUI v3 patterns. The repository-requested
-                <code>heroui-react</code> skill is unavailable, so no substitute primitive will be
-                introduced.
-              </li>
-              <li>
-                All new/changed renderer strings must use Lingui and all 12 non-English catalogs
-                must remain complete.
-              </li>
-              <li>
-                External browser automation, browser ownership, credentials, Pipedream, cookies, and
-                provider launch boundaries are out of visual scope and must remain unchanged.
-              </li>
-              <li>
-                Explicit saved dark appearance remains supported; the user's local QA profile will
-                be set light as requested.
-              </li>
-            </ul>
+          <summary>Memory and browser residency</summary>
+          <div class="detail">
+            Closed work bodies are unmounted. Existing browser LRU limits remain unchanged: six
+            ordinary live webviews, four sensitive live webviews, and thirty ordinary metadata
+            entries. Repeated packaged cleanup is a release gate.
           </div>
         </details>
         <details>
-          <summary>Artifacts</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                <a href="../plans/y-space-minimal-branding.html">Extensive planning report</a>
-              </li>
-              <li><a href="qa-e2e-tests.json">QA E2E JSON</a></li>
-              <li><a href="pass-criteria.md">Pass criteria</a></li>
-              <li>
-                <a href="../">Worktree root</a>:
-                <code>/Users/zvonimirsabljic/Development/y-space/y-space-minimal-branding</code>
-              </li>
-            </ul>
+          <summary>External authorization</summary>
+          <div class="detail">
+            Claude Code 2.1.210 is installed but <code>loggedIn=false</code>. Launch behavior can be
+            fully verified now; a real Claude inference/browser run cannot honestly pass until the
+            user authenticates. No Pipedream OAuth/account grant or provider credential mutation is
+            part of this follow-up.
           </div>
         </details>
+      </section>
+
+      <section>
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Decision</h2>
+        </div>
+        <div class="card green">
+          <span class="status">Ready</span>
+          <strong>Production implementation may begin.</strong>
+          <p style="margin-top: 8px; color: var(--muted)">
+            No new dependency is planned. The work reuses the provider adapters, resolved MCP
+            transport, canonical runtime events, disclosures, virtualized list, browser lifecycle
+            controls, and existing packaging workflow. Completion requires focused and full
+            verification, an unsigned package, hands-on Computer Use proof, a Husky-validated
+            commit, and a stacked pull request. No merge or force push is authorized.
+          </p>
+        </div>
       </section>
     </main>
   </body>

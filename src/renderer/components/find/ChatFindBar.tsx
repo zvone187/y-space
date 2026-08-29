@@ -3,7 +3,7 @@ import { useLingui } from "@lingui/react/macro";
 import { useShallow } from "zustand/react/shallow";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useChatFindStore } from "@/renderer/state/chatFindStore";
-import { selectVisibleThreadTimelineEntries } from "@/renderer/components/thread/ChatPane/chatPaneSelectors";
+import { selectCompactThreadTimelineEntries } from "@/renderer/components/thread/ChatPane/chatPaneSelectors";
 import { FindBar } from "./FindBar";
 import { collectChatMatches } from "./chatFindMatches";
 import { useFindBarChrome } from "./useFindBarChrome";
@@ -21,8 +21,11 @@ export type ScrollToIndex = (
 
 interface ChatFindBarProps {
   threadId: string;
+  hiddenItemId?: string | undefined;
+  isTurnActive?: boolean;
   scrollToIndexRef: React.RefObject<ScrollToIndex | null>;
   scrollElement: HTMLDivElement | null;
+  onActiveMatchItemIdChange?: (itemId: string | null) => void;
 }
 
 /**
@@ -37,7 +40,14 @@ export function ChatFindBar(props: ChatFindBarProps) {
   return <ActiveChatFind {...props} />;
 }
 
-function ActiveChatFind({ threadId, scrollToIndexRef, scrollElement }: ChatFindBarProps) {
+function ActiveChatFind({
+  threadId,
+  hiddenItemId,
+  isTurnActive = false,
+  scrollToIndexRef,
+  scrollElement,
+  onActiveMatchItemIdChange,
+}: ChatFindBarProps) {
   const { t } = useLingui();
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRafRef = useRef<number | null>(null);
@@ -54,7 +64,9 @@ function ActiveChatFind({ threadId, scrollToIndexRef, scrollElement }: ChatFindB
   const close = useChatFindStore((state) => state.close);
   const setMatchCount = useChatFindStore((state) => state.setMatchCount);
 
-  const entries = useAppStore((state) => selectVisibleThreadTimelineEntries(state, threadId));
+  const entries = useAppStore((state) =>
+    selectCompactThreadTimelineEntries(state, threadId, hiddenItemId, isTurnActive),
+  );
   const itemSnapshot = useAppStore(
     useShallow(
       (state) =>
@@ -100,6 +112,17 @@ function ActiveChatFind({ threadId, scrollToIndexRef, scrollElement }: ChatFindB
   useEffect(() => {
     setMatchCount(matches.length);
   }, [matches.length, setMatchCount]);
+
+  useEffect(() => {
+    onActiveMatchItemIdChange?.(matches[currentIndex]?.itemId ?? null);
+  }, [currentIndex, matches, onActiveMatchItemIdChange]);
+
+  useEffect(
+    () => () => {
+      onActiveMatchItemIdChange?.(null);
+    },
+    [onActiveMatchItemIdChange],
+  );
 
   useFindBarChrome(inputRef, openToken, close);
 

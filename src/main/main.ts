@@ -1105,6 +1105,9 @@ if (!hasSingleInstanceLock) {
       });
       browserMcpIngress = new BrowserMcpIngress({
         resolveLaunchContextIdentity: resolveLaunchContextIdentity("browser"),
+        onToolCallReport: async (report) => {
+          await supervisorClient.call("recordBrowserMcpToolCall", report);
+        },
       });
       browserMcpIngress.setManagerAccessor(() => browserPanelManager);
       primeBrowserAllowFlags(initialSettings);

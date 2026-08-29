@@ -12,6 +12,8 @@ import { ReasoningExpandedBody, ReasoningStreamViewport } from "./ReasoningStrea
 
 interface ReasoningInlineProps {
   item: RuntimeChatItem;
+  /** Keep the full body mounted while Find targets this reasoning item. */
+  forceExpanded?: boolean;
 }
 
 /**
@@ -21,11 +23,15 @@ interface ReasoningInlineProps {
  * row with a one-line preview of the whole block. Expanding reveals the live
  * pinned viewport while streaming, or the static body after.
  */
-export const ReasoningInline = memo(function ReasoningInline({ item }: ReasoningInlineProps) {
+export const ReasoningInline = memo(function ReasoningInline({
+  item,
+  forceExpanded = false,
+}: ReasoningInlineProps) {
   const { t } = useLingui();
   const actions = useChatPaneActions();
   const isStreaming = item.state !== "completed";
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const isExpanded = manuallyExpanded || forceExpanded;
   const rawText = item.streams.reasoning_text ?? "";
   const smoothedText = useSmoothStreamedText(rawText, isStreaming && !isExpanded);
   const hasText = rawText.trim().length > 0;
@@ -55,7 +61,7 @@ export const ReasoningInline = memo(function ReasoningInline({ item }: Reasoning
       className="text-[length:var(--lc-chat-font-size-command)] leading-tight"
       isExpanded={isExpanded}
       onExpandedChange={(next) => {
-        setIsExpanded(next);
+        setManuallyExpanded(next);
         actions?.onContentHeightChange();
       }}
     >

@@ -17,7 +17,8 @@ const mocks = vi.hoisted(() => ({
   createOpencodeClient: vi.fn<() => unknown>(),
   resolveAgentBinaryPath: vi.fn<() => string>(),
   resolveWslHomeDirectoryAsync: vi.fn<() => Promise<string>>(),
-  installOpenCodePlugin: vi.fn<() => { ok: true; version: string }>(),
+  installOpenCodePlugin:
+    vi.fn<() => { ok: true; version: string } | { ok: false; reason: string; version?: string }>(),
   spawnOpenCodeServer: vi.fn<() => OpenCodeServerHandle>(),
   disposeSpawnedOpenCodeServerHandles: vi.fn<() => void>(),
 }));
@@ -149,6 +150,9 @@ describe("acquireOpenCodeServer", () => {
     mocks.createOpencodeClient
       .mockReturnValueOnce({})
       .mockReturnValueOnce({
+        config: {
+          get: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({ mcp: {} }),
+        },
         mcp: {
           add: firstAdd,
           connect: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -156,6 +160,9 @@ describe("acquireOpenCodeServer", () => {
       })
       .mockReturnValueOnce({})
       .mockReturnValueOnce({
+        config: {
+          get: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({ mcp: {} }),
+        },
         mcp: {
           add: secondAdd,
         },
@@ -183,6 +190,9 @@ describe("acquireOpenCodeServer", () => {
 
   function makeSubagentClient() {
     return {
+      config: {
+        get: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({ mcp: {} }),
+      },
       mcp: {
         add: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
         connect: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -227,6 +237,212 @@ describe("acquireOpenCodeServer", () => {
 
     await acquired.dispose();
     expect(handle.dispose).not.toHaveBeenCalled();
+  });
+
+  it("starts Browser-backed SDK sidecars with a launch-scoped exclusive config", async () => {
+    const handle = makeHandle("http://127.0.0.1:4200");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const acquired = await acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-browser-policy" },
+      serverIsolationKey: "thread-browser-policy",
+      mcpServers: [remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
+    });
+
+    const launchEnv = mocks.buildOpenCodeServerCommand.mock.calls.at(-1)?.[2] ?? {};
+    const launchConfig = JSON.parse(launchEnv.OPENCODE_CONFIG_CONTENT ?? "{}") as {
+      tools?: Record<string, boolean>;
+      permission?: { skill?: Record<string, string> };
+      mcp?: Record<string, { enabled?: boolean }>;
+    };
+    expect(launchConfig.tools).toMatchObject({
+      webfetch: false,
+      websearch: false,
+    });
+    expect(launchConfig.permission?.skill).toMatchObject({
+      gstack: "deny",
+      playwright: "deny",
+    });
+    expect(launchConfig.mcp?.playwright).toMatchObject({ enabled: false });
+    expect(launchConfig.mcp?.browserbase).toMatchObject({ enabled: false });
+    expect(launchEnv.PORACODE_OPENCODE_BROWSER_EXCLUSIVE).toBe("1");
+    expect(launchEnv.OPENCODE_CONFIG_CONTENT).not.toContain("remote-browser-token");
+
+    await acquired.dispose();
+  });
+
+  it("fails closed before spawning when the Browser command plugin cannot be staged", async () => {
+    mocks.installOpenCodePlugin.mockReturnValue({
+      ok: false,
+      reason: "private plugin failure",
+    });
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const launch = acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-browser-plugin-failure" },
+      serverIsolationKey: "thread-browser-plugin-failure",
+      mcpServers: [remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
+    });
+
+    await expect(launch).rejects.toThrow(/browser-command plugin is unavailable/iu);
+    await expect(launch).rejects.not.toThrow("private plugin failure");
+    expect(mocks.spawnOpenCodeServer).not.toHaveBeenCalled();
+  });
+
+  it("disconnects every unmanaged profile MCP while retaining app-managed Browser", async () => {
+    const handle = makeHandle("http://127.0.0.1:4201");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+    const client = makeSubagentClient();
+    client.config.get.mockResolvedValue({
+      mcp: {
+        e2e: {
+          type: "local",
+          command: ["npx", "-y", "@playwright/mcp@latest"],
+          enabled: true,
+        },
+        github: {
+          type: "remote",
+          url: "https://api.github.test/mcp",
+          enabled: true,
+        },
+      },
+    });
+    mocks.createOpencodeClient.mockReturnValue(client);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const acquired = await acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-profile-browser" },
+      serverIsolationKey: "thread-profile-browser",
+      mcpServers: [remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
+    });
+
+    expect(client.mcp.disconnect).toHaveBeenCalledWith({
+      directory: "/repo-profile-browser",
+      name: "e2e",
+    });
+    expect(client.mcp.disconnect).toHaveBeenCalledWith({
+      directory: "/repo-profile-browser",
+      name: "github",
+    });
+    expect(client.mcp.add).toHaveBeenCalledWith(
+      expect.objectContaining({ directory: "/repo-profile-browser", name: "browser" }),
+    );
+
+    await acquired.dispose();
+  });
+
+  it("re-inspects unmanaged profile MCPs after a settings reload recreates the directory", async () => {
+    const handle = makeHandle("http://127.0.0.1:4204");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+    const client = makeSubagentClient();
+    client.config.get.mockResolvedValue({
+      mcp: {
+        neutral: {
+          type: "remote",
+          url: "https://neutral-profile.test/mcp",
+          enabled: true,
+        },
+        browser: {
+          type: "remote",
+          url: remoteBrowserMcp.url,
+          enabled: true,
+        },
+      },
+    });
+    mocks.createOpencodeClient.mockReturnValue(client);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const acquired = await acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-profile-reload" },
+      serverIsolationKey: "thread-profile-reload",
+      mcpServers: [
+        remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers),
+        remoteMcp("memory", "https://memory.test/mcp"),
+      ],
+    });
+    await acquired.updateMcpServers([
+      remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers),
+    ]);
+
+    expect(client.instance.dispose).toHaveBeenCalledWith({ directory: "/repo-profile-reload" });
+    expect(client.config.get).toHaveBeenCalledTimes(2);
+    expect(client.mcp.disconnect).toHaveBeenCalledTimes(3);
+    expect(client.mcp.disconnect).toHaveBeenNthCalledWith(1, {
+      directory: "/repo-profile-reload",
+      name: "neutral",
+    });
+    expect(client.mcp.disconnect).toHaveBeenNthCalledWith(3, {
+      directory: "/repo-profile-reload",
+      name: "neutral",
+    });
+
+    await acquired.dispose();
+  });
+
+  it("re-inspects unmanaged profile MCPs when managed settings are unchanged", async () => {
+    const handle = makeHandle("http://127.0.0.1:4205");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+    const client = makeSubagentClient();
+    client.config.get.mockResolvedValue({
+      mcp: {
+        neutral: { type: "remote", url: "https://neutral-profile.test/mcp", enabled: true },
+        browser: { type: "remote", url: remoteBrowserMcp.url, enabled: true },
+      },
+    });
+    mocks.createOpencodeClient.mockReturnValue(client);
+    const browser = remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const acquired = await acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-profile-unchanged" },
+      serverIsolationKey: "thread-profile-unchanged",
+      mcpServers: [browser],
+    });
+    await acquired.updateMcpServers([browser]);
+
+    expect(client.config.get).toHaveBeenCalledTimes(2);
+    expect(client.mcp.disconnect).toHaveBeenCalledTimes(2);
+    expect(client.instance.dispose).not.toHaveBeenCalled();
+    expect(client.mcp.add).toHaveBeenCalledTimes(1);
+
+    await acquired.dispose();
+  });
+
+  it("fails closed before Browser registration when effective config inspection is unavailable", async () => {
+    const handle = makeHandle("http://127.0.0.1:4202");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+    const client = makeSubagentClient();
+    delete (client.config as { get?: unknown }).get;
+    mocks.createOpencodeClient.mockReturnValue(client);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    await expect(
+      acquireOpenCodeServer({
+        projectLocation: { kind: "posix", path: "/repo-missing-config-inspection" },
+        serverIsolationKey: "thread-missing-config-inspection",
+        mcpServers: [remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
+      }),
+    ).rejects.toThrow(/effective MCP configuration could not be inspected/iu);
+    expect(client.mcp.add).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before Browser registration when effective config is malformed", async () => {
+    const handle = makeHandle("http://127.0.0.1:4203");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+    const client = makeSubagentClient();
+    client.config.get.mockResolvedValue({ mcp: [] });
+    mocks.createOpencodeClient.mockReturnValue(client);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    await expect(
+      acquireOpenCodeServer({
+        projectLocation: { kind: "posix", path: "/repo-malformed-config-inspection" },
+        serverIsolationKey: "thread-malformed-config-inspection",
+        mcpServers: [remoteMcp("browser", remoteBrowserMcp.url, remoteBrowserMcp.headers)],
+      }),
+    ).rejects.toThrow(/effective MCP configuration could not be inspected/iu);
+    expect(client.mcp.add).not.toHaveBeenCalled();
   });
 
   it("shares an authenticated native sidecar across directories", async () => {

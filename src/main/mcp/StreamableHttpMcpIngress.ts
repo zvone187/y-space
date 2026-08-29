@@ -33,6 +33,14 @@ export interface StreamableHttpMcpToolResult {
   isError?: boolean;
 }
 
+export interface StreamableHttpMcpToolCallOutcome {
+  name: string;
+  occurredAt: number;
+  success: boolean;
+  /** Raw in-process result. Consumers must reduce this before crossing IPC. */
+  rawResult?: unknown;
+}
+
 /** Revalidates a signed launch context through the live supervisor boundary. */
 export type McpLaunchContextIdentityResolver = (
   context: McpLaunchContext,
@@ -64,6 +72,17 @@ export interface StreamableHttpMcpIngressOptions<TContext> {
    */
   launchContextAudience?: McpLaunchContextAudience;
   onBeforeToolCall?(name: string, ctx: TContext): void;
+  /**
+   * Runs after dispatch + result formatting and is awaited before the MCP
+   * response is written. Reporting is best effort: a callback failure must not
+   * turn an already-performed, potentially non-idempotent browser action into
+   * an agent-visible failure that invites an unsafe retry.
+   */
+  onAfterToolCall?(
+    outcome: StreamableHttpMcpToolCallOutcome,
+    ctx: TContext,
+    identity: McpThreadIdentity,
+  ): void | Promise<void>;
   /** Revalidate the signed thread capability against live supervisor state. */
   resolveLaunchContextIdentity?: McpLaunchContextIdentityResolver;
   serverInfo: { name: string; version: string };
@@ -426,6 +445,11 @@ export class StreamableHttpMcpIngress<TContext> {
         try {
           raw = await this.options.dispatchTool(name, args, ctx);
         } catch (err) {
+          await this.reportToolCall(
+            { name, occurredAt: Date.now(), success: false },
+            ctx,
+            identity,
+          );
           return {
             jsonrpc: "2.0",
             id,
@@ -435,7 +459,27 @@ export class StreamableHttpMcpIngress<TContext> {
             },
           };
         }
-        const result = this.options.formatToolResult(name, raw);
+        let result: StreamableHttpMcpToolResult;
+        try {
+          result = this.options.formatToolResult(name, raw);
+        } catch (error) {
+          await this.reportToolCall(
+            { name, occurredAt: Date.now(), success: false },
+            ctx,
+            identity,
+          );
+          throw error;
+        }
+        await this.reportToolCall(
+          {
+            name,
+            occurredAt: Date.now(),
+            success: result.isError !== true,
+            ...(result.isError === true ? {} : { rawResult: raw }),
+          },
+          ctx,
+          identity,
+        );
         return { jsonrpc: "2.0", id, result };
       }
       return {
@@ -449,6 +493,23 @@ export class StreamableHttpMcpIngress<TContext> {
         id,
         error: { code: -32000, message: (err as Error).message ?? "internal" },
       };
+    }
+  }
+
+  private async reportToolCall(
+    outcome: StreamableHttpMcpToolCallOutcome,
+    ctx: TContext,
+    identity: McpThreadIdentity,
+  ): Promise<void> {
+    try {
+      await this.options.onAfterToolCall?.(outcome, ctx, identity);
+    } catch (error) {
+      // The action may already have changed page state. Preserve its original
+      // result and leave the absence of canonical proof visible in the UI.
+      console.warn(
+        `[mcp:${this.options.serverInfo.name}] post-tool reporting failed for ${outcome.name}:`,
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 }

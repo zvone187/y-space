@@ -54,6 +54,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     getThreadSnapshots: () => threads.getThreadSnapshots(),
     getTerminalShellSnapshots: () => threads.getTerminalShellSnapshots(),
     resolveMcpCallerIdentity: (payload) => threads.resolveMcpCallerIdentity(payload) ?? null,
+    recordBrowserMcpToolCall: (payload) => threads.recordBrowserMcpToolCall(payload),
     getAvailableWindowsShells: () => runtime.getAvailableWindowsShells(),
     startThread: (payload) => threads.startThread(payload),
     sendThreadInput: (payload) => threads.sendThreadInput(payload),

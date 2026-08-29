@@ -75,6 +75,7 @@ export class ComputerUseMcpIngress {
     const { threadId } = identity;
     return {
       driver: this.driver,
+      ...(identity.managedBrowserConnected === true ? { managedBrowserConnected: true } : {}),
       ...(threadId
         ? {
             threadId,

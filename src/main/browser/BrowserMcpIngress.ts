@@ -1,9 +1,17 @@
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
+import {
+  MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH,
+  MAX_BROWSER_EVIDENCE_TOOL_NAME_LENGTH,
+  MAX_BROWSER_EVIDENCE_URL_LENGTH,
+  type BrowserMcpSafeTabEvidence,
+  type BrowserMcpToolCallReport,
+} from "@/shared/browserMcpEvidence";
 import type { BrowserPanelManager } from "./BrowserPanelManager";
 import {
   StreamableHttpMcpIngress,
   type McpLaunchContextIdentityResolver,
   type StreamableHttpMcpIngressInfo,
+  type StreamableHttpMcpToolCallOutcome,
 } from "../mcp/StreamableHttpMcpIngress";
 import {
   BROWSER_MCP_INSTRUCTIONS,
@@ -18,6 +26,8 @@ export type BrowserMcpIngressInfo = StreamableHttpMcpIngressInfo;
 
 export interface BrowserMcpIngressOptions {
   resolveLaunchContextIdentity: McpLaunchContextIdentityResolver;
+  /** Private main -> supervisor proof path. Never receives tool args or page content. */
+  onToolCallReport?(report: BrowserMcpToolCallReport): Promise<void> | void;
 }
 
 /**
@@ -48,6 +58,8 @@ export class BrowserMcpIngress {
       contextUnavailableMessage: "browser panel not ready",
       dispatchTool,
       formatToolResult,
+      onAfterToolCall: (outcome, ctx, identity) =>
+        this.reportToolCall(options, outcome, ctx, identity),
     });
   }
 
@@ -86,4 +98,92 @@ export class BrowserMcpIngress {
       ...(identity.title ? { threadTitle: identity.title } : {}),
     };
   }
+
+  private async reportToolCall(
+    options: BrowserMcpIngressOptions,
+    outcome: StreamableHttpMcpToolCallOutcome,
+    ctx: ToolContext,
+    identity: McpThreadIdentity,
+  ): Promise<void> {
+    if (
+      !options.onToolCallReport ||
+      !identity.threadId ||
+      !identity.launchId ||
+      !identity.browserEvidenceTurnId
+    ) {
+      return;
+    }
+    const successfulProof = outcome.success && !isTimedOutToolResult(outcome.rawResult);
+    const report: BrowserMcpToolCallReport = {
+      threadId: identity.threadId,
+      launchId: identity.launchId,
+      turnId: identity.browserEvidenceTurnId,
+      toolName: boundText(outcome.name, MAX_BROWSER_EVIDENCE_TOOL_NAME_LENGTH),
+      success: successfulProof,
+      occurredAt: outcome.occurredAt,
+      ...(successfulProof ? extractSafeTabEvidence(outcome.rawResult, ctx) : {}),
+    };
+    await options.onToolCallReport(report);
+  }
+}
+
+/**
+ * Reduce an arbitrary in-process tool result to metadata read back from the
+ * app's authoritative tab object. We never forward args, raw results, DOM
+ * snapshots, screenshots, console output, titles, URL paths/queries, or other
+ * page content.
+ */
+function extractSafeTabEvidence(rawResult: unknown, ctx: ToolContext): BrowserMcpSafeTabEvidence {
+  const tabId = readResultTabId(rawResult) ?? ctx.resolvedTabIdForToolCall;
+  const tab = tabId ? ctx.manager.getTab(tabId) : null;
+  if (!tab) return {};
+  try {
+    const snapshot = tab.snapshot();
+    const safeUrl = snapshot.url ? sanitizeEvidenceUrl(snapshot.url) : undefined;
+    return {
+      tabId: boundText(tab.tabId, MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH),
+      ...(safeUrl ? { url: safeUrl } : {}),
+    };
+  } catch {
+    return { tabId: boundText(tab.tabId, MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH) };
+  }
+}
+
+function isTimedOutToolResult(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    (value as Record<string, unknown>).timedOut === true
+  );
+}
+
+function readResultTabId(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  const nested =
+    record.tab && typeof record.tab === "object"
+      ? (record.tab as Record<string, unknown>).tabId
+      : undefined;
+  for (const candidate of [record.tabId, nested, record.implicitTabId, record.activeTabId]) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return boundText(candidate, MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH);
+    }
+  }
+  return undefined;
+}
+
+function boundText(value: string, maxLength: number): string {
+  return value.trim().slice(0, maxLength);
+}
+
+/** Persist only an HTTP(S) origin; paths, queries, fragments, and credentials are private. */
+function sanitizeEvidenceUrl(value: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+  return boundText(url.origin, MAX_BROWSER_EVIDENCE_URL_LENGTH) || undefined;
 }

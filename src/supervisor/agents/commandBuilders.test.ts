@@ -311,19 +311,34 @@ describe("agent command builders", () => {
     });
 
     expect(spec.command.toLowerCase()).toBe(getWslCommand().toLowerCase());
-    expect(spec.args).toEqual([
+    expect(spec.args.slice(0, 7)).toEqual([
       "-d",
       "Ubuntu",
       "--cd",
       "/home/demo/project",
       "--",
-      "/usr/bin/env",
-      "PATH=/home/demo/.nvm/versions/node/v24.10.0/bin:/home/demo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "/bin/sh",
+      "-c",
+    ]);
+    expect(spec.args.slice(8)).toEqual([
+      "y-space-wsl-launch",
       "/home/demo/.local/bin/codex",
       "--enable",
       "goals",
       "app-server",
     ]);
+    const serializedArgs = JSON.stringify(spec.args);
+    const script = spec.args[7]!;
+    expect(serializedArgs).not.toContain(
+      "/home/demo/.nvm/versions/node/v24.10.0/bin:/home/demo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    );
+    expect(script).toContain("__y_space_launch_env_file");
+    expect(script).toContain('/bin/rm -f -- "$1"');
+    expect(script).toContain('/bin/rmdir -- "$2"');
+    expect(script).toContain('exec /usr/bin/env "$@"');
+    expect(spec.cleanup).toEqual(expect.any(Function));
+
+    spec.cleanup?.();
   });
 
   it("omits an empty prompt when reopening Codex", () => {

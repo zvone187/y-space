@@ -6,6 +6,7 @@ import type { AgentKind } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { SessionRuntime } from "./sessionTypes";
+import { BROWSER_MCP_TOKEN_ENV, BROWSER_MCP_URL_ENV } from "../agents/browserMcp";
 
 vi.mock("../agents/base", async (importActual) => {
   const actual = await importActual<typeof import("../agents/base")>();
@@ -42,9 +43,13 @@ const THREAD_ID = "thread-stale";
 
 const managersToDispose: ThreadSessionManager[] = [];
 const tempDirs: string[] = [];
+const savedBrowserMcpUrl = process.env[BROWSER_MCP_URL_ENV];
+const savedBrowserMcpToken = process.env[BROWSER_MCP_TOKEN_ENV];
 
 beforeEach(() => {
   vi.useFakeTimers();
+  process.env[BROWSER_MCP_URL_ENV] = "http://127.0.0.1:43199";
+  process.env[BROWSER_MCP_TOKEN_ENV] = "stale-interrupt-test-browser-token";
 });
 
 afterEach(async () => {
@@ -55,6 +60,10 @@ afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
+  if (savedBrowserMcpUrl === undefined) delete process.env[BROWSER_MCP_URL_ENV];
+  else process.env[BROWSER_MCP_URL_ENV] = savedBrowserMcpUrl;
+  if (savedBrowserMcpToken === undefined) delete process.env[BROWSER_MCP_TOKEN_ENV];
+  else process.env[BROWSER_MCP_TOKEN_ENV] = savedBrowserMcpToken;
 });
 
 function createStructuredSession(
@@ -78,6 +87,7 @@ function createAdapter(structuredSession: StructuredSessionHandle): AgentAdapter
   createStructuredSession: NonNullable<AgentAdapter["createStructuredSession"]>;
 } {
   return {
+    browserRouting: { gui: "exclusive" },
     kind: AGENT_KIND,
     label: AGENT_KIND,
     binary: AGENT_KIND,

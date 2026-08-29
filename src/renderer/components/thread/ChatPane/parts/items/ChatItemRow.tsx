@@ -6,8 +6,11 @@ import type { ToolCallPayload } from "@/shared/contracts";
 import { memo } from "react";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { CheckpointRevertRequest } from "../CheckpointRevertControls";
-import { getRuntimeItemStoreSelector, type ChatTimelineEntry } from "../../chatPaneSelectors";
-import { AssistantMessage } from "./AssistantMessage";
+import {
+  getRuntimeItemStoreSelector,
+  type ChatDisplayTimelineEntry,
+} from "../../chatPaneSelectors";
+import { AssistantMessage, AssistantMessageGroup } from "./AssistantMessage";
 import { CommandExecution } from "./CommandExecution";
 import { FileChange } from "./FileChange";
 import { ImageView } from "./ImageView";
@@ -16,18 +19,20 @@ import { QuestionAnswer } from "./QuestionAnswer";
 import { Reasoning } from "./Reasoning";
 import { SubAgentToolCall } from "./SubAgentToolCall";
 import { ToolCallGroup } from "./ToolCallGroup";
+import { TurnActivityGroup } from "./TurnActivityGroup";
 import { UserMessage } from "./UserMessage";
 import { WebSearchItem } from "./WebSearchItem";
 import { isDelegatedAgentTool } from "./toolDisplay";
 
 interface ChatItemRowProps {
   threadId: string;
-  entry: ChatTimelineEntry;
-  /** True when this is the tail of the visible timeline. Drives live-group expand state. */
+  entry: ChatDisplayTimelineEntry;
+  /** True when this is the active tail of the visible timeline. */
   isLastEntry?: boolean;
   onHeightChange?: () => void;
   onVirtualizerLayoutChange?: () => void;
   isTurnActive?: boolean;
+  revealedItemId?: string | null;
   checkpointRevert: CheckpointRevertRequest | null;
 }
 
@@ -46,15 +51,39 @@ export const ChatItemRow = memo(function ChatItemRow({
   onHeightChange,
   onVirtualizerLayoutChange,
   isTurnActive = false,
+  revealedItemId = null,
   checkpointRevert,
 }: ChatItemRowProps) {
   "use no memo";
+  if (entry.kind === "turn_activity_group") {
+    return (
+      <TurnActivityGroup
+        threadId={threadId}
+        entries={entry.entries}
+        isLive={entry.isCurrentTurn && isTurnActive}
+        revealedItemId={revealedItemId}
+        {...(onHeightChange ? { onHeightChange } : {})}
+        {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
+      />
+    );
+  }
+  if (entry.kind === "assistant_message_group") {
+    return (
+      <AssistantMessageGroup
+        threadId={threadId}
+        itemIds={entry.itemIds}
+        isTurnActive={isTurnActive}
+      />
+    );
+  }
   if (entry.kind === "tool_call_group") {
     return (
       <ToolCallGroup
         threadId={threadId}
         itemIds={entry.itemIds}
         isLive={isLastEntry}
+        forceExpanded={revealedItemId !== null && entry.itemIds.includes(revealedItemId)}
+        revealedItemId={revealedItemId}
         {...(onHeightChange ? { onHeightChange } : {})}
         {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
       />
@@ -65,6 +94,7 @@ export const ChatItemRow = memo(function ChatItemRow({
       threadId={threadId}
       itemId={entry.id}
       isTurnActive={isTurnActive}
+      forceExpanded={revealedItemId === entry.id}
       checkpointRevert={checkpointRevert}
     />
   );
@@ -74,11 +104,13 @@ const SingleChatItemRow = memo(function SingleChatItemRow({
   threadId,
   itemId,
   isTurnActive,
+  forceExpanded,
   checkpointRevert,
 }: {
   threadId: string;
   itemId: string;
   isTurnActive: boolean;
+  forceExpanded: boolean;
   checkpointRevert: CheckpointRevertRequest | null;
 }) {
   const item = useAppStore(getRuntimeItemStoreSelector(threadId, itemId));
@@ -97,13 +129,14 @@ const SingleChatItemRow = memo(function SingleChatItemRow({
       return <SubAgentToolCall threadId={threadId} item={item} />;
     }
   }
-  return renderItem(threadId, item, isTurnActive, checkpointRevert);
+  return renderItem(threadId, item, isTurnActive, forceExpanded, checkpointRevert);
 });
 
 function renderItem(
   threadId: string,
   item: RuntimeChatItem,
   isTurnActive: boolean,
+  forceExpanded: boolean,
   checkpointRevert: CheckpointRevertRequest | null,
 ) {
   switch (item.type) {
@@ -114,7 +147,7 @@ function renderItem(
     case "assistant_message":
       return <AssistantMessage threadId={threadId} item={item} isTurnActive={isTurnActive} />;
     case "reasoning":
-      return <Reasoning item={item} />;
+      return <Reasoning item={item} forceExpanded={forceExpanded} />;
     case "plan":
       return <PlanItem item={item} />;
     case "command_execution":

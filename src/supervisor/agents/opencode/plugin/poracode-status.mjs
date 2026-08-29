@@ -24,13 +24,13 @@
  * not add additional named OR default exports beyond this single object.
  *
  * Filename note: deliberately `poracode-status.mjs` in the source tree.
- * The supervisor drops it as `poracode-status.js` into OpenCode's
+ * The supervisor drops it as `y-space-status.js` into OpenCode's
  * auto-discovery directory (`~/.config/opencode/plugins/`) — OpenCode's glob
  * is `{plugin,plugins}/*.{ts,js}` so `.mjs` would be silently ignored. Bun
  * (OpenCode's runtime) handles ESM syntax in `.js` natively. The displayed
  * plugin name in OpenCode's TUI status panel (`dialog-status.tsx`) is the
- * basename of the dropped file before the first dot, so naming the drop
- * `poracode-status.js` produces "poracode-status". The Windows panel
+ * basename of the dropped file before the first dot, so the branded drop
+ * produces "y-space-status". The Windows panel
  * display is buggy upstream — OpenCode `split("/")`s a native `\`-path —
  * and cannot be fixed plugin-side. `id` is still set because newer OpenCode
  * builds will read it.
@@ -38,8 +38,8 @@
  * Safe outside Poracode: when the env vars are missing the handlers no-op.
  */
 
-import { readFileSync } from "node:fs";
-import { basename, dirname, extname, join } from "node:path";
+import { readFileSync, statSync } from "node:fs";
+import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -47,8 +47,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 //   1. Deployed in OpenCode's plugins/ dir → sibling `<basename>.plugin.json`
 //      (the installer drops both files together so `import.meta.url` reaches
 //      the manifest at runtime). OpenCode auto-loads `.{ts,js}` only, so the
-//      deployed plugin file is `poracode-status.js` and its manifest is
-//      `poracode-status.plugin.json`.
+//      deployed plugin file is `y-space-status.js` and its manifest is
+//      `y-space-status.plugin.json`.
 //   2. Staged in our agent-plugins/ dir → sibling `plugin.json` (matches
 //      `installerBase`'s canonical filename, used by tests / dev paths). The
 //      staged file is `poracode-status.mjs`.
@@ -77,6 +77,113 @@ function readPluginVersionFromManifest() {
 const PLUGIN_VERSION = readPluginVersionFromManifest();
 const PROTOCOL_VERSION = 1;
 const PROVIDER_SESSION_ID_ARG = "__poracode_provider_session_id";
+const BROWSER_EXCLUSIVE_DENY_REASON =
+  "Y Space Browser is connected. Use its Browser tools instead of a script or package command that opens or retrieves web pages.";
+const MAX_INSPECTED_SCRIPT_BYTES = 512 * 1024;
+const SCRIPT_FILE_RE =
+  /(?:^|[;&|]\s*|\s)(?:node(?:\.exe)?|bun(?:\.exe)?|deno(?:\.exe)?|python(?:3(?:\.\d+)?)?(?:\.exe)?|py(?:\.exe)?|ruby(?:\.exe)?|perl(?:\.exe)?|php(?:\.exe)?|bash|sh|zsh|osascript)\s+(?:(?:--?[A-Za-z][\w-]*(?:=[^\s;&|]+)?|-\w+)\s+)*(?:["']([^"']+\.(?:[cm]?[jt]s|tsx?|py|rb|pl|php|sh|scpt|applescript))["']|([^\s;&|]+\.(?:[cm]?[jt]s|tsx?|py|rb|pl|php|sh|scpt|applescript)))/giu;
+const PACKAGE_SCRIPT_RE =
+  /(?:^|[;&|]\s*)(npm|pnpm|yarn|bun)(?:\.cmd|\.exe)?\s+(?:(run)\s+)?([A-Za-z0-9:_-]+)(?:\s|$)/iu;
+const PACKAGE_SCRIPT_SHORTHANDS = new Set(["test", "start", "stop", "restart"]);
+const DIRECT_BROWSER_COMMAND_RE =
+  /(?:\b(?:playwright|puppeteer|selenium|webdriver|browser-use|browser_use|curl|wget|httpie)\b|\b(?:open|xdg-open|gio\s+open|Start-Process)\b[^\r\n]*https?:\/\/|\bosascript\b[^\r\n]*(?:Google Chrome|Chromium|Safari|Firefox|Brave(?: Browser)?|Microsoft Edge|Arc|Comet|Opera|Vivaldi)|\b(?:fetch|XMLHttpRequest|urlopen|file_get_contents|curl_init)\s*\(|\b(?:axios|requests|httpx)\s*\.\s*(?:get|post|put|patch|delete|request)\s*\(|\b(?:aiohttp|Net::HTTP|HTTP::Tiny|LWP::UserAgent)\b)/iu;
+const BROWSER_SCRIPT_CONTENT_RE =
+  /(?:\b(?:fetch|XMLHttpRequest|urlopen|file_get_contents|curl_init)\s*\(|\b(?:axios|requests|httpx)\s*\.\s*(?:get|post|put|patch|delete|request)\s*\(|\b(?:aiohttp|Net::HTTP|HTTP::Tiny|LWP::UserAgent)\b|(?:from|import|require\s*\()[^\r\n]{0,160}\b(?:playwright|puppeteer|selenium|webdriver|browser-use|browser_use)\b|\b(?:tell\s+(?:application|app)|using\s+terms\s+from)\s+["']?(?:Google Chrome|Chromium|Safari|Firefox|Brave(?: Browser)?|Microsoft Edge|Arc|Comet|Opera|Vivaldi)\b|\b(?:subprocess\s*\.\s*(?:run|call|Popen|check_call|check_output)|os\s*\.\s*system)\s*\([^\r\n]{0,400}["'](?:open|google-chrome|chromium|firefox|brave-browser|msedge|microsoft-edge|opera|vivaldi|comet)\b)/iu;
+const COMPETING_BROWSER_SKILL_NAMES = [
+  "browser",
+  "browse",
+  "browser-use",
+  "control-in-app-browser",
+  "gstack",
+  "setup-browser-cookies",
+  "playwright",
+  "puppeteer",
+  "selenium",
+  "chrome",
+  "chromium",
+  "firefox",
+  "webkit",
+  "stagehand",
+  "browserbase",
+  "browserstack",
+  "browserless",
+  "webdriver",
+  "node-repl",
+];
+
+function isCompetingBrowserSkillIdentity(value) {
+  const normalized = String(value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "");
+  return COMPETING_BROWSER_SKILL_NAMES.some(
+    (name) => normalized === name || normalized.endsWith(`-${name}`),
+  );
+}
+
+function readInspectionSource(sourcePath) {
+  try {
+    const stat = statSync(sourcePath);
+    if (!stat.isFile() || stat.size > MAX_INSPECTED_SCRIPT_BYTES) return undefined;
+    return readFileSync(sourcePath, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function browserCommandOrScript(command, cwd, depth = 0) {
+  if (DIRECT_BROWSER_COMMAND_RE.test(command)) return true;
+  if (depth >= 4) return true;
+  const packageMatch = PACKAGE_SCRIPT_RE.exec(command);
+  const scriptName = packageMatch?.[3];
+  if (scriptName && (packageMatch[2] || PACKAGE_SCRIPT_SHORTHANDS.has(scriptName))) {
+    const manifest = readInspectionSource(resolve(cwd, "package.json"));
+    if (manifest === undefined) return true;
+    try {
+      const scripts = JSON.parse(manifest)?.scripts;
+      const script = scripts && typeof scripts === "object" ? scripts[scriptName] : undefined;
+      if (typeof script !== "string" || script.trim().length === 0) return true;
+      return [`pre${scriptName}`, scriptName, `post${scriptName}`].some((name) => {
+        const lifecycleCommand = scripts[name];
+        return (
+          typeof lifecycleCommand === "string" &&
+          browserCommandOrScript(lifecycleCommand, cwd, depth + 1)
+        );
+      });
+    } catch {
+      return true;
+    }
+  }
+  const paths = [...command.matchAll(SCRIPT_FILE_RE)].flatMap((match) => {
+    const scriptPath = match[1] ?? match[2];
+    if (!scriptPath) return [];
+    return [isAbsolute(scriptPath) ? scriptPath : resolve(cwd, scriptPath)];
+  });
+  return paths.some((scriptPath) => {
+    const source = readInspectionSource(scriptPath);
+    return source === undefined || BROWSER_SCRIPT_CONTENT_RE.test(source);
+  });
+}
+
+function denyBrowserScriptIndirection(input, output) {
+  if (process.env.PORACODE_OPENCODE_BROWSER_EXCLUSIVE !== "1") return;
+  const tool = typeof input?.tool === "string" ? input.tool.toLowerCase() : "";
+  const args = output?.args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return;
+  if (tool === "skill") {
+    const identity = args.name ?? args.skill ?? args.skillName;
+    if (typeof identity === "string" && isCompetingBrowserSkillIdentity(identity)) {
+      throw new Error(BROWSER_EXCLUSIVE_DENY_REASON);
+    }
+    return;
+  }
+  if (tool !== "bash" && tool !== "shell" && tool !== "powershell") return;
+  const command = typeof args.command === "string" ? args.command : args.cmd;
+  if (typeof command !== "string") return;
+  const rawCwd = args.cwd ?? args.workdir ?? input?.cwd ?? input?.directory;
+  const cwd = typeof rawCwd === "string" && rawCwd.length > 0 ? resolve(rawCwd) : process.cwd();
+  if (browserCommandOrScript(command, cwd)) throw new Error(BROWSER_EXCLUSIVE_DENY_REASON);
+}
 
 function injectProviderSessionId(input, output) {
   if (process.env.PORACODE_OPENCODE_SESSION_ROUTING !== "1") return;
@@ -218,7 +325,7 @@ async function forwardIntent(eventType, intent, sessionId, extra) {
 }
 
 export default {
-  id: "poracode-status",
+  id: "y-space-status",
   server: async () => ({
     // Unified event dispatcher — see file header for why session/permission
     // lifecycle hooks must come through here, not as top-level keys.
@@ -261,6 +368,7 @@ export default {
     // (paired with chat.message) are idempotent in the state machine.
     "tool.execute.before": async (input, output) => {
       try {
+        denyBrowserScriptIndirection(input, output);
         injectProviderSessionId(input, output);
         const sessionId =
           typeof input?.sessionID === "string" && input.sessionID.length > 0
@@ -271,6 +379,7 @@ export default {
         await forwardIntent("tool.execute.before", "session.turn_started", sessionId, extra);
       } catch (error) {
         debugLog(`tool.execute.before uncaught: ${String(error)}`);
+        throw error;
       }
     },
   }),

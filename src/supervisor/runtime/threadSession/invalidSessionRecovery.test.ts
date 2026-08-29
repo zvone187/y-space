@@ -23,6 +23,7 @@ function createHarness() {
     kind: "recover-test",
     label: "Recovery Test",
     binary: "recover-test",
+    browserRouting: { terminal: "exclusive" },
     capabilities: {
       models: [],
       efforts: [],

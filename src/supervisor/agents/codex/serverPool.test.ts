@@ -6,7 +6,15 @@ import type { CreateStructuredSessionInput } from "../base";
 
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn<(...args: unknown[]) => unknown>(),
-  terminateChildProcessTree: vi.fn<(child: unknown) => void>(),
+  terminateChildProcessTree:
+    vi.fn<(child: unknown, options?: { ownedProcessGroup?: boolean }) => void>(),
+  buildCodexAppServerCommand: vi.fn<(...args: unknown[]) => unknown>(),
+  installCodexPlugin: vi.fn<(...args: unknown[]) => unknown>(),
+  commandCleanup: vi.fn<() => void>(),
+  probeCodexCliSemver: vi.fn<() => [number, number, number] | null>(),
+  parseCodexVersionLine: vi.fn<(line: string) => [number, number, number] | null>(),
+  batchWslCommandsAsync: vi.fn<() => Promise<Array<{ ok: boolean; stdout: string }>>>(),
+  resolveNodeForDistro: vi.fn<() => Promise<{ nodePath: string }>>(),
 }));
 
 vi.mock("node:child_process", async (importOriginal) => ({
@@ -16,14 +24,28 @@ vi.mock("node:child_process", async (importOriginal) => ({
 vi.mock("@/shared/processTree", () => ({
   terminateChildProcessTree: mocks.terminateChildProcessTree,
 }));
+vi.mock("../base", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../base")>()),
+  batchWslCommandsAsync: mocks.batchWslCommandsAsync,
+}));
+vi.mock("../../wsl/runtime", () => ({
+  resolveNodeForDistro: mocks.resolveNodeForDistro,
+}));
 vi.mock("./argv", () => ({
-  buildCodexAppServerCommand: () => ({
-    command: process.execPath,
-    args: [],
-  }),
+  buildCodexAppServerCommand: mocks.buildCodexAppServerCommand,
 }));
 vi.mock("./mcpSkillConflicts", () => ({
   buildCodexMcpSkillConflictArgs: () => [],
+}));
+vi.mock("./plugin/install", () => ({
+  codexHooksFeatureFlagForSemver: () => "hooks",
+  installCodexPlugin: mocks.installCodexPlugin,
+  isCodexSemverSupportedForHooks: (version: [number, number, number] | null) =>
+    Boolean(
+      version && (version[0] > 0 || version[1] > 122 || (version[1] === 122 && version[2] >= 0)),
+    ),
+  parseCodexVersionLine: mocks.parseCodexVersionLine,
+  probeCodexCliSemver: mocks.probeCodexCliSemver,
 }));
 
 import {
@@ -45,7 +67,7 @@ function fakeChildProcess() {
 function browserServer(
   threadId: string,
   baseUrl = "http://127.0.0.1:9000",
-  token = `yspace-mcp-v1.${threadId}.signature`,
+  token = "yspace-mcp-v1.shared.signature",
 ): ResolvedMcpServer {
   return {
     id: "browser",
@@ -86,7 +108,58 @@ describe("Codex app-server pool", () => {
   beforeEach(() => {
     mocks.spawn.mockReset();
     mocks.terminateChildProcessTree.mockReset();
+    mocks.buildCodexAppServerCommand.mockReset();
+    mocks.installCodexPlugin.mockReset();
+    mocks.commandCleanup.mockReset();
+    mocks.probeCodexCliSemver.mockReset().mockReturnValue([0, 130, 0]);
+    mocks.parseCodexVersionLine.mockReset().mockImplementation((line) => {
+      const match = /codex-cli\s+(\d+)\.(\d+)\.(\d+)/u.exec(line);
+      return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+    });
+    mocks.batchWslCommandsAsync
+      .mockReset()
+      .mockResolvedValue([{ ok: true, stdout: "codex-cli 0.130.0" }]);
+    mocks.resolveNodeForDistro.mockReset().mockResolvedValue({ nodePath: "/usr/bin/node" });
     mocks.spawn.mockImplementation(() => fakeChildProcess());
+    mocks.installCodexPlugin.mockResolvedValue({
+      ok: true,
+      paths: {
+        codexHomeDir: "/private/y-space/codex/home",
+        sqliteHomeDir: "/home/demo/.codex",
+      },
+      version: "test",
+    });
+    mocks.buildCodexAppServerCommand.mockImplementation((_location, rawOptions) => {
+      const options = rawOptions as {
+        browserExclusiveHook?: {
+          codexHomeDir: string;
+          sqliteHomeDir: string;
+          featureFlag: string;
+        };
+      };
+      return {
+        command: process.execPath,
+        args: [
+          ...(options.browserExclusiveHook
+            ? [
+                "--dangerously-bypass-hook-trust",
+                "--enable",
+                options.browserExclusiveHook.featureFlag,
+              ]
+            : []),
+          "app-server",
+        ],
+        ...(options.browserExclusiveHook
+          ? {
+              env: {
+                CODEX_HOME: options.browserExclusiveHook.codexHomeDir,
+                CODEX_SQLITE_HOME: options.browserExclusiveHook.sqliteHomeDir,
+              },
+            }
+          : {}),
+        cleanup: mocks.commandCleanup,
+      };
+    });
   });
 
   afterEach(() => {
@@ -112,10 +185,86 @@ describe("Codex app-server pool", () => {
     }
   });
 
-  it("reuses one process when only thread-scoped MCP query values differ", async () => {
+  it("stages and trusts the app-owned deny hook for a Browser-connected app-server", async () => {
+    const acquired = await acquireCodexAppServer(input("local-a", browserServer("local-a")));
+
+    expect(mocks.installCodexPlugin).toHaveBeenCalledOnce();
+    expect(mocks.buildCodexAppServerCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        browserExclusiveHook: {
+          codexHomeDir: "/private/y-space/codex/home",
+          sqliteHomeDir: "/home/demo/.codex",
+          featureFlag: "hooks",
+        },
+      }),
+    );
+    expect(mocks.spawn.mock.calls[0]?.[1]).toEqual(
+      expect.arrayContaining(["--dangerously-bypass-hook-trust", "--enable", "hooks"]),
+    );
+    const spawnOptions = mocks.spawn.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv } | undefined;
+    expect(spawnOptions?.env?.CODEX_HOME).toBe("/private/y-space/codex/home");
+    expect(spawnOptions?.env?.CODEX_SQLITE_HOME).toBe("/home/demo/.codex");
+
+    acquired.dispose();
+  });
+
+  it.each([
+    ["older than hook support", [0, 121, 99] as [number, number, number]],
+    ["unparseable", null],
+  ])("rejects a native Browser app-server when Codex is %s", async (_label, version) => {
+    mocks.probeCodexCliSemver.mockReturnValue(version);
+
+    await expect(
+      acquireCodexAppServer(input("unsupported-native", browserServer("unsupported-native"))),
+    ).rejects.toThrow("requires codex-cli >= 0.122.0");
+
+    expect(mocks.installCodexPlugin).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it.each(["codex-cli 0.121.99", "unexpected version output"])(
+    "rejects a WSL Browser app-server when Codex reports %s",
+    async (versionOutput) => {
+      mocks.batchWslCommandsAsync.mockResolvedValue([{ ok: true, stdout: versionOutput }]);
+      const launch = {
+        ...input("unsupported-wsl", browserServer("unsupported-wsl")),
+        projectLocation: {
+          kind: "wsl" as const,
+          distro: "Ubuntu",
+          linuxPath: "/repo",
+          uncPath: "\\\\wsl$\\Ubuntu\\repo",
+        },
+      };
+
+      await expect(acquireCodexAppServer(launch, "/usr/bin/codex")).rejects.toThrow(
+        "requires codex-cli >= 0.122.0",
+      );
+
+      expect(mocks.installCodexPlugin).not.toHaveBeenCalled();
+      expect(mocks.spawn).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not stage or trust the deny hook without managed Browser", async () => {
+    const acquired = await acquireCodexAppServer(
+      input("local-a", httpServer("slack", "http://127.0.0.1:9000/mcp")),
+    );
+
+    expect(mocks.installCodexPlugin).not.toHaveBeenCalled();
+    expect(mocks.buildCodexAppServerCommand).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ browserExclusiveHook: expect.anything() }),
+    );
+    expect(mocks.spawn.mock.calls[0]?.[1]).not.toContain("--dangerously-bypass-hook-trust");
+
+    acquired.dispose();
+  });
+
+  it("reuses one process when only thread-scoped MCP query values differ and credentials match", async () => {
     const first = await acquireCodexAppServer(input("local-a", browserServer("local-a")));
     const secondInput = {
-      ...input("local-b", browserServer("local-b", undefined, "yspace-mcp-v1.thread-b.signature")),
+      ...input("local-b", browserServer("local-b")),
       projectLocation: { kind: "windows" as const, path: "D:\\other-repo" },
     };
     const second = await acquireCodexAppServer(secondInput);
@@ -127,6 +276,21 @@ describe("Codex app-server pool", () => {
     expect(mocks.terminateChildProcessTree).not.toHaveBeenCalled();
     second.dispose();
     expect(mocks.terminateChildProcessTree).toHaveBeenCalledOnce();
+  });
+
+  it("does not reuse a process when signed launch credentials differ", async () => {
+    const first = await acquireCodexAppServer(
+      input("local-a", browserServer("local-a", undefined, "yspace-mcp-v1.thread-a.signature")),
+    );
+    const second = await acquireCodexAppServer(
+      input("local-b", browserServer("local-b", undefined, "yspace-mcp-v1.thread-b.signature")),
+    );
+
+    expect(mocks.spawn).toHaveBeenCalledTimes(2);
+    expect(second.connection).not.toBe(first.connection);
+
+    first.dispose();
+    second.dispose();
   });
 
   it("reuses one process when thread context windows differ", async () => {
@@ -160,7 +324,45 @@ describe("Codex app-server pool", () => {
     second.dispose();
     expect(mocks.terminateChildProcessTree).not.toHaveBeenCalled();
     third.dispose();
-    expect(mocks.terminateChildProcessTree).toHaveBeenCalledOnce();
+    expect(mocks.terminateChildProcessTree).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      ownedProcessGroup: process.platform !== "win32",
+    });
+  });
+
+  it("launches the app-server in an owned POSIX process group", async () => {
+    const acquired = await acquireCodexAppServer(input("local-a", browserServer("local-a")));
+
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ detached: process.platform !== "win32" }),
+    );
+
+    acquired.dispose();
+  });
+
+  it("reaps an app-server tree exactly once when dispose races its exit callback", async () => {
+    const child = fakeChildProcess();
+    mocks.spawn.mockReturnValueOnce(child);
+    const acquired = await acquireCodexAppServer(input("local-a", browserServer("local-a")));
+
+    acquired.dispose();
+    child.emit("exit", null, "SIGKILL");
+
+    expect(mocks.terminateChildProcessTree).toHaveBeenCalledExactlyOnceWith(child, {
+      ownedProcessGroup: process.platform !== "win32",
+    });
+  });
+
+  it("terminates owned app-server process groups during supervisor shutdown", async () => {
+    await acquireCodexAppServer(input("local-a", browserServer("local-a")));
+    const child = mocks.spawn.mock.results[0]?.value;
+
+    shutdownSpawnedCodexAppServers();
+
+    expect(mocks.terminateChildProcessTree).toHaveBeenCalledWith(child, {
+      ownedProcessGroup: process.platform !== "win32",
+    });
   });
 
   it("keeps the shared process alive when its final established lease overlaps an acquisition", async () => {
@@ -307,6 +509,40 @@ describe("Codex app-server pool", () => {
     },
   );
 
+  it.each(["app-controls", "browser", "computer-use"])(
+    "includes signed launch credentials in the pool identity for %s",
+    (id) => {
+      const first = httpServer(
+        id,
+        "http://127.0.0.1:9000/mcp?thread=local-a",
+        "yspace-mcp-v1.thread-a.signature",
+      );
+      const second = httpServer(
+        id,
+        "http://127.0.0.1:9000/mcp?thread=local-b",
+        "yspace-mcp-v1.thread-b.signature",
+      );
+
+      expect(codexAppServerPoolKey({ kind: "windows", path: "C:\\repo" }, [first])).not.toBe(
+        codexAppServerPoolKey({ kind: "windows", path: "C:\\repo" }, [second]),
+      );
+    },
+  );
+
+  it("includes the WSL launch-context header in the pool identity", () => {
+    const first = httpServer("browser", "http://127.0.0.1:9000/mcp?thread=local-a");
+    const second = httpServer("browser", "http://127.0.0.1:9000/mcp?thread=local-b");
+    if (first.transport.type === "stdio" || second.transport.type === "stdio") {
+      throw new Error("Expected HTTP MCP fixtures.");
+    }
+    first.transport.headers["x-y-space-mcp-context"] = "yspace-mcp-v1.thread-a.signature";
+    second.transport.headers["x-y-space-mcp-context"] = "yspace-mcp-v1.thread-b.signature";
+
+    expect(codexAppServerPoolKey({ kind: "windows", path: "C:\\repo" }, [first])).not.toBe(
+      codexAppServerPoolKey({ kind: "windows", path: "C:\\repo" }, [second]),
+    );
+  });
+
   it("does not normalize custom MCP query values", () => {
     const first = httpServer("custom", "http://127.0.0.1:9000/mcp?thread=local-a");
     const second = httpServer("custom", "http://127.0.0.1:9000/mcp?thread=local-b");
@@ -332,6 +568,7 @@ describe("Codex app-server pool", () => {
 
     await acquireCodexAppServer(launch);
     firstChild.emit("exit", 1);
+    expect(mocks.commandCleanup).toHaveBeenCalledOnce();
     await acquireCodexAppServer(launch);
 
     expect(mocks.spawn).toHaveBeenCalledTimes(2);
@@ -348,8 +585,20 @@ describe("Codex app-server pool", () => {
     await expect(acquireCodexAppServer(launch)).rejects.toThrow(
       "Codex app-server failed to spawn: spawn failed",
     );
+    expect(mocks.commandCleanup).toHaveBeenCalledOnce();
     await acquireCodexAppServer(launch);
 
     expect(mocks.spawn).toHaveBeenCalledTimes(2);
+  });
+
+  it("cleans launch artifacts when spawn throws synchronously", async () => {
+    mocks.spawn.mockImplementationOnce(() => {
+      throw new Error("synchronous spawn failure");
+    });
+
+    await expect(acquireCodexAppServer(input("local-a", browserServer("local-a")))).rejects.toThrow(
+      "synchronous spawn failure",
+    );
+    expect(mocks.commandCleanup).toHaveBeenCalledOnce();
   });
 });

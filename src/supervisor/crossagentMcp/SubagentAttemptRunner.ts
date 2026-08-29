@@ -33,7 +33,18 @@ export class SubagentAttemptRunner {
     attempt: ResolvedSpawnAttempt,
     callbacks: AttemptCallbacks,
   ): void {
-    if (resolveSubagentExecution(attempt.adapter) === "one-shot") {
+    const execution = resolveSubagentExecution(attempt.adapter);
+    if (
+      attempt.config.browserMcp === true &&
+      (execution === "one-shot" || attempt.adapter.browserRouting?.gui !== "exclusive")
+    ) {
+      callbacks.onSettle(
+        "failed",
+        `Y Space Browser is required for ${attempt.adapter.label}, but this subagent path does not provide an exclusive embedded Browser connection.`,
+      );
+      return;
+    }
+    if (execution === "one-shot") {
       this.runOneShot(state, attemptIndex, attempt, callbacks);
       return;
     }

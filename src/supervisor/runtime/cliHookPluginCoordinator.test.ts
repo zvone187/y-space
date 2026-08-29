@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentKind } from "@/shared/contracts";
+import type { AgentKind, ResolvedMcpServer } from "@/shared/contracts";
 import {
   type AgentAdapter,
   type AgentEnvContext,
@@ -21,6 +21,17 @@ import { CliHookPluginCoordinator } from "./cliHookPluginCoordinator";
  */
 
 const tempDirs: string[] = [];
+
+const ySpaceBrowserMcp: ResolvedMcpServer = {
+  id: "browser",
+  name: "browser",
+  timeoutMs: 30_000,
+  transport: {
+    type: "http",
+    url: "http://127.0.0.1:43199/mcp",
+    headers: {},
+  },
+};
 
 function makeTempSettings(): string {
   const dir = mkdtempSync(join(tmpdir(), "poracode-cli-hook-cache-"));
@@ -824,6 +835,210 @@ describe("CliHookPluginCoordinator install cache", () => {
       PORACODE_HOOK_PROTOCOL_VERSION: "1",
     });
     expect(resolved!.extraArgs).toEqual(["--codex-marker"]);
+  });
+
+  it("fails closed safely when the required Codex Browser hook cannot be installed", async () => {
+    const stub = makeStubAdapter("codex");
+    stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "0.9.0" });
+    stub.installPlugin.mockResolvedValue({
+      ok: false,
+      reason: "installation failed with private-value-sentinel",
+    });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    await expect(
+      coordinator.resolvePluginEnvForSpawn({
+        threadId: "thread-codex-browser",
+        agentKind: "codex",
+        mcpServers: [ySpaceBrowserMcp],
+      }),
+    ).rejects.toThrow(
+      "Y Space Browser cannot start Codex safely because its browser-command hook is unavailable.",
+    );
+    await expect(
+      coordinator.resolvePluginEnvForSpawn({
+        threadId: "thread-codex-browser",
+        agentKind: "codex",
+        mcpServers: [ySpaceBrowserMcp],
+      }),
+    ).rejects.not.toThrow("private-value-sentinel");
+  });
+
+  it("fails closed safely when the required Claude Browser hook cannot be installed", async () => {
+    const stub = makeStubAdapter("claude");
+    stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "0.9.0" });
+    stub.installPlugin.mockResolvedValue({
+      ok: false,
+      reason: "installation failed with private-value-sentinel",
+    });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["claude", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const launch = coordinator.resolvePluginEnvForSpawn({
+      threadId: "thread-claude-browser",
+      agentKind: "claude",
+      mcpServers: [ySpaceBrowserMcp],
+    });
+    await expect(launch).rejects.toThrow(
+      "Y Space Browser cannot start Claude safely because its browser-command hook is unavailable.",
+    );
+    await expect(launch).rejects.not.toThrow("private-value-sentinel");
+  });
+
+  it("fails closed safely when the required Codex Browser hook transport is unavailable", async () => {
+    const stub = makeStubAdapter("codex");
+    stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
+    const wslHookBridge = {
+      ensureBridge: vi.fn<
+        (
+          distro: string,
+        ) => Promise<{ baseUrl: string; hookUrl: string; secret: string } | undefined>
+      >(async () => undefined),
+      dispose: vi.fn<() => Promise<void>>(async () => undefined),
+    } as unknown as WslBridgeServer;
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "wsl", wslDistro: "Ubuntu" }),
+        wslHookBridge,
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    await expect(
+      coordinator.resolvePluginEnvForSpawn({
+        threadId: "thread-codex-browser-wsl",
+        agentKind: "codex",
+        projectLocation: {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/u/repo",
+          uncPath: "\\\\wsl$\\Ubuntu\\home\\u\\repo",
+        },
+        mcpServers: [ySpaceBrowserMcp],
+      }),
+    ).rejects.toThrow(
+      "Y Space Browser cannot start Codex safely because its browser-command hook is unavailable.",
+    );
+  });
+
+  it("fails closed when Claude's Browser hook transport or settings extras are unavailable", async () => {
+    const transportStub = makeStubAdapter("claude", {
+      pluginLaunchExtras: async () => ({
+        args: ["--settings", "/private/y-space/agent-plugins/claude/settings.json"],
+      }),
+    });
+    transportStub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
+    const wslHookBridge = {
+      ensureBridge: vi.fn<() => Promise<undefined>>(async () => undefined),
+      dispose: vi.fn<() => Promise<void>>(async () => undefined),
+    } as unknown as WslBridgeServer;
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["claude", transportStub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "wsl", wslDistro: "Ubuntu" }),
+        wslHookBridge,
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    await expect(
+      coordinator.resolvePluginEnvForSpawn({
+        threadId: "thread-claude-browser-wsl",
+        agentKind: "claude",
+        projectLocation: {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/u/repo",
+          uncPath: "\\\\wsl$\\Ubuntu\\home\\u\\repo",
+        },
+        mcpServers: [ySpaceBrowserMcp],
+      }),
+    ).rejects.toThrow(/cannot start Claude safely/iu);
+    await coordinator.dispose();
+
+    const settingsStub = makeStubAdapter("claude", {
+      pluginLaunchExtras: async () => ({ args: [] }),
+    });
+    settingsStub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["claude", settingsStub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    await expect(
+      coordinator.resolvePluginEnvForSpawn({
+        threadId: "thread-claude-browser-settings",
+        agentKind: "claude",
+        mcpServers: [ySpaceBrowserMcp],
+      }),
+    ).rejects.toThrow(/cannot start Claude safely/iu);
+  });
+
+  it("returns the complete launch-scoped Codex Browser hook gate", async () => {
+    const stub = makeStubAdapter("codex", {
+      pluginLaunchExtras: async () => ({
+        args: ["--dangerously-bypass-hook-trust", "--enable", "hooks"],
+        env: {
+          CODEX_HOME: "/private/y-space/agent-plugins/codex/home",
+          CODEX_SQLITE_HOME: "/home/demo/.codex",
+        },
+      }),
+    });
+    stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const resolved = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "thread-codex-browser",
+      agentKind: "codex",
+      mcpServers: [ySpaceBrowserMcp],
+    });
+
+    expect(resolved).toMatchObject({
+      env: {
+        PORACODE_AGENT_KIND: "codex",
+        PORACODE_THREAD_ID: "thread-codex-browser",
+        CODEX_HOME: "/private/y-space/agent-plugins/codex/home",
+        CODEX_SQLITE_HOME: "/home/demo/.codex",
+      },
+      extraArgs: ["--dangerously-bypass-hook-trust", "--enable", "hooks"],
+    });
   });
 
   it("resolves Gemini spawn env with PORACODE_AGENT_KIND=gemini and provider settings path", async () => {

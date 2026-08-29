@@ -29,6 +29,7 @@ import {
   parseCodexVersionLine,
   probeCodexCliSemver,
   readBundledCodexPluginVersion,
+  resolveCodexSqliteHome,
   uninstallCodexPlugin,
 } from "./plugin/install";
 import { listNativeCodexPlugins } from "./nativePlugins";
@@ -108,6 +109,7 @@ export function createCodexAdapter(): AgentAdapter {
   let preSpawnStartedAt = 0;
 
   return {
+    browserRouting: { terminal: "exclusive", gui: "exclusive" },
     kind: codexDetectionSpec.kind,
     label: codexDetectionSpec.label,
     binary: codexDetectionSpec.binary,
@@ -184,10 +186,17 @@ export function createCodexAdapter(): AgentAdapter {
     },
     async pluginLaunchExtras(ctx) {
       const paths = getCodexPluginPaths(ctx);
+      const sqliteHomeDir = await resolveCodexSqliteHome(ctx);
       const hooksFeatureFlag = await resolveCodexHooksFeatureFlag(ctx);
       return {
-        args: ["--enable", hooksFeatureFlag],
-        env: { CODEX_HOME: paths.codexHomeDir },
+        // This private CODEX_HOME and hooks.json are generated entirely by Y Space.
+        // Bypass workspace trust only for that app-owned hook so its PreToolUse
+        // policy can enforce launch-scoped Browser exclusivity.
+        args: ["--dangerously-bypass-hook-trust", "--enable", hooksFeatureFlag],
+        env: {
+          CODEX_HOME: paths.codexHomeDir,
+          CODEX_SQLITE_HOME: sqliteHomeDir,
+        },
       };
     },
     handleOscNotification: codexOscHint,

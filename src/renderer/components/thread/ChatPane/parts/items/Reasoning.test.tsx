@@ -68,6 +68,49 @@ describe("Reasoning", () => {
     expect(container.querySelector(".overflow-y-auto")).toBeNull();
   });
 
+  it("mounts the full body when Find targets a completed thought", () => {
+    const hiddenNeedle = "standalone-find-only-needle";
+    const item = {
+      ...makeReasoningItem(`${"Earlier analysis. ".repeat(12)}${hiddenNeedle}`),
+      state: "completed" as const,
+    };
+    const { container } = render(
+      <AppProvider>
+        <Reasoning item={item} forceExpanded />
+      </AppProvider>,
+    );
+
+    expect(container.querySelector("button")).toHaveAttribute("aria-expanded", "true");
+    expect(container).toHaveTextContent(hiddenNeedle);
+  });
+
+  it("does not turn a temporary Find reveal into a manual expansion", () => {
+    const hiddenNeedle = "temporary-find-reveal-needle";
+    const item = {
+      ...makeReasoningItem(`${"Earlier analysis. ".repeat(12)}${hiddenNeedle}`),
+      state: "completed" as const,
+    };
+    const view = render(
+      <AppProvider>
+        <Reasoning item={item} forceExpanded />
+      </AppProvider>,
+    );
+
+    const toggle = view.container.querySelector("button");
+    if (!toggle) throw new Error("missing Thought toggle");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(toggle);
+
+    view.rerender(
+      <AppProvider>
+        <Reasoning item={item} />
+      </AppProvider>,
+    );
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(view.container).not.toHaveTextContent(hiddenNeedle);
+  });
+
   it("keeps live reasoning pinned to the bottom while new content streams in", async () => {
     const { container, rerender } = renderReasoning(makeReasoningItem("Inspecting logs"));
     expandReasoning(container);

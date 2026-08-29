@@ -1,11 +1,14 @@
 import type { ComputerUseDriver, ComputerUseScreenshot, ComputerUseWindowState } from "./types";
 import type { McpToolAnnotations } from "@/shared/contracts";
+import { isCompetingBrowserAppIdentity } from "@/shared/browserExclusivePolicy";
 import { readNumber, readString, readWindow } from "../drivers/common";
 
 export interface ToolContext {
   driver: ComputerUseDriver;
   setSessionActive?: (active: boolean) => void;
   threadId?: string;
+  /** Trusted live-session policy; never accepted from agent-supplied tool input. */
+  managedBrowserConnected?: boolean;
 }
 
 export interface ToolSpec {
@@ -30,7 +33,7 @@ const WINDOW_SCHEMA = {
 };
 
 export const COMPUTER_USE_MCP_INSTRUCTIONS =
-  "Use the computer_use MCP server to inspect and control native macOS or Windows apps on the host desktop (including when the user is driving from a paired phone/remote client — agents still run on that desktop). Start with computer_use.api or computer_use.list_apps, choose a returned window, then call computer_use.get_window_state before coordinate input. Immediately before the first interactive action, call computer_use.enable once; it keeps the Computer Use overlay visible across the whole uninterrupted control session. Keep it enabled between related actions, including passive inspection calls. Always call computer_use.disable before you pause to ask for user input, wait for an external event, or finish; call enable again when you resume. Prefer ordinary Win32 desktop apps when you have a choice — some Store/WinUI apps recreate window handles during activation, so always prefer the `window` object returned by interactive tools (or re-call list_windows/get_window) before the next click/type. list/get/screenshot operations are passive and do not steal focus; click, drag, scroll, type_text, press_key, activate_window, and launch_app switch to interactive mode, bring the target app to the FOREGROUND, and take exclusive control of the real mouse/keyboard — nobody should use the host machine while interactive computer-use is running. Coordinates (x/y) are window-relative with the origin at the TOP-LEFT of the window frame (including the title bar), matching the top-left pixel of the most recent get_window_state screenshot for that window; if the window may have moved or resized, call get_window_state again before sending coordinates. If a tool reports that the window is no longer available (windows are re-identified after they move/resize), call computer_use.list_windows or computer_use.get_window to obtain a fresh window id and retry. Prefer the browser MCP server for web pages. Locked desktops, secure prompts, OS permission prompts, and password/authentication surfaces require the user.";
+  "Use the computer_use MCP server to inspect and control native macOS or Windows apps on the host desktop (including when the user is driving from a paired phone/remote client — agents still run on that desktop). Start with computer_use.api or computer_use.list_apps, choose a returned window, then call computer_use.get_window_state before coordinate input. Immediately before the first interactive action, call computer_use.enable once; it keeps the Computer Use overlay visible across the whole uninterrupted control session. Keep it enabled between related actions, including passive inspection calls. Always call computer_use.disable before you pause to ask for user input, wait for an external event, or finish; call enable again when you resume. Prefer ordinary Win32 desktop apps when you have a choice — some Store/WinUI apps recreate window handles during activation, so always prefer the `window` object returned by interactive tools (or re-call list_windows/get_window) before the next click/type. list/get/screenshot operations are passive and do not steal focus; click, drag, scroll, type_text, press_key, activate_window, and launch_app switch to interactive mode, bring the target app to the FOREGROUND, and take exclusive control of the real mouse/keyboard — nobody should use the host machine while interactive computer-use is running. Coordinates (x/y) are window-relative with the origin at the TOP-LEFT of the window frame (including the title bar), matching the top-left pixel of the most recent get_window_state screenshot for that window; if the window may have moved or resized, call get_window_state again before sending coordinates. If a tool reports that the window is no longer available (windows are re-identified after they move/resize), call computer_use.list_windows or computer_use.get_window to obtain a fresh window id and retry. Use the browser MCP exclusively for web pages; when it is available, never launch, activate, inspect, or control a browser through computer_use. Locked desktops, secure prompts, OS permission prompts, and password/authentication surfaces require the user.";
 
 const RAW_TOOLS: ToolSpec[] = [
   {
@@ -254,6 +257,39 @@ function readMouseButton(value: unknown): string | undefined {
   return value;
 }
 
+const Y_SPACE_HOST_APP_RE = /(?:^|[^a-z0-9])(?:y[\s-]*space|poracode|lightcode)(?:[^a-z0-9]|$)/iu;
+const URI_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/iu;
+const WINDOWS_DRIVE_PATH_RE = /^[a-z]:[\\/]/iu;
+const BROWSER_DOCUMENT_PATH_RE = /\.(?:html?|xhtml|mhtml|webarchive)(?:[?#][\s\S]*)?$/iu;
+
+function isBrowserSurface(...values: readonly (string | undefined)[]): boolean {
+  return (
+    isCompetingBrowserAppIdentity(...values) ||
+    values.some((value) => Y_SPACE_HOST_APP_RE.test(value ?? ""))
+  );
+}
+
+function assertBrowserWindowAllowed(app: string | undefined, ctx: ToolContext): void {
+  if (ctx.managedBrowserConnected && isBrowserSurface(app)) {
+    throw new Error(
+      "Y Space Browser is connected. Use its browser MCP instead of Computer Use for browser apps.",
+    );
+  }
+}
+
+function assertBrowserLaunchAllowed(app: string, ctx: ToolContext): void {
+  const launchTarget = app.trim();
+  const isUri = URI_SCHEME_RE.test(launchTarget) && !WINDOWS_DRIVE_PATH_RE.test(launchTarget);
+  if (
+    ctx.managedBrowserConnected &&
+    (isUri || BROWSER_DOCUMENT_PATH_RE.test(launchTarget) || isBrowserSurface(app))
+  ) {
+    throw new Error(
+      "Y Space Browser is connected. Use its browser MCP instead of Computer Use for browser apps.",
+    );
+  }
+}
+
 export async function dispatchTool(
   name: string,
   args: Record<string, unknown>,
@@ -278,20 +314,44 @@ export async function dispatchTool(
       if (!ctx.setSessionActive) throw new Error("computer_use.disable requires a thread context");
       ctx.setSessionActive(false);
       return { enabled: false };
-    case "list_apps":
-      return await ctx.driver.listApps();
-    case "list_windows":
-      return await ctx.driver.listWindows();
-    case "launch_app":
-      return await ctx.driver.launchApp({ app: readString(args.app, "app") });
-    case "get_window":
-      return await ctx.driver.getWindow({
-        ...(typeof args.app === "string" ? { app: args.app } : {}),
+    case "list_apps": {
+      const apps = await ctx.driver.listApps();
+      if (!ctx.managedBrowserConnected) return apps;
+      return apps
+        .filter((app) => !isBrowserSurface(app.id, app.displayName))
+        .map((app) => ({
+          ...app,
+          windows: app.windows.filter((window) => !isBrowserSurface(window.app)),
+        }));
+    }
+    case "list_windows": {
+      const windows = await ctx.driver.listWindows();
+      return ctx.managedBrowserConnected
+        ? windows.filter((window) => !isBrowserSurface(window.app))
+        : windows;
+    }
+    case "launch_app": {
+      const app = readString(args.app, "app");
+      assertBrowserLaunchAllowed(app, ctx);
+      const result = await ctx.driver.launchApp({ app });
+      assertBrowserWindowAllowed(result.window?.app, ctx);
+      return result;
+    }
+    case "get_window": {
+      const app = typeof args.app === "string" ? args.app : undefined;
+      assertBrowserWindowAllowed(app, ctx);
+      const window = await ctx.driver.getWindow({
+        ...(app ? { app } : {}),
         id: readNumber(args.id, "id"),
       });
-    case "get_window_state":
+      assertBrowserWindowAllowed(window.app, ctx);
+      return window;
+    }
+    case "get_window_state": {
+      const window = readWindow(args.window);
+      assertBrowserWindowAllowed(window.app, ctx);
       return await ctx.driver.getWindowState({
-        window: readWindow(args.window),
+        window,
         ...(typeof args.include_screenshot === "boolean"
           ? { include_screenshot: args.include_screenshot }
           : {}),
@@ -301,45 +361,63 @@ export async function dispatchTool(
           : {}),
         ...(args.format === "png" || args.format === "jpeg" ? { format: args.format } : {}),
       });
-    case "activate_window":
-      return await ctx.driver.activateWindow({ window: readWindow(args.window) });
+    }
+    case "activate_window": {
+      const window = readWindow(args.window);
+      assertBrowserWindowAllowed(window.app, ctx);
+      return await ctx.driver.activateWindow({ window });
+    }
     case "click": {
       const clickCount = readClickCount(args.click_count);
       const mouseButton = readMouseButton(args.mouse_button);
+      const window = readWindow(args.window);
+      assertBrowserWindowAllowed(window.app, ctx);
       return await ctx.driver.click({
-        window: readWindow(args.window),
+        window,
         x: readNumber(args.x, "x"),
         y: readNumber(args.y, "y"),
         ...(clickCount !== undefined ? { click_count: clickCount } : {}),
         ...(mouseButton !== undefined ? { mouse_button: mouseButton } : {}),
       });
     }
-    case "press_key":
+    case "press_key": {
+      const window = readWindow(args.window);
+      assertBrowserWindowAllowed(window.app, ctx);
       return await ctx.driver.pressKey({
-        window: readWindow(args.window),
+        window,
         key: readString(args.key, "key"),
       });
-    case "type_text":
+    }
+    case "type_text": {
+      const window = readWindow(args.window);
+      assertBrowserWindowAllowed(window.app, ctx);
       return await ctx.driver.typeText({
-        window: readWindow(args.window),
+        window,
         text: readString(args.text, "text"),
       });
-    case "scroll":
+    }
+    case "scroll": {
+      const window = readWindow(args.window);
+      assertBrowserWindowAllowed(window.app, ctx);
       return await ctx.driver.scroll({
-        window: readWindow(args.window),
+        window,
         x: readNumber(args.x, "x"),
         y: readNumber(args.y, "y"),
         scrollX: readNumber(args.scrollX, "scrollX"),
         scrollY: readNumber(args.scrollY, "scrollY"),
       });
-    case "drag":
+    }
+    case "drag": {
+      const window = readWindow(args.window);
+      assertBrowserWindowAllowed(window.app, ctx);
       return await ctx.driver.drag({
-        window: readWindow(args.window),
+        window,
         from_x: readNumber(args.from_x, "from_x"),
         from_y: readNumber(args.from_y, "from_y"),
         to_x: readNumber(args.to_x, "to_x"),
         to_y: readNumber(args.to_y, "to_y"),
       });
+    }
     default:
       throw new Error(`unknown tool: ${name}`);
   }

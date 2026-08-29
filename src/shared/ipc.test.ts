@@ -6,6 +6,8 @@ import {
   createProcedureBridge,
   ipcProcedureMap,
   MAIN_LOCAL_PROCEDURE_NAMES,
+  RENDERER_IPC_PROCEDURE_NAMES,
+  SUPERVISOR_INTERNAL_PROCEDURE_NAMES,
   type MainLocalProcedureName,
 } from "./ipc";
 
@@ -18,11 +20,17 @@ describe("ipcProcedureMap", () => {
     }
   });
 
-  it("creates bridge methods for every procedure", () => {
+  it("creates bridge methods only for renderer-callable procedures", () => {
     const bridge = createInvokeBridge(async () => undefined);
-    for (const name of Object.keys(ipcProcedureMap)) {
+    for (const name of RENDERER_IPC_PROCEDURE_NAMES) {
       expect(typeof bridge[name as keyof typeof bridge]).toBe("function");
     }
+    for (const name of SUPERVISOR_INTERNAL_PROCEDURE_NAMES) {
+      expect(Object.hasOwn(bridge, name)).toBe(false);
+    }
+    expect(
+      [...RENDERER_IPC_PROCEDURE_NAMES, ...SUPERVISOR_INTERNAL_PROCEDURE_NAMES].sort(),
+    ).toEqual(Object.keys(ipcProcedureMap).sort());
   });
 
   it("can generate a bridge while preserving procedure names and arguments", async () => {

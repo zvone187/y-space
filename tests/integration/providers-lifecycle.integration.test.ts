@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -13,8 +13,15 @@ import type {
 } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import type { AgentAdapter } from "@/supervisor/agents/base";
+import { createClaudeAdapter } from "@/supervisor/agents/claude";
 import { createAgentRegistry } from "@/supervisor/agents/registry";
 import { SupervisorRuntime } from "@/supervisor/supervisorRuntime";
+import {
+  createLiveProviderProfileSandbox,
+  isolateCodexAdapterProfile,
+  isolatedLiveProviderRuntimeSettings,
+  type LiveProviderProfileSandbox,
+} from "./providerProfileSandbox";
 
 // Live-CLI integration: for each adapter in `createAgentRegistry()`, this test
 // starts a real thread with a cheap model, waits for sessionRef discovery,
@@ -58,19 +65,7 @@ interface DialogResponder {
   reason: string;
 }
 
-const KIND_DIALOG_RESPONDERS: Record<string, DialogResponder[]> = {
-  // Codex >= 0.130 gates first-run on a "Hooks need review" dialog whenever
-  // CODEX_HOME contains hooks the user hasn't accepted. The supervisor stages
-  // a fresh hook bundle into a temp CODEX_HOME each test invocation, so we
-  // always see this prompt; auto-select "2. Trust all and continue".
-  codex: [
-    {
-      needle: /Hooks\s+need\s+review/i,
-      response: "2\r",
-      reason: "codex: accept hooks trust dialog",
-    },
-  ],
-};
+const KIND_DIALOG_RESPONDERS: Record<string, DialogResponder[]> = {};
 
 function decodeScrollbackText(scrollback: string): string {
   // Strip CSI / OSC / private-mode escape sequences so simple substring or
@@ -273,6 +268,7 @@ interface SuiteContext {
   runtime: SupervisorRuntime;
   events: SupervisorEvent[];
   cwd: string;
+  isolatedProviderCwd: string;
   dataDir: string;
   prevDataDir: string | undefined;
   adapters: AgentAdapter[];
@@ -282,27 +278,55 @@ const ctx: SuiteContext = {
   runtime: undefined as unknown as SupervisorRuntime,
   events: [],
   cwd: "",
+  isolatedProviderCwd: "",
   dataDir: "",
   prevDataDir: process.env.PORACODE_DATA_DIR,
   adapters: [],
 };
+let profileSandbox: LiveProviderProfileSandbox;
 
 beforeAll(() => {
-  // Use the actual repo root as the project cwd so providers that gate launch
-  // on directory trust (Claude's "Do you trust this folder?" dialog, Cursor's
-  // workspace prompt, etc.) don't block on a never-seen tmp path. The test
-  // prompt is "reply OK" — providers do not write files for that — so using
-  // the repo dir is non-destructive. Supervisor state stays isolated via
-  // PORACODE_DATA_DIR (set per test in beforeEach).
   ctx.cwd = process.cwd();
-  ctx.adapters = createAgentRegistry();
+  ctx.isolatedProviderCwd = mkdtempSync(join(tmpdir(), "y-space-provider-cwd-"));
+  writeFileSync(join(ctx.isolatedProviderCwd, "README.md"), "# isolated provider fixture\n");
+  // Live Claude and Codex CLIs persist state even for a read-only prompt. Keep
+  // auth/config snapshots usable while ensuring every mutable write lands in a
+  // disposable profile, never the user's canonical files.
+  profileSandbox = createLiveProviderProfileSandbox({
+    trustedClaudeProjectPaths: [ctx.isolatedProviderCwd],
+  });
+  // Other providers keep the actual repo cwd so their existing trust state is
+  // usable. Claude and Codex use the empty fixture above, preventing project
+  // hooks/MCP config from joining an otherwise isolated global profile.
+  // Supervisor state stays isolated via PORACODE_DATA_DIR per test.
+  ctx.adapters = createAgentRegistry().map((adapter) => {
+    if (adapter.kind === "claude") {
+      return createClaudeAdapter({
+        configDir: profileSandbox.paths.claudeConfigDir,
+        customEnv: { ...profileSandbox.environment },
+      });
+    }
+    return adapter.kind === "codex"
+      ? isolateCodexAdapterProfile(adapter, profileSandbox.environment)
+      : adapter;
+  });
+});
+
+afterAll(() => {
+  try {
+    profileSandbox?.dispose();
+  } finally {
+    if (ctx.isolatedProviderCwd) {
+      rmSync(ctx.isolatedProviderCwd, { recursive: true, force: true });
+    }
+  }
 });
 
 // Providers that need CLI hook plugins active to surface sessionRef back into
 // the runtime. OpenCode's structured-session→terminal handoff drops the
 // session id when hooks are disabled, so we leave hooks enabled for it.
-// Codex must stay on `disableCliHookPlugin: true` — its first-run "Hooks
-// need review" dialog triggers off the installed hook bundle.
+// The isolated Codex adapter above omits its hook-plugin slice entirely so the
+// test never stages a private home that aliases the user's real profile.
 const NEEDS_HOOKS_ENABLED = new Set(["opencode"]);
 
 beforeEach((testCtx) => {
@@ -314,10 +338,13 @@ beforeEach((testCtx) => {
   ctx.dataDir = mkdtempSync(join(tmpdir(), "poracode-int-"));
   process.env.PORACODE_DATA_DIR = ctx.dataDir;
   const kind = testCtx.task.name;
+  if (kind === "claude" || kind === "codex") {
+    profileSandbox.activate();
+  }
   const disableHooks = !NEEDS_HOOKS_ENABLED.has(kind);
   writeFileSync(
     join(ctx.dataDir, "settings.json"),
-    JSON.stringify({ disableCliHookPlugin: disableHooks }),
+    JSON.stringify(isolatedLiveProviderRuntimeSettings(disableHooks)),
   );
   ctx.events = [];
   ctx.runtime = new SupervisorRuntime((event) => {
@@ -331,14 +358,25 @@ afterEach(() => {
   } catch {
     // best-effort
   }
-  if (ctx.prevDataDir === undefined) {
-    delete process.env.PORACODE_DATA_DIR;
-  } else {
-    process.env.PORACODE_DATA_DIR = ctx.prevDataDir;
+  let profileInvariantError: unknown;
+  try {
+    profileSandbox?.deactivate();
+  } catch (error) {
+    profileInvariantError = error;
+  } finally {
+    if (ctx.prevDataDir === undefined) {
+      delete process.env.PORACODE_DATA_DIR;
+    } else {
+      process.env.PORACODE_DATA_DIR = ctx.prevDataDir;
+    }
+    // Only remove the data dir — `ctx.cwd` is the poracode repo root and must
+    // never be deleted.
+    if (ctx.dataDir) rmSync(ctx.dataDir, { recursive: true, force: true });
   }
-  // Only remove the data dir — `ctx.cwd` is the poracode repo root and must
-  // never be deleted.
-  if (ctx.dataDir) rmSync(ctx.dataDir, { recursive: true, force: true });
+  if (profileInvariantError instanceof Error) throw profileInvariantError;
+  if (profileInvariantError !== undefined) {
+    throw new Error(`Provider profile invariant failed: ${String(profileInvariantError)}`);
+  }
 });
 
 const REGISTRY_KINDS = createAgentRegistry().map((a) => a.kind);
@@ -384,8 +422,10 @@ describe("provider lifecycle: create → unload → resume → initial message v
       console.log(`[int-test] ${kind} using model: ${model}`);
 
       const threadId = `int-${kind}-${randomUUID()}`;
-      const projectLocation = makeProjectLocation(ctx.cwd);
-      const config: ThreadConfig = { model };
+      const projectLocation = makeProjectLocation(
+        kind === "claude" || kind === "codex" ? ctx.isolatedProviderCwd : ctx.cwd,
+      );
+      const config: ThreadConfig = { model, browserMcp: false };
       const startPayload: StartThreadPayload = {
         threadId,
         projectLocation,

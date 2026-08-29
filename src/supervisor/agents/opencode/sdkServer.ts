@@ -15,6 +15,7 @@ export class OpenCodeReadinessTimeoutError extends ExpectedStructuredRuntimeErro
 }
 
 const activeServerChildren = new Set<ChildProcess>();
+const reapedServerChildren = new WeakSet<ChildProcess>();
 let processExitCleanupRegistered = false;
 
 export interface OpenCodeServerHandle {
@@ -30,24 +31,43 @@ interface PendingResolve {
   reject(err: Error): void;
 }
 
-function terminateOpenCodeServerChildNow(child: ChildProcess): void {
-  if (typeof child.pid !== "number") return;
-  if (child.exitCode !== null || child.killed) return;
-
-  if (process.platform === "win32") {
-    terminateChildProcessTree(child);
-    return;
-  }
-
+function reapOpenCodeServerProcessGroupOnce(
+  child: ChildProcess,
+  options: { fallbackToLeader?: boolean } = {},
+): void {
+  if (process.platform === "win32" || typeof child.pid !== "number") return;
+  if (reapedServerChildren.has(child)) return;
+  reapedServerChildren.add(child);
   try {
     process.kill(-child.pid, "SIGKILL");
   } catch {
+    if (!options.fallbackToLeader) return;
     try {
       process.kill(child.pid, "SIGKILL");
     } catch {
       // Already gone.
     }
   }
+}
+
+function terminateOpenCodeServerChildNow(child: ChildProcess): void {
+  if (process.platform === "win32") {
+    if (child.exitCode !== null || child.killed) return;
+    terminateChildProcessTree(child);
+    return;
+  }
+
+  // The leader may already be gone while descendants still retain its pgid.
+  reapOpenCodeServerProcessGroupOnce(child, { fallbackToLeader: true });
+}
+
+/**
+ * A detached POSIX process group can outlive its `opencode serve` leader. Reap
+ * that group from the leader's exit callback while its original pgid is still
+ * authoritative; a later dispose cannot safely recover descendants by pid.
+ */
+function reapExitedOpenCodeServerProcessGroup(child: ChildProcess): void {
+  reapOpenCodeServerProcessGroupOnce(child);
 }
 
 /** Terminate only `opencode serve` children spawned through {@link spawnOpenCodeServer}. */
@@ -67,17 +87,29 @@ function registerProcessExitCleanup(): void {
 export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHandle {
   registerProcessExitCleanup();
   const isWin = process.platform === "win32";
-  const child = spawn(commandSpec.command, commandSpec.args, {
-    cwd: commandSpec.cwd,
-    env: sanitizeChildProcessEnv({ ...process.env, ...commandSpec.env }),
-    stdio: ["pipe", "pipe", "pipe"],
-    shell: false,
-    windowsHide: true,
-    // POSIX: own process group so dispose() can `kill(-pid, ...)` to take
-    // the whole tree down (opencode forks subprocesses for tools).
-    // Windows has no process groups; taskkill /T handles the tree.
-    detached: !isWin,
-  });
+  let launchCleanupCalled = false;
+  const cleanupLaunch = (): void => {
+    if (launchCleanupCalled) return;
+    launchCleanupCalled = true;
+    commandSpec.cleanup?.();
+  };
+  let child: ChildProcess;
+  try {
+    child = spawn(commandSpec.command, commandSpec.args, {
+      cwd: commandSpec.cwd,
+      env: sanitizeChildProcessEnv({ ...process.env, ...commandSpec.env }),
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+      windowsHide: true,
+      // POSIX: own process group so dispose() can `kill(-pid, ...)` to take
+      // the whole tree down (opencode forks subprocesses for tools).
+      // Windows has no process groups; taskkill /T handles the tree.
+      detached: !isWin,
+    });
+  } catch (error) {
+    cleanupLaunch();
+    throw error;
+  }
   activeServerChildren.add(child);
 
   let stdoutBuf = "";
@@ -91,11 +123,15 @@ export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHan
 
   // Spawn-error and early-exit guards (mirrors Codex acp.ts:327-336).
   child.once("error", (err) => {
+    cleanupLaunch();
+    activeServerChildren.delete(child);
     pending?.reject(
       new Error(classifyOpenCodeError({ cause: err, operation: "spawn opencode serve" })),
     );
   });
   child.once("exit", (code, signal) => {
+    reapExitedOpenCodeServerProcessGroup(child);
+    cleanupLaunch();
     activeServerChildren.delete(child);
     if (!baseUrl) {
       const detail = formatOutput();
@@ -203,15 +239,7 @@ export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHan
       });
     });
     if (child.exitCode !== null) return;
-    try {
-      process.kill(-pid, "SIGKILL");
-    } catch {
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {
-        // Already gone.
-      }
-    }
+    reapOpenCodeServerProcessGroupOnce(child, { fallbackToLeader: true });
   }
 
   return {

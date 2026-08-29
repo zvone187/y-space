@@ -74,8 +74,12 @@ import { FileContentPlaceholder, useReadAbsoluteFile } from "./useReadAbsoluteFi
 interface ToolCallGroupProps {
   threadId: string;
   itemIds: readonly string[];
-  /** True while this group is the tail of the timeline. Drives default expand state. */
+  /** True while this group belongs to the active timeline tail. */
   isLive?: boolean;
+  /** Temporarily reveal this group while Find targets one of its child rows. */
+  forceExpanded?: boolean;
+  /** Exact nested item targeted by Find. */
+  revealedItemId?: string | null;
   /** Synchronously remeasure the owning virtual row after an explicit layout change. */
   onHeightChange?: () => void;
   /** Arm scroll anchoring before a disclosure commits a new row height. */
@@ -88,6 +92,8 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   threadId,
   itemIds,
   isLive = false,
+  forceExpanded = false,
+  revealedItemId = null,
   onHeightChange,
   onVirtualizerLayoutChange,
 }: ToolCallGroupProps) {
@@ -99,39 +105,38 @@ export const ToolCallGroup = memo(function ToolCallGroup({
     ),
   );
   const actions = useChatPaneActions();
-  // Single pass: edit-only groups stay collapsed while live; same-file multi
-  // patches also get the compact "N edits: path" header.
-  const { editOnly: editOnlyGroup, sameFile: sameFileEditSummary } = analyzeEditToolGroup(items);
+  // Single pass: same-file multi-patch runs get the compact "N edits: path"
+  // header. Every group now shares the same closed-by-default behavior.
+  const { sameFile: sameFileEditSummary } = analyzeEditToolGroup(items);
   // Mixed groups render per-segment: strictly consecutive same-file edits
   // collapse into one merged edit row; everything else stays its own row.
   const segments = segmentToolGroupRows(items);
-  const [isExpanded, setIsExpanded] = useState(() => isLive && !editOnlyGroup);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const isFindTarget = revealedItemId !== null && itemIds.includes(revealedItemId);
+  const isExpanded = manuallyExpanded || forceExpanded || isFindTarget;
   const [showAll, setShowAll] = useState(false);
+  const displayAll = showAll || isFindTarget;
   const scrollRef = useRef<HTMLDivElement>(null);
-  const previousLayoutRef = useRef({ isExpanded, showAll });
+  const previousLayoutRef = useRef({ isExpanded, showAll: displayAll });
   const hasOverflowRows = segments.length > TOOL_CALL_GROUP_MAX_VISIBLE_ROWS;
-  // Preserve manual open/close across live-tail item updates.
-  const userToggledRef = useRef(false);
+  const previousLiveRef = useRef(isLive);
 
   useLayoutEffect(() => {
     const previous = previousLayoutRef.current;
-    if (previous.isExpanded === isExpanded && previous.showAll === showAll) return;
-    previousLayoutRef.current = { isExpanded, showAll };
+    if (previous.isExpanded === isExpanded && previous.showAll === displayAll) return;
+    previousLayoutRef.current = { isExpanded, showAll: displayAll };
     if (onHeightChange) {
       onHeightChange();
     } else {
       actions?.onContentHeightChange();
     }
-  }, [actions, isExpanded, onHeightChange, showAll]);
+  }, [actions, displayAll, isExpanded, onHeightChange]);
 
   useEffect(() => {
-    if (!isLive) {
-      userToggledRef.current = false;
-      setIsExpanded(false);
-      return;
-    }
-    if (!userToggledRef.current) setIsExpanded(!editOnlyGroup);
-  }, [isLive, editOnlyGroup]);
+    const wasLive = previousLiveRef.current;
+    previousLiveRef.current = isLive;
+    if (wasLive && !isLive) setManuallyExpanded(false);
+  }, [isLive]);
 
   useEffect(() => {
     if (!hasOverflowRows) setShowAll(false);
@@ -140,15 +145,15 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   // Auto-scroll to bottom when new items arrive in live mode (only relevant
   // when the full list is scrollable; collapsed mode slices to the latest rows).
   useEffect(() => {
-    if (isLive && isExpanded && showAll && scrollRef.current) {
+    if (isLive && isExpanded && displayAll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [items.length, isLive, isExpanded, showAll]);
+  }, [displayAll, items.length, isLive, isExpanded]);
 
   if (items.length === 0) return null;
   const sections = summarizeToolCalls(items);
   const visibleSegments =
-    !showAll && hasOverflowRows ? segments.slice(-TOOL_CALL_GROUP_MAX_VISIBLE_ROWS) : segments;
+    !displayAll && hasOverflowRows ? segments.slice(-TOOL_CALL_GROUP_MAX_VISIBLE_ROWS) : segments;
 
   return (
     <div className={chatRowShellClass}>
@@ -160,8 +165,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
           // row. LegendList can adjust its visible-content anchor during that
           // commit, before the post-commit remeasurement callback runs.
           onVirtualizerLayoutChange?.();
-          userToggledRef.current = true;
-          setIsExpanded(next);
+          setManuallyExpanded(next);
         }}
       >
         <Disclosure.Heading>
@@ -211,7 +215,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
                 styles.css), so a plain conditional is correct; no keep-alive. */}
             {isExpanded ? (
               <>
-                {hasOverflowRows && !sameFileEditSummary ? (
+                {hasOverflowRows && !sameFileEditSummary && !isFindTarget ? (
                   <div className="mb-0.5 flex justify-start">
                     <button
                       type="button"
@@ -229,18 +233,32 @@ export const ToolCallGroup = memo(function ToolCallGroup({
                 <div
                   ref={scrollRef}
                   className={`poracode-tool-call-group-viewport flex flex-col gap-0.5 pr-1 ${
-                    showAll ? "max-h-[420px] overflow-y-auto" : ""
+                    displayAll ? "max-h-[420px] overflow-y-auto" : ""
                   }`}
                 >
                   {sameFileEditSummary ? (
                     <SameFileEditGroupBody items={items} />
                   ) : (
                     visibleSegments.map((segment) => (
-                      <div key={segmentKey(segment)} className="animate-tool-call-enter">
+                      <div
+                        key={segmentKey(segment)}
+                        className="animate-tool-call-enter"
+                        data-item-id={segmentKey(segment)}
+                      >
                         {segment.kind === "same-file-edits" ? (
-                          <SameFileEditRunInline items={segment.items} summary={segment.summary} />
+                          <SameFileEditRunInline
+                            items={segment.items}
+                            summary={segment.summary}
+                            forceExpanded={
+                              revealedItemId !== null &&
+                              segment.items.some((item) => item.id === revealedItemId)
+                            }
+                          />
                         ) : (
-                          <GroupRowInline item={segment.item} />
+                          <GroupRowInline
+                            item={segment.item}
+                            forceExpanded={revealedItemId === segment.item.id}
+                          />
                         )}
                       </div>
                     ))
@@ -267,18 +285,21 @@ function segmentKey(segment: ToolGroupRowSegment): string {
 function SameFileEditRunInline({
   items,
   summary,
+  forceExpanded = false,
 }: {
   items: readonly RuntimeChatItem[];
   summary: SameFileEditGroupSummary;
+  forceExpanded?: boolean;
 }) {
   const actions = useChatPaneActions();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const isExpanded = manuallyExpanded || forceExpanded;
   return (
     <Disclosure
       className="text-[length:var(--lc-chat-font-size-command)] leading-tight"
       isExpanded={isExpanded}
       onExpandedChange={(next) => {
-        setIsExpanded(next);
+        setManuallyExpanded(next);
         actions?.onContentHeightChange();
       }}
     >
@@ -392,15 +413,30 @@ function SameFileEditGroupBody({ items }: { items: readonly RuntimeChatItem[] })
  * renders group children goes through this so non-tool row types (reasoning
  * today) get their dedicated renderer everywhere.
  */
-function GroupRowInline({ item }: { item: RuntimeChatItem }) {
-  if (item.type === "reasoning") return <ReasoningInline item={item} />;
-  return <ToolCallInline item={item} />;
+function GroupRowInline({
+  item,
+  forceExpanded = false,
+}: {
+  item: RuntimeChatItem;
+  forceExpanded?: boolean;
+}) {
+  if (item.type === "reasoning") {
+    return <ReasoningInline item={item} forceExpanded={forceExpanded} />;
+  }
+  return <ToolCallInline item={item} forceExpanded={forceExpanded} />;
 }
 
-function ToolCallInline({ item }: { item: RuntimeChatItem }) {
+function ToolCallInline({
+  item,
+  forceExpanded = false,
+}: {
+  item: RuntimeChatItem;
+  forceExpanded?: boolean;
+}) {
   const { t } = useLingui();
   const actions = useChatPaneActions();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  const isExpanded = manuallyExpanded || forceExpanded;
   const row = getInlineRow(item, isExpanded, t);
   const isRunning = item.state !== "completed";
   const fetchTarget =
@@ -430,7 +466,7 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
       className="text-[length:var(--lc-chat-font-size-command)] leading-tight"
       isExpanded={isExpanded}
       onExpandedChange={(next) => {
-        setIsExpanded(next);
+        setManuallyExpanded(next);
         actions?.onContentHeightChange();
       }}
     >

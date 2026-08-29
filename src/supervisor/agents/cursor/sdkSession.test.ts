@@ -254,7 +254,7 @@ describe("CursorSdkSession", () => {
             { id: "effort", value: "high" },
           ],
         },
-        name: "poracode/thread-1",
+        name: "y-space/thread-1",
         local: {
           cwd: "/repo",
           settingSources: ["all"],
@@ -485,7 +485,7 @@ describe("CursorSdkSession", () => {
             { id: "effort", value: "high" },
           ],
         },
-        name: "poracode/thread-1",
+        name: "y-space/thread-1",
         local: {
           cwd: "/repo",
           settingSources: ["all"],

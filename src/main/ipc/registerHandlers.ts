@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import {
   ipcProcedureMap,
   parseIpcProcedureArgs,
-  type IpcProcedureName,
+  RENDERER_IPC_PROCEDURE_NAMES,
   type IpcProcedurePayload,
   type IpcProcedureResult,
   type MainLocalIpcHandlerMap,
@@ -18,8 +18,7 @@ interface RegisterIpcHandlersOptions {
 }
 
 export function registerIpcHandlers(options: RegisterIpcHandlersOptions): void {
-  const procedureNames = Object.keys(ipcProcedureMap) as IpcProcedureName[];
-  for (const name of procedureNames) {
+  for (const name of RENDERER_IPC_PROCEDURE_NAMES) {
     const procedure = ipcProcedureMap[name];
     ipcMain.handle(procedure.channel, async (_event, ...args: unknown[]) => {
       const payload = parseIpcProcedureArgs(name, args);

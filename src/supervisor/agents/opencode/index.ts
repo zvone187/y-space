@@ -4,6 +4,7 @@ import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import {
   createKnownSessionRef,
   detectAgentInstall,
+  getProjectShellEnv,
   shortenHomePath,
   type AgentAdapter,
   type CreateStructuredSessionInput,
@@ -23,6 +24,8 @@ import {
 import { buildOpenCodeMcpLaunchConfig } from "../userMcp";
 import { runOpenCodeOneShot } from "./sdkOneShot";
 import { detectOpenCodeTerminalStatus, opencodeOscHint, opencodeOscTitleHint } from "./terminal";
+import { resolveOpenCodeProfileMcpNames } from "./mcpSkillConflicts";
+import { hasYSpaceBrowserMcp } from "@/shared/browserExclusivePolicy";
 
 const OPENCODE_PLUGIN_VERSION = readBundledOpenCodePluginVersion();
 
@@ -49,11 +52,24 @@ function opencodeHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
 
 function buildOpenCodeMcpEnv(
   mcpServers: readonly ResolvedMcpServer[] = [],
+  location?: Parameters<typeof resolveOpenCodeProfileMcpNames>[0],
 ): Record<string, string> | undefined {
   if (mcpServers.length === 0) return undefined;
-  const launch = buildOpenCodeMcpLaunchConfig(mcpServers);
+  const managedNames = new Set(mcpServers.map((server) => server.name));
+  const profileEnv =
+    location && location.kind !== "wsl"
+      ? (getProjectShellEnv(location.path) ?? process.env)
+      : process.env;
+  const unmanagedProfileMcpNames =
+    location && hasYSpaceBrowserMcp(mcpServers)
+      ? resolveOpenCodeProfileMcpNames(location, profileEnv).filter(
+          (name) => !managedNames.has(name),
+        )
+      : [];
+  const launch = buildOpenCodeMcpLaunchConfig(mcpServers, unmanagedProfileMcpNames);
   return {
     ...launch.env,
+    ...(hasYSpaceBrowserMcp(mcpServers) ? { PORACODE_OPENCODE_BROWSER_EXCLUSIVE: "1" } : {}),
     OPENCODE_CONFIG_CONTENT: launch.configContent,
   };
 }
@@ -62,6 +78,7 @@ export function createOpenCodeAdapter(): AgentAdapter {
   let capabilities: AgentCapability = opencodeDefaultCapabilities;
 
   return {
+    browserRouting: { terminal: "exclusive", gui: "exclusive" },
     kind: opencodeDetectionSpec.kind,
     label: opencodeDetectionSpec.label,
     binary: opencodeDetectionSpec.binary,
@@ -109,7 +126,7 @@ export function createOpenCodeAdapter(): AgentAdapter {
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },
 
     // ── CLI hook plugin support ──────────────────────────────────────────
-    pluginId: "poracode-status@opencode",
+    pluginId: "y-space-status@opencode",
     pluginVersion: OPENCODE_PLUGIN_VERSION,
     minProtocolVersion: 1,
     async isPluginSupported(ctx) {
@@ -155,10 +172,10 @@ export function createOpenCodeAdapter(): AgentAdapter {
     // The TUI process below picks up the pre-allocated id via `--session <id>`,
     // so the supervisor knows the providerSessionId synchronously instead of
     // polling `opencode session list` after spawn.
-    buildLaunchArgv(_location, config, prompt, _sessionRef, launchOptions) {
+    buildLaunchArgv(location, config, prompt, _sessionRef, launchOptions) {
       const sessionId = launchOptions?.resumeThreadId;
       const args = buildOpenCodeArgs(config, prompt, sessionId);
-      const env = buildOpenCodeMcpEnv(launchOptions?.mcpServers);
+      const env = buildOpenCodeMcpEnv(launchOptions?.mcpServers, location);
       return {
         binary: "opencode",
         args,
@@ -167,8 +184,8 @@ export function createOpenCodeAdapter(): AgentAdapter {
         ...(sessionId ? { sessionRef: createKnownSessionRef(sessionId) } : {}),
       };
     },
-    buildResumeArgv(_location, config, prompt, sessionRef, launchOptions) {
-      const env = buildOpenCodeMcpEnv(launchOptions?.mcpServers);
+    buildResumeArgv(location, config, prompt, sessionRef, launchOptions) {
+      const env = buildOpenCodeMcpEnv(launchOptions?.mcpServers, location);
       return {
         binary: "opencode",
         args: buildOpenCodeArgs(config, prompt, sessionRef.providerSessionId),

@@ -83,6 +83,7 @@ const CODEX_SYSTEM_ERROR_FALLBACK_DELAY_MS = 250;
 const CODEX_RESUME_STATUS_REPLAY_SUPPRESSION_MS = 500;
 const CODEX_FORK_NOTIFICATION_BUFFER_LIMIT = 100;
 const CODEX_DISPOSE_INTERRUPT_TIMEOUT_MS = 2_000;
+const CODEX_INITIALIZE_TIMEOUT_MS = 120_000;
 const CODEX_EVENT_DEBUG_ENV = "PORACODE_DEBUG_CODEX_EVENTS";
 
 type CodexEventDebugDirection =
@@ -1314,13 +1315,15 @@ export class CodexStructuredSession implements StructuredSessionHandle {
 
   private async initialize(): Promise<void> {
     // Cold start runs through an interactive login shell + Rust binary load +
-    // first-launch Gatekeeper checks on macOS, which can exceed the default
-    // 5s timeout. The probe path uses 12s for the same handshake.
+    // first-launch Gatekeeper checks. Codex can also rebuild its SQLite thread
+    // index during this handshake; its own backfill lease exceeds 30 seconds,
+    // so killing the app-server at that boundary can leave the rebuild marked
+    // as running and make every subsequent launch fail.
     const initResult = await this.rpc.request(
       "initialize",
       {
         clientInfo: {
-          name: "poracode",
+          name: "y-space",
           version: "0.1.0",
         },
         capabilities: {
@@ -1328,7 +1331,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
           requestAttestation: false,
         },
       },
-      30_000,
+      CODEX_INITIALIZE_TIMEOUT_MS,
     );
 
     this.currentBaseSlashCommands = mapCodexSlashCommands(readCodexInitCommands(initResult));

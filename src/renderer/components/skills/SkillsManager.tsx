@@ -456,10 +456,7 @@ export function SkillsManager(props: {
             <Trans>No skills found</Trans>
           </p>
           <p className="mt-1 max-w-md text-xs text-muted">
-            <Trans>
-              Add a skill to .agents/skills or .poracode/skills, or import one from another
-              provider.
-            </Trans>
+            <Trans>Add a skill from your workspace or import one from another provider.</Trans>
           </p>
         </div>
       ) : null}

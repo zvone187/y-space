@@ -7,6 +7,7 @@ import type {
 } from "@/shared/contracts";
 import {
   buildAgentCommand,
+  buildDirectWslEnvironmentCommandArgs,
   DEFAULT_WSL_EXEC_PATH,
   getWslCommand,
   type AgentArgvSpec,
@@ -22,6 +23,7 @@ import { resolveCodexWindowsLaunchBinary } from "./windowsExecutable";
 import { codexContextWindowOverrides } from "@/shared/agents/codexContextWindows";
 import { buildCodexMcp } from "../userMcp";
 import { buildCodexMcpSkillConflictArgs } from "./mcpSkillConflicts";
+import { buildCodexBrowserExclusiveArgs, buildCodexBrowserExclusiveEnv } from "./browserPolicy";
 
 const CODEX_GOALS_FEATURE_FLAG = "goals";
 const codexGoalsSupportCache = new Map<string, boolean>();
@@ -120,9 +122,13 @@ export function buildCodexArgvFor(
   const binary = resolveCodexWindowsLaunchBinary(location) ?? "codex";
   const mcpServers = launchOptions?.mcpServers ?? [];
   const mcp = buildCodexMcp(mcpServers);
-  const mcpArgs = [...buildCodexMcpSkillConflictArgs(location, mcpServers), ...mcp.args];
-  const mcpEnv = mcp.env;
-  const hasMcpEnv = Object.keys(mcpEnv).length > 0;
+  const mcpArgs = [
+    ...buildCodexBrowserExclusiveArgs(mcpServers),
+    ...buildCodexMcpSkillConflictArgs(location, mcpServers),
+    ...mcp.args,
+  ];
+  const launchEnv = { ...mcp.env, ...buildCodexBrowserExclusiveEnv(mcpServers) };
+  const hasLaunchEnv = Object.keys(launchEnv).length > 0;
   const enableGoals = isCodexGoalsSupported(location);
   const baseArgsOptions: BuildCodexArgsOptions = {
     config,
@@ -146,7 +152,7 @@ export function buildCodexArgvFor(
     return {
       binary,
       args,
-      ...(hasMcpEnv ? { env: mcpEnv } : {}),
+      ...(hasLaunchEnv ? { env: launchEnv } : {}),
     };
   }
 
@@ -163,7 +169,7 @@ export function buildCodexArgvFor(
   return {
     binary,
     args,
-    ...(hasMcpEnv ? { env: mcpEnv } : {}),
+    ...(hasLaunchEnv ? { env: launchEnv } : {}),
   };
 }
 
@@ -174,6 +180,12 @@ export function buildCodexAppServerCommand(
     wslNodePath?: string;
     mcpServers?: readonly ResolvedMcpServer[];
     includeMcpConfig?: boolean;
+    /** App-owned hook staged by the structured-session server pool. */
+    browserExclusiveHook?: {
+      codexHomeDir: string;
+      sqliteHomeDir: string;
+      featureFlag: string;
+    };
   },
 ): CommandSpec {
   const wslExecPath = options?.wslExecPath;
@@ -182,10 +194,26 @@ export function buildCodexAppServerCommand(
   const mcp = buildCodexMcp(mcpServers);
   const includeMcpConfig = options?.includeMcpConfig ?? true;
   const mcpSkillConflictArgs = buildCodexMcpSkillConflictArgs(location, mcpServers);
-  const mcpEnv = mcp.env;
-  const hasMcpEnv = Object.keys(mcpEnv).length > 0;
+  const browserExclusiveEnv = buildCodexBrowserExclusiveEnv(mcpServers);
+  const browserExclusiveHook =
+    Object.keys(browserExclusiveEnv).length > 0 ? options?.browserExclusiveHook : undefined;
+  const launchEnv = {
+    ...mcp.env,
+    ...browserExclusiveEnv,
+    ...(browserExclusiveHook
+      ? {
+          CODEX_HOME: browserExclusiveHook.codexHomeDir,
+          CODEX_SQLITE_HOME: browserExclusiveHook.sqliteHomeDir,
+        }
+      : {}),
+  };
+  const hasLaunchEnv = Object.keys(launchEnv).length > 0;
   const args = [
     ...(isCodexGoalsSupported(location, wslExecPath) ? ["--enable", CODEX_GOALS_FEATURE_FLAG] : []),
+    ...(browserExclusiveHook
+      ? ["--dangerously-bypass-hook-trust", "--enable", browserExclusiveHook.featureFlag]
+      : []),
+    ...buildCodexBrowserExclusiveArgs(mcpServers),
     ...mcpSkillConflictArgs,
     ...(includeMcpConfig ? mcp.args : []),
     "app-server",
@@ -196,20 +224,14 @@ export function buildCodexAppServerCommand(
       wslExecPath?.startsWith("/") ? posixDirname(wslExecPath) : undefined,
       DEFAULT_WSL_EXEC_PATH,
     ].filter((segment): segment is string => Boolean(segment));
+    const direct = buildDirectWslEnvironmentCommandArgs(wslExecPath ?? "codex", args, {
+      PATH: pathSegments.join(":"),
+      ...(hasLaunchEnv ? launchEnv : {}),
+    });
     return {
       command: getWslCommand(),
-      args: [
-        "-d",
-        location.distro,
-        "--cd",
-        location.linuxPath,
-        "--",
-        "/usr/bin/env",
-        `PATH=${pathSegments.join(":")}`,
-        ...(hasMcpEnv ? Object.entries(mcpEnv).map(([name, value]) => `${name}=${value}`) : []),
-        wslExecPath ?? "codex",
-        ...args,
-      ],
+      args: ["-d", location.distro, "--cd", location.linuxPath, "--", ...direct.args],
+      ...(direct.cleanup ? { cleanup: direct.cleanup } : {}),
     };
   }
   return buildAgentCommand(
@@ -217,7 +239,7 @@ export function buildCodexAppServerCommand(
     "codex",
     args,
     resolveCodexWindowsLaunchBinary(location) ?? wslExecPath,
-    hasMcpEnv ? mcpEnv : undefined,
+    hasLaunchEnv ? launchEnv : undefined,
   );
 }
 

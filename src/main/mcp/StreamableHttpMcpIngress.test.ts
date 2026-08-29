@@ -7,6 +7,7 @@ import {
   StreamableHttpMcpIngress,
   type StreamableHttpMcpIngressInfo,
   type StreamableHttpMcpIngressOptions,
+  type StreamableHttpMcpToolCallOutcome,
 } from "./StreamableHttpMcpIngress";
 
 let ingress: StreamableHttpMcpIngress<{ ok: true }> | null = null;
@@ -46,6 +47,14 @@ const PROVIDER_SESSION_ID_ARG = "__poracode_provider_session_id";
 
 interface RoutedContext {
   identity: McpThreadIdentity;
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
 }
 
 function makeRoutedIngress(
@@ -247,6 +256,126 @@ describe("StreamableHttpMcpIngress auth + host guards", () => {
 });
 
 describe("StreamableHttpMcpIngress thread-bound launch identity", () => {
+  it("awaits successful post-tool reporting before writing the MCP response", async () => {
+    const release = deferred();
+    const callbackStarted = deferred();
+    const onAfterToolCall = vi.fn<
+      (
+        outcome: StreamableHttpMcpToolCallOutcome,
+        ctx: RoutedContext,
+        identity: McpThreadIdentity,
+      ) => Promise<void>
+    >(async () => {
+      callbackStarted.resolve();
+      await release.promise;
+    });
+    const routed = new StreamableHttpMcpIngress<RoutedContext>({
+      bindHost: "127.0.0.1",
+      launchContextAudience: "browser",
+      resolveLaunchContextIdentity: async () => ({
+        threadId: "thread-awaited",
+        launchId: "launch-awaited",
+        browserEvidenceTurnId: "turn-awaited",
+      }),
+      serverInfo: { name: "awaited", version: "0.0.0" },
+      instructions: "awaited",
+      tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
+      isKnownToolName: (name) => name === "noop",
+      buildContext: (identity) => ({ identity }),
+      dispatchTool: async () => ({ safe: true }),
+      formatToolResult: () => ({ content: [{ type: "text", text: "ok" }] }),
+      onAfterToolCall,
+    });
+    try {
+      const info = await routed.start();
+      const token = createMcpLaunchContextToken(info.token, "browser", {
+        threadId: "thread-awaited",
+        launchId: "launch-awaited",
+      });
+      let responseSettled = false;
+      const response = fetch(`${info.url}/mcp`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "noop", arguments: { privatePageText: "must-not-be-reported" } },
+        }),
+      }).then((value) => {
+        responseSettled = true;
+        return value;
+      });
+
+      await callbackStarted.promise;
+      await Promise.resolve();
+      expect(responseSettled).toBe(false);
+      release.resolve();
+      expect((await response).status).toBe(200);
+      expect(onAfterToolCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "noop",
+          success: true,
+          occurredAt: expect.any(Number),
+          rawResult: { safe: true },
+        }),
+        expect.any(Object),
+        expect.objectContaining({
+          threadId: "thread-awaited",
+          launchId: "launch-awaited",
+          browserEvidenceTurnId: "turn-awaited",
+        }),
+      );
+    } finally {
+      routed.dispose();
+    }
+  });
+
+  it("awaits and reports dispatch failures without exposing a raw result", async () => {
+    const onAfterToolCall = vi.fn<
+      (
+        outcome: StreamableHttpMcpToolCallOutcome,
+        ctx: RoutedContext,
+        identity: McpThreadIdentity,
+      ) => Promise<void>
+    >(async () => undefined);
+    const routed = new StreamableHttpMcpIngress<RoutedContext>({
+      bindHost: "127.0.0.1",
+      serverInfo: { name: "failure-report", version: "0.0.0" },
+      instructions: "failure-report",
+      tools: [{ name: "noop", description: "noop", inputSchema: { type: "object" } }],
+      isKnownToolName: (name) => name === "noop",
+      buildContext: (identity) => ({ identity }),
+      dispatchTool: async () => {
+        throw new Error("tool failed");
+      },
+      formatToolResult: () => ({ content: [] }),
+      onAfterToolCall,
+    });
+    try {
+      const info = await routed.start();
+      const response = await fetch(`${info.url}/mcp`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${info.token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name: "noop", arguments: {} },
+        }),
+      });
+      expect((await response.json()).result).toMatchObject({ isError: true });
+      expect(onAfterToolCall).toHaveBeenCalledWith(
+        expect.not.objectContaining({ rawResult: expect.anything() }),
+        expect.any(Object),
+        expect.any(Object),
+      );
+      expect(onAfterToolCall.mock.calls[0]?.[0]).toMatchObject({ name: "noop", success: false });
+    } finally {
+      routed.dispose();
+    }
+  });
+
   it("strips a forged provider session id and dispatches as the signed task", async () => {
     const resolver = vi.fn<(context: McpLaunchContext) => Promise<McpThreadIdentity | undefined>>(
       async (context) => context.identity,

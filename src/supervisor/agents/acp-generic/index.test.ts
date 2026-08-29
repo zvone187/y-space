@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentInstanceConfig } from "@/shared/contracts";
 import { authenticateAcpAgent, logoutAcpAgent, probeAcpCapabilities } from "../acp";
+import { cleanupTrackedWslLaunchEnvironmentFiles } from "../base";
 import {
   authenticateAcpGenericInstance,
   createAcpGenericAdapter,
@@ -45,6 +46,10 @@ const baseInstance: AgentInstanceConfig = {
 };
 
 describe("createAcpGenericAdapter", () => {
+  afterEach(() => {
+    cleanupTrackedWslLaunchEnvironmentFiles();
+  });
+
   beforeEach(() => {
     vi.mocked(authenticateAcpAgent).mockReset().mockResolvedValue(undefined);
     vi.mocked(logoutAcpAgent).mockReset().mockResolvedValue(undefined);
@@ -464,10 +469,16 @@ describe("createAcpGenericAdapter", () => {
     });
 
     const [command, args] = vi.mocked(authenticateAcpAgent).mock.calls[0]!;
+    const serializedArgs = JSON.stringify(args);
+    const script = String(args.at(-1));
     expect(command).toMatch(/wsl(?:\.exe)?$/u);
     expect(args).toContain("Ubuntu");
-    expect(args.at(-1)).toContain("BROWSER=");
-    expect(args.at(-1)).toContain("cmd.exe /c start");
+    expect(serializedArgs).not.toContain("BROWSER=");
+    expect(serializedArgs).not.toContain('cmd.exe /c start ""');
+    expect(script).toContain("__y_space_launch_env_file");
+    expect(script).toContain('/bin/rm -f -- "$1"');
+    expect(script).toContain('/bin/rmdir -- "$2"');
+    expect(script).toContain("exec 'my-acp' '--stdio'");
   });
 
   it("verifies authentication with a fresh ACP probe", async () => {

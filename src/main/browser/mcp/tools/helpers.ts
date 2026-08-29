@@ -24,6 +24,10 @@ export async function resolveTabId(
   ctx: ToolContext,
   payload: Record<string, unknown>,
 ): Promise<string> {
+  const rememberResolvedTab = (tabId: string): string => {
+    ctx.resolvedTabIdForToolCall = tabId;
+    return tabId;
+  };
   const sessionId = ctx.threadId ?? "unscoped";
   const requested = typeof payload.tabId === "string" ? payload.tabId : null;
   if (requested) {
@@ -33,7 +37,7 @@ export async function resolveTabId(
     await ctx.manager.ensureTabReady(requested);
     if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, requested);
     await ctx.manager.showAutomationCursor(sessionId, requested);
-    return requested;
+    return rememberResolvedTab(requested);
   }
   const active = ctx.threadId
     ? ctx.manager.getActiveTabForThread(ctx.threadId)
@@ -42,13 +46,13 @@ export async function resolveTabId(
     ctx.manager.recordAutomationTarget(sessionId, active.tabId);
     await ctx.manager.ensureTabReady(active.tabId);
     await ctx.manager.showAutomationCursor(sessionId, active.tabId);
-    return active.tabId;
+    return rememberResolvedTab(active.tabId);
   }
   ctx.manager.touchAutomationSession(sessionId);
   const info = await ctx.manager.createTab({ activate: true }, agentTabOpts(ctx));
   ctx.manager.recordAutomationTarget(sessionId, info.tabId);
   await ctx.manager.showAutomationCursor(sessionId, info.tabId);
-  return info.tabId;
+  return rememberResolvedTab(info.tabId);
 }
 
 export async function resolveSelectorArg(

@@ -4,8 +4,17 @@ export interface McpThreadIdentity {
   threadId?: string;
   /** Opaque per-launch nonce used to revoke capabilities across task restarts. */
   launchId?: string;
+  /**
+   * Live supervisor-owned nonce for the accepted user turn. This value is
+   * deliberately excluded from the signed launch token: the ingress receives
+   * it only from per-request liveness revalidation, so an agent cannot carry
+   * Browser proof from an earlier turn into the current one.
+   */
+  browserEvidenceTurnId?: string;
   title?: string;
   disabledTools?: readonly string[];
+  /** Live, supervisor-derived policy for the Computer Use ingress. Not signed by agents. */
+  managedBrowserConnected?: boolean;
 }
 
 const MAX_TITLE = 80;

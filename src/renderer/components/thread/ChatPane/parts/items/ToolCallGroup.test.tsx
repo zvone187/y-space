@@ -28,6 +28,7 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandGroup(/10 views/i);
     const viewport = getViewport(view.container);
     const body = viewport.parentElement;
     if (!body) throw new Error("missing tool group body");
@@ -60,6 +61,32 @@ describe("ToolCallGroup", () => {
     expect(screen.queryByText("Read file 1")).not.toBeInTheDocument();
     expect(screen.getByText("Read file 10")).toBeInTheDocument();
     expect(viewport.className).not.toContain("overflow-y-auto");
+  });
+
+  it("mounts and expands a Find-targeted thought outside the last-eight-row window", () => {
+    const threadId = "thread-find";
+    const hiddenNeedle = "find-only-reasoning-needle";
+    const items = [
+      makeReasoningItem("reasoning-1", `${"Earlier analysis. ".repeat(12)}${hiddenNeedle}`),
+      ...Array.from({ length: 9 }, (_, index) =>
+        makeToolItem(`tool-${index + 1}`, `Read later file ${index + 1}`),
+      ),
+    ];
+    seedThread(threadId, items);
+
+    const { container } = render(
+      <AppProvider>
+        <ToolCallGroup
+          threadId={threadId}
+          itemIds={items.map((item) => item.id)}
+          forceExpanded
+          revealedItemId="reasoning-1"
+        />
+      </AppProvider>,
+    );
+
+    expect(container).toHaveTextContent(hiddenNeedle);
+    expect(screen.queryByRole("button", { name: "Show all" })).not.toBeInTheDocument();
   });
 
   it("does not mount child rows while collapsed and mounts them once expanded", () => {
@@ -99,21 +126,24 @@ describe("ToolCallGroup", () => {
     const items = [makeToolItem("tool-1", "Read file one")];
     seedThread(threadId, items);
     let container: HTMLElement | null = null;
-    const onHeightChange = vi.fn<() => void>(() => {
-      expect(container?.querySelector(".poracode-tool-call-group-viewport")).toBeNull();
-    });
+    const onHeightChange = vi.fn<() => void>();
     const beginVirtualizerLayoutChange = vi.fn<() => void>();
     const view = renderToolCallGroup(
       threadId,
       [items[0]!.id],
-      true,
+      false,
       onHeightChange,
       beginVirtualizerLayoutChange,
     );
     container = view.container;
 
-    fireEvent.click(screen.getByRole("button", { name: /1 view/i }));
+    const trigger = screen.getByRole("button", { name: /1 view/i });
+    fireEvent.click(trigger);
+    onHeightChange.mockClear();
+    beginVirtualizerLayoutChange.mockClear();
+    fireEvent.click(trigger);
 
+    expect(container.querySelector(".poracode-tool-call-group-viewport")).toBeNull();
     expect(beginVirtualizerLayoutChange).toHaveBeenCalledOnce();
     expect(beginVirtualizerLayoutChange.mock.invocationCallOrder[0]!).toBeLessThan(
       onHeightChange.mock.invocationCallOrder[0]!,
@@ -171,11 +201,15 @@ describe("ToolCallGroup", () => {
     renderToolCallGroup(
       threadId,
       items.map((item) => item.id),
-      true,
+      false,
       onHeightChange,
       beginVirtualizerLayoutChange,
     );
 
+    expandGroup(/10 views/i);
+    onHeightChange.mockClear();
+    beginVirtualizerLayoutChange.mockClear();
+    committedFirstRows.length = 0;
     fireEvent.click(screen.getByRole("button", { name: "Show all" }));
     fireEvent.click(screen.getByRole("button", { name: "Show less" }));
 
@@ -193,14 +227,15 @@ describe("ToolCallGroup", () => {
     const threadId = "thread-1";
     const items = [makeToolItem("tool-1", "Read file one")];
     seedThread(threadId, items);
-    let container: HTMLElement | null = null;
-    const onHeightChange = vi.fn<() => void>(() => {
-      expect(container?.querySelector(".poracode-tool-call-group-viewport")).toBeNull();
-    });
+    const onHeightChange = vi.fn<() => void>();
     const view = renderToolCallGroup(threadId, [items[0]!.id], true, onHeightChange);
-    container = view.container;
 
+    const trigger = screen.getByRole("button", { name: /1 view/i });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Read file one")).not.toBeInTheDocument();
+    fireEvent.click(trigger);
     expect(screen.getByText("Read file one")).toBeInTheDocument();
+    onHeightChange.mockClear();
 
     view.rerender(
       <AppProvider>
@@ -229,6 +264,7 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandGroup(/6 views/i);
     const viewport = getViewport(view.container);
 
     for (let i = 1; i <= 6; i += 1) {
@@ -247,6 +283,7 @@ describe("ToolCallGroup", () => {
     seedThread(threadId, [item]);
 
     const view = renderToolCallGroup(threadId, [item.id]);
+    expandGroup(/1 view/i);
     const indicators = view.container.querySelectorAll(".disclosure__indicator");
 
     expect(indicators).toHaveLength(2);
@@ -362,7 +399,7 @@ describe("ToolCallGroup", () => {
     expect(view.container.querySelector(".poracode-tool-call-group-viewport")).toBeNull();
   });
 
-  it("still auto-expands live groups that include non-edit tools", () => {
+  it("starts live groups collapsed even when they include non-edit tools", () => {
     const threadId = "thread-1";
     const items = [
       makeToolItem("tool-1", "Read file one"),
@@ -376,8 +413,12 @@ describe("ToolCallGroup", () => {
       true,
     );
 
-    expect(view.container.querySelector(".poracode-tool-call-group-viewport")).not.toBeNull();
-    expect(screen.getByText("Read file one")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /1 view/i })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(view.container.querySelector(".poracode-tool-call-group-viewport")).toBeNull();
+    expect(screen.queryByText("Read file one")).not.toBeInTheDocument();
   });
 
   it("flattens same-file edit groups into one merged file diff without per-edit rows", async () => {
@@ -518,6 +559,7 @@ describe("ToolCallGroup", () => {
     seedThread(threadId, [item]);
 
     renderToolCallGroup(threadId, [item.id]);
+    expandOuterGroup();
     fireEvent.click(screen.getByText("source.ts"));
 
     await waitFor(() => {
@@ -533,6 +575,7 @@ describe("ToolCallGroup", () => {
     seedThread(threadId, [item]);
 
     renderToolCallGroup(threadId, [item.id]);
+    expandOuterGroup();
     fireEvent.click(screen.getByText("store.js"));
 
     const viewport = await waitFor(() => {
@@ -585,6 +628,7 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandOuterGroup();
 
     expect(document.body).toHaveTextContent("View 1:24 · src/supervisor/runtime.test.ts");
     expect(screen.getByText('Search · "vitest.mjs"')).toBeInTheDocument();
@@ -607,6 +651,7 @@ describe("ToolCallGroup", () => {
     seedThread(threadId, [item]);
 
     const view = renderToolCallGroup(threadId, [item.id]);
+    expandOuterGroup();
 
     expect(screen.queryByText(";src/shared/settings.ts")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("src/shared/settings.ts"));
@@ -675,6 +720,7 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandOuterGroup();
 
     expect(screen.getByText("github · search")).toBeInTheDocument();
     expect(screen.getAllByText("screen.png").length).toBeGreaterThan(0);
@@ -724,6 +770,7 @@ describe("ToolCallGroup", () => {
     seedThread(threadId, [item]);
 
     renderToolCallGroup(threadId, [item.id]);
+    expandOuterGroup();
 
     expect(screen.getByText("Web search")).toBeInTheDocument();
   });
@@ -745,6 +792,7 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandOuterGroup();
 
     // Rows with structured titles shimmer only the stable prefix (a <span>);
     // plain titles shimmer the whole <code>. The path segment must never be
@@ -774,6 +822,7 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandOuterGroup();
 
     expect(screen.getByText(byTextContent("1 thought"))).toBeInTheDocument();
     expect(screen.getByText(byTextContent("2 views"))).toBeInTheDocument();
@@ -795,9 +844,10 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandOuterGroup();
 
-    // Mixed group auto-expands live; the two consecutive foo.ts edits render
-    // as one merged "2 edits: foo.ts" run row next to the view row.
+    // The two consecutive foo.ts edits render as one merged
+    // "2 edits: foo.ts" run row next to the view row.
     const viewport = getViewport(view.container);
     expect(viewport.querySelectorAll(":scope > .animate-tool-call-enter")).toHaveLength(2);
     const runRow = screen.getByRole("button", { name: /2 edits:/i });
@@ -831,8 +881,8 @@ describe("ToolCallGroup", () => {
     );
 
     // Header keeps physical counts; the run merge is a body-level treatment.
-    // The command makes this a mixed group, so it auto-expands while live.
     expect(screen.getByText(byTextContent("5 edits"))).toBeInTheDocument();
+    expandOuterGroup();
 
     // 6 items render as 5 rows: the consecutive same-file pair collapses into
     // one "2 edits: chatPaneSelectors.test.ts" row with the summed diff.
@@ -858,6 +908,7 @@ describe("ToolCallGroup", () => {
       threadId,
       items.map((item) => item.id),
     );
+    expandOuterGroup();
 
     // The interposed tool call breaks the run: no merged "2 edits" row, each
     // edit stays its own row — but all three still live in the same group.
@@ -899,7 +950,7 @@ describe("ToolCallGroup", () => {
 function renderToolCallGroup(
   threadId: string,
   itemIds: readonly string[],
-  isLive = true,
+  isLive = false,
   onHeightChange?: () => void,
   onVirtualizerLayoutChange?: () => void,
 ) {
@@ -919,6 +970,13 @@ function renderToolCallGroup(
 /** Open a live edit-only group that stays collapsed by default. */
 function expandGroup(name: RegExp) {
   fireEvent.click(screen.getByRole("button", { name }));
+}
+
+/** Open the outer group before nested row disclosures are mounted. */
+function expandOuterGroup() {
+  const trigger = screen.getAllByRole("button")[0];
+  if (!trigger) throw new Error("missing tool call group trigger");
+  fireEvent.click(trigger);
 }
 
 function seedThread(threadId: string, items: readonly RuntimeChatItem[]) {

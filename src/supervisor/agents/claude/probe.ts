@@ -144,7 +144,10 @@ async function probeClaudeSdkPartialNative(
           persistSession: false,
           cwd: process.platform === "win32" ? (process.env.USERPROFILE ?? process.cwd()) : "/tmp",
           env: sanitizePrivilegedChildEnvironment({ ...process.env, ...(envOverrides ?? {}) }),
-          settingSources: ["user", "project", "local"],
+          settingSources: [],
+          strictMcpConfig: true,
+          mcpServers: {},
+          tools: [],
           allowedTools: [],
           stderr: () => {},
           spawnClaudeCodeProcess: spawnClaudeProbeProcess,
@@ -258,7 +261,7 @@ async function probeClaudeSdkPartialWsl(
 
 export async function probeClaudeCapabilities(
   ctx: DetectProbeCtx,
-  options?: { env?: Record<string, string> },
+  options?: { env?: Record<string, string>; authMethodEnv?: Record<string, string> },
 ): Promise<CapabilitiesProbeResult | undefined> {
   if (!ctx.executablePath) return undefined;
 
@@ -279,7 +282,9 @@ export async function probeClaudeCapabilities(
   return {
     ...(sdkPartial ?? {}),
     ...(versionPartial ?? {}),
-    authMethods: [claudeTerminalAuthMethod(options?.env)],
+    // Probe isolation must never leak into the intentional `auth login` lane.
+    // Profile adapters pass their original launch env separately.
+    authMethods: [claudeTerminalAuthMethod(options?.authMethodEnv)],
     authLogoutSupported: true,
   };
 }

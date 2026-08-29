@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from "vitest";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
-import type { ChatTimelineEntry } from "@/renderer/components/thread/ChatPane/chatPaneSelectors";
+import type {
+  ChatDisplayTimelineEntry,
+  ChatTimelineEntry,
+} from "@/renderer/components/thread/ChatPane/chatPaneSelectors";
 import { countOccurrences } from "./findText";
 import { collectChatMatches, getChatItemSearchText } from "./chatFindMatches";
 
@@ -91,7 +94,44 @@ describe("collectChatMatches", () => {
     ]);
   });
 
-  it("skips tool-call groups and returns nothing for an empty query", () => {
+  it("returns nothing for an empty query", () => {
     expect(collectChatMatches(itemsById, entries, "", false)).toEqual([]);
+  });
+
+  it("maps nested activity matches to the outer virtual row while retaining the item id", () => {
+    const compactEntries: ChatDisplayTimelineEntry[] = [
+      {
+        kind: "turn_activity_group",
+        id: "turn-activity-group:a",
+        itemIds: ["a"],
+        entries: [{ kind: "item", id: "a" }],
+        isCurrentTurn: false,
+      },
+      { kind: "item", id: "u" },
+    ];
+
+    expect(collectChatMatches(itemsById, compactEntries, "world", false)).toEqual([
+      { itemId: "a", itemIndex: 0, occurrence: 0 },
+      { itemId: "u", itemIndex: 1, occurrence: 0 },
+    ]);
+  });
+
+  it("maps every multipart final match to its single coalesced virtual row", () => {
+    const multipartItems = {
+      first: assistant("first", "First final section"),
+      second: assistant("second", "Second final section"),
+    };
+    const compactEntries: ChatDisplayTimelineEntry[] = [
+      {
+        kind: "assistant_message_group",
+        id: "assistant-message-group:first",
+        itemIds: ["first", "second"],
+      },
+    ];
+
+    expect(collectChatMatches(multipartItems, compactEntries, "final", false)).toEqual([
+      { itemId: "first", itemIndex: 0, occurrence: 0 },
+      { itemId: "second", itemIndex: 0, occurrence: 0 },
+    ]);
   });
 });

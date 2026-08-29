@@ -99,6 +99,7 @@ export interface ThreadSessionManagerOptions {
   prepareMcpToolFilters?(
     servers: McpServer[],
     projectLocation: ProjectLocation,
+    browserExclusive?: boolean,
   ): Promise<McpServer[]>;
   /** Synchronize Poracode-owned provider skill projections before a new agent process starts. */
   prepareSkillsForLaunch?(projectLocation: ProjectLocation, agentKind: AgentKind): Promise<void>;

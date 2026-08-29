@@ -20,6 +20,7 @@ import {
   type AgentCliHookPluginSupport,
   resolveWslHomeDirectoryAsync,
 } from "../agents/base";
+import { hasYSpaceBrowserMcp } from "@/shared/browserExclusivePolicy";
 import type { WslBridgeServer } from "../wsl/bridge";
 import { isPoracodeHookDebug } from "./hookDebug";
 import { HookIngress, type HookIngressBootInfo } from "./hookIngress";
@@ -51,6 +52,87 @@ export interface CliHookPluginCoordinatorOptions {
 }
 
 const DEFAULT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export const CODEX_BROWSER_HOOK_UNAVAILABLE_MESSAGE =
+  "Y Space Browser cannot start Codex safely because its browser-command hook is unavailable. Restart Y Space and try again, or globally disable Browser MCP before launching Codex.";
+export const CLAUDE_BROWSER_HOOK_UNAVAILABLE_MESSAGE =
+  "Y Space Browser cannot start Claude safely because its browser-command hook is unavailable. Restart Y Space and try again, or globally disable Browser MCP before launching Claude.";
+export const OPENCODE_BROWSER_HOOK_UNAVAILABLE_MESSAGE =
+  "Y Space Browser cannot start OpenCode safely because its browser-command hook is unavailable. Restart Y Space and try again, or globally disable Browser MCP before launching OpenCode.";
+
+type ResolvedCliHookPluginExtras = {
+  env: Record<string, string>;
+  extraArgs: string[];
+};
+
+function browserHookUnavailableMessage(agentKind: AgentKind): string {
+  if (agentKind === "claude") return CLAUDE_BROWSER_HOOK_UNAVAILABLE_MESSAGE;
+  if (agentKind === "opencode") return OPENCODE_BROWSER_HOOK_UNAVAILABLE_MESSAGE;
+  return CODEX_BROWSER_HOOK_UNAVAILABLE_MESSAGE;
+}
+
+export function isBrowserExclusiveHookRequired(
+  agentKind: AgentKind,
+  mcpServers: readonly ResolvedMcpServer[],
+  liveInputMode: "terminal" | "server" | undefined = "terminal",
+): boolean {
+  return (
+    (agentKind === "codex" || agentKind === "claude" || agentKind === "opencode") &&
+    liveInputMode !== "server" &&
+    hasYSpaceBrowserMcp(mcpServers)
+  );
+}
+
+export function assertBrowserExclusiveHookResolution(
+  agentKind: AgentKind,
+  required: boolean,
+  resolved: ResolvedCliHookPluginExtras | undefined,
+): asserts resolved is ResolvedCliHookPluginExtras {
+  if (!required) return;
+
+  const env = resolved?.env;
+  const args = resolved?.extraArgs ?? [];
+  const commonComplete =
+    Boolean(env?.PORACODE_HOOK_URL) &&
+    Boolean(env?.PORACODE_HOOK_SECRET) &&
+    Boolean(env?.PORACODE_HOOK_NONCE) &&
+    Boolean(env?.PORACODE_HOOK_PROTOCOL_VERSION) &&
+    Boolean(env?.PORACODE_THREAD_ID) &&
+    env?.PORACODE_AGENT_KIND === agentKind;
+  const providerComplete = (() => {
+    if (agentKind === "codex") {
+      const enableIndex = args.indexOf("--enable");
+      const codexHome = env?.CODEX_HOME ?? "";
+      const sqliteHome = env?.CODEX_SQLITE_HOME ?? "";
+      return (
+        /(?:^|[/\\])agent-plugins[/\\]codex[/\\]home[/\\]?$/iu.test(codexHome) &&
+        Boolean(sqliteHome) &&
+        sqliteHome !== codexHome &&
+        args.includes("--dangerously-bypass-hook-trust") &&
+        enableIndex >= 0 &&
+        Boolean(args[enableIndex + 1])
+      );
+    }
+    if (agentKind === "claude") {
+      const settingsIndex = args.indexOf("--settings");
+      const settingsPath = args[settingsIndex + 1] ?? "";
+      return (
+        settingsIndex >= 0 &&
+        /(?:^|[/\\])agent-plugins[/\\]claude[/\\]settings\.json$/iu.test(settingsPath)
+      );
+    }
+    if (agentKind === "opencode") return true;
+    return false;
+  })();
+
+  if (!commonComplete || !providerComplete) {
+    throw new Error(browserHookUnavailableMessage(agentKind));
+  }
+}
+
+function throwRequiredBrowserHookUnavailable(agentKind: AgentKind): never {
+  throw new Error(browserHookUnavailableMessage(agentKind));
+}
 
 /**
  * Placeholder `pluginVersion` returned by `readBundled*PluginVersion()` when
@@ -181,7 +263,9 @@ export class CliHookPluginCoordinator {
    * picks up the CLI hook plugin. Returns `undefined` when the agent has no
    * hook-plugin support, the cache says it failed to install on this machine,
    * or the required transport (HookIngress for native, WslHookBridge for WSL)
-   * isn't available — the caller falls back to terminal parsing (L2) silently.
+   * isn't available — the caller falls back to terminal parsing (L2) silently,
+   * except when a terminal Codex launch carries the canonical Y Space Browser.
+   * That launch must have the app-owned PreToolUse command gate and fails closed.
    */
   async resolvePluginEnvForSpawn(input: {
     threadId: string;
@@ -194,8 +278,14 @@ export class CliHookPluginCoordinator {
     // extras (`--settings <path>`), and hook env vars stay unchanged so
     // `preferredNotifChannel: "iterm2"` keeps flowing and L2 can drive status.
     const adapter = this.options.adapters.get(input.agentKind);
+    const browserHookRequired = isBrowserExclusiveHookRequired(
+      input.agentKind,
+      input.mcpServers ?? [],
+      adapter?.capabilities?.liveInputMode,
+    );
     const slice = adapter ? toCliHookPluginSlice(adapter) : undefined;
     if (!adapter || !slice) {
+      if (browserHookRequired) throwRequiredBrowserHookUnavailable(input.agentKind);
       return undefined;
     }
 
@@ -212,15 +302,29 @@ export class CliHookPluginCoordinator {
     if (input.mcpServers && input.mcpServers.length > 0) ctx.mcpServers = input.mcpServers;
     const outcome = await this.ensureInstalledOrUpdated(adapter, slice, ctx);
     if (!outcome.ok) {
+      if (browserHookRequired) throwRequiredBrowserHookUnavailable(input.agentKind);
       return undefined;
     }
 
-    const transport = await this.resolveTransport(ctx);
+    let transport: Awaited<ReturnType<CliHookPluginCoordinator["resolveTransport"]>>;
+    try {
+      transport = await this.resolveTransport(ctx);
+    } catch (error) {
+      if (browserHookRequired) throwRequiredBrowserHookUnavailable(input.agentKind);
+      throw error;
+    }
     if (!transport) {
+      if (browserHookRequired) throwRequiredBrowserHookUnavailable(input.agentKind);
       return undefined;
     }
 
-    const launchExtras = (await slice.pluginLaunchExtras?.(ctx)) ?? {};
+    let launchExtras: Awaited<ReturnType<NonNullable<typeof slice.pluginLaunchExtras>>> = {};
+    try {
+      launchExtras = (await slice.pluginLaunchExtras?.(ctx)) ?? {};
+    } catch (error) {
+      if (browserHookRequired) throwRequiredBrowserHookUnavailable(input.agentKind);
+      throw error;
+    }
 
     const env: Record<string, string> = {
       PORACODE_HOOK_URL: transport.url,
@@ -237,7 +341,9 @@ export class CliHookPluginCoordinator {
       PORACODE_AGENT_KIND: input.agentKind,
       ...(launchExtras.env ?? {}),
     };
-    return { env, extraArgs: launchExtras.args ?? [] };
+    const resolved = { env, extraArgs: launchExtras.args ?? [] };
+    assertBrowserExclusiveHookResolution(input.agentKind, browserHookRequired, resolved);
+    return resolved;
   }
 
   /**

@@ -16,6 +16,7 @@ import {
   isDelegatedAgentTool,
 } from "@/shared/toolCallClassification";
 import { imageViewRendersInline } from "./parts/items/imageViewSource";
+import { isAppOwnedBrowserEvidenceItem } from "./parts/items/browserVerification";
 import {
   getToolLikePayload,
   isToolGroupItem as isGroupableItemType,
@@ -24,10 +25,34 @@ import {
 
 export const EMPTY_THREAD_ITEM_IDS = Object.freeze([]) as readonly string[];
 export const EMPTY_THREAD_TIMELINE_ENTRIES = Object.freeze([]) as readonly ChatTimelineEntry[];
+export const EMPTY_CHAT_DISPLAY_TIMELINE_ENTRIES = Object.freeze(
+  [],
+) as readonly ChatDisplayTimelineEntry[];
 
 export type ChatTimelineEntry =
   | { kind: "item"; id: string }
   | { kind: "tool_call_group"; id: string; itemIds: readonly string[] };
+
+/**
+ * Main-chat projection. Canonical and sub-agent timelines intentionally keep
+ * using {@link ChatTimelineEntry}; only the main transcript folds the work
+ * between a prompt and its final answer into one disclosure row.
+ */
+export type ChatDisplayTimelineEntry =
+  | ChatTimelineEntry
+  | {
+      kind: "assistant_message_group";
+      id: string;
+      itemIds: readonly string[];
+    }
+  | {
+      kind: "turn_activity_group";
+      id: string;
+      itemIds: readonly string[];
+      entries: readonly ChatTimelineEntry[];
+      /** True only for the currently running turn's activity group. */
+      isCurrentTurn: boolean;
+    };
 
 const MAX_INCREMENTAL_TAIL_ITEMS = 128;
 
@@ -52,6 +77,15 @@ const timelineEntryCache = new Map<
     entries: readonly ChatTimelineEntry[];
     entryStartIndices: readonly number[];
     childParentIds: ReadonlySet<string>;
+  }
+>();
+
+const compactTimelineEntryCache = new Map<
+  string,
+  {
+    sourceEntries: readonly ChatTimelineEntry[];
+    rawItemIds: readonly string[];
+    result: readonly ChatDisplayTimelineEntry[];
   }
 >();
 
@@ -268,6 +302,185 @@ export function selectVisibleThreadTimelineEntries(
     childParentIds,
   });
   return entries;
+}
+
+/**
+ * Codex-style display projection for the main chat surface.
+ *
+ * User prompts and submitted question answers remain first-class rows. Within
+ * each resulting turn segment, the maximal trailing run of assistant messages
+ * is coalesced into one visible final-response row while every earlier status/
+ * reasoning/tool entry is represented by one stable activity disclosure. If a
+ * later tool arrives, previously visible assistant candidates naturally become
+ * part of that same disclosure. A turn that ends without an assistant answer
+ * still retains its activity row.
+ */
+export function selectCompactThreadTimelineEntries(
+  state: AppStoreState,
+  threadId: string,
+  hiddenItemId?: string,
+  isTurnActive = false,
+): readonly ChatDisplayTimelineEntry[] {
+  const sourceEntries = selectVisibleThreadTimelineEntries(state, threadId, hiddenItemId);
+  if (sourceEntries.length === 0) return EMPTY_CHAT_DISPLAY_TIMELINE_ENTRIES;
+  const rawItemIds = state.runtimeItemIdsByThread[threadId] ?? EMPTY_THREAD_ITEM_IDS;
+  const cacheKey = `${threadId}\0${hiddenItemId ?? ""}\0${isTurnActive ? "live" : "settled"}`;
+  const cached = compactTimelineEntryCache.get(cacheKey);
+  if (cached?.sourceEntries === sourceEntries && cached.rawItemIds === rawItemIds) {
+    return cached.result;
+  }
+
+  const result = buildChatDisplayTimelineEntries(
+    state.runtimeItemsByIdByThread[threadId],
+    sourceEntries,
+    isTurnActive,
+    rawItemIds,
+  );
+  if (compactTimelineEntryCache.size > 500) compactTimelineEntryCache.clear();
+  compactTimelineEntryCache.set(cacheKey, { sourceEntries, rawItemIds, result });
+  return result;
+}
+
+export function buildChatDisplayTimelineEntries(
+  items: Record<string, RuntimeChatItem> | undefined,
+  sourceEntries: readonly ChatTimelineEntry[],
+  isTurnActive: boolean,
+  rawItemIds: readonly string[] = EMPTY_THREAD_ITEM_IDS,
+): readonly ChatDisplayTimelineEntry[] {
+  const result: ChatDisplayTimelineEntry[] = [];
+  let turnEntries: ChatTimelineEntry[] = [];
+  const assistantIdsBeforeTerminalError = collectAssistantIdsBeforeTerminalError(items, rawItemIds);
+
+  const flushTurn = (isCurrentTurn: boolean) => {
+    if (turnEntries.length === 0) return;
+    // Browser evidence is appended by Y Space itself after the main process
+    // observes a successful Browser MCP call. A background child can finish
+    // reporting that proof after the provider has already emitted the settled
+    // assistant final. Treat only those authenticated tail rows as logically
+    // preceding the final; an ordinary/provider-authored late tool still means
+    // the assistant text was progress and therefore belongs in activity.
+    let finalAnswerEnd = turnEntries.length;
+    if (!isCurrentTurn) {
+      while (
+        finalAnswerEnd > 0 &&
+        isAppOwnedBrowserEvidenceEntry(items, turnEntries[finalAnswerEnd - 1]!)
+      ) {
+        finalAnswerEnd -= 1;
+      }
+    }
+    let finalAnswerStart = finalAnswerEnd;
+    while (finalAnswerStart > 0) {
+      const candidate = turnEntries[finalAnswerStart - 1]!;
+      if (candidate.kind !== "item" || items?.[candidate.id]?.type !== "assistant_message") break;
+      finalAnswerStart -= 1;
+    }
+    // Canonical error rows are intentionally omitted from the visible
+    // transcript, but their raw ordering still decides whether a preceding
+    // assistant message was merely progress or the turn's actual final answer.
+    // Preserve live tail candidates until the turn settles; once settled, a
+    // raw terminal error after the candidate folds the whole candidate run
+    // into the work disclosure instead of leaving failed progress expanded.
+    const lastEntry = turnEntries[finalAnswerEnd - 1];
+    if (
+      !isCurrentTurn &&
+      lastEntry?.kind === "item" &&
+      assistantIdsBeforeTerminalError.has(lastEntry.id)
+    ) {
+      finalAnswerStart = finalAnswerEnd;
+    }
+    const hasFinalAnswer = finalAnswerStart < finalAnswerEnd;
+    const activityEntries = hasFinalAnswer
+      ? [...turnEntries.slice(0, finalAnswerStart), ...turnEntries.slice(finalAnswerEnd)]
+      : turnEntries;
+    if (activityEntries.length > 0) {
+      const itemIds = activityEntries.flatMap((entry) =>
+        entry.kind === "item" ? [entry.id] : entry.itemIds,
+      );
+      const firstItemId = itemIds[0];
+      if (firstItemId) {
+        result.push({
+          kind: "turn_activity_group",
+          id: `turn-activity-group:${firstItemId}`,
+          itemIds,
+          entries: activityEntries,
+          isCurrentTurn,
+        });
+      }
+    }
+    const finalAnswerEntries = hasFinalAnswer
+      ? turnEntries.slice(finalAnswerStart, finalAnswerEnd)
+      : [];
+    if (finalAnswerEntries.length > 1) {
+      const itemIds = finalAnswerEntries.flatMap((entry) =>
+        entry.kind === "item" ? [entry.id] : [],
+      );
+      const firstItemId = itemIds[0];
+      if (firstItemId) {
+        result.push({
+          kind: "assistant_message_group",
+          id: `assistant-message-group:${firstItemId}`,
+          itemIds,
+        });
+      }
+    } else {
+      result.push(...finalAnswerEntries);
+    }
+    turnEntries = [];
+  };
+
+  for (const entry of sourceEntries) {
+    const item = entry.kind === "item" ? items?.[entry.id] : undefined;
+    if (item?.type === "user_message" || item?.type === "question_answer") {
+      flushTurn(false);
+      result.push(entry);
+      continue;
+    }
+    turnEntries.push(entry);
+  }
+  flushTurn(isTurnActive);
+  return result.length === 0 ? EMPTY_CHAT_DISPLAY_TIMELINE_ENTRIES : result;
+}
+
+function isAppOwnedBrowserEvidenceEntry(
+  items: Record<string, RuntimeChatItem> | undefined,
+  entry: ChatTimelineEntry,
+): boolean {
+  const itemIds = entry.kind === "item" ? [entry.id] : entry.itemIds;
+  return (
+    itemIds.length > 0 && itemIds.every((itemId) => isAppOwnedBrowserEvidenceItem(items?.[itemId]))
+  );
+}
+
+/**
+ * Assistant rows that were followed by a top-level canonical error before the
+ * next user boundary. The visible projection filters `error`, so this must be
+ * derived from the raw timeline first. A later assistant row is deliberately
+ * not marked unless another error follows it, allowing provider recovery and
+ * genuine multipart finals to remain visible.
+ */
+function collectAssistantIdsBeforeTerminalError(
+  items: Record<string, RuntimeChatItem> | undefined,
+  rawItemIds: readonly string[],
+): ReadonlySet<string> {
+  const result = new Set<string>();
+  let precedingAssistantIds: string[] = [];
+
+  for (const itemId of rawItemIds) {
+    const item = items?.[itemId];
+    if (!item || item.parentItemId) continue;
+    if (item.type === "user_message" || item.type === "question_answer") {
+      precedingAssistantIds = [];
+      continue;
+    }
+    if (item.type === "assistant_message") {
+      precedingAssistantIds.push(itemId);
+      continue;
+    }
+    if (item.type !== "error") continue;
+    for (const assistantId of precedingAssistantIds) result.add(assistantId);
+  }
+
+  return result;
 }
 
 function collectChildParentIds(state: AppStoreState, threadId: string): ReadonlySet<string> {
@@ -767,7 +980,7 @@ export function selectMostRecentDisplayableCompletedTurn(
 export function selectCompletedTurnForEntry(
   state: AppStoreState,
   threadId: string,
-  entry: ChatTimelineEntry,
+  entry: ChatDisplayTimelineEntry,
 ): CompletedTurnRecord | undefined {
   const anchorMap = selectCompletedTurnsByAnchorItem(state, threadId);
   if (anchorMap.size === 0) return undefined;
@@ -789,6 +1002,9 @@ export function clearRuntimeItemStoreSelectorCacheForThread(threadId: string): v
   }
   for (const key of timelineEntryCache.keys()) {
     if (key.startsWith(prefix)) timelineEntryCache.delete(key);
+  }
+  for (const key of compactTimelineEntryCache.keys()) {
+    if (key.startsWith(prefix)) compactTimelineEntryCache.delete(key);
   }
   for (const key of visibleItemIdsCache.keys()) {
     if (key.startsWith(prefix)) visibleItemIdsCache.delete(key);

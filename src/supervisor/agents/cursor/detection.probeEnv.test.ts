@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   readCursorAgentCommandOutput:
@@ -56,7 +56,7 @@ vi.mock("../base", async (importOriginal) => ({
 }));
 
 import { cursorDetectionSpec } from "./detection";
-import type { DetectionSpec } from "../base";
+import { cleanupTrackedWslLaunchEnvironmentFiles, type DetectionSpec } from "../base";
 
 type ProbeCtx = Parameters<NonNullable<DetectionSpec["capabilitiesProbe"]>>[0];
 
@@ -69,6 +69,10 @@ function probeCtx(probeEnv: Record<string, string> | undefined): ProbeCtx {
 }
 
 describe("cursor detection probes honor ctx.probeEnv", () => {
+  afterEach(() => {
+    cleanupTrackedWslLaunchEnvironmentFiles();
+  });
+
   beforeEach(() => {
     mocks.readCursorAgentCommandOutput
       .mockReset()
@@ -119,7 +123,7 @@ describe("cursor detection probes honor ctx.probeEnv", () => {
     expect(mocks.probeAcpCapabilities.mock.calls[0]?.[3]?.env).toBeUndefined();
   });
 
-  it("exports the profile key into the WSL login shell for the model list", async () => {
+  it("stages the profile key outside WSL argv for the model list", async () => {
     await cursorDetectionSpec.capabilitiesProbe?.({
       ...probeCtx({ CURSOR_API_KEY: "profile-key" }),
       location: {
@@ -134,8 +138,14 @@ describe("cursor detection probes honor ctx.probeEnv", () => {
     expect(mocks.readWslLoginShellCommandOutputAsync.mock.calls[0]?.[4]?.env).toEqual({
       CURSOR_API_KEY: "profile-key",
     });
-    expect(mocks.probeAcpCapabilities.mock.calls[0]?.[1].at(-1)).toContain(
-      "export CURSOR_API_KEY='profile-key';",
-    );
+    const args = mocks.probeAcpCapabilities.mock.calls[0]?.[1] ?? [];
+    const serializedArgs = JSON.stringify(args);
+    const script = String(args.at(-1));
+    expect(serializedArgs).not.toContain("CURSOR_API_KEY");
+    expect(serializedArgs).not.toContain("profile-key");
+    expect(script).toContain("__y_space_launch_env_file");
+    expect(script).toContain('/bin/rm -f -- "$1"');
+    expect(script).toContain('/bin/rmdir -- "$2"');
+    expect(script).toContain("exec '/usr/local/bin/cursor-agent' 'acp'");
   });
 });
