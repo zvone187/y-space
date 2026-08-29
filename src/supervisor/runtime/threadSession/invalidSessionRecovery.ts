@@ -70,6 +70,7 @@ export class InvalidSessionRecoveryCoordinator {
       ...session.mcpIdentity,
       threadId: session.threadId,
       launchId: randomUUID(),
+      browserEvidenceTurnId: randomUUID(),
     };
     const launchConfig = context.spawnPipeline.resolveMcpLaunchConfig(
       workspaceLaunchConfig(

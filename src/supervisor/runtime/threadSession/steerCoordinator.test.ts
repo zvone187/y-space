@@ -69,10 +69,15 @@ function createHarness(
       order.push("start");
     },
   );
+  const beginBrowserEvidenceTurn = vi.fn<(session: SessionRuntime) => string>(() => {
+    order.push("begin-browser-evidence");
+    return "browser-turn-replacement";
+  });
   const coordinator = new SteerCoordinator({
     emit: (event) => events.push(event),
     sessions,
     interruptStructuredTurn,
+    beginBrowserEvidenceTurn,
     startStructuredTurn,
     failStructuredSession: vi.fn<(session: SessionRuntime, error: unknown) => void>(),
     resolveSkillTurnInjection: vi.fn<
@@ -90,6 +95,7 @@ function createHarness(
 
   return {
     coordinator,
+    beginBrowserEvidenceTurn,
     events,
     interruptStructuredTurn,
     order,
@@ -111,16 +117,17 @@ describe("SteerCoordinator interrupt-backed steering", () => {
       expect(harness.interruptStructuredTurn).toHaveBeenCalledTimes(1);
     });
     expect(harness.order).toEqual(["prepare", "interrupt"]);
+    expect(harness.beginBrowserEvidenceTurn).not.toHaveBeenCalled();
     expect(harness.startStructuredTurn).not.toHaveBeenCalled();
 
     harness.session.status = "idle";
     harness.coordinator.maybeDrainPendingSteer(harness.session);
 
-    expect(harness.order).toEqual(["prepare", "interrupt", "start"]);
-    expect(harness.startStructuredTurn).toHaveBeenCalledExactlyOnceWith(
-      harness.session,
-      harness.turn,
-    );
+    expect(harness.order).toEqual(["prepare", "interrupt", "begin-browser-evidence", "start"]);
+    expect(harness.startStructuredTurn).toHaveBeenCalledExactlyOnceWith(harness.session, {
+      ...harness.turn,
+      browserEvidenceTurnId: "browser-turn-replacement",
+    });
     expect(harness.session.pendingSteer).toBeUndefined();
     expect(harness.events.at(-1)).toMatchObject({
       type: "thread-pending-steer",
@@ -184,7 +191,7 @@ describe("SteerCoordinator interrupt-backed steering", () => {
     await Promise.resolve();
 
     expect(harness.startStructuredTurn).toHaveBeenCalledTimes(1);
-    expect(harness.order).toEqual(["prepare", "start"]);
+    expect(harness.order).toEqual(["prepare", "begin-browser-evidence", "start"]);
     expect(harness.interruptStructuredTurn).not.toHaveBeenCalled();
   });
 });

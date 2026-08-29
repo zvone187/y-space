@@ -1,4 +1,5 @@
-import { homedir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createClaudeAdapter, createClaudeProfileAdapter } from "./index";
@@ -119,10 +120,13 @@ describe("createClaudeAdapter structured sessions", () => {
 
     expect(adapter.capabilities.presentationMode).toBe("terminal");
     expect(adapter.capabilities.presentationModes).toEqual(["terminal", "gui"]);
+    expect(adapter.browserRouting).toEqual({ terminal: "exclusive", gui: "exclusive" });
   });
 
-  it("declares terminal MCP as launch-scoped and forwards launch MCP config", () => {
-    const adapter = createClaudeAdapter();
+  it("makes Y Space Browser the sole browser route for terminal launches", () => {
+    const adapter = createClaudeAdapter({
+      configDir: path.join(tmpdir(), "y-space-test-empty-claude-browser-profile"),
+    });
     expect(adapter.capabilities.mcpScope?.terminal).toBe("launch");
 
     const launch = adapter.buildLaunchArgv(projectLocation, config, "test the app", undefined, {
@@ -139,16 +143,179 @@ describe("createClaudeAdapter structured sessions", () => {
         },
       ],
     });
+    expect(launch.args).toContain("--no-chrome");
+    expect(launch.args).toContain("--strict-mcp-config");
+    expect(launch.args).not.toContain("--disable-slash-commands");
+
+    const disallowedIndex = launch.args.indexOf("--disallowedTools");
+    expect(disallowedIndex).toBeGreaterThanOrEqual(0);
+    const disallowedTools = launch.args[disallowedIndex + 1] ?? "";
+    expect(disallowedTools).toMatch(/\bWebFetch\b/u);
+    expect(disallowedTools).toMatch(/\bWebSearch\b/u);
+    expect(disallowedTools).toContain("Skill(gstack)");
+    expect(disallowedTools).toContain("Skill(control-in-app-browser *)");
+    expect(disallowedTools).toContain("Skill(playwright)");
+    expect(disallowedTools).toContain("Bash(*playwright*)");
+    expect(disallowedTools).toContain("Bash(*open -a*Safari*)");
+    expect(disallowedTools).toContain("Bash(open *https://*)");
+    expect(disallowedTools).toContain("Bash(xdg-open *https://*)");
+    expect(disallowedTools).toContain("Bash(gio open *https://*)");
+    expect(disallowedTools).toContain("PowerShell(Start-Process *https://*)");
+    expect(disallowedTools).toContain("PowerShell(start *https://*)");
+    expect(disallowedTools).toContain("PowerShell(explorer.exe *https://*)");
+    expect(disallowedTools).toContain("Bash(google-chrome*)");
+    expect(disallowedTools).toContain("PowerShell(*\\msedge.exe*)");
+    expect(disallowedTools).toContain("Bash(bash -lc 'open *https://*)");
+    expect(disallowedTools).toContain("Bash(sh -lc 'open *https://*)");
+    expect(disallowedTools).toContain("Bash(zsh -lc 'firefox*)");
+    expect(disallowedTools).toContain("Bash(bash -c 'open *https://*)");
+    expect(disallowedTools).toContain("Bash(env DISPLAY=* firefox*)");
+    expect(disallowedTools).toContain("Bash(FOO=* firefox*)");
+    expect(disallowedTools).toContain("Bash(command firefox*)");
+    expect(disallowedTools).toContain("Bash(nohup chromium*)");
+    expect(disallowedTools).not.toContain("Skill(qa)");
+    expect(disallowedTools).not.toMatch(/(?:^|,)Skill(?:,|$)/u);
+
+    const guidanceIndex = launch.args.indexOf("--append-system-prompt");
+    expect(guidanceIndex).toBeGreaterThanOrEqual(0);
+    const guidance = launch.args[guidanceIndex + 1] ?? "";
+    expect(guidance).toMatch(/Y Space Browser/iu);
+    expect(guidance).toMatch(/(?:only|sole).{0,80}browser|browser.{0,80}(?:only|sole)/iu);
+    expect(guidance).toContain("current turn");
+    expect(guidance).toContain("exact tab id");
+    expect(guidance).toContain("URL or title");
+    expect(guidance).toContain("page result you observed");
+
     const configIndex = launch.args.indexOf("--mcp-config");
     expect(configIndex).toBeGreaterThanOrEqual(0);
-    expect(JSON.parse(launch.args[configIndex + 1] ?? "{}")).toMatchObject({
+    const serializedMcpConfig = launch.args[configIndex + 1] ?? "{}";
+    expect(serializedMcpConfig).not.toContain("browser-token");
+    expect(JSON.parse(serializedMcpConfig)).toMatchObject({
       mcpServers: {
         browser: {
           type: "http",
           url: "http://127.0.0.1:43210/mcp?thread=thread-1",
+          headers: {
+            Authorization: expect.stringMatching(/^\$\{PORACODE_MCP_CLAUDE_/u),
+          },
         },
       },
     });
+    expect(Object.values(launch.env ?? {})).toContain("Bearer browser-token");
+  });
+
+  it("shadows unmanaged Claude profile MCPs only for Browser-exclusive terminal launches", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "y-space-claude-terminal-profile-"));
+    try {
+      const profileDir = path.join(root, "profile");
+      const projectDir = path.join(root, "project");
+      mkdirSync(path.join(profileDir, "agents"), { recursive: true });
+      mkdirSync(projectDir, { recursive: true });
+      const statePath = path.join(profileDir, ".claude.json");
+      const agentPath = path.join(profileDir, "agents", "profile-helper.md");
+      writeFileSync(
+        statePath,
+        JSON.stringify({
+          mcpServers: {
+            "profile-safe": {
+              type: "http",
+              url: "${PROFILE_MCP_URL}",
+              headers: { Authorization: "Bearer ${PROFILE_MCP_TOKEN}" },
+            },
+            playwright: { command: "npx", args: ["@playwright/mcp"] },
+          },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        agentPath,
+        "---\nname: profile-helper\ndescription: Uses the safe profile MCP\nmcpServers:\n  - profile-safe\n---\nUse the safe profile MCP.\n",
+        "utf8",
+      );
+      const originalState = readFileSync(statePath, "utf8");
+      const originalAgent = readFileSync(agentPath, "utf8");
+      const adapter = createClaudeAdapter({
+        configDir: profileDir,
+        customEnv: {
+          PROFILE_MCP_URL: "https://profile.example.test/mcp",
+          PROFILE_MCP_TOKEN: "profile-secret",
+        },
+      });
+      const appServers = [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          transport: {
+            type: "http" as const,
+            url: "http://127.0.0.1:43210/mcp",
+            headers: { Authorization: "Bearer browser-secret" },
+          },
+        },
+        {
+          id: "pipedream",
+          name: "pipedream",
+          timeoutMs: 30_000,
+          transport: {
+            type: "http" as const,
+            url: "https://mcp.pipedream.example.test",
+            headers: { Authorization: "Bearer pipedream-secret" },
+          },
+        },
+      ];
+      const launch = adapter.buildLaunchArgv(
+        { kind: "posix", path: projectDir },
+        config,
+        "use my integrations",
+        undefined,
+        { mcpServers: appServers },
+      );
+
+      const configIndex = launch.args.indexOf("--mcp-config");
+      const agentsIndex = launch.args.indexOf("--agents");
+      const serializedConfig = launch.args[configIndex + 1] ?? "{}";
+      const serializedAgents = launch.args[agentsIndex + 1] ?? "{}";
+      expect(Object.keys(JSON.parse(serializedConfig).mcpServers).sort()).toEqual([
+        "browser",
+        "pipedream",
+      ]);
+      expect(JSON.parse(serializedAgents)).toMatchObject({
+        "profile-helper": {
+          mcpServers: [
+            {
+              browser: expect.objectContaining({ url: "http://127.0.0.1:43210/mcp" }),
+            },
+          ],
+        },
+      });
+      expect(serializedConfig).not.toContain("playwright");
+      expect(`${serializedConfig}${serializedAgents}`).not.toContain("profile-secret");
+      expect(`${serializedConfig}${serializedAgents}`).not.toContain("pipedream-secret");
+      expect(Object.values(launch.env ?? {})).toContain("profile-secret");
+      expect(Object.values(launch.env ?? {})).toContain("Bearer pipedream-secret");
+      expect(launch.env?.PORACODE_CLAUDE_BROWSER_EXCLUSIVE).toBe("1");
+      expect(readFileSync(statePath, "utf8")).toBe(originalState);
+      expect(readFileSync(agentPath, "utf8")).toBe(originalAgent);
+
+      const browserDisabledLaunch = adapter.buildLaunchArgv(
+        { kind: "posix", path: projectDir },
+        config,
+        "use pipedream",
+        undefined,
+        { mcpServers: [appServers[1]!] },
+      );
+      const disabledConfigIndex = browserDisabledLaunch.args.indexOf("--mcp-config");
+      expect(browserDisabledLaunch.args).not.toContain("--strict-mcp-config");
+      expect(browserDisabledLaunch.args).not.toContain("--agents");
+      expect(browserDisabledLaunch.env?.PORACODE_CLAUDE_BROWSER_EXCLUSIVE).toBeUndefined();
+      expect(
+        Object.keys(
+          JSON.parse(browserDisabledLaunch.args[disabledConfigIndex + 1] ?? "{}").mcpServers,
+        ),
+      ).toEqual(["pipedream"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("creates a structured SDK session only for GUI presentation", async () => {

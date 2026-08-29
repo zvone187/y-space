@@ -125,6 +125,11 @@ msgstr "{0, plural, one {# 個のツール} other {# 個のツール}}"
 msgid "{0, plural, one {# use} other {# uses}}"
 msgstr "{0, plural, other {# 回}}"
 
+#. placeholder {0}: state.actionCount
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "{0, plural, one {Browser verified · # action} other {Browser verified · # actions}}"
+msgstr ""
+
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "{0, plural, one {Candidate (#)} other {Candidates (#)}}"
@@ -400,6 +405,10 @@ msgstr "{0}/{1} 件を選択済み"
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0}mo ago"
 msgstr "{0}か月前"
+
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
+msgid "{activityCount, plural, one {Worked · # step} other {Worked · # steps}}"
+msgstr "{activityCount, plural, one {完了 · # ステップ} other {完了 · # ステップ}}"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{agent} reported authentication success, but Y Space could not verify it. Configure {agent} directly, then try again."
@@ -941,8 +950,12 @@ msgid "Add a project to use GitHub Actions."
 msgstr "GitHub Actions を使用するにはプロジェクトを追加してください。"
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
-msgstr ".agents/skills または .poracode/skills にスキルを追加するか、別のプロバイダーからインポートしてください。"
+msgid "Add a skill from your workspace or import one from another provider."
+msgstr ""
+
+#: src/renderer/components/skills/SkillsManager.tsx
+#~ msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
+#~ msgstr ".agents/skills または .poracode/skills にスキルを追加するか、別のプロバイダーからインポートしてください。"
 
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
@@ -1208,8 +1221,8 @@ msgstr "エージェントはタスクタグで委任された作業を分類し
 #~ msgstr "AI"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
-msgstr "AI エージェント オーケストレーター — ターミナルおよびネイティブ ACP 経由でコーディング エージェントを管理します。"
+#~ msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
+#~ msgstr "AI エージェント オーケストレーター — ターミナルおよびネイティブ ACP 経由でコーディング エージェントを管理します。"
 
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
@@ -1966,7 +1979,6 @@ msgstr "Y Space の隔離された組み込みブラウザーで Web サイト�
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Browser"
 msgstr "ブラウザ"
@@ -1994,6 +2006,10 @@ msgstr "このスレッドに対してブラウザ MCP が有効になってい�
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Browser menu"
 msgstr "ブラウザメニュー"
+
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "Browser not verified"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13873,8 +13889,12 @@ msgstr "スペースを使わず、英数字、ピリオド、ハイフン、ま
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
-msgstr "1 つのグローバルフォルダーを使用するか、各プロジェクト内の .poracode/worktrees にワークツリーをネストします。"
+msgid "Use one global folder, or keep each project's worktrees with that project."
+msgstr ""
+
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#~ msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
+#~ msgstr "1 つのグローバルフォルダーを使用するか、各プロジェクト内の .poracode/worktrees にワークツリーをネストします。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
@@ -14388,6 +14408,7 @@ msgid "Working tree clean"
 msgstr "作業ツリーはクリーンです"
 
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
 msgid "Working…"
 msgstr "実行中…"
 
@@ -14581,8 +14602,12 @@ msgstr "Y Space は再起動し、現在のデータをバックアップして�
 #~ msgstr "Y Space は再起動し、現在のデータをバックアップしてから、Y Space データの完全なコピーに置き換えます。"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Y Space's built-in browser tools."
-msgstr "Y Space の組み込みブラウザツール。"
+#~ msgid "Y Space's built-in browser tools."
+#~ msgstr "Y Space の組み込みブラウザツール。"
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Your focused workspace for agents, files, and the web."
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

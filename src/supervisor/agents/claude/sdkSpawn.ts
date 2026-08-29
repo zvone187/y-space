@@ -3,9 +3,12 @@ import type { SpawnOptions, SpawnedProcess } from "@anthropic-ai/claude-agent-sd
 import type { ProjectLocation } from "@/shared/contracts";
 import {
   buildAgentCommand,
+  composeLaunchCleanups,
+  createWslLaunchEnvironmentFile,
   definedEnv,
   getWslCommand,
   getWslProjectShellEnv,
+  partitionWslLaunchEnvironment,
   quotePosixShellArg,
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
@@ -15,7 +18,7 @@ import {
   posixPrivilegedEnvironmentUnsetPrefix,
 } from "@/supervisor/privilegedChildEnvironment";
 
-type WindowsProjectLocation = Extract<ProjectLocation, { kind: "windows" }>;
+type NativeProjectLocation = Exclude<ProjectLocation, { kind: "wsl" }>;
 
 export function projectCwd(location: ProjectLocation): string {
   switch (location.kind) {
@@ -64,13 +67,14 @@ function buildDirectWslEnvCommandArgs(
   command: string,
   args: string[],
   env: Record<string, string>,
+  protectedEnvPrefix = "",
 ): string[] {
   const exports = Object.entries(env)
     .filter(([key]) => POSIX_ENV_NAME_RE.test(key))
     .map(([key, value]) => `export ${key}=${quotePosixShellArg(value)}`)
     .join("; ");
   const exec = `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
-  const script = `${posixPrivilegedEnvironmentUnsetPrefix()}${exports ? `${exports}; ` : ""}${exec}`;
+  const script = `${posixPrivilegedEnvironmentUnsetPrefix()}${exports ? `${exports}; ` : ""}${protectedEnvPrefix}${exec}`;
   return ["/bin/sh", "-c", script];
 }
 
@@ -86,24 +90,42 @@ export function spawnClaudeInWsl(location: ProjectLocation, options: SpawnOption
   const env = capturedEnv
     ? { ...capturedEnv, ...filteredEnv(options.env) }
     : filteredEnv(options.env);
+  const partitioned = partitionWslLaunchEnvironment(env);
+  const launchEnvironment = createWslLaunchEnvironmentFile(partitioned.protected);
   const args = [
     "-d",
     location.distro,
     "--cd",
     cwd,
     "--",
-    ...buildDirectWslEnvCommandArgs(command, options.args, env),
+    ...buildDirectWslEnvCommandArgs(
+      command,
+      options.args,
+      partitioned.inline,
+      launchEnvironment?.sourcePrefix,
+    ),
   ];
-  return spawn(getWslCommand(), args, {
-    env: sanitizeChildProcessEnv(process.env),
-    signal: options.signal,
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-  }) as unknown as SpawnedProcess;
+  try {
+    const child = spawn(getWslCommand(), args, {
+      env: sanitizeChildProcessEnv(process.env),
+      signal: options.signal,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    if (launchEnvironment) {
+      const cleanup = composeLaunchCleanups(undefined, launchEnvironment.cleanup)!;
+      child.once("exit", cleanup);
+      child.once("error", cleanup);
+    }
+    return child as unknown as SpawnedProcess;
+  } catch (error) {
+    launchEnvironment?.cleanup();
+    throw error;
+  }
 }
 
 export function spawnClaudeNative(
-  location: WindowsProjectLocation,
+  location: NativeProjectLocation,
   options: SpawnOptions,
 ): SpawnedProcess {
   const command = options.command || resolveAgentBinaryPath(location, "claude") || "claude";
@@ -134,6 +156,10 @@ export function spawnClaudeNative(
     signal: options.signal,
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
+    // Own a POSIX process group so task/session teardown can reap Claude's
+    // shell and tool descendants even if the SDK's immediate CLI child exits
+    // first. Windows keeps its prior spawn behavior and uses taskkill /T.
+    detached: location.kind === "posix",
     cwd,
   }) as unknown as SpawnedProcess;
 }

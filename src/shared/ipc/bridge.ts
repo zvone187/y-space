@@ -6,10 +6,12 @@ import type { GitStatePatch } from "../gitState";
 import { createChannel } from "./core";
 import {
   ipcProcedureMap,
+  RENDERER_IPC_PROCEDURE_NAMES,
   type IpcProcedureName,
   type IpcProcedurePayload,
   type IpcProcedureResult,
   type MainLocalProcedureName,
+  type RendererIpcProcedureName,
   type SupervisorProcedureName,
 } from "./procedureMap";
 import type {
@@ -26,11 +28,13 @@ import type { QuickComposerSubmission } from "./schemas";
 export const PORACODE_WINDOW_KINDS = ["main", "browserExtract", "quickComposer"] as const;
 export type PoracodeWindowKind = (typeof PORACODE_WINDOW_KINDS)[number];
 
-type ProcedureArgs<Name extends IpcProcedureName> =
+type ProcedureArgs<Name extends RendererIpcProcedureName> =
   (typeof ipcProcedureMap)[Name]["__types"]["args"];
 
 export type PoracodeInvokeBridge = {
-  [Name in IpcProcedureName]: (...args: ProcedureArgs<Name>) => Promise<IpcProcedureResult<Name>>;
+  [Name in RendererIpcProcedureName]: (
+    ...args: ProcedureArgs<Name>
+  ) => Promise<IpcProcedureResult<Name>>;
 };
 
 export type PoracodeBridge = PoracodeInvokeBridge & {
@@ -90,12 +94,11 @@ export function createInvokeBridge(
 
 /** Builds every typed procedure method while preserving its canonical name. */
 export function createProcedureBridge(
-  invoke: (name: IpcProcedureName, args: unknown[]) => Promise<unknown>,
+  invoke: (name: RendererIpcProcedureName, args: unknown[]) => Promise<unknown>,
 ): PoracodeInvokeBridge {
   const bridge = {} as PoracodeInvokeBridge;
-  const names = Object.keys(ipcProcedureMap) as IpcProcedureName[];
-  for (const name of names) {
-    (bridge as Record<IpcProcedureName, unknown>)[name] = (...args: unknown[]) =>
+  for (const name of RENDERER_IPC_PROCEDURE_NAMES) {
+    (bridge as Record<RendererIpcProcedureName, unknown>)[name] = (...args: unknown[]) =>
       invoke(name, args);
   }
   return bridge;

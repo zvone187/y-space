@@ -16,20 +16,16 @@ import { SettingRow } from "./SettingsForm";
 
 const ADD_PROVIDER_KEY = "__add__";
 
-const OPEN_CODE_MCP_KEYS = [
-  "browserMcp",
-  "crossagentMcp",
-  "computerUse",
-] as const satisfies readonly (ComposerMcpConfigKey | "computerUse")[];
+const OPEN_CODE_MCP_KEYS = ["crossagentMcp", "computerUse"] as const satisfies readonly (
+  | ComposerMcpConfigKey
+  | "computerUse"
+)[];
 type OpenCodeMcpKey = (typeof OPEN_CODE_MCP_KEYS)[number];
 
 function readMcpSettings(
   settings: Record<string, boolean | string> | undefined,
 ): Record<OpenCodeMcpKey, boolean> {
   return {
-    // Every Y Space agent should be able to inspect and operate the embedded
-    // browser unless the user explicitly opts this provider out.
-    browserMcp: settings?.browserMcp !== false,
     // Each OpenCode GUI task gets an isolated sidecar and direct thread token.
     // An explicit false remains an opt-out for users who do not want delegation.
     crossagentMcp: settings?.crossagentMcp !== false,
@@ -265,14 +261,6 @@ export function OpenCodeProviderSettings(props: {
             <Disclosure.Content>
               <Disclosure.Body className="space-y-3 pt-2">
                 <div className="space-y-0.5">
-                  <McpToggleRow
-                    title={t`Browser`}
-                    description={<Trans>Y Space's built-in browser tools.</Trans>}
-                    isSelected={draftMcp.browserMcp}
-                    onChange={(value) =>
-                      setDraftMcp((current) => ({ ...current, browserMcp: value }))
-                    }
-                  />
                   <McpToggleRow
                     title={t`Crossagents`}
                     description={<Trans>Delegate work to other AI agents.</Trans>}

@@ -293,7 +293,7 @@ export function McpServersManager(props: {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "poracode-mcp-servers.json";
+    anchor.download = "y-space-mcp-servers.json";
     anchor.click();
     URL.revokeObjectURL(url);
   };

@@ -58,11 +58,14 @@ vi.spyOn(console, "warn").mockImplementation(() => {});
 vi.spyOn(console, "log").mockImplementation(() => {});
 
 import { codexExtraArgsPosition } from "./agents/codex/argv";
+import { BROWSER_MCP_TOKEN_ENV, BROWSER_MCP_URL_ENV } from "./agents/browserMcp";
 import { SupervisorRuntime } from "./supervisorRuntime";
 
 const tempDirs: string[] = [];
 const runtimesToDispose: SupervisorRuntime[] = [];
 const poracodeDataDirBeforeTests = process.env.PORACODE_DATA_DIR;
+const browserMcpUrlBeforeTests = process.env[BROWSER_MCP_URL_ENV];
+const browserMcpTokenBeforeTests = process.env[BROWSER_MCP_TOKEN_ENV];
 
 function makeTempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "poracode-runtime-"));
@@ -74,6 +77,43 @@ function makeRuntime(emit: ConstructorParameters<typeof SupervisorRuntime>[0]): 
   const runtime = new SupervisorRuntime(emit);
   runtimesToDispose.push(runtime);
   return runtime;
+}
+
+function createCodexBrowserHookExtras(threadId: string): {
+  env: Record<string, string>;
+  extraArgs: string[];
+} {
+  return {
+    env: {
+      PORACODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event",
+      PORACODE_HOOK_SECRET: "runtime-test-hook-secret",
+      PORACODE_HOOK_NONCE: "runtime-test-hook-nonce",
+      PORACODE_HOOK_PROTOCOL_VERSION: "1",
+      PORACODE_THREAD_ID: threadId,
+      PORACODE_AGENT_KIND: "codex",
+      CODEX_HOME: "/tmp/agent-plugins/codex/home",
+      CODEX_SQLITE_HOME: "/tmp/codex-profile",
+    },
+    extraArgs: ["--dangerously-bypass-hook-trust", "--enable", "hooks"],
+  };
+}
+
+function createClaudeBrowserHookExtras(threadId: string): {
+  env: Record<string, string>;
+  extraArgs: string[];
+} {
+  return {
+    env: {
+      PORACODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event",
+      PORACODE_HOOK_SECRET: "runtime-test-hook-secret",
+      PORACODE_HOOK_NONCE: "runtime-test-hook-nonce",
+      PORACODE_HOOK_PROTOCOL_VERSION: "1",
+      PORACODE_THREAD_ID: threadId,
+      PORACODE_AGENT_KIND: "claude",
+      PORACODE_CLAUDE_BROWSER_EXCLUSIVE: "1",
+    },
+    extraArgs: ["--settings", "/tmp/agent-plugins/claude/settings.json"],
+  };
 }
 
 afterEach(() => {
@@ -100,6 +140,16 @@ afterEach(() => {
     delete process.env.PORACODE_DATA_DIR;
   } else {
     process.env.PORACODE_DATA_DIR = poracodeDataDirBeforeTests;
+  }
+  if (browserMcpUrlBeforeTests === undefined) {
+    delete process.env[BROWSER_MCP_URL_ENV];
+  } else {
+    process.env[BROWSER_MCP_URL_ENV] = browserMcpUrlBeforeTests;
+  }
+  if (browserMcpTokenBeforeTests === undefined) {
+    delete process.env[BROWSER_MCP_TOKEN_ENV];
+  } else {
+    process.env[BROWSER_MCP_TOKEN_ENV] = browserMcpTokenBeforeTests;
   }
   taskkillSpawnSyncMock.mockReset();
   ptySpawnMock.mockReset();
@@ -208,6 +258,8 @@ function createRuntimeSession(overrides: Record<string, unknown> = {}) {
 
 describe("SupervisorRuntime thread input", () => {
   beforeEach(() => {
+    process.env[BROWSER_MCP_URL_ENV] = "http://127.0.0.1:43199";
+    process.env[BROWSER_MCP_TOKEN_ENV] = "runtime-test-browser-token";
     vi.useRealTimers();
     taskkillSpawnSyncMock.mockReset();
     ptySpawnMock.mockReset();
@@ -1658,6 +1710,7 @@ describe("SupervisorRuntime thread input", () => {
     });
 
     const adapter = {
+      browserRouting: { gui: "exclusive" } as const,
       kind: "generic-gui" as const,
       label: "Codex",
       capabilities: {
@@ -1797,6 +1850,7 @@ describe("SupervisorRuntime thread input", () => {
     });
 
     const adapter = {
+      browserRouting: { gui: "exclusive" } as const,
       kind: "generic-gui" as const,
       label: "Generic GUI Provider",
       capabilities: {
@@ -1896,6 +1950,7 @@ describe("SupervisorRuntime thread input", () => {
     });
 
     const adapter = {
+      browserRouting: { gui: "exclusive" } as const,
       kind: "generic-gui" as const,
       label: "Generic GUI Provider",
       capabilities: {
@@ -2001,6 +2056,7 @@ describe("SupervisorRuntime thread input", () => {
     });
 
     const adapter = {
+      browserRouting: { gui: "exclusive" } as const,
       kind: "generic-gui" as const,
       label: "Generic GUI Provider",
       capabilities: {
@@ -2139,6 +2195,7 @@ describe("SupervisorRuntime thread input", () => {
     });
 
     const adapter = {
+      browserRouting: { gui: "exclusive" } as const,
       kind: "generic-gui" as const,
       label: "Generic GUI Provider",
       capabilities: {
@@ -2261,6 +2318,7 @@ describe("SupervisorRuntime thread input", () => {
     });
 
     const adapter = {
+      browserRouting: { terminal: "exclusive", gui: "exclusive" } as const,
       kind: "codex" as const,
       label: "Codex",
       capabilities: {
@@ -2360,6 +2418,7 @@ describe("SupervisorRuntime thread input", () => {
     ptySpawnMock.mockReturnValueOnce(pty);
 
     const adapter = {
+      browserRouting: { terminal: "exclusive" } as const,
       kind: "codex" as const,
       label: "Codex",
       capabilities: {
@@ -2401,10 +2460,7 @@ describe("SupervisorRuntime thread input", () => {
       }
     ).cliHookPluginCoordinator.resolvePluginEnvForSpawn = vi.fn<
       (input: unknown) => Promise<{ env: Record<string, string>; extraArgs: string[] }>
-    >(async () => ({
-      env: { PORACODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event" },
-      extraArgs: ["--enable", "hooks"],
-    }));
+    >(async () => createCodexBrowserHookExtras("thread-hook-order"));
 
     await runtime.threadSessionManager.startThread({
       threadId: "thread-hook-order",
@@ -2437,6 +2493,7 @@ describe("SupervisorRuntime thread input", () => {
     ptySpawnMock.mockReturnValueOnce(pty);
 
     const adapter = {
+      browserRouting: { terminal: "exclusive" } as const,
       kind: "codex" as const,
       label: "Codex",
       capabilities: {
@@ -2478,10 +2535,7 @@ describe("SupervisorRuntime thread input", () => {
       }
     ).cliHookPluginCoordinator.resolvePluginEnvForSpawn = vi.fn<
       (input: unknown) => Promise<{ env: Record<string, string>; extraArgs: string[] }>
-    >(async () => ({
-      env: { PORACODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event" },
-      extraArgs: ["--enable", "hooks"],
-    }));
+    >(async () => createCodexBrowserHookExtras("thread-hook-resume-order"));
 
     await runtime.threadSessionManager.startThread({
       threadId: "thread-hook-resume-order",
@@ -2612,6 +2666,7 @@ describe("SupervisorRuntime thread input", () => {
       }));
 
       const adapter = {
+        browserRouting: { terminal: "exclusive" } as const,
         kind: "claude" as const,
         label: "Claude",
         capabilities: {
@@ -2647,6 +2702,18 @@ describe("SupervisorRuntime thread input", () => {
         "claude",
         adapter,
       );
+      (
+        runtime as unknown as {
+          cliHookPluginCoordinator: {
+            resolvePluginEnvForSpawn: (input: unknown) => Promise<{
+              env: Record<string, string>;
+              extraArgs: string[];
+            }>;
+          };
+        }
+      ).cliHookPluginCoordinator.resolvePluginEnvForSpawn = vi.fn<
+        (input: unknown) => Promise<{ env: Record<string, string>; extraArgs: string[] }>
+      >(async () => createClaudeBrowserHookExtras("thread-prompt-quoting"));
 
       const spicyPrompt = "let's `do` $this\nwith 'quotes'";
       await runtime.threadSessionManager.startThread({

@@ -2,21 +2,28 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport as ClientStdioTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "@/shared/contracts";
+import { createMcpToolFilterProxy } from "./mcpToolFilterProxy";
 
-const CONFIG_ENV = "PORACODE_MCP_FILTER_CONFIG";
+const CONFIG_ENV_PREFIX = "PORACODE_MCP_FILTER_CONFIG_";
 
-function readConfig(): { server: McpServer; disabledTools: string[] } {
-  const encoded = process.env[CONFIG_ENV];
+function configEnvName(): string {
+  const name = process.argv[2];
+  if (!name?.startsWith(CONFIG_ENV_PREFIX)) throw new Error("Missing MCP filter config identity");
+  return name;
+}
+
+function readConfig(): { server: McpServer; disabledTools: string[]; browserExclusive: boolean } {
+  const encoded = process.env[configEnvName()];
   if (!encoded) throw new Error("Missing MCP filter configuration");
-  return JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as {
+  const decoded = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as {
     server: McpServer;
     disabledTools: string[];
+    browserExclusive?: boolean;
   };
+  return { ...decoded, browserExclusive: decoded.browserExclusive === true };
 }
 
 function createUpstreamTransport(server: McpServer) {
@@ -42,33 +49,14 @@ function createUpstreamTransport(server: McpServer) {
 
 async function main(): Promise<void> {
   const config = readConfig();
-  const disabled = new Set(config.disabledTools);
   const client = new Client({ name: "poracode-mcp-filter", version: "1.0.0" });
   await client.connect(createUpstreamTransport(config.server) as Transport);
 
-  const server = new Server(
-    { name: config.server.name, version: "1.0.0" },
-    { capabilities: { tools: {} } },
-  );
-  server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const tools = [];
-    let cursor: string | undefined;
-    do {
-      const result = await client.listTools(cursor ? { cursor } : undefined);
-      tools.push(...result.tools.filter((tool) => !disabled.has(tool.name)));
-      cursor = result.nextCursor;
-    } while (cursor);
-    return { tools };
-  });
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const name = request.params.name;
-    if (disabled.has(name)) {
-      return {
-        isError: true,
-        content: [{ type: "text", text: `Tool disabled by Y Space: ${name}` }],
-      };
-    }
-    return await client.callTool(request.params);
+  const server = createMcpToolFilterProxy({
+    client,
+    serverName: config.server.name,
+    disabledTools: config.disabledTools,
+    browserExclusive: config.browserExclusive,
   });
 
   const close = async () => {

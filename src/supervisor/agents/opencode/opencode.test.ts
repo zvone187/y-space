@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createOpenCodeAdapter } from ".";
-import { buildOpenCodeArgs } from "./argv";
+import { buildOpenCodeArgs, buildOpenCodeServerCommand } from "./argv";
 import {
   attachOpenCodeProviderIds,
   buildOpenCodeStatusFromSdkInventory,
@@ -80,6 +80,35 @@ describe("buildOpenCodeArgs", () => {
       "--model",
       "opencode/big-pickle",
     ]);
+  });
+});
+
+describe("buildOpenCodeServerCommand", () => {
+  it("keeps generated WSL MCP credentials out of wsl.exe argv", () => {
+    const secret = "opencode-wsl-mcp-secret-sentinel";
+    const serverPassword = "opencode-wsl-server-password-sentinel";
+    const command = buildOpenCodeServerCommand(
+      {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/work/project",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\work\\project",
+      },
+      "/home/demo/.opencode/bin/opencode",
+      {
+        OPENCODE_CONFIG_CONTENT: "{}",
+        OPENCODE_SERVER_PASSWORD: serverPassword,
+        PORACODE_MCP_OPENCODE_BROWSER_ABC_HEADER_AUTHORIZATION_DEF: secret,
+      },
+    );
+
+    expect(JSON.stringify(command.args)).not.toContain(secret);
+    expect(JSON.stringify(command.args)).not.toContain(serverPassword);
+    expect(command.args).toContain("/bin/sh");
+    expect(command.args.join(" ")).toContain("__y_space_launch_env_file");
+    expect(command.cleanup).toEqual(expect.any(Function));
+
+    command.cleanup?.();
   });
 });
 
@@ -412,6 +441,7 @@ describe("createOpenCodeAdapter", () => {
     expect(adapter.capabilities.crossagentMcpRouting).toBe("thread-token");
     expect(adapter.capabilities.agentSettingsDefaults?.browserMcp).toBe(true);
     expect(adapter.capabilities.agentSettingsDefaults?.crossagentMcp).toBe(true);
+    expect(adapter.browserRouting).toEqual({ terminal: "exclusive", gui: "exclusive" });
   });
 
   it("does not enable retired provider-session routing for built-in MCP servers", () => {
@@ -577,6 +607,84 @@ describe("createOpenCodeAdapter", () => {
     expect(argv.env?.OPENCODE_CONFIG_CONTENT).not.toContain("Bearer secret");
     expect(argv.env?.OPENCODE_CONFIG_CONTENT).toContain("{env:PORACODE_MCP_OPENCODE_");
     expect(Object.values(argv.env ?? {})).toContain("Bearer secret");
+  });
+
+  it("makes Y Space Browser the sole browser route in the per-launch config", () => {
+    const adapter = createOpenCodeAdapter();
+    const argv = adapter.buildLaunchArgv(
+      { kind: "windows", path: "C:\\repo" },
+      { model: "" },
+      "",
+      undefined,
+      {
+        mcpServers: [
+          {
+            id: "browser",
+            name: "browser",
+            timeoutMs: 30_000,
+            transport: {
+              type: "http",
+              url: "http://127.0.0.1:43210/mcp",
+              headers: { Authorization: "Bearer browser-secret" },
+            },
+          },
+        ],
+      },
+    );
+
+    const launchConfig = JSON.parse(argv.env?.OPENCODE_CONFIG_CONTENT ?? "{}") as {
+      tools?: Record<string, boolean>;
+      mcp?: Record<string, Record<string, unknown>>;
+      permission?: { skill?: Record<string, string>; bash?: Record<string, string> };
+    };
+    expect(launchConfig.tools).toMatchObject({
+      webfetch: false,
+      websearch: false,
+    });
+    expect(launchConfig.tools?.skill).toBeUndefined();
+    expect(launchConfig.permission?.skill).toMatchObject({
+      gstack: "deny",
+      browse: "deny",
+      "browser-use": "deny",
+      "control-in-app-browser": "deny",
+    });
+    expect(launchConfig.permission?.skill?.["*"]).toBeUndefined();
+    expect(launchConfig.permission?.bash).toMatchObject({
+      "open *https://*": "deny",
+      "xdg-open *https://*": "deny",
+      "gio open *https://*": "deny",
+      "Start-Process *https://*": "deny",
+      "start *https://*": "deny",
+      "explorer.exe *https://*": "deny",
+      "google-chrome*": "deny",
+      "*\\msedge.exe*": "deny",
+      "bash -lc 'open *https://*": "deny",
+      "command firefox*": "deny",
+      "nohup chromium*": "deny",
+    });
+    expect(launchConfig.mcp?.playwright).toMatchObject({ enabled: false });
+    for (const externalBrowser of [
+      "chrome",
+      "puppeteer",
+      "selenium",
+      "gstack",
+      "stagehand",
+      "browserbase",
+      "browserstack",
+      "browserless",
+      "firefox",
+      "webkit",
+      "node_repl",
+    ]) {
+      expect(launchConfig.mcp?.[externalBrowser]).toMatchObject({ enabled: false });
+    }
+    expect(launchConfig.mcp?.browser).toMatchObject({
+      type: "remote",
+      url: "http://127.0.0.1:43210/mcp",
+      enabled: true,
+    });
+    expect(JSON.stringify(launchConfig)).not.toContain("browser-secret");
+    expect(Object.values(argv.env ?? {})).toContain("Bearer browser-secret");
   });
 
   it("enables trusted session routing when a terminal launch hosts Crossagents", () => {

@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 import { resolve as resolvePosixPath } from "node:path/posix";
 import { resolve as resolveWindowsPath } from "node:path/win32";
 import type { ProjectLocation, ResolvedMcpServer } from "@/shared/contracts";
+import { hasYSpaceBrowserMcp } from "@/shared/browserExclusivePolicy";
 import { resolveWslHomeDirectoryAsync, type AgentEnvContext } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { buildOpenCodeServerCommand } from "./argv";
-import { buildOpenCodeMcp } from "../userMcp";
+import { buildOpenCodeBrowserExclusiveConfig, buildOpenCodeMcp } from "../userMcp";
 import { classifyOpenCodeError, isOpenCodeConnectionLoss } from "./opencodeErrors";
 import { installOpenCodePlugin } from "./plugin/install";
 import type { LegacyOpenCodeClient } from "./legacySdk";
@@ -27,15 +28,20 @@ export function resolveOpenCodeSessionDirectory(location: ProjectLocation): stri
   }
 }
 
-function poolKey(location: ProjectLocation, serverIsolationKey?: string): string {
+function poolKey(
+  location: ProjectLocation,
+  serverIsolationKey?: string,
+  browserExclusive = false,
+): string {
   const isolationSuffix = serverIsolationKey ? `:isolated:${serverIsolationKey}` : "";
+  const browserPolicySuffix = browserExclusive ? ":browser-exclusive" : "";
   switch (location.kind) {
     case "windows":
-      return `windows${isolationSuffix}`;
+      return `windows${isolationSuffix}${browserPolicySuffix}`;
     case "wsl":
-      return `wsl:${location.distro}${isolationSuffix}`;
+      return `wsl:${location.distro}${isolationSuffix}${browserPolicySuffix}`;
     case "posix":
-      return `posix${isolationSuffix}`;
+      return `posix${isolationSuffix}${browserPolicySuffix}`;
   }
 }
 
@@ -72,7 +78,13 @@ interface PoolEntry {
   idleTimer: ReturnType<typeof setTimeout> | undefined;
 }
 
-async function installSharedServerPlugin(projectLocation: ProjectLocation): Promise<void> {
+const OPENCODE_BROWSER_PLUGIN_UNAVAILABLE =
+  "Y Space Browser cannot start OpenCode safely because its browser-command plugin is unavailable. Restart Y Space and try again, or globally disable Browser MCP before launching OpenCode.";
+
+async function installSharedServerPlugin(
+  projectLocation: ProjectLocation,
+  browserExclusive: boolean,
+): Promise<void> {
   try {
     const baseDir = process.env.PORACODE_DATA_DIR?.trim();
     const ctx: AgentEnvContext =
@@ -88,9 +100,15 @@ async function installSharedServerPlugin(projectLocation: ProjectLocation): Prom
     }
     const result = installOpenCodePlugin(ctx);
     if (!result.ok) {
+      if (browserExclusive) throw new Error(OPENCODE_BROWSER_PLUGIN_UNAVAILABLE);
       console.warn(`[opencode] failed to install shared-server plugin: ${result.reason}`);
     }
   } catch (error) {
+    if (browserExclusive) {
+      // Do not attach provider/install output to an error that crosses the UI boundary.
+      // oxlint-disable-next-line eslint/preserve-caught-error
+      throw new Error(OPENCODE_BROWSER_PLUGIN_UNAVAILABLE);
+    }
     console.warn("[opencode] failed to install shared-server plugin:", error);
   }
 }
@@ -189,16 +207,25 @@ async function createLegacySdkClient(
   });
 }
 
-async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSnapshot> {
+async function spawnAndWire(
+  projectLocation: ProjectLocation,
+  browserExclusive: boolean,
+): Promise<ServerSnapshot> {
   // The process must load the Poracode lifecycle plugin before it starts.
   // Installing after `opencode serve` starts is too late because its plugin
   // set is fixed for the lifetime of the process.
-  await installSharedServerPlugin(projectLocation);
+  await installSharedServerPlugin(projectLocation, browserExclusive);
   const resolvedExecPath = resolveAgentBinaryPath(projectLocation, "opencode");
   const username = "opencode";
   const password = randomUUID();
   const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
   const command = buildOpenCodeServerCommand(projectLocation, resolvedExecPath, {
+    ...(browserExclusive
+      ? {
+          OPENCODE_CONFIG_CONTENT: JSON.stringify(buildOpenCodeBrowserExclusiveConfig()),
+          PORACODE_OPENCODE_BROWSER_EXCLUSIVE: "1",
+        }
+      : {}),
     OPENCODE_SERVER_USERNAME: username,
     OPENCODE_SERVER_PASSWORD: password,
   });
@@ -246,11 +273,79 @@ async function addMcpServers(
   );
 }
 
+type OpenCodeResolvedMcpConfig = {
+  enabled?: boolean;
+  type?: string;
+  command?: readonly string[];
+  url?: string;
+};
+
+const OPENCODE_BROWSER_CONFIG_INSPECTION_ERROR =
+  "Y Space Browser cannot start OpenCode safely because its effective MCP configuration could not be inspected. Restart Y Space and try again, or globally disable Browser MCP before launching OpenCode.";
+
+function throwOpenCodeBrowserConfigInspectionError(): never {
+  throw new Error(OPENCODE_BROWSER_CONFIG_INSPECTION_ERROR);
+}
+
+/**
+ * OpenCode merges its normal user/project config below launch overrides. A
+ * provider-profile MCP can therefore use an arbitrary server name and expose
+ * browser tools only after dynamic discovery. Since provider-native transports
+ * cannot be routed through Y Space's advertised-tool proxy, fail closed by
+ * disconnecting every unmanaged profile MCP while leaving app-managed names.
+ */
+async function disconnectResolvedUnmanagedProfileMcpServers(
+  directory: string,
+  managedNames: ReadonlySet<string>,
+  client: LegacyOpenCodeClient,
+): Promise<void> {
+  const configClient = client.config as
+    | { get?: (input: { directory: string }) => Promise<unknown> }
+    | undefined;
+  if (typeof configClient?.get !== "function") throwOpenCodeBrowserConfigInspectionError();
+
+  let response: unknown;
+  try {
+    response = await configClient.get({ directory });
+  } catch {
+    throwOpenCodeBrowserConfigInspectionError();
+  }
+  const resolved =
+    response && typeof response === "object" && "data" in response
+      ? (response as { data?: unknown }).data
+      : response;
+  if (!resolved || typeof resolved !== "object" || Array.isArray(resolved)) {
+    throwOpenCodeBrowserConfigInspectionError();
+  }
+  const mcp = (resolved as { mcp?: unknown }).mcp;
+  if (!mcp || typeof mcp !== "object" || Array.isArray(mcp)) {
+    throwOpenCodeBrowserConfigInspectionError();
+  }
+
+  const unmanagedNames = Object.entries(mcp as Record<string, unknown>).flatMap(([name, value]) => {
+    if (managedNames.has(name)) return [];
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throwOpenCodeBrowserConfigInspectionError();
+    }
+    const config = value as OpenCodeResolvedMcpConfig;
+    if (config.enabled === false) return [];
+    return [name];
+  });
+
+  if (unmanagedNames.length > 0) {
+    console.info(
+      `[opencode] Browser-exclusive launch disconnected ${unmanagedNames.length} unmanaged provider-profile MCP server(s); app-managed MCPs remain available.`,
+    );
+  }
+  await Promise.all(unmanagedNames.map((name) => client.mcp.disconnect({ directory, name })));
+}
+
 async function syncDirectoryMcpServers(
   entry: PoolEntry,
   directory: string,
   servers: ReturnType<typeof buildOpenCodeMcp>,
   client: LegacyOpenCodeClient,
+  afterSync?: () => Promise<void>,
 ): Promise<void> {
   const existing = entry.directoryMcp.get(directory);
   const state = existing ?? { sync: Promise.resolve() };
@@ -261,9 +356,13 @@ async function syncDirectoryMcpServers(
   );
   const nextNames = new Set(Object.keys(servers));
   const operation = state.sync.then(async () => {
-    if (state.managedMcpFingerprint === nextFingerprint) return;
+    if (state.managedMcpFingerprint === nextFingerprint) {
+      await afterSync?.();
+      return;
+    }
 
     let serversToAdd = servers;
+    let recreatedDirectory = false;
     if (state.managedMcpFingerprint !== undefined) {
       const previousServers = state.managedMcpServers ?? {};
       const removedNames = Object.keys(previousServers).filter((name) => !nextNames.has(name));
@@ -280,6 +379,7 @@ async function syncDirectoryMcpServers(
         // directory instance to clear removed runtime config, then rebuild
         // the current set. Other project instances and the server stay live.
         await client.instance.dispose({ directory });
+        recreatedDirectory = true;
       } else {
         serversToAdd = Object.fromEntries(
           Object.entries(servers).filter(
@@ -287,9 +387,20 @@ async function syncDirectoryMcpServers(
           ),
         );
       }
+    } else {
+      // Fail closed before registering Browser for the first time. The fully
+      // resolved profile can contain neutrally named MCPs that are invisible
+      // to launch-time static configuration.
+      await afterSync?.();
     }
 
+    if (!recreatedDirectory && state.managedMcpFingerprint !== undefined) {
+      await afterSync?.();
+    }
     await addMcpServers(directory, serversToAdd, client);
+    // Disposing a directory causes OpenCode to reconstruct it from settings,
+    // so profile MCPs must be disconnected again after managed servers return.
+    if (recreatedDirectory) await afterSync?.();
     state.managedMcpServers = servers;
     state.managedMcpFingerprint = nextFingerprint;
   });
@@ -310,11 +421,12 @@ async function acquireOpenCodeServerInner(
   input: AcquireOpenCodeServerInput,
   retryMcpConnectionLoss: boolean,
 ): Promise<AcquiredOpenCodeServer> {
-  const key = poolKey(input.projectLocation, input.serverIsolationKey);
+  const browserExclusive = hasYSpaceBrowserMcp(input.mcpServers ?? []);
+  const key = poolKey(input.projectLocation, input.serverIsolationKey, browserExclusive);
   let entry = pool.get(key);
 
   if (!entry) {
-    const ready = spawnAndWire(input.projectLocation);
+    const ready = spawnAndWire(input.projectLocation, browserExclusive);
     const createdEntry: PoolEntry = {
       ready,
       directoryMcp: new Map(),
@@ -373,7 +485,20 @@ async function acquireOpenCodeServerInner(
     // An explicit empty array is the settings-level request to clear the set.
     if (input.mcpServers !== undefined) {
       const nextMcp = buildOpenCodeMcp(input.mcpServers);
-      await syncDirectoryMcpServers(acquiringEntry, directory, nextMcp, client);
+      await syncDirectoryMcpServers(
+        acquiringEntry,
+        directory,
+        nextMcp,
+        client,
+        browserExclusive
+          ? () =>
+              disconnectResolvedUnmanagedProfileMcpServers(
+                directory,
+                new Set(Object.keys(nextMcp)),
+                client,
+              )
+          : undefined,
+      );
     }
   } catch (error) {
     if (!retryMcpConnectionLoss || !isOpenCodeConnectionLoss(error)) {
@@ -403,7 +528,21 @@ async function acquireOpenCodeServerInner(
       return () => snapshot.handle.child.off("exit", callback);
     },
     updateMcpServers: async (servers) => {
-      await syncDirectoryMcpServers(acquiringEntry, directory, buildOpenCodeMcp(servers), client);
+      const nextMcp = buildOpenCodeMcp(servers);
+      await syncDirectoryMcpServers(
+        acquiringEntry,
+        directory,
+        nextMcp,
+        client,
+        browserExclusive
+          ? () =>
+              disconnectResolvedUnmanagedProfileMcpServers(
+                directory,
+                new Set(Object.keys(nextMcp)),
+                client,
+              )
+          : undefined,
+      );
     },
     dispose: async (options) => {
       const closeImmediately = options?.closeServerIfIdle === true;

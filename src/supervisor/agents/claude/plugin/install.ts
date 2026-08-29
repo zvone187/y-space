@@ -319,6 +319,7 @@ const CLAUDE_HOOK_SPECS_MINIMAL: ReadonlyArray<{ event: string; matcher?: string
   { event: "SessionStart" },
   { event: "UserPromptSubmit" },
   { event: "PermissionRequest" },
+  { event: "PreToolUse", matcher: "*" },
   { event: "PermissionDenied", matcher: "*" },
   { event: "PostToolUse", matcher: "*" },
   { event: "PostToolUseFailure", matcher: "*" },
@@ -338,7 +339,6 @@ const CLAUDE_HOOK_SPECS_MINIMAL: ReadonlyArray<{ event: string; matcher?: string
 const CLAUDE_HOOK_SPECS_FULL: ReadonlyArray<{ event: string; matcher?: string }> = [
   ...CLAUDE_HOOK_SPECS_MINIMAL,
   { event: "SessionEnd" },
-  { event: "PreToolUse", matcher: "*" },
   { event: "SubagentStart", matcher: "*" },
   { event: "SubagentStop", matcher: "*" },
   { event: "TeammateIdle" },

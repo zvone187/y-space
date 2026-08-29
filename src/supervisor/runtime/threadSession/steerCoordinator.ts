@@ -58,6 +58,7 @@ export interface SteerCoordinatorContext {
   emit(event: SupervisorEvent): void;
   sessions: Map<string, SessionRuntime>;
   interruptStructuredTurn(session: SessionRuntime): Promise<void>;
+  beginBrowserEvidenceTurn?(session: SessionRuntime): string | undefined;
   startStructuredTurn(session: SessionRuntime, turn: QueuedStructuredTurn): void;
   failStructuredSession(session: SessionRuntime, error: unknown): void;
   /** Portable-skills fallback for a steer turn (see managerOptions). */
@@ -170,9 +171,20 @@ export class SteerCoordinator {
     if (!slot) return;
     session.pendingSteer = undefined;
     emitPendingSteer(session, this.ctx.emit);
+    // Keep the in-flight turn's Browser authority current while its interrupt
+    // is only staged. Rotating earlier would let late work from the old parent
+    // (or a surviving structured child) mint proof for the replacement before
+    // that replacement has actually begun. Publish the new nonce immediately
+    // before handing the fresh turn to the provider instead.
+    const browserEvidenceTurnId = this.ctx.beginBrowserEvidenceTurn?.(session);
     const turn: QueuedStructuredTurn = {
       prompt: slot.prompt,
       config: slot.config,
+      ...(browserEvidenceTurnId
+        ? { browserEvidenceTurnId }
+        : slot.browserEvidenceTurnId
+          ? { browserEvidenceTurnId: slot.browserEvidenceTurnId }
+          : {}),
       ...(slot.segments ? { segments: slot.segments } : {}),
       ...(slot.userMessageItemId ? { userMessageItemId: slot.userMessageItemId } : {}),
       ...(slot.inlineInstructions ? { inlineInstructions: slot.inlineInstructions } : {}),
@@ -219,7 +231,11 @@ export class SteerCoordinator {
     // an authoritatively live turn; idle/needs-reply/error must drain as a
     // normal turn instead.
     if (session.status === "working" && session.structuredSession.steerTurn) {
-      this.steerStructuredTurn(session, turn);
+      const browserEvidenceTurnId = this.ctx.beginBrowserEvidenceTurn?.(session);
+      this.steerStructuredTurn(session, {
+        ...turn,
+        ...(browserEvidenceTurnId ? { browserEvidenceTurnId } : {}),
+      });
       return;
     }
     this.stagePendingSteer(session, turn);

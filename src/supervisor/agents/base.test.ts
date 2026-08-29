@@ -54,21 +54,27 @@ describe.skipIf(process.platform !== "win32")("buildAgentCommand", () => {
     });
   });
 
-  it("bakes env vars into the WSL shell script as exports", () => {
+  it("stages env vars outside the host-visible WSL shell argv", () => {
+    const value = "claude-no-flicker-sentinel";
     const spec = buildAgentCommand(wslProject, "claude", ["--print"], undefined, {
-      CLAUDE_CODE_NO_FLICKER: "1",
+      CLAUDE_CODE_NO_FLICKER: value,
     });
     const script = spec.args[spec.args.length - 1]!;
-    expect(script).toBe("export CLAUDE_CODE_NO_FLICKER='1'; exec 'claude' '--print'");
+    expect(JSON.stringify(spec.args)).not.toContain(value);
+    expect(script).toContain("__y_space_launch_env_file");
+    expect(script).toContain("exec 'claude' '--print'");
+    expect(spec.cleanup).toEqual(expect.any(Function));
+
+    spec.cleanup?.();
   });
 });
 
 describe("injectWslEnv", () => {
-  it("prepends export statements to the WSL script arg", () => {
+  it("stages injected values outside the WSL script argv", () => {
     const original = buildAgentCommand(wslProject, "claude", ["--version"]);
     const patched = injectWslEnv(original, wslProject, {
-      CLAUDE_CODE_NO_FLICKER: "1",
-      ANOTHER_VAR: "hello",
+      CLAUDE_CODE_NO_FLICKER: "no-flicker-sentinel",
+      ANOTHER_VAR: "another-value-sentinel",
     });
 
     // Original is unchanged
@@ -77,9 +83,13 @@ describe("injectWslEnv", () => {
     );
 
     const script = patched.args[patched.args.length - 1]!;
-    expect(script).toContain("export CLAUDE_CODE_NO_FLICKER='1'");
-    expect(script).toContain("export ANOTHER_VAR='hello'");
+    expect(JSON.stringify(patched.args)).not.toContain("no-flicker-sentinel");
+    expect(JSON.stringify(patched.args)).not.toContain("another-value-sentinel");
+    expect(script).toContain("__y_space_launch_env_file");
     expect(script).toContain("exec 'claude' '--version'");
+    expect(patched.cleanup).toEqual(expect.any(Function));
+
+    patched.cleanup?.();
   });
 
   it("returns the spec unchanged for non-WSL locations", () => {
@@ -93,5 +103,28 @@ describe("injectWslEnv", () => {
     const original = buildAgentCommand(wslProject, "claude", ["--version"]);
     const result = injectWslEnv(original, wslProject, {});
     expect(result).toBe(original);
+  });
+});
+
+describe("WSL launch credential isolation", () => {
+  it("keeps MCP, provider-profile, and hook credentials out of host-visible argv", () => {
+    const mcpSecret = "claude-wsl-mcp-secret-sentinel";
+    const profileSecret = "claude-wsl-profile-token-sentinel";
+    const hookSecret = "claude-wsl-hook-secret-sentinel";
+    const spec = buildAgentCommand(wslProject, "claude", ["--print"], undefined, {
+      CLAUDE_CODE_NO_FLICKER: "1",
+      ANTHROPIC_AUTH_TOKEN: profileSecret,
+      PORACODE_HOOK_SECRET: hookSecret,
+      PORACODE_MCP_CLAUDE_BROWSER_ABC_HEADER_AUTHORIZATION_DEF: mcpSecret,
+    });
+
+    expect(JSON.stringify(spec.args)).not.toContain(mcpSecret);
+    expect(JSON.stringify(spec.args)).not.toContain(profileSecret);
+    expect(JSON.stringify(spec.args)).not.toContain(hookSecret);
+    expect(JSON.stringify(spec.args)).not.toContain("CLAUDE_CODE_NO_FLICKER='1'");
+    expect(spec.args.at(-1)).toContain("__y_space_launch_env_file");
+    expect(spec.cleanup).toEqual(expect.any(Function));
+
+    spec.cleanup?.();
   });
 });

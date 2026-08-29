@@ -34,10 +34,24 @@ import type { StructuredSessionUpdate } from "../base";
 
 describe("createCodexAdapter skill roots", () => {
   it("declares Codex's native shared .agents root", () => {
-    const support = createCodexAdapter().skillSupport;
+    const adapter = createCodexAdapter();
+    const support = adapter.skillSupport;
 
     expect(support?.roots.map((root) => root.id)).toEqual(["codex", "agents"]);
     expect(support?.projectionRoots).toBeUndefined();
+    expect(adapter.browserRouting).toEqual({ terminal: "exclusive", gui: "exclusive" });
+  });
+});
+
+describe("createCodexAdapter hook launch policy", () => {
+  it("trusts only the app-owned private Codex hook at launch", async () => {
+    const extras = await createCodexAdapter().pluginLaunchExtras?.({ envKind: "posix" });
+
+    expect(extras?.args).toContain("--dangerously-bypass-hook-trust");
+    expect(extras?.args).toContain("--enable");
+    expect(extras?.env?.CODEX_HOME).toMatch(/agent-plugins[/\\]codex[/\\]home$/u);
+    expect(extras?.env?.CODEX_SQLITE_HOME).toMatch(/[/\\]\.codex$/u);
+    expect(extras?.env?.CODEX_SQLITE_HOME).not.toBe(extras?.env?.CODEX_HOME);
   });
 });
 
@@ -1106,7 +1120,11 @@ describe("CodexStructuredSession", () => {
 
   it("does not interrupt a replacement that claims the thread during the active-turn read", async () => {
     const structuredSession = makeStructuredSession([]);
-    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const requests: Array<{
+      method: string;
+      params: Record<string, unknown>;
+      timeoutMs?: number;
+    }> = [];
     let ownsThread = true;
     let resolveRead!: (result: unknown) => void;
     (structuredSession as unknown as Record<string, unknown>)["currentThreadStatus"] = {
@@ -1552,8 +1570,8 @@ describe("CodexStructuredSession", () => {
     const structuredSession = makeStructuredSession(requests);
     (structuredSession as unknown as Record<string, unknown>)["rpc"] = {
       claimThread: () => {},
-      request: async (method: string, params: Record<string, unknown>) => {
-        requests.push({ method, params });
+      request: async (method: string, params: Record<string, unknown>, timeoutMs?: number) => {
+        requests.push({ method, params, ...(timeoutMs !== undefined ? { timeoutMs } : {}) });
         if (method === "thread/read" && params.includeTurns === true) {
           return { thread: { turns: [{ id: "turn-1" }, { id: "turn-2" }] } };
         }
@@ -2298,15 +2316,19 @@ describe("CodexStructuredSession", () => {
   });
 
   it("surfaces Codex app-server commands as slash commands during initialize", async () => {
-    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const requests: Array<{
+      method: string;
+      params: Record<string, unknown>;
+      timeoutMs?: number;
+    }> = [];
     const structuredSession = makeStructuredSession(requests);
     const updates: unknown[] = [];
     (structuredSession as unknown as Record<string, unknown>)["listener"] = {
       onUpdate: (update: unknown) => updates.push(update),
     };
     (structuredSession as unknown as Record<string, unknown>)["rpc"] = {
-      request: async (method: string, params: Record<string, unknown>) => {
-        requests.push({ method, params });
+      request: async (method: string, params: Record<string, unknown>, timeoutMs?: number) => {
+        requests.push({ method, params, ...(timeoutMs !== undefined ? { timeoutMs } : {}) });
         return {
           commands: [
             {
@@ -2327,6 +2349,7 @@ describe("CodexStructuredSession", () => {
       params: {
         capabilities: { experimentalApi: true, requestAttestation: false },
       },
+      timeoutMs: 120_000,
     });
     expect(updates).toContainEqual(
       expect.objectContaining({

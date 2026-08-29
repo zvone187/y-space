@@ -22,7 +22,7 @@ describe("repairLegacyMacAppPath", () => {
     return executablePath;
   }
 
-  it("restores both legacy Nightly paths as relative symlinks", () => {
+  it("restores only the exact legacy Nightly path still referenced by the Dock", () => {
     const executablePath = packagedExecutable("Y Space Nightly.app");
 
     expect(
@@ -30,17 +30,17 @@ describe("repairLegacyMacAppPath", () => {
         platform: "darwin",
         isPackaged: true,
         executablePath,
+        dockPreferencesXml: "<string>file:///Applications/Lightcode%20Nightly.app/</string>",
       }),
     ).toBe("created");
 
-    for (const legacyName of ["Poracode Nightly.app", "Lightcode Nightly.app"]) {
-      const legacyPath = join(root, legacyName);
-      expect(lstatSync(legacyPath).isSymbolicLink()).toBe(true);
-      expect(readlinkSync(legacyPath)).toBe("Y Space Nightly.app");
-    }
+    const legacyPath = join(root, "Lightcode Nightly.app");
+    expect(lstatSync(legacyPath).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(legacyPath)).toBe("Y Space Nightly.app");
+    expect(() => lstatSync(join(root, "Poracode Nightly.app"))).toThrow(/ENOENT/u);
   });
 
-  it("restores both legacy Stable paths", () => {
+  it("restores a legacy Stable path referenced with an unescaped name", () => {
     const executablePath = packagedExecutable("Y Space.app");
 
     expect(
@@ -48,10 +48,26 @@ describe("repairLegacyMacAppPath", () => {
         platform: "darwin",
         isPackaged: true,
         executablePath,
+        dockPreferencesXml: "<string>file:///Applications/Poracode.app/</string>",
       }),
     ).toBe("created");
     expect(readlinkSync(join(root, "Poracode.app"))).toBe("Y Space.app");
-    expect(readlinkSync(join(root, "Lightcode.app"))).toBe("Y Space.app");
+    expect(() => lstatSync(join(root, "Lightcode.app"))).toThrow(/ENOENT/u);
+  });
+
+  it("does not create legacy aliases on a fresh install", () => {
+    const executablePath = packagedExecutable("Y Space.app");
+
+    expect(
+      repairLegacyMacAppPath("stable", {
+        platform: "darwin",
+        isPackaged: true,
+        executablePath,
+        dockPreferencesXml: "<plist><array /></plist>",
+      }),
+    ).toBe("skipped");
+    expect(() => lstatSync(join(root, "Poracode.app"))).toThrow(/ENOENT/u);
+    expect(() => lstatSync(join(root, "Lightcode.app"))).toThrow(/ENOENT/u);
   });
 
   it("never replaces an existing legacy app", () => {
@@ -64,6 +80,8 @@ describe("repairLegacyMacAppPath", () => {
         platform: "darwin",
         isPackaged: true,
         executablePath,
+        dockPreferencesXml:
+          "<string>file:///Applications/Poracode%20Nightly.app/</string><string>file:///Applications/Lightcode%20Nightly.app/</string>",
       }),
     ).toBe("created");
     expect(lstatSync(legacyPath).isDirectory()).toBe(true);

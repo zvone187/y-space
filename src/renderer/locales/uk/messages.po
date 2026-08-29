@@ -125,6 +125,11 @@ msgstr "{0, plural, one {# інструмент} few {# інструменти} 
 msgid "{0, plural, one {# use} other {# uses}}"
 msgstr "{0, plural, one {# використання} few {# використання} many {# використань} other {# використання}}"
 
+#. placeholder {0}: state.actionCount
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "{0, plural, one {Browser verified · # action} other {Browser verified · # actions}}"
+msgstr ""
+
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "{0, plural, one {Candidate (#)} other {Candidates (#)}}"
@@ -400,6 +405,10 @@ msgstr "Вибрано: {0}/{1}"
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0}mo ago"
 msgstr "{0} міс. тому"
+
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
+msgid "{activityCount, plural, one {Worked · # step} other {Worked · # steps}}"
+msgstr "{activityCount, plural, one {Виконано · # крок} few {Виконано · # кроки} many {Виконано · # кроків} other {Виконано · # кроку}}"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{agent} reported authentication success, but Y Space could not verify it. Configure {agent} directly, then try again."
@@ -942,8 +951,12 @@ msgid "Add a project to use GitHub Actions."
 msgstr "Додайте проєкт, щоб використовувати GitHub Actions."
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
-msgstr "Додайте навичку до .agents/skills або .poracode/skills чи імпортуйте її від іншого провайдера."
+msgid "Add a skill from your workspace or import one from another provider."
+msgstr ""
+
+#: src/renderer/components/skills/SkillsManager.tsx
+#~ msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
+#~ msgstr "Додайте навичку до .agents/skills або .poracode/skills чи імпортуйте її від іншого провайдера."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
@@ -1209,8 +1222,8 @@ msgstr "Агенти класифікують делеговану роботу 
 #~ msgstr "AI"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
-msgstr "Оркестратор AI-агентів — керуйте агентами для кодування через термінал і нативний ACP."
+#~ msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
+#~ msgstr "Оркестратор AI-агентів — керуйте агентами для кодування через термінал і нативний ACP."
 
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
@@ -1967,7 +1980,6 @@ msgstr "Переглядайте, досліджуйте й тестуйте с�
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Browser"
 msgstr "Браузер"
@@ -1995,6 +2007,10 @@ msgstr "Browser MCP увімкнено для цього треду"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Browser menu"
 msgstr "Меню браузера"
+
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "Browser not verified"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13875,8 +13891,12 @@ msgstr "Використовуйте літери, цифри, крапки, д�
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
-msgstr "Використовуйте одну глобальну папку або вкладайте worktree всередину кожного проєкту в .poracode/worktrees."
+msgid "Use one global folder, or keep each project's worktrees with that project."
+msgstr ""
+
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#~ msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
+#~ msgstr "Використовуйте одну глобальну папку або вкладайте worktree всередину кожного проєкту в .poracode/worktrees."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
@@ -14390,6 +14410,7 @@ msgid "Working tree clean"
 msgstr "Робоче дерево чисте"
 
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
 msgid "Working…"
 msgstr "Виконується…"
 
@@ -14583,8 +14604,12 @@ msgstr "Y Space перезапуститься, створить резервн�
 #~ msgstr "Y Space перезапуститься, створить резервну копію поточних даних і замінить їх повною копією даних Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Y Space's built-in browser tools."
-msgstr "Вбудовані інструменти браузера Y Space."
+#~ msgid "Y Space's built-in browser tools."
+#~ msgstr "Вбудовані інструменти браузера Y Space."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Your focused workspace for agents, files, and the web."
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

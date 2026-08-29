@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "./legacySdk";
 import type { ProjectLocation, RuntimeEvent, ThreadConfig } from "@/shared/contracts";
+import { COMPETING_BROWSER_COMMAND_GLOBS } from "@/shared/browserExclusivePolicy";
 import type { StructuredSessionUpdate } from "../base";
 import { subscribeOpenCodeServerEvents } from "./sdkEventHub";
 import { OpencodeSdkSession, parseOpenCodeQuestionAnswers } from "./sdkSession";
@@ -9,6 +10,54 @@ import { OpenCodeReadinessTimeoutError } from "./sdkServer";
 const mocks = vi.hoisted(() => ({
   acquireOpenCodeServer: vi.fn<(input: unknown) => Promise<unknown>>(),
 }));
+
+const fullAccessBrowserRoutePermissions = [
+  { permission: "*", pattern: "*", action: "allow" },
+  { permission: "webfetch", pattern: "*", action: "deny" },
+  { permission: "websearch", pattern: "*", action: "deny" },
+  { permission: "skill", pattern: "browser", action: "deny" },
+  { permission: "skill", pattern: "browse", action: "deny" },
+  { permission: "skill", pattern: "browser-use", action: "deny" },
+  { permission: "skill", pattern: "control-in-app-browser", action: "deny" },
+  { permission: "skill", pattern: "gstack", action: "deny" },
+  { permission: "skill", pattern: "setup-browser-cookies", action: "deny" },
+  { permission: "skill", pattern: "playwright", action: "deny" },
+  { permission: "skill", pattern: "puppeteer", action: "deny" },
+  { permission: "skill", pattern: "selenium", action: "deny" },
+  { permission: "skill", pattern: "chrome", action: "deny" },
+  { permission: "skill", pattern: "chromium", action: "deny" },
+  { permission: "skill", pattern: "firefox", action: "deny" },
+  { permission: "skill", pattern: "webkit", action: "deny" },
+  { permission: "skill", pattern: "stagehand", action: "deny" },
+  { permission: "skill", pattern: "browserbase", action: "deny" },
+  { permission: "skill", pattern: "browserstack", action: "deny" },
+  { permission: "skill", pattern: "browserless", action: "deny" },
+  { permission: "skill", pattern: "webdriver", action: "deny" },
+  { permission: "skill", pattern: "node-repl", action: "deny" },
+  ...COMPETING_BROWSER_COMMAND_GLOBS.map((pattern) => ({
+    permission: "bash" as const,
+    pattern,
+    action: "deny" as const,
+  })),
+  { permission: "playwright_*", pattern: "*", action: "deny" },
+  { permission: "puppeteer_*", pattern: "*", action: "deny" },
+  { permission: "selenium_*", pattern: "*", action: "deny" },
+  { permission: "gstack_*", pattern: "*", action: "deny" },
+  { permission: "stagehand_*", pattern: "*", action: "deny" },
+  { permission: "browserbase_*", pattern: "*", action: "deny" },
+  { permission: "browserstack_*", pattern: "*", action: "deny" },
+  { permission: "browserless_*", pattern: "*", action: "deny" },
+  { permission: "chrome_*", pattern: "*", action: "deny" },
+  { permission: "chromium_*", pattern: "*", action: "deny" },
+  { permission: "chrome-devtools_*", pattern: "*", action: "deny" },
+  { permission: "chrome_devtools_*", pattern: "*", action: "deny" },
+  { permission: "firefox_*", pattern: "*", action: "deny" },
+  { permission: "webkit_*", pattern: "*", action: "deny" },
+  { permission: "webdriver_*", pattern: "*", action: "deny" },
+  { permission: "node_repl_*", pattern: "*", action: "deny" },
+  { permission: "browser-use_*", pattern: "*", action: "deny" },
+  { permission: "browser_use_*", pattern: "*", action: "deny" },
+] as const;
 
 vi.mock("./sdkClient", async (importActual) => {
   const actual = await importActual<typeof import("./sdkClient")>();
@@ -332,6 +381,15 @@ describe("OpencodeSdkSession", () => {
   });
 
   it("stores a new MCP set via updateMcpServers without acquiring before activation", async () => {
+    const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      eventClient: emptyEventClient(),
+      client: {},
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      updateMcpServers: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      dispose,
+    });
     const session = await OpencodeSdkSession.create({
       threadId: "thread-lazy-mcp",
       projectLocation,
@@ -351,9 +409,16 @@ describe("OpencodeSdkSession", () => {
     await session.updateMcpServers(newMcpServers);
 
     expect(mocks.acquireOpenCodeServer).not.toHaveBeenCalled();
+
+    await session.activate();
+    expect(mocks.acquireOpenCodeServer).toHaveBeenCalledWith(
+      expect.objectContaining({ mcpServers: newMcpServers }),
+    );
+    await session.dispose();
+    expect(dispose).toHaveBeenCalledOnce();
   });
 
-  it("updates the active directory MCP set without re-acquiring", async () => {
+  it("updates the active directory MCP set without re-acquiring when browser presence is unchanged", async () => {
     const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const updateMcpServers = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mocks.acquireOpenCodeServer.mockResolvedValue({
@@ -393,8 +458,8 @@ describe("OpencodeSdkSession", () => {
 
     const newMcpServers = [
       {
-        id: "remote-browser",
-        name: "remote-browser",
+        id: "browser",
+        name: "browser",
         timeoutMs: 300_000,
         transport: { type: "http" as const, url: "http://127.0.0.1:9502/mcp", headers: {} },
       },
@@ -408,6 +473,78 @@ describe("OpencodeSdkSession", () => {
     await session.dispose();
     expect(dispose).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    {
+      label: "added",
+      initialMcpServers: [],
+      nextMcpServers: [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 300_000,
+          transport: { type: "http" as const, url: "http://127.0.0.1:9501/mcp", headers: {} },
+        },
+      ],
+    },
+    {
+      label: "removed",
+      initialMcpServers: [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 300_000,
+          transport: { type: "http" as const, url: "http://127.0.0.1:9501/mcp", headers: {} },
+        },
+      ],
+      nextMcpServers: [],
+    },
+  ])(
+    "reacquires the active server when Y Space Browser is $label",
+    async ({ initialMcpServers, nextMcpServers }) => {
+      const firstDispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+      const secondDispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+      const updateMcpServers = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+      mocks.acquireOpenCodeServer
+        .mockResolvedValueOnce({
+          eventClient: emptyEventClient(),
+          client: {},
+          baseUrl: "http://127.0.0.1:1",
+          handle: {},
+          updateMcpServers,
+          dispose: firstDispose,
+        })
+        .mockResolvedValueOnce({
+          eventClient: emptyEventClient(),
+          client: {},
+          baseUrl: "http://127.0.0.1:2",
+          handle: {},
+          updateMcpServers: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+          dispose: secondDispose,
+        });
+
+      const session = await OpencodeSdkSession.create({
+        threadId: `thread-browser-${initialMcpServers.length > 0 ? "remove" : "add"}`,
+        projectLocation,
+        config,
+        presentationMode: "gui",
+        mcpServers: initialMcpServers,
+      });
+
+      await session.activate();
+      await session.updateMcpServers(nextMcpServers);
+
+      expect(updateMcpServers).not.toHaveBeenCalled();
+      expect(mocks.acquireOpenCodeServer).toHaveBeenCalledTimes(2);
+      expect(mocks.acquireOpenCodeServer).toHaveBeenLastCalledWith(
+        expect.objectContaining({ mcpServers: nextMcpServers }),
+      );
+      expect(firstDispose).toHaveBeenCalledOnce();
+
+      await session.dispose();
+      expect(secondDispose).toHaveBeenCalledOnce();
+    },
+  );
 
   it("stores the created session id in launch options for terminal TUI handoff", async () => {
     const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
@@ -886,11 +1023,11 @@ describe("OpencodeSdkSession", () => {
 
     expect(create).toHaveBeenCalledWith({
       directory: "/repo",
-      title: "poracode/thread-o",
+      title: "y-space/thread-o",
     });
   });
 
-  it("passes an allow-all session permission override in full access mode", async () => {
+  it("keeps the original allow-all rule when no Y Space Browser is attached", async () => {
     const create = vi
       .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
       .mockResolvedValue({ data: { id: "ses_test" } });
@@ -917,7 +1054,7 @@ describe("OpencodeSdkSession", () => {
 
     expect(create).toHaveBeenCalledWith({
       directory: "/repo",
-      title: "poracode/thread-o",
+      title: "y-space/thread-o",
       permission: [{ permission: "*", pattern: "*", action: "allow" }],
     });
   });
@@ -1083,7 +1220,7 @@ describe("OpencodeSdkSession", () => {
       directory: "/repo",
       sessionID: "ses_test",
       permission: [
-        { permission: "*", pattern: "*", action: "allow" },
+        ...fullAccessBrowserRoutePermissions,
         { permission: "crossagents_spawn_agent", pattern: "*", action: "deny" },
         { permission: "browser_close_tab", pattern: "*", action: "deny" },
         { permission: "poracode_delete_thread", pattern: "*", action: "deny" },

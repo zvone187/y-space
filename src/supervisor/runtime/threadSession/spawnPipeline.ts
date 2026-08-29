@@ -28,6 +28,10 @@ import {
   resolveEnabledMcpServers,
 } from "@/shared/contracts";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
+import {
+  filterCompetingBrowserMcpServers,
+  hasYSpaceBrowserMcp,
+} from "@/shared/browserExclusivePolicy";
 import type { AgentNativePlugin } from "@/supervisor/agents/base";
 import {
   resolveBrowserMcpHttpConfigForLaunch,
@@ -139,7 +143,7 @@ export function effectiveLaunchConfig(
   disabledBuiltInMcpServerIds: readonly BuiltInMcpServerId[],
   pluginBuiltInMcpServerIds: readonly BuiltInMcpServerId[] = [],
 ): ThreadConfig {
-  const withDefaults = config.browserMcp === undefined ? { ...config, browserMcp: true } : config;
+  const withDefaults = config.browserMcp === true ? config : { ...config, browserMcp: true };
   if (disabledBuiltInMcpServerIds.length === 0 && pluginBuiltInMcpServerIds.length === 0) {
     return withDefaults;
   }
@@ -248,9 +252,15 @@ export function composeResolvedMcpServers(
           ...(approvalMode ? { approvalMode } : {}),
         }
       : undefined;
+  const managedBrowserMcp = snapshot.disabledBuiltInMcpServerIds.includes("browser")
+    ? undefined
+    : browserMcp;
+  const baseServers = managedBrowserMcp
+    ? filterCompetingBrowserMcpServers(snapshot.mcpServers)
+    : [...snapshot.mcpServers];
   return [
-    ...snapshot.mcpServers,
-    http("browser", browserMcp),
+    ...baseServers,
+    http("browser", managedBrowserMcp),
     http("crossagents", crossagentMcp, 300_000, "approve"),
     http("computer-use", computerUseMcp),
     http("app-controls", appControlsMcp),
@@ -428,6 +438,7 @@ export class SpawnPipeline {
     const mcpIdentity: McpLaunchIdentity = {
       threadId: payload.threadId,
       launchId: randomUUID(),
+      browserEvidenceTurnId: randomUUID(),
       title: initialPrompt.split("\n", 1)[0]?.trim() ?? "",
     };
     // Every provider translator keys its output record by `server.name`, so a
@@ -444,9 +455,14 @@ export class SpawnPipeline {
       mcpServers = await this.ctx.options.applyMcpServerAuthorization(mcpServers);
     }
     if (this.ctx.options.prepareMcpToolFilters) {
+      // Use the same forced-on/global-disable/provider-settings policy that
+      // will govern the real launch. The raw composer payload may explicitly
+      // say false even though Browser is intentionally default-on.
+      const browserExclusive = optimisticLaunchConfig.browserMcp === true;
       mcpServers = await this.ctx.options.prepareMcpToolFilters(
         mcpServers,
         payload.projectLocation,
+        browserExclusive,
       );
     }
     const mcpLaunchSnapshot: McpLaunchSnapshot = {
@@ -651,9 +667,10 @@ export class SpawnPipeline {
         // (`PORACODE_HOOK_URL`, `PORACODE_HOOK_SECRET`, `PORACODE_THREAD_ID`,
         // `PORACODE_AGENT_KIND`, `PORACODE_HOOK_PROTOCOL_VERSION`) flow through
         // `spawnThread` → `agentEnv` so they end up in the PTY env on every
-        // platform (WSL, win32, posix). Failure to resolve plugin extras silently
-        // degrades to L2 — the supervisor must never block thread creation on
-        // the hook-plugin plumbing.
+        // platform (WSL, win32, posix). Failure to resolve plugin extras normally
+        // degrades to L2. A Codex terminal connected to the canonical Browser is
+        // the exception: it requires the app-owned PreToolUse command gate and
+        // fails closed before spawn when that gate cannot be staged.
         const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
           payload.threadId,
           payload.agentKind,
@@ -678,21 +695,30 @@ export class SpawnPipeline {
         if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
           await primeProjectShellEnv(payload.projectLocation.path);
         }
-        const command = resolveLaunchSpec(payload.projectLocation, argv);
-
         const keepStructuredSession = structuredSession && useStructuredFlow;
         if (structuredSession && !keepStructuredSession) {
-          await structuredSession.dispose();
+          try {
+            await structuredSession.dispose();
+          } catch (error) {
+            argv.cleanup?.();
+            throw error;
+          }
         }
         if (ctx.pendingStartAborts.delete(payload.threadId)) {
           ctx.pendingStartInterrupts.delete(payload.threadId);
-          if (structuredSession && keepStructuredSession) {
-            await structuredSession.dispose();
+          try {
+            if (structuredSession && keepStructuredSession) {
+              await structuredSession.dispose();
+            }
+          } finally {
+            argv.cleanup?.();
           }
-          command.cleanup?.();
           return { threadId: payload.threadId };
         }
 
+        // Materialize WSL launch files only after every awaited pre-launch
+        // operation has settled, keeping the credential-file lifetime minimal.
+        const command = resolveLaunchSpec(payload.projectLocation, argv);
         const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
         this.spawnThread({
           threadId: payload.threadId,
@@ -743,6 +769,7 @@ export class SpawnPipeline {
       // Replace authority before teardown begins. A bearer from the prior
       // provider process must stop working while its replacement is starting.
       launchId: randomUUID(),
+      browserEvidenceTurnId: turn.browserEvidenceTurnId ?? randomUUID(),
     };
     const launchConfig = this.resolveMcpLaunchConfig(
       workspaceLaunchConfig(
@@ -940,20 +967,29 @@ export class SpawnPipeline {
           argv.cleanup?.();
           return;
         }
-        const command = resolveLaunchSpec(session.projectLocation, argv);
-
         const keepStructuredSession = structuredSession && useStructuredFlow;
         if (structuredSession && !keepStructuredSession) {
-          await structuredSession.dispose();
+          try {
+            await structuredSession.dispose();
+          } catch (error) {
+            argv.cleanup?.();
+            throw error;
+          }
         }
         if (!ctx.isCurrentSession(session)) {
-          if (structuredSession && keepStructuredSession) {
-            await structuredSession.dispose();
+          try {
+            if (structuredSession && keepStructuredSession) {
+              await structuredSession.dispose();
+            }
+          } finally {
+            argv.cleanup?.();
           }
-          command.cleanup?.();
           return;
         }
 
+        // Avoid creating WSL launch files until no asynchronous pre-launch
+        // disposal can strand them.
+        const command = resolveLaunchSpec(session.projectLocation, argv);
         this.spawnThread({
           threadId: session.threadId,
           agentKind: session.agentKind,
@@ -1166,6 +1202,17 @@ export class SpawnPipeline {
         crossagentThreadId = undefined;
       }
     }
+    const effectivePresentation = presentationMode ?? adapter?.capabilities.presentationMode;
+    if (
+      adapter &&
+      config.browserMcp === true &&
+      !mcpLaunchSnapshot.disabledBuiltInMcpServerIds.includes("browser") &&
+      (!effectivePresentation || adapter.browserRouting?.[effectivePresentation] !== "exclusive")
+    ) {
+      throw new Error(
+        `Y Space Browser is required for ${adapter.label} in ${effectivePresentation ?? "this"} mode, but that agent mode does not provide an exclusive embedded Browser connection. Globally disable Browser MCP to launch this mode without browser access.`,
+      );
+    }
     const browserMcp = await this.resolveBrowserMcpForLaunch(
       location,
       config,
@@ -1199,7 +1246,7 @@ export class SpawnPipeline {
       computerUseMcp,
       appControlsMcp,
     );
-    const pipedreamServers = pipedreamIdentity?.threadId
+    let pipedreamServers = pipedreamIdentity?.threadId
       ? await this.ctx.options.resolvePipedreamMcpServers?.({
           threadId: pipedreamIdentity.threadId,
           providerBindingId: resolvePipedreamProviderBindingId(
@@ -1211,7 +1258,29 @@ export class SpawnPipeline {
           projectLocation: location,
         })
       : undefined;
-    return pipedreamServers?.length ? [...baseServers, ...pipedreamServers] : baseServers;
+    if (
+      pipedreamServers?.length &&
+      hasYSpaceBrowserMcp(baseServers) &&
+      this.ctx.options.prepareMcpToolFilters
+    ) {
+      pipedreamServers = filterCompetingBrowserMcpServers(pipedreamServers);
+      const filtered = await this.ctx.options.prepareMcpToolFilters(
+        pipedreamServers.map((server) => ({
+          ...server,
+          description: "",
+          enabled: true,
+        })),
+        location,
+        true,
+      );
+      pipedreamServers = filtered;
+    }
+    const combinedServers = pipedreamServers?.length
+      ? [...baseServers, ...pipedreamServers]
+      : baseServers;
+    return hasYSpaceBrowserMcp(combinedServers)
+      ? filterCompetingBrowserMcpServers(combinedServers)
+      : combinedServers;
   }
 
   resolveMcpLaunchConfig(
@@ -1252,7 +1321,10 @@ export class SpawnPipeline {
         disabledTools: mcpLaunchSnapshot.disabledBuiltInMcpTools?.browser ?? [],
       },
     );
-    return cfg;
+    if (cfg) return cfg;
+    throw new Error(
+      "Y Space Browser is required for this agent launch, but its embedded Browser connection is unavailable. Restart Y Space and try again, or globally disable Browser MCP before launching the agent.",
+    );
   }
 
   /**

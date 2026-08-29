@@ -95,10 +95,9 @@ export const crossagentMcpServer: ComposerMcpServerDescriptor = {
     resolveMcpScope(capabilities.mcpScope, presentationMode),
 };
 
-export const composerMcpServers: readonly ComposerMcpServerDescriptor[] = [
-  browserMcpServer,
-  crossagentMcpServer,
-];
+// Browser is mandatory at launch and can only be stopped through the global
+// built-in MCP hard-disable, so it must not appear as a per-thread toggle.
+export const composerMcpServers: readonly ComposerMcpServerDescriptor[] = [crossagentMcpServer];
 
 /**
  * Persistent-enablement key for Computer Use. It is not a registry descriptor

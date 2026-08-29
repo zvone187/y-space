@@ -68,6 +68,14 @@ function resolveAttempt(
   if (!execution) {
     throw new SubagentSpawnError(`Provider ${selection.agent} cannot be spawned as a subagent`);
   }
+  if (
+    parentConfig.browserMcp === true &&
+    (execution === "one-shot" || adapter.browserRouting?.gui !== "exclusive")
+  ) {
+    throw new SubagentSpawnError(
+      `Y Space Browser is required for ${adapter.label}, but this subagent path does not provide an exclusive embedded Browser connection. Globally disable Browser MCP to spawn this provider without browser access.`,
+    );
+  }
 
   const configuredCapabilities = deps.getStatusCapabilities?.(adapter.kind);
   if (configuredCapabilities === null) {

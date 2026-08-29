@@ -24,6 +24,8 @@ import type {
 export interface QueuedStructuredTurn {
   prompt: string;
   config: ThreadConfig;
+  /** Supervisor nonce binding Browser proof to this accepted user turn. */
+  browserEvidenceTurnId?: string;
   segments?: PromptSegment[];
   userMessageItemId?: string;
   /** Inlined SKILL.md instructions for skills the provider can't load natively. */

@@ -89,6 +89,7 @@ export const NON_ROUTER_PROJECT_PROCEDURES = {
   dbReplaceThreadRuntimeSnapshot: "remote-runtime-mirror-local",
   dbGetThreadContextUsage: "remote-runtime-mirror-local",
   resolveMcpCallerIdentity: "supervisor-internal-capability-validation",
+  recordBrowserMcpToolCall: "supervisor-internal-capability-validation",
   readTerminalScrollback: "remote-thread-snapshot-provided",
   readTerminalSize: "remote-server-internal",
   dbPersistExperimentState: "remote-experiments-excluded",

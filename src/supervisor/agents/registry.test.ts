@@ -99,6 +99,15 @@ describe("built-in agent registry", () => {
     expect(codex?.capabilities.defaultApprovalsReviewer).toBe("auto_review");
   });
 
+  it("declares exclusive embedded Browser routing only for every Claude, Codex, and OpenCode lane", () => {
+    const exclusiveKinds = new Set(["claude", "codex", "opencode"]);
+    for (const adapter of adapters) {
+      expect(adapter.browserRouting).toEqual(
+        exclusiveKinds.has(adapter.kind) ? { terminal: "exclusive", gui: "exclusive" } : undefined,
+      );
+    }
+  });
+
   it.each(adapters.map((adapter) => [adapter.kind, adapter] as const))(
     "exposes nonempty identity metadata for %s",
     (_kind, adapter) => {
@@ -123,6 +132,22 @@ describe("built-in agent registry", () => {
 });
 
 describe("profile agent registry", () => {
+  it("keeps Claude profile terminal and GUI lanes Browser-exclusive", () => {
+    const adapters = buildAgentRegistry([
+      {
+        id: "work",
+        driver: "claude",
+        displayName: "Work",
+        config: { configDir: "/tmp/y-space-claude-work" },
+      },
+    ]);
+
+    expect(adapters.find((adapter) => adapter.kind === "claude:work")?.browserRouting).toEqual({
+      terminal: "exclusive",
+      gui: "exclusive",
+    });
+  });
+
   it("registers Cursor profiles with their own adapter kinds", () => {
     const adapters = buildAgentRegistry([
       {

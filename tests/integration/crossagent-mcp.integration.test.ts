@@ -4,11 +4,16 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AgentKind, ProjectLocation, RuntimeEvent } from "@/shared/contracts";
 import type { AgentAdapter } from "@/supervisor/agents/base";
+import { createClaudeAdapter } from "@/supervisor/agents/claude";
 import { createAgentRegistry } from "@/supervisor/agents/registry";
 import { CrossagentMcpIngress } from "@/supervisor/crossagentMcp/CrossagentMcpIngress";
 import { SubagentRunManager } from "@/supervisor/crossagentMcp/SubagentRunManager";
 import type { SpawnableAgent } from "@/supervisor/crossagentMcp/types";
 import type { CrossagentMcpHttpConfig } from "@/supervisor/agents/crossagentMcp";
+import {
+  createLiveProviderProfileSandbox,
+  type LiveProviderProfileSandbox,
+} from "./providerProfileSandbox";
 
 // Live integration: stands up the real Crossagents MCP ingress + run manager with
 // the real adapter registry, then acts as the MCP client exactly the way a
@@ -27,6 +32,7 @@ describe("Crossagents MCP (live)", () => {
   let mcp: CrossagentMcpHttpConfig;
   let claude: AgentAdapter | undefined;
   let opencode: AgentAdapter | undefined;
+  let profileSandbox: LiveProviderProfileSandbox;
   const parentEvents: RuntimeEvent[] = [];
 
   const projectLocation = (): ProjectLocation =>
@@ -38,9 +44,19 @@ describe("Crossagents MCP (live)", () => {
     projectDir = mkdtempSync(join(tmpdir(), "poracode-subagent-int-"));
     writeFileSync(join(projectDir, "README.md"), "# subagent dogfood fixture\n");
     writeFileSync(join(projectDir, "hello.txt"), "hello from the parent project\n");
+    profileSandbox = createLiveProviderProfileSandbox({
+      trustedClaudeProjectPaths: [projectDir],
+    });
 
     const adapters = new Map<AgentKind, AgentAdapter>(
       createAgentRegistry().map((a) => [a.kind, a]),
+    );
+    adapters.set(
+      "claude",
+      createClaudeAdapter({
+        configDir: profileSandbox.paths.claudeConfigDir,
+        customEnv: { ...profileSandbox.environment },
+      }),
     );
     claude = adapters.get("claude" as AgentKind);
     opencode = adapters.get("opencode" as AgentKind);
@@ -90,9 +106,13 @@ describe("Crossagents MCP (live)", () => {
   });
 
   afterAll(() => {
-    runManager.cancelAllForThread(PARENT_THREAD_ID);
-    ingress.dispose();
-    rmSync(projectDir, { recursive: true, force: true });
+    try {
+      runManager?.cancelAllForThread(PARENT_THREAD_ID);
+      ingress?.dispose();
+    } finally {
+      if (projectDir) rmSync(projectDir, { recursive: true, force: true });
+      profileSandbox?.dispose();
+    }
   });
 
   async function rpc(method: string, params?: unknown, token?: string) {
@@ -149,23 +169,30 @@ describe("Crossagents MCP (live)", () => {
 
   it("spawn_agent completes a real child turn and bridges events to the parent", async () => {
     if (!claude) return;
-    const status = await claude.detectInstall().catch(() => undefined);
-    if (!status?.installed || status.authState !== "authenticated") {
-      console.log(
-        `[subagent-int] SKIPPED live run: installed=${status?.installed} auth=${status?.authState}`,
-      );
-      return;
-    }
-    console.log("[subagent-int] running LIVE child turn (claude haiku)");
+    profileSandbox.activate();
+    let result: Awaited<ReturnType<typeof callTool>> | undefined;
+    try {
+      const status = await claude.detectInstall().catch(() => undefined);
+      if (!status?.installed || status.authState !== "authenticated") {
+        console.log(
+          `[subagent-int] SKIPPED live run: installed=${status?.installed} auth=${status?.authState}`,
+        );
+        return;
+      }
+      console.log("[subagent-int] running LIVE child turn (claude haiku)");
 
-    parentEvents.length = 0;
-    const result = await callTool("spawn_agent", {
-      provider: "claude",
-      model: "haiku",
-      name: "dogfood",
-      prompt:
-        "Reply with exactly the single word SUBAGENT_OK and nothing else. Do not use any tools.",
-    });
+      parentEvents.length = 0;
+      result = await callTool("spawn_agent", {
+        provider: "claude",
+        model: "haiku",
+        name: "dogfood",
+        prompt:
+          "Reply with exactly the single word SUBAGENT_OK and nothing else. Do not use any tools.",
+      });
+    } finally {
+      profileSandbox.deactivate();
+    }
+    if (!result) return;
     expect(result.isError).toBeFalsy();
     const parsed = JSON.parse(result.content[0]!.text) as {
       run_id: string;
@@ -244,25 +271,30 @@ describe("Crossagents MCP (live)", () => {
 
   it("spawn_agent + get_status + cancel round-trips without blocking", async () => {
     if (!claude) return;
-    const status = await claude.detectInstall().catch(() => undefined);
-    if (!status?.installed || status.authState !== "authenticated") return;
+    profileSandbox.activate();
+    try {
+      const status = await claude.detectInstall().catch(() => undefined);
+      if (!status?.installed || status.authState !== "authenticated") return;
 
-    const spawned = await callTool("spawn_agent", {
-      provider: "claude",
-      model: "haiku",
-      prompt: "Count slowly from 1 to 50, one number per line.",
-    });
-    const { run_id } = JSON.parse(spawned.content[0]!.text) as { run_id: string };
-    expect(run_id).toBeTruthy();
+      const spawned = await callTool("spawn_agent", {
+        provider: "claude",
+        model: "haiku",
+        prompt: "Count slowly from 1 to 50, one number per line.",
+      });
+      const { run_id } = JSON.parse(spawned.content[0]!.text) as { run_id: string };
+      expect(run_id).toBeTruthy();
 
-    const polled = await callTool("get_status", { run_id });
-    const polledParsed = JSON.parse(polled.content[0]!.text) as { status: string };
-    expect(["running", "completed"]).toContain(polledParsed.status);
+      const polled = await callTool("get_status", { run_id });
+      const polledParsed = JSON.parse(polled.content[0]!.text) as { status: string };
+      expect(["running", "completed"]).toContain(polledParsed.status);
 
-    const cancelled = await callTool("cancel", { run_id });
-    expect(JSON.parse(cancelled.content[0]!.text)).toEqual({ ok: true });
-    const after = await callTool("get_status", { run_id });
-    const afterParsed = JSON.parse(after.content[0]!.text) as { status: string };
-    expect(["cancelled", "completed"]).toContain(afterParsed.status);
+      const cancelled = await callTool("cancel", { run_id });
+      expect(JSON.parse(cancelled.content[0]!.text)).toEqual({ ok: true });
+      const after = await callTool("get_status", { run_id });
+      const afterParsed = JSON.parse(after.content[0]!.text) as { status: string };
+      expect(["cancelled", "completed"]).toContain(afterParsed.status);
+    } finally {
+      profileSandbox.deactivate();
+    }
   }, 120_000);
 });

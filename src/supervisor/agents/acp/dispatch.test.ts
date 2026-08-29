@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentAdapter, CommandSpec } from "../base";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanupTrackedWslLaunchEnvironmentFiles,
+  type AgentAdapter,
+  type CommandSpec,
+} from "../base";
 import { dispatchAcpAuthenticate, dispatchAcpLogout } from "./dispatch";
 
 const authenticateAcpAgentMock = vi.hoisted(() =>
@@ -74,6 +78,10 @@ function makeAdapter(command: CommandSpec, overrides: Partial<AgentAdapter> = {}
 }
 
 describe("dispatchAcpAuthenticate", () => {
+  afterEach(() => {
+    cleanupTrackedWslLaunchEnvironmentFiles();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     authenticateAcpAgentMock.mockResolvedValue(undefined);
@@ -104,10 +112,16 @@ describe("dispatchAcpAuthenticate", () => {
     });
 
     const [command, args, methodId, options] = authenticateAcpAgentMock.mock.calls[0]!;
+    const serializedArgs = JSON.stringify(args);
+    const script = String(args.at(-1));
     expect(command).toMatch(/wsl(?:\.exe)?$/u);
     expect(methodId).toBe("browser-login");
-    expect(args.at(-1)).toContain("export BROWSER='cmd.exe /c start \"\"'");
-    expect(args.at(-1)).toContain("exec 'cursor-agent' 'acp'");
+    expect(serializedArgs).not.toContain("BROWSER=");
+    expect(serializedArgs).not.toContain('cmd.exe /c start ""');
+    expect(script).toContain("__y_space_launch_env_file");
+    expect(script).toContain('/bin/rm -f -- "$1"');
+    expect(script).toContain('/bin/rmdir -- "$2"');
+    expect(script).toContain("exec 'cursor-agent' 'acp'");
     expect(options).not.toHaveProperty("env");
   });
 
@@ -137,7 +151,11 @@ describe("dispatchAcpAuthenticate", () => {
     const [, args] = authenticateAcpAgentMock.mock.calls[0]!;
     const script = String(args.at(-1));
     expect(script.match(/export CURSOR_CONFIG=/gu)).toHaveLength(1);
-    expect(script).toContain("export BROWSER='cmd.exe /c start \"\"'");
+    expect(script).not.toContain("BROWSER=");
+    expect(script).not.toContain('cmd.exe /c start ""');
+    expect(script).toContain("__y_space_launch_env_file");
+    expect(script).toContain('/bin/rm -f -- "$1"');
+    expect(script).toContain('/bin/rmdir -- "$2"');
   });
 });
 

@@ -637,7 +637,7 @@ linux:
       arch:
         - x64
   icon: build/icon${iconSuffix}.png
-  category: Development
+  category: Utility
   maintainer: Y Space contributors
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
@@ -653,7 +653,7 @@ mac:
         - x64
         - arm64
   icon: build/icon${iconSuffix}.icns
-  category: public.app-category.developer-tools
+  category: public.app-category.productivity
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
   hardenedRuntime: true
   gatekeeperAssess: false

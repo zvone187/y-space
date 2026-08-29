@@ -1,17 +1,23 @@
 import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
-  copyFileSync as fsCopyFileSync,
+  copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
-  writeFileSync,
+  readlinkSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
-import { buildAgentCommand, execInWsl, quotePosixShellArg } from "../../base";
+import { buildAgentCommand, execInWsl, getPrimedPosixEnv, quotePosixShellArg } from "../../base";
 import { resolveAgentBinaryPath } from "../../binaryResolver";
 import {
   FORWARD_RUNTIME_FILE,
@@ -41,6 +47,8 @@ export interface CodexPluginPaths {
   pluginDir: string;
   /** Private CODEX_HOME used only for Codex processes spawned by Poracode. */
   codexHomeDir: string;
+  /** Effective profile SQLite home shared with the user's regular Codex runtime. */
+  sqliteHomeDir: string;
   /** Path to hooks.json inside the private CODEX_HOME. */
   codexHooksPath: string;
   version: string;
@@ -85,7 +93,13 @@ function computeCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "codex");
     if (!wsl) {
-      return { pluginDir: "", codexHomeDir: "", codexHooksPath: "", version: "0.0.0" };
+      return {
+        pluginDir: "",
+        codexHomeDir: "",
+        sqliteHomeDir: "",
+        codexHooksPath: "",
+        version: "0.0.0",
+      };
     }
     const linuxCodexHome = `${wsl.linuxBase}/home`;
     let version = "0.0.0";
@@ -97,6 +111,7 @@ function computeCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
     return {
       pluginDir: wsl.linuxBase,
       codexHomeDir: linuxCodexHome,
+      sqliteHomeDir: `${wsl.home}/.codex`,
       codexHooksPath: `${linuxCodexHome}/hooks.json`,
       version,
     };
@@ -112,6 +127,7 @@ function computeCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
   return {
     pluginDir,
     codexHomeDir,
+    sqliteHomeDir: resolveNativeCodexSqliteHome(),
     codexHooksPath: join(codexHomeDir, "hooks.json"),
     version,
   };
@@ -186,73 +202,332 @@ const CODEX_LINK_TARGETS = [
   { name: "sessions", kind: "dir" as const },
   { name: "session_index.jsonl", kind: "file" as const },
   { name: "auth.json", kind: "file" as const },
-  { name: "config.toml", kind: "file" as const },
+  // CODEX_HOME changes where Codex discovers these roots. Link the complete
+  // global trees so unrelated user capabilities remain available; launch-time
+  // policy disables only browser-classified skills/plugins.
+  { name: "skills", kind: "dir" as const },
+  { name: "plugins", kind: "dir" as const },
 ];
+const CODEX_CONFIG_SOURCE_BASELINE = ".y-space-config-source.toml";
 
-function seedNativeCodexHome(codexHomeDir: string): void {
-  mkdirSync(codexHomeDir, { recursive: true });
-  const globalCodexHome = join(homedir(), ".codex");
-  mkdirSync(join(globalCodexHome, "sessions"), { recursive: true });
-  if (!existsSync(join(globalCodexHome, "session_index.jsonl"))) {
-    writeFileSync(join(globalCodexHome, "session_index.jsonl"), "", { flag: "a" });
+export function seedNativeCodexHome(
+  codexHomeDir: string,
+  globalCodexHome = resolveNativeCodexProfileHome(),
+): void {
+  if (resolve(codexHomeDir) === resolve(globalCodexHome)) {
+    throw new Error("private Codex home cannot also be the effective profile home");
   }
-  restorePrivateStateFile(codexHomeDir, globalCodexHome, "auth.json");
-  restorePrivateStateFile(codexHomeDir, globalCodexHome, "config.toml");
+  mkdirSync(codexHomeDir, { recursive: true });
 
   for (const { name, kind } of CODEX_LINK_TARGETS) {
-    ensureNativeStateLink(join(globalCodexHome, name), join(codexHomeDir, name), kind);
+    const source = join(globalCodexHome, name);
+    const target = join(codexHomeDir, name);
+    if (!pathExistsOrSymlink(source)) continue;
+    assertNativeCodexProfileEntry(source, kind);
+    if (isNativeCodexStateMirror(source, target, kind)) continue;
+    if (pathExistsOrSymlink(target)) preserveNativeCodexState(target);
+    ensureNativeStateLink(source, target, kind);
+    if (!isNativeCodexStateMirror(source, target, kind)) {
+      throw new Error(`failed to link private Codex ${name} to the effective profile`);
+    }
   }
+
+  reconcileNativeCodexConfig(
+    join(globalCodexHome, "config.toml"),
+    join(codexHomeDir, "config.toml"),
+    join(codexHomeDir, CODEX_CONFIG_SOURCE_BASELINE),
+  );
 }
 
-function restorePrivateStateFile(
-  codexHomeDir: string,
-  globalCodexHome: string,
-  file: "auth.json" | "config.toml",
-): void {
-  const source = join(codexHomeDir, file);
-  const target = join(globalCodexHome, file);
-  if (existsSync(target) || !existsSync(source)) return;
+export function resolveNativeCodexProfileHome(): string {
+  const configured = getPrimedPosixEnv()?.CODEX_HOME?.trim() || process.env.CODEX_HOME?.trim();
+  return configured ? resolve(configured) : join(homedir(), ".codex");
+}
+
+export function resolveNativeCodexSqliteHome(): string {
+  const configured =
+    getPrimedPosixEnv()?.CODEX_SQLITE_HOME?.trim() || process.env.CODEX_SQLITE_HOME?.trim();
+  return configured ? resolve(configured) : resolveNativeCodexProfileHome();
+}
+
+function pathExistsOrSymlink(path: string): boolean {
   try {
-    fsCopyFileSync(source, target);
+    lstatSync(path);
+    return true;
   } catch {
-    // Best-effort recovery for Windows when file symlinks were unavailable.
+    return false;
   }
 }
 
-async function seedWslCodexHome(
+function sameNativeLinkTarget(target: string, source: string): boolean {
+  try {
+    return resolve(dirname(target), readlinkSync(target)) === resolve(source);
+  } catch {
+    return false;
+  }
+}
+
+function assertNativeCodexProfileEntry(source: string, kind: "dir" | "file"): void {
+  const sourceStat = statSync(source);
+  if ((kind === "dir" && sourceStat.isDirectory()) || (kind === "file" && sourceStat.isFile())) {
+    return;
+  }
+  throw new Error(`effective Codex profile ${source} is not a ${kind}`);
+}
+
+function uniqueNativePreservationPath(path: string): string {
+  let candidate = `${path}.y-space-private`;
+  let index = 1;
+  while (pathExistsOrSymlink(candidate)) {
+    candidate = `${path}.y-space-private-${index}`;
+    index += 1;
+  }
+  return candidate;
+}
+
+function preserveNativeCodexState(target: string): void {
+  renameSync(target, uniqueNativePreservationPath(target));
+}
+
+function nativeFilesShareInode(left: string, right: string): boolean {
+  try {
+    const leftStat = statSync(left);
+    const rightStat = statSync(right);
+    return leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino;
+  } catch {
+    return false;
+  }
+}
+
+function nativeFilesHaveEqualContents(left: string, right: string): boolean {
+  try {
+    const leftStat = statSync(left);
+    const rightStat = statSync(right);
+    return (
+      leftStat.isFile() &&
+      rightStat.isFile() &&
+      leftStat.size === rightStat.size &&
+      readFileSync(left).equals(readFileSync(right))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function copyNativeFileAtomically(source: string, target: string): void {
+  mkdirSync(dirname(target), { recursive: true });
+  const temporary = `${target}.y-space-copy-${randomUUID()}`;
+  try {
+    copyFileSync(source, temporary);
+    renameSync(temporary, target);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
+function isTrustedNativeConfigBaseline(source: string, target: string, baseline: string): boolean {
+  try {
+    return (
+      !lstatSync(baseline).isSymbolicLink() &&
+      statSync(baseline).isFile() &&
+      !nativeFilesShareInode(source, baseline) &&
+      !nativeFilesShareInode(target, baseline)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isTrustedNativeConfigRemoval(target: string, baseline: string): boolean {
+  try {
+    const targetEntry = lstatSync(target);
+    const baselineEntry = lstatSync(baseline);
+    return (
+      targetEntry.isFile() &&
+      !targetEntry.isSymbolicLink() &&
+      baselineEntry.isFile() &&
+      !baselineEntry.isSymbolicLink() &&
+      !nativeFilesShareInode(target, baseline) &&
+      nativeFilesHaveEqualContents(target, baseline)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function assertIndependentNativeConfig(source: string, target: string): void {
+  if (
+    lstatSync(target).isSymbolicLink() ||
+    !statSync(target).isFile() ||
+    nativeFilesShareInode(source, target)
+  ) {
+    throw new Error("private Codex config.toml is not an independent regular file");
+  }
+}
+
+function reconcileNativeCodexConfig(source: string, target: string, baseline: string): void {
+  if (!pathExistsOrSymlink(source)) {
+    if (pathExistsOrSymlink(target) && lstatSync(target).isSymbolicLink()) {
+      if (!statSync(target).isFile()) {
+        throw new Error("private Codex config.toml symlink cannot be safely materialized");
+      }
+      copyNativeFileAtomically(target, target);
+      return;
+    }
+    if (isTrustedNativeConfigRemoval(target, baseline)) {
+      rmSync(target);
+      rmSync(baseline);
+    }
+    return;
+  }
+
+  assertNativeCodexProfileEntry(source, "file");
+  if (!pathExistsOrSymlink(target)) {
+    copyNativeFileAtomically(source, target);
+    copyNativeFileAtomically(source, baseline);
+    assertIndependentNativeConfig(source, target);
+    return;
+  }
+
+  let targetIsFile = false;
+  try {
+    targetIsFile = statSync(target).isFile();
+  } catch {
+    // A dangling legacy symlink cannot be copied without losing its target.
+    throw new Error("private Codex config.toml cannot be safely materialized");
+  }
+  if (!targetIsFile) {
+    preserveNativeCodexState(target);
+    copyNativeFileAtomically(source, target);
+    copyNativeFileAtomically(source, baseline);
+    assertIndependentNativeConfig(source, target);
+    return;
+  }
+
+  if (lstatSync(target).isSymbolicLink() || nativeFilesShareInode(source, target)) {
+    const matchesSource = nativeFilesHaveEqualContents(source, target);
+    // Copy through a sibling temporary before replacement. Opening `target`
+    // for writes here would follow a symlink or shared inode into the user's
+    // effective profile.
+    copyNativeFileAtomically(target, target);
+    if (matchesSource) copyNativeFileAtomically(source, baseline);
+    assertIndependentNativeConfig(source, target);
+    return;
+  }
+
+  if (isTrustedNativeConfigBaseline(source, target, baseline)) {
+    if (nativeFilesHaveEqualContents(target, baseline)) {
+      if (!nativeFilesHaveEqualContents(source, target)) {
+        copyNativeFileAtomically(source, target);
+      }
+      copyNativeFileAtomically(source, baseline);
+    }
+  } else if (nativeFilesHaveEqualContents(source, target)) {
+    // Upgrade a pre-baseline independent copy without changing it. Future
+    // profile refreshes are safe only while this private copy matches the
+    // app-owned baseline.
+    copyNativeFileAtomically(source, baseline);
+  }
+
+  assertIndependentNativeConfig(source, target);
+}
+
+function isNativeCodexStateMirror(source: string, target: string, kind: "dir" | "file"): boolean {
+  if (!existsSync(source) || !existsSync(target)) return false;
+  try {
+    if (lstatSync(target).isSymbolicLink()) {
+      return sameNativeLinkTarget(target, source) || realpathSync(target) === realpathSync(source);
+    }
+    if (kind !== "file") return false;
+    const sourceStat = statSync(source);
+    const targetStat = statSync(target);
+    if (!sourceStat.isFile() || !targetStat.isFile()) return false;
+    return (
+      (sourceStat.dev === targetStat.dev && sourceStat.ino === targetStat.ino) ||
+      (sourceStat.size === targetStat.size && readFileSync(source).equals(readFileSync(target)))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function buildWslCodexHomeSeedScript(
+  home: string,
+  linuxCodexHome: string,
+  globalCodexHome = `${home}/.codex`,
+): string {
+  const reconcileLine = (name: string, kind: "dir" | "file") =>
+    `__y_space_reconcile ${quotePosixShellArg(`${globalCodexHome}/${name}`)} ${quotePosixShellArg(`${linuxCodexHome}/${name}`)} ${quotePosixShellArg(kind)}`;
+  const profileConfig = `${globalCodexHome}/config.toml`;
+  const privateConfig = `${linuxCodexHome}/config.toml`;
+  const configBaseline = `${linuxCodexHome}/${CODEX_CONFIG_SOURCE_BASELINE}`;
+  return [
+    "set -eu",
+    '__y_space_same() ( __y_space_source=$1; __y_space_target=$2; __y_space_kind=$3; [ -e "$__y_space_source" ] && [ -e "$__y_space_target" ] || exit 1; if [ -L "$__y_space_target" ]; then [ "$(readlink "$__y_space_target" 2>/dev/null || true)" = "$__y_space_source" ]; exit; fi; [ "$__y_space_kind" = file ] && [ -f "$__y_space_source" ] && [ -f "$__y_space_target" ] || exit 1; [ "$__y_space_source" -ef "$__y_space_target" ] 2>/dev/null || cmp -s -- "$__y_space_source" "$__y_space_target"; )',
+    '__y_space_preserve() ( __y_space_target=$1; __y_space_backup=$__y_space_target.y-space-private; __y_space_index=1; while [ -e "$__y_space_backup" ] || [ -L "$__y_space_backup" ]; do __y_space_backup=$__y_space_target.y-space-private-$__y_space_index; __y_space_index=$((__y_space_index + 1)); done; mv -- "$__y_space_target" "$__y_space_backup"; )',
+    '__y_space_reconcile() ( __y_space_source=$1; __y_space_target=$2; __y_space_kind=$3; [ -e "$__y_space_source" ] || [ -L "$__y_space_source" ] || exit 0; if [ "$__y_space_kind" = dir ]; then [ -d "$__y_space_source" ] || exit 1; else [ -f "$__y_space_source" ] || exit 1; fi; __y_space_same "$__y_space_source" "$__y_space_target" "$__y_space_kind" && exit 0; if [ -e "$__y_space_target" ] || [ -L "$__y_space_target" ]; then __y_space_preserve "$__y_space_target"; fi; ln -s -- "$__y_space_source" "$__y_space_target" 2>/dev/null || { [ "$__y_space_kind" = file ] && { ln -- "$__y_space_source" "$__y_space_target" 2>/dev/null || cp -p -- "$__y_space_source" "$__y_space_target"; }; }; __y_space_same "$__y_space_source" "$__y_space_target" "$__y_space_kind"; )',
+    '__y_space_atomic_copy() ( __y_space_copy_source=$1; __y_space_copy_target=$2; __y_space_copy_tmp=$(mktemp "$__y_space_copy_target.y-space-copy.XXXXXX"); trap \'rm -f -- "$__y_space_copy_tmp"\' 0 1 2 15; cp -p -- "$__y_space_copy_source" "$__y_space_copy_tmp"; mv -f -- "$__y_space_copy_tmp" "$__y_space_copy_target"; )',
+    '__y_space_config_baseline_is_trusted() ( __y_space_source=$1; __y_space_target=$2; __y_space_baseline=$3; [ -f "$__y_space_baseline" ] && [ ! -L "$__y_space_baseline" ] || exit 1; [ "$__y_space_source" -ef "$__y_space_baseline" ] 2>/dev/null && exit 1; [ "$__y_space_target" -ef "$__y_space_baseline" ] 2>/dev/null && exit 1; exit 0; )',
+    '__y_space_config_removal_is_trusted() ( __y_space_target=$1; __y_space_baseline=$2; [ -f "$__y_space_target" ] && [ ! -L "$__y_space_target" ] || exit 1; [ -f "$__y_space_baseline" ] && [ ! -L "$__y_space_baseline" ] || exit 1; [ "$__y_space_target" -ef "$__y_space_baseline" ] 2>/dev/null && exit 1; cmp -s -- "$__y_space_target" "$__y_space_baseline"; )',
+    '__y_space_config_is_independent() ( __y_space_source=$1; __y_space_target=$2; [ -f "$__y_space_target" ] && [ ! -L "$__y_space_target" ] || exit 1; [ "$__y_space_source" -ef "$__y_space_target" ] 2>/dev/null && exit 1; exit 0; )',
+    '__y_space_reconcile_config() ( __y_space_source=$1; __y_space_target=$2; __y_space_baseline=$3; if [ ! -e "$__y_space_source" ] && [ ! -L "$__y_space_source" ]; then if [ -L "$__y_space_target" ]; then [ -f "$__y_space_target" ] || exit 1; __y_space_atomic_copy "$__y_space_target" "$__y_space_target"; exit; fi; if __y_space_config_removal_is_trusted "$__y_space_target" "$__y_space_baseline"; then rm -f -- "$__y_space_target" "$__y_space_baseline"; fi; exit 0; fi; [ -f "$__y_space_source" ] || exit 1; if [ ! -e "$__y_space_target" ] && [ ! -L "$__y_space_target" ]; then __y_space_atomic_copy "$__y_space_source" "$__y_space_target"; __y_space_atomic_copy "$__y_space_source" "$__y_space_baseline"; __y_space_config_is_independent "$__y_space_source" "$__y_space_target"; exit; fi; if [ ! -f "$__y_space_target" ]; then __y_space_preserve "$__y_space_target"; __y_space_atomic_copy "$__y_space_source" "$__y_space_target"; __y_space_atomic_copy "$__y_space_source" "$__y_space_baseline"; __y_space_config_is_independent "$__y_space_source" "$__y_space_target"; exit; fi; if [ -L "$__y_space_target" ] || [ "$__y_space_source" -ef "$__y_space_target" ]; then __y_space_matches_source=false; if cmp -s -- "$__y_space_source" "$__y_space_target"; then __y_space_matches_source=true; fi; __y_space_atomic_copy "$__y_space_target" "$__y_space_target"; if [ "$__y_space_matches_source" = true ]; then __y_space_atomic_copy "$__y_space_source" "$__y_space_baseline"; fi; __y_space_config_is_independent "$__y_space_source" "$__y_space_target"; exit; fi; if __y_space_config_baseline_is_trusted "$__y_space_source" "$__y_space_target" "$__y_space_baseline"; then if cmp -s -- "$__y_space_target" "$__y_space_baseline"; then if ! cmp -s -- "$__y_space_source" "$__y_space_target"; then __y_space_atomic_copy "$__y_space_source" "$__y_space_target"; fi; __y_space_atomic_copy "$__y_space_source" "$__y_space_baseline"; fi; elif cmp -s -- "$__y_space_source" "$__y_space_target"; then __y_space_atomic_copy "$__y_space_source" "$__y_space_baseline"; fi; __y_space_config_is_independent "$__y_space_source" "$__y_space_target"; )',
+    `mkdir -p ${quotePosixShellArg(linuxCodexHome)}`,
+    ...CODEX_LINK_TARGETS.map(({ name, kind }) => reconcileLine(name, kind)),
+    `__y_space_reconcile_config ${quotePosixShellArg(profileConfig)} ${quotePosixShellArg(privateConfig)} ${quotePosixShellArg(configBaseline)}`,
+  ].join("\n");
+}
+
+interface WslCodexRuntimeHomes {
+  profileHome: string;
+  sqliteHome: string;
+}
+
+async function resolveWslCodexRuntimeHomes(
+  distro: string,
+  home: string,
+): Promise<WslCodexRuntimeHomes> {
+  const configuredHomes = await execInWsl(
+    distro,
+    "/",
+    "sh",
+    ["-lc", 'printf "%s\\0%s" "${CODEX_HOME:-}" "${CODEX_SQLITE_HOME:-}"'],
+    { timeout: 15_000 },
+  );
+  const [configuredProfileHome = "", configuredSqliteHome = ""] = configuredHomes.split("\0");
+  const profileHome = configuredProfileHome.trim() || `${home}/.codex`;
+  const sqliteHome = configuredSqliteHome.trim() || profileHome;
+  if (!profileHome.startsWith("/")) {
+    throw new Error(`WSL Codex profile home must be absolute in distro ${distro}`);
+  }
+  if (!sqliteHome.startsWith("/")) {
+    throw new Error(`WSL Codex SQLite home must be absolute in distro ${distro}`);
+  }
+  return { profileHome, sqliteHome };
+}
+
+export async function resolveCodexSqliteHome(ctx?: AgentEnvContext): Promise<string> {
+  if (isWslPluginContext(ctx)) {
+    const wsl = getWslPluginBaseDirs(ctx.wslDistro, "codex");
+    if (!wsl)
+      throw new Error(`unable to resolve Codex runtime home in wsl distro ${ctx.wslDistro}`);
+    return (await resolveWslCodexRuntimeHomes(ctx.wslDistro, wsl.home)).sqliteHome;
+  }
+  return resolveNativeCodexSqliteHome();
+}
+
+export async function seedWslCodexHome(
   distro: string,
   home: string,
   linuxCodexHome: string,
-): Promise<void> {
-  const uncCodexHome = toWslUncPath(distro, linuxCodexHome);
-  mkdirSync(uncCodexHome, { recursive: true });
-  const globalCodexHome = `${home}/.codex`;
-  const linkExists = (path: string) =>
-    `[ -e ${quotePosixShellArg(path)} ] || [ -L ${quotePosixShellArg(path)} ]`;
-  // ln -s can fail on Windows-mounted filesystems (9p / DrvFs). For files,
-  // fall back to hardlink, then copy. Dirs only get the symlink attempt.
-  const linkLine = (name: string, kind: "dir" | "file") => {
-    const target = quotePosixShellArg(`${linuxCodexHome}/${name}`);
-    const source = quotePosixShellArg(`${globalCodexHome}/${name}`);
-    const attempts = [
-      linkExists(`${linuxCodexHome}/${name}`),
-      `ln -s ${source} ${target}`,
-      ...(kind === "file" ? [`ln ${source} ${target}`, `cp ${source} ${target}`] : []),
-    ];
-    return attempts.join(" || ");
-  };
-  const script = [
-    [
-      "mkdir -p",
-      quotePosixShellArg(linuxCodexHome),
-      quotePosixShellArg(`${globalCodexHome}/sessions`),
-    ].join(" "),
-    `touch ${quotePosixShellArg(`${globalCodexHome}/session_index.jsonl`)}`,
-    ...CODEX_LINK_TARGETS.map(({ name, kind }) => linkLine(name, kind)),
-  ].join("\n");
-  await execInWsl(distro, "/", "sh", ["-lc", script], { timeout: 15_000 }).catch((error) => {
-    console.warn(`[codex] WSL plugin install failed for distro ${distro}:`, error);
-  });
+): Promise<WslCodexRuntimeHomes> {
+  const runtimeHomes = await resolveWslCodexRuntimeHomes(distro, home);
+  const globalCodexHome = runtimeHomes.profileHome;
+  if (globalCodexHome.replace(/\/+$/u, "") === linuxCodexHome.replace(/\/+$/u, "")) {
+    throw new Error("private WSL Codex home cannot also be the effective profile home");
+  }
+  const script = buildWslCodexHomeSeedScript(home, linuxCodexHome, globalCodexHome);
+  await execInWsl(distro, "/", "sh", ["-lc", script], { timeout: 15_000 });
+  return runtimeHomes;
 }
 
 const MIN_CODEX_SEMVER = [0, 122, 0] as const;
@@ -367,7 +642,16 @@ export async function installCodexPlugin(
   const pluginDir = getNativePluginBaseDir("codex", ctx?.baseDir);
   const codexHomeDir = join(pluginDir, "home");
   mkdirSync(pluginDir, { recursive: true });
-  seedNativeCodexHome(codexHomeDir);
+  try {
+    seedNativeCodexHome(codexHomeDir);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `failed to seed private Codex home from the effective profile: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
   copyPluginAssetsIfStale(sourceDir, pluginDir);
   copyForwardRuntimeFile(pluginDir);
   const wrapperPath = writeNativeHookWrapper(pluginDir, {
@@ -411,6 +695,7 @@ export async function installCodexPlugin(
     paths: {
       pluginDir,
       codexHomeDir,
+      sqliteHomeDir: resolveNativeCodexSqliteHome(),
       codexHooksPath: hooksPath,
       version: manifest.version,
     },
@@ -430,7 +715,17 @@ async function installCodexPluginWsl(
 
   const linuxForward = `${staged.linuxPluginDir}/forward.mjs`;
   const linuxCodexHome = `${staged.linuxPluginDir}/home`;
-  await seedWslCodexHome(distro, staged.deploy.home, linuxCodexHome);
+  let runtimeHomes: WslCodexRuntimeHomes;
+  try {
+    runtimeHomes = await seedWslCodexHome(distro, staged.deploy.home, linuxCodexHome);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `failed to seed private Codex home in wsl distro ${distro}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
   const linuxHooksPath = `${linuxCodexHome}/hooks.json`;
   const uncHooks = toWslUncPath(distro, linuxHooksPath);
 
@@ -473,6 +768,7 @@ async function installCodexPluginWsl(
     paths: {
       pluginDir: staged.linuxPluginDir,
       codexHomeDir: linuxCodexHome,
+      sqliteHomeDir: runtimeHomes.sqliteHome,
       codexHooksPath: linuxHooksPath,
       version: manifest.version,
     },
@@ -485,11 +781,22 @@ export function isCodexPluginInstalled(
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "codex");
     if (!wsl) return Promise.resolve({ installed: false });
-    return Promise.resolve(verifyCodexInstallAt(wsl.uncBase, "wsl"));
+    const status = verifyCodexInstallAt(wsl.uncBase, "wsl");
+    if (!status.installed) return Promise.resolve(status);
+    return seedWslCodexHome(ctx.wslDistro, wsl.home, `${wsl.linuxBase}/home`).then(
+      () => status,
+      () => ({ installed: false }),
+    );
   }
-  return Promise.resolve(
-    verifyCodexInstallAt(getNativePluginBaseDir("codex", ctx?.baseDir), "native"),
-  );
+  const pluginDir = getNativePluginBaseDir("codex", ctx?.baseDir);
+  const status = verifyCodexInstallAt(pluginDir, "native");
+  if (!status.installed) return Promise.resolve(status);
+  try {
+    seedNativeCodexHome(join(pluginDir, "home"));
+    return Promise.resolve(status);
+  } catch {
+    return Promise.resolve({ installed: false });
+  }
 }
 
 export function uninstallCodexPlugin(ctx?: AgentEnvContext): void {

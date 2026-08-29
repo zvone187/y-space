@@ -11,15 +11,21 @@ import { newItemId } from "../../contextUsage";
 import type { OpenCodeMapperState } from "../sdkCanonicalMappingState";
 import { suffixPrefixOverlap } from "./readers";
 
-export function ensureAssistantItemForMessage(
+export function ensureAssistantItemForPart(
   state: OpenCodeMapperState,
+  partID: string,
   messageID: string,
   events: RuntimeEvent[],
 ): string {
-  const existing = state.assistantItems.get(messageID);
+  const messageItems = state.assistantItems.get(messageID);
+  const existing = messageItems?.get(partID);
   if (existing) return existing;
   const itemId = newItemId("asst");
-  state.assistantItems.set(messageID, itemId);
+  if (messageItems) {
+    messageItems.set(partID, itemId);
+  } else {
+    state.assistantItems.set(messageID, new Map([[partID, itemId]]));
+  }
   events.push({
     type: "item.started",
     threadId: state.threadId,
@@ -27,6 +33,35 @@ export function ensureAssistantItemForMessage(
     itemType: "assistant_message",
   });
   return itemId;
+}
+
+export function completeAssistantItem(
+  state: OpenCodeMapperState,
+  messageID: string,
+  partID: string,
+  events: RuntimeEvent[],
+): void {
+  const messageItems = state.assistantItems.get(messageID);
+  const itemId = messageItems?.get(partID);
+  if (!messageItems || !itemId) return;
+  events.push({ type: "item.completed", threadId: state.threadId, itemId });
+  messageItems.delete(partID);
+  if (messageItems.size === 0) state.assistantItems.delete(messageID);
+}
+
+export function completeAssistantItemsForMessage(
+  state: OpenCodeMapperState,
+  messageID: string,
+  events: RuntimeEvent[],
+): void {
+  const messageItems = state.assistantItems.get(messageID);
+  if (!messageItems) return;
+  for (const [partID, itemId] of messageItems) {
+    events.push({ type: "item.completed", threadId: state.threadId, itemId });
+    state.emittedText.delete(partID);
+    state.partTypes.delete(partID);
+  }
+  state.assistantItems.delete(messageID);
 }
 
 export function ensureReasoningItemForPart(
@@ -120,8 +155,10 @@ export function appendDelta(
 /** Close any open content items at turn boundaries. */
 export function closeOpenItems(state: OpenCodeMapperState): RuntimeEvent[] {
   const events: RuntimeEvent[] = [];
-  for (const [, itemId] of state.assistantItems) {
-    events.push({ type: "item.completed", threadId: state.threadId, itemId });
+  for (const [, messageItems] of state.assistantItems) {
+    for (const [, itemId] of messageItems) {
+      events.push({ type: "item.completed", threadId: state.threadId, itemId });
+    }
   }
   state.assistantItems.clear();
   for (const [, entry] of state.reasoningItems) {
@@ -129,6 +166,7 @@ export function closeOpenItems(state: OpenCodeMapperState): RuntimeEvent[] {
   }
   state.reasoningItems.clear();
   for (const [, value] of state.toolItems) {
+    if (value.completed) continue;
     events.push({ type: "item.completed", threadId: state.threadId, itemId: value.itemId });
   }
   state.toolItems.clear();

@@ -1,7 +1,13 @@
 import { homedir } from "node:os";
 import { dirname as posixDirname } from "node:path/posix";
 import type { ProjectLocation, ThreadConfig } from "@/shared/contracts";
-import { buildAgentCommand, DEFAULT_WSL_EXEC_PATH, getWslCommand, type CommandSpec } from "../base";
+import {
+  buildAgentCommand,
+  buildDirectWslEnvironmentCommandArgs,
+  DEFAULT_WSL_EXEC_PATH,
+  getWslCommand,
+  type CommandSpec,
+} from "../base";
 
 // `opencode` (default TUI) only accepts `[project]` as a positional, so the
 // initial prompt must go through `--prompt` rather than a trailing arg.
@@ -56,20 +62,14 @@ export function buildOpenCodeServerCommand(
       resolvedExecPath?.startsWith("/") ? posixDirname(resolvedExecPath) : undefined,
       DEFAULT_WSL_EXEC_PATH,
     ].filter((segment): segment is string => Boolean(segment));
+    const direct = buildDirectWslEnvironmentCommandArgs(resolvedExecPath ?? "opencode", args, {
+      PATH: pathSegments.join(":"),
+      ...env,
+    });
     return {
       command: getWslCommand(),
-      args: [
-        "-d",
-        location.distro,
-        "--cd",
-        "~",
-        "--",
-        "/usr/bin/env",
-        `PATH=${pathSegments.join(":")}`,
-        ...Object.entries(env).map(([key, value]) => `${key}=${value}`),
-        resolvedExecPath ?? "opencode",
-        ...args,
-      ],
+      args: ["-d", location.distro, "--cd", "~", "--", ...direct.args],
+      ...(direct.cleanup ? { cleanup: direct.cleanup } : {}),
     };
   }
   const runtimeLocation = { ...location, path: homedir() };

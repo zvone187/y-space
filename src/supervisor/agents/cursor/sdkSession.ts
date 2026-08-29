@@ -545,7 +545,7 @@ export class CursorSdkSession implements StructuredSessionHandle {
     const safetyPosture = sdkSafetyPosture(config);
     return {
       model: this.modelSelection(config),
-      name: `poracode/${this.input.threadId.slice(0, 8)}`,
+      name: `y-space/${this.input.threadId.slice(0, 8)}`,
       local: {
         cwd: resolveSessionCwd(this.input.projectLocation),
         settingSources: ["all"],

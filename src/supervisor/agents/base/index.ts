@@ -47,6 +47,11 @@ import type {
   ResolveExecutablePath,
   StatusProbeResult,
 } from "./types";
+import {
+  composeLaunchCleanups,
+  createWslLaunchEnvironmentFile,
+  partitionWslLaunchEnvironment,
+} from "./wslLaunchEnvironment";
 
 export type {
   AcpEmptyResponseErrorResolver,
@@ -100,6 +105,7 @@ export * from "./promptSession";
 export * from "./processRuntime";
 export * from "./shellBasics";
 export * from "./spawnEnv";
+export * from "./wslLaunchEnvironment";
 export type { DetectedPowerShell } from "../../shellPreference";
 export * from "./sessionFs";
 export function buildWindowsCmdCommand(cwd: string, command: string, args: string[]): CommandSpec {
@@ -126,14 +132,22 @@ export function injectWslEnv(
 ): CommandSpec {
   if (location.kind !== "wsl" || Object.keys(env).length === 0) return spec;
 
-  const prefix = buildPosixExportPrefix(env);
-  if (!prefix) return spec;
+  const partitioned = partitionWslLaunchEnvironment(env);
+  const prefix = buildPosixExportPrefix(partitioned.inline);
+  const launchEnvironment = createWslLaunchEnvironmentFile(partitioned.protected);
+  if (!prefix && !launchEnvironment) return spec;
 
   // The script is always the last arg after "-c".
   const args = [...spec.args];
   const scriptIdx = args.length - 1;
-  args[scriptIdx] = `${prefix}${args[scriptIdx]}`;
-  return { ...spec, args };
+  args[scriptIdx] = `${prefix}${launchEnvironment?.sourcePrefix ?? ""}${args[scriptIdx]}`;
+  return {
+    ...spec,
+    args,
+    ...(launchEnvironment
+      ? { cleanup: composeLaunchCleanups(spec.cleanup, launchEnvironment.cleanup)! }
+      : {}),
+  };
 }
 
 export function buildWslLoginShellCommand(
@@ -358,17 +372,20 @@ export function buildAgentCommand(
     // version manager and break things like `npx` (e.g. fnm shims that exec a
     // node not on PATH).
     const execCommand = resolvedExecPath ?? command;
-    const exports = buildPosixExportPrefix(
-      env ? sanitizePrivilegedChildEnvironment(env) : undefined,
-    );
-    const script = `${posixPrivilegedEnvironmentUnsetPrefix()}${exports}exec ${[execCommand, ...args].map(quotePosixShellArg).join(" ")}`;
+    const sanitizedEnv = env ? sanitizePrivilegedChildEnvironment(env) : {};
+    const partitioned = partitionWslLaunchEnvironment(sanitizedEnv);
+    const exports = buildPosixExportPrefix(partitioned.inline);
+    const launchEnvironment = createWslLaunchEnvironmentFile(partitioned.protected);
+    const script = `${posixPrivilegedEnvironmentUnsetPrefix()}${exports}${launchEnvironment?.sourcePrefix ?? ""}exec ${[execCommand, ...args].map(quotePosixShellArg).join(" ")}`;
     // `--exec` (not `--`) is required: `--` routes the command line through the
     // user's default WSL shell, which re-parses the already-quoted script. Any
     // `$(`, backtick, or unbalanced quote inside `args` (e.g. a diff embedded
     // in a one-shot prompt) then breaks bash parsing ("unexpected EOF while
     // looking for matching …") or, worse, executes as command substitution.
     // `--exec` passes argv straight to execvp, so the script arrives verbatim.
-    return buildWslLoginShellCommand(location.distro, location.linuxPath, script);
+    const spec = buildWslLoginShellCommand(location.distro, location.linuxPath, script);
+    if (launchEnvironment) spec.cleanup = launchEnvironment.cleanup;
+    return spec;
   }
 
   if (location.kind === "windows") {
@@ -407,9 +424,8 @@ export function resolveLaunchSpec(location: ProjectLocation, argv: AgentArgvSpec
   if (argv.sessionRef) {
     spec.sessionRef = argv.sessionRef;
   }
-  if (argv.cleanup) {
-    spec.cleanup = argv.cleanup;
-  }
+  const cleanup = composeLaunchCleanups(spec.cleanup, argv.cleanup);
+  if (cleanup) spec.cleanup = cleanup;
   return spec;
 }
 

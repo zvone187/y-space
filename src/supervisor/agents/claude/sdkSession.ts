@@ -24,8 +24,15 @@ import type {
   TurnState,
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
+import {
+  COMPETING_BROWSER_COMMAND_GLOBS,
+  COMPETING_BROWSER_SKILL_NAMES,
+  hasYSpaceBrowserMcp,
+  Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE,
+} from "@/shared/browserExclusivePolicy";
+import { isCompetingBrowserCommandOrScript } from "@/shared/browserExclusiveCommandInspection";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import { buildClaudeMcpServers } from "../userMcp";
+import { buildClaudeMcpLaunchConfig } from "../userMcp";
 import {
   createKnownSessionRef,
   getPrimedPosixEnv,
@@ -44,6 +51,7 @@ import { captureSupervisorException } from "../../diagnostics/sentry";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { DeferredTurnCompletion } from "./deferredTurnCompletion";
 import { applyClaudeContextSuffix } from "./argv";
+import { resolveClaudeBrowserExclusiveMcpConfig } from "./effectiveMcpConfig";
 import {
   buildClaudeQuestionAnswerEvents,
   ClaudeUsageScopeTracker,
@@ -90,6 +98,15 @@ type CompletedClaudeTurn = {
  * signal, not the first streamed token).
  */
 const DEFERRED_FLUSH_RESUME_GRACE_MS = 5000;
+
+const CLAUDE_BROWSER_SKILL_DENY_RULES = COMPETING_BROWSER_SKILL_NAMES.flatMap((name) => [
+  `Skill(${name})`,
+  `Skill(${name} *)`,
+]);
+const CLAUDE_BROWSER_COMMAND_DENY_RULES = COMPETING_BROWSER_COMMAND_GLOBS.flatMap((pattern) => [
+  `Bash(${pattern})`,
+  `PowerShell(${pattern})`,
+]);
 
 export class ClaudeSdkSession implements StructuredSessionHandle {
   launchOptions: AgentLaunchOptions = { suppressResumeConfigOverrides: true };
@@ -590,7 +607,15 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     const child = proc as unknown as ChildProcess;
     this.spawnedProcesses.add(child);
     const forget = (): void => {
-      this.spawnedProcesses.delete(child);
+      const wasTracked = this.spawnedProcesses.delete(child);
+      // On native POSIX, the detached process group can outlive its Claude
+      // leader. Reap it immediately on unexpected leader exit, while the pgid
+      // is still tied to this app-owned launch. An intentional dispose removes
+      // the child before killing its group, so do not send a second signal from
+      // the later exit event.
+      if (wasTracked && this.ownsSpawnedProcessGroup()) {
+        terminateChildProcessTree(child, { ownedProcessGroup: true });
+      }
     };
     child.once("exit", forget);
     if (this.disposed) {
@@ -601,10 +626,18 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 
   private killSpawnedProcess(child: ChildProcess): void {
     this.spawnedProcesses.delete(child);
-    // Windows: taskkill /T /F reaps the whole tree. POSIX: best-effort kill of
-    // the captured process (the SDK's own teardown handles the rest).
+    // Windows: taskkill /T /F reaps the whole tree. Native POSIX launches own
+    // a process group, so kill the leader and all shell/tool descendants.
     // terminateChildProcessTree swallows its own errors, so no guard is needed.
-    terminateChildProcessTree(child);
+    if (this.ownsSpawnedProcessGroup()) {
+      terminateChildProcessTree(child, { ownedProcessGroup: true });
+    } else {
+      terminateChildProcessTree(child);
+    }
+  }
+
+  private ownsSpawnedProcessGroup(): boolean {
+    return process.platform !== "win32" && this.input.projectLocation.kind === "posix";
   }
 
   private requireQuery(): Promise<Query> {
@@ -647,7 +680,9 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
             getPrimedPosixEnv() ??
             (process.env as Record<string, string>))
           : undefined;
-      const env = sanitizeChildProcessEnv(
+      const appMcpLaunch = buildClaudeMcpLaunchConfig(this.input.mcpServers ?? []);
+      const browserExclusive = hasYSpaceBrowserMcp(this.input.mcpServers ?? []);
+      const baseEnv = sanitizeChildProcessEnv(
         this.input.projectLocation.kind === "wsl"
           ? {
               CLAUDE_AGENT_SDK_CLIENT_APP: "poracode",
@@ -660,6 +695,17 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
               ...(this.input.env ?? {}),
             },
       );
+      const mcpLaunch = browserExclusive
+        ? resolveClaudeBrowserExclusiveMcpConfig({
+            projectLocation: this.input.projectLocation,
+            ...(this.input.env?.CLAUDE_CONFIG_DIR
+              ? { configDir: this.input.env.CLAUDE_CONFIG_DIR }
+              : {}),
+            launchEnv: baseEnv,
+            appLaunch: appMcpLaunch,
+          })
+        : { ...appMcpLaunch, agents: {} };
+      const env = sanitizeChildProcessEnv({ ...baseEnv, ...mcpLaunch.env });
       // Posix builds ship without the SDK's bundled `claude` SEA binary
       // (electron-builder strips `@anthropic-ai/claude-agent-sdk-*` from the
       // asar). The SDK falls back to that binary when `pathToClaudeCodeExecutable`
@@ -700,10 +746,17 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           void _exhaustive;
         }
       }
-      const mcpServers = buildClaudeMcpServers(this.input.mcpServers ?? []);
+      const mcpServers = mcpLaunch.mcpServers;
       const hasMcpServers = Object.keys(mcpServers).length > 0;
+      const hasExplicitAgents = Object.keys(mcpLaunch.agents).length > 0;
       let spawnClaudeCodeProcess: ((spawnOptions: SpawnOptions) => SpawnedProcess) | undefined;
       switch (this.input.projectLocation.kind) {
+        case "posix": {
+          const location = this.input.projectLocation;
+          spawnClaudeCodeProcess = (spawnOptions) =>
+            this.trackSpawnedProcess(spawnClaudeNative(location, spawnOptions));
+          break;
+        }
         case "wsl": {
           const location = this.input.projectLocation;
           spawnClaudeCodeProcess = (spawnOptions) =>
@@ -720,7 +773,11 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       const options: ClaudeQueryOptions = {
         cwd: projectCwd(this.input.projectLocation),
         model,
-        systemPrompt: { type: "preset", preset: "claude_code" },
+        systemPrompt: {
+          type: "preset",
+          preset: "claude_code",
+          ...(browserExclusive ? { append: Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE } : {}),
+        },
         settingSources: ["user", "project", "local"],
         permissionMode,
         ...(permissionMode === "bypassPermissions"
@@ -733,6 +790,18 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         forwardSubagentText: true,
         canUseTool: this.canUseTool,
         env,
+        ...(browserExclusive
+          ? {
+              strictMcpConfig: true,
+              disallowedTools: [
+                "WebFetch",
+                "WebSearch",
+                ...CLAUDE_BROWSER_SKILL_DENY_RULES,
+                ...CLAUDE_BROWSER_COMMAND_DENY_RULES,
+              ],
+              extraArgs: { "no-chrome": null },
+            }
+          : {}),
         ...(this.currentConfig.effort
           ? {
               // `ultracode` is not a model-level effort value — the CLI rejects
@@ -746,7 +815,8 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           : {}),
         ...(claudeExecutablePath ? { pathToClaudeCodeExecutable: claudeExecutablePath } : {}),
         ...(hasMcpServers ? ({ mcpServers } as Partial<ClaudeQueryOptions>) : {}),
-        ...(spawnClaudeCodeProcess ? { spawnClaudeCodeProcess } : {}),
+        ...(hasExplicitAgents ? ({ agents: mcpLaunch.agents } as Partial<ClaudeQueryOptions>) : {}),
+        spawnClaudeCodeProcess,
       };
 
       this.queryRuntime = query({ prompt: this.promptQueue, options });
@@ -793,6 +863,22 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 
   private readonly canUseTool: CanUseTool = async (toolName, toolInput, callbackOptions) => {
     if (this.disposed) return { behavior: "deny", message: "Session closed." };
+    if (
+      hasYSpaceBrowserMcp(this.input.mcpServers ?? []) &&
+      (toolName === "Bash" || toolName === "PowerShell") &&
+      typeof toolInput.command === "string" &&
+      isCompetingBrowserCommandOrScript(
+        toolInput.command,
+        this.input.projectLocation.kind === "wsl"
+          ? this.input.projectLocation.uncPath
+          : projectCwd(this.input.projectLocation),
+      )
+    ) {
+      return {
+        behavior: "deny",
+        message: "Use the embedded Y Space Browser for web and browser work.",
+      };
+    }
     if (toolName === "AskUserQuestion") {
       const requestId = `claude-question-${randomUUID()}` as ThreadServerRequestId;
       const questions = parseClaudeQuestions(toolInput);

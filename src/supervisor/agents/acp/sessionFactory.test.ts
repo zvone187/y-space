@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CreateStructuredSessionInput } from "../base";
+import {
+  cleanupTrackedWslLaunchEnvironmentFiles,
+  type CreateStructuredSessionInput,
+} from "../base";
 import { AcpStructuredSession } from "./session";
 import { createAcpStructuredSession } from "./sessionFactory";
 
@@ -20,6 +23,7 @@ function makeInput(
 describe("createAcpStructuredSession baseSpawnEnv merge", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    cleanupTrackedWslLaunchEnvironmentFiles();
   });
 
   function spyOnCreate() {
@@ -60,7 +64,7 @@ describe("createAcpStructuredSession baseSpawnEnv merge", () => {
     });
   });
 
-  it("exports merged environment inside WSL before launching the ACP agent", () => {
+  it("stages merged environment outside WSL argv before launching the ACP agent", () => {
     const createSpy = spyOnCreate();
 
     createAcpStructuredSession(
@@ -90,12 +94,19 @@ describe("createAcpStructuredSession baseSpawnEnv merge", () => {
       }),
     );
 
-    expect(createSpy.mock.calls[0]?.[0]).toMatchObject({
-      env: { CURSOR_API_KEY: "profile-key" },
-      args: expect.arrayContaining([
-        expect.stringContaining("export CURSOR_API_KEY='profile-key'; cursor-agent acp"),
-      ]),
-    });
+    const command = createSpy.mock.calls[0]?.[0];
+    const serializedArgs = JSON.stringify(command?.args ?? []);
+    const script = String(command?.args.at(-1));
+    expect(command?.env).toEqual({ CURSOR_API_KEY: "profile-key" });
+    expect(serializedArgs).not.toContain("CURSOR_API_KEY");
+    expect(serializedArgs).not.toContain("profile-key");
+    expect(script).toContain("__y_space_launch_env_file");
+    expect(script).toContain('/bin/rm -f -- "$1"');
+    expect(script).toContain('/bin/rmdir -- "$2"');
+    expect(script).toContain("cursor-agent acp");
+    expect(command?.cleanup).toEqual(expect.any(Function));
+
+    command?.cleanup?.();
   });
 
   it("passes the command through unchanged when nothing contributes env", () => {

@@ -2,13 +2,14 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentKind, McpServer, ResolvedMcpServer } from "@/shared/contracts";
+import type { AgentKind, McpServer, ProjectLocation, ResolvedMcpServer } from "@/shared/contracts";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import type { SupervisorEvent } from "@/shared/ipc";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { WindowsShellPreference } from "../shellPreference";
 import type { SessionRuntime } from "./sessionTypes";
 import type { McpLaunchAuthorization, McpLaunchIdentity } from "./threadSession/spawnPipeline";
+import { BROWSER_MCP_TOKEN_ENV, BROWSER_MCP_URL_ENV } from "../agents/browserMcp";
 
 const captureSupervisorException = vi.hoisted(() =>
   vi.fn<(error: unknown, tags?: Record<string, string>) => void>(),
@@ -95,6 +96,22 @@ function createManager(
     readDisableCliHookPlugin: () => false,
     adapters: new Map([[agentKind, adapter]]),
     resolveWindowsShell,
+    resolvePluginEnvForSpawn: async (input) =>
+      input.agentKind === "codex"
+        ? {
+            env: {
+              PORACODE_HOOK_URL: "http://127.0.0.1:43200/v1/agent-event",
+              PORACODE_HOOK_SECRET: "thread-session-manager-test-hook-secret",
+              PORACODE_HOOK_NONCE: "thread-session-manager-test-hook-secret",
+              PORACODE_HOOK_PROTOCOL_VERSION: "1",
+              PORACODE_THREAD_ID: input.threadId,
+              PORACODE_AGENT_KIND: "codex",
+              CODEX_HOME: join(tempDir, "agent-plugins", "codex", "home"),
+              CODEX_SQLITE_HOME: join(tempDir, "codex-profile"),
+            },
+            extraArgs: ["--dangerously-bypass-hook-trust", "--enable", "hooks"],
+          }
+        : undefined,
   });
   managersToDispose.push(manager);
   return manager;
@@ -124,6 +141,7 @@ function createAdapter(
     kind: agentKind,
     label: agentKind,
     binary: agentKind,
+    browserRouting: { terminal: "exclusive", gui: "exclusive" },
     capabilities: {
       models: [],
       efforts: [],
@@ -209,9 +227,27 @@ function attachAuthorizedRuntime(
   return identity;
 }
 
+function collectRuntimeEvents(events: readonly SupervisorEvent[]) {
+  return events.flatMap((event) => {
+    if (event.type === "thread-runtime-event") return [event.event];
+    if (event.type === "thread-runtime-events") return event.events;
+    if (event.type === "thread-runtime-events-multi") {
+      return event.batches.flatMap((batch) => batch.events);
+    }
+    return [];
+  });
+}
+
 const guardedStructuredProviders = ["codex", "opencode"] as const;
 const managersToDispose: ThreadSessionManager[] = [];
 const tempDirs: string[] = [];
+const savedBrowserMcpUrl = process.env[BROWSER_MCP_URL_ENV];
+const savedBrowserMcpToken = process.env[BROWSER_MCP_TOKEN_ENV];
+
+beforeEach(() => {
+  process.env[BROWSER_MCP_URL_ENV] = "http://127.0.0.1:43199";
+  process.env[BROWSER_MCP_TOKEN_ENV] = "thread-session-manager-test-browser-token";
+});
 
 afterEach(async () => {
   for (const manager of managersToDispose.splice(0)) {
@@ -220,9 +256,359 @@ afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
+  if (savedBrowserMcpUrl === undefined) delete process.env[BROWSER_MCP_URL_ENV];
+  else process.env[BROWSER_MCP_URL_ENV] = savedBrowserMcpUrl;
+  if (savedBrowserMcpToken === undefined) delete process.env[BROWSER_MCP_TOKEN_ENV];
+  else process.env[BROWSER_MCP_TOKEN_ENV] = savedBrowserMcpToken;
 });
 
 describe("ThreadSessionManager provider-session routing", () => {
+  it("records only successful Browser proof for the exact current launch and user turn", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const events: SupervisorEvent[] = [];
+    const manager = createManager("codex", adapter, (event) => events.push(event));
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "browser-evidence-current-turn";
+    runtime.status = "idle";
+    runtime.config = { model: "codex/model", browserMcp: true };
+    runtime.launchConfig = { ...runtime.config };
+    const identity = attachAuthorizedRuntime(manager, runtime);
+    const firstTurnId = identity.browserEvidenceTurnId!;
+    const report = {
+      threadId: runtime.threadId,
+      launchId: identity.launchId,
+      turnId: firstTurnId,
+      toolName: "navigate",
+      success: true,
+      occurredAt: 1_778_000_000_000,
+      tabId: "tab-proof",
+      url: "http://127.0.0.1:41739/alpha",
+      title: "Alpha",
+    } as const;
+
+    expect(manager.recordBrowserMcpToolCall({ ...report, toolName: "enable" })).toBe(false);
+    expect(manager.recordBrowserMcpToolCall({ ...report, toolName: "list_tabs" })).toBe(false);
+    expect(manager.recordBrowserMcpToolCall(report)).toBe(true);
+    const proofEvents = collectRuntimeEvents(events);
+    expect(proofEvents).toEqual([
+      expect.objectContaining({
+        type: "item.started",
+        threadId: runtime.threadId,
+        itemType: "mcp_tool_call",
+        payload: expect.objectContaining({
+          name: "navigate",
+          serverId: "browser",
+          status: "success",
+          browserEvidence: {
+            source: "y-space-browser-mcp",
+            occurredAt: 1_778_000_000_000,
+            tabId: "tab-proof",
+            url: "http://127.0.0.1:41739/alpha",
+            title: "Alpha",
+          },
+        }),
+      }),
+      expect.objectContaining({ type: "item.completed", threadId: runtime.threadId }),
+    ]);
+
+    expect(manager.recordBrowserMcpToolCall({ ...report, success: false })).toBe(false);
+    expect(manager.recordBrowserMcpToolCall({ ...report, launchId: "stale-launch" })).toBe(false);
+
+    const internal = manager as unknown as {
+      beginBrowserEvidenceTurnForSession(session: SessionRuntime): string | undefined;
+    };
+    const nextTurnId = internal.beginBrowserEvidenceTurnForSession(runtime)!;
+    expect(nextTurnId).not.toBe(firstTurnId);
+    expect(manager.recordBrowserMcpToolCall(report)).toBe(false);
+    expect(manager.recordBrowserMcpToolCall({ ...report, turnId: nextTurnId })).toBe(true);
+
+    await manager.closeThread({ threadId: runtime.threadId });
+    expect(manager.recordBrowserMcpToolCall({ ...report, turnId: nextTurnId })).toBe(false);
+  });
+
+  it("rotates Browser proof authority across an accepted restart prompt", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.startTurn = vi.fn<NonNullable<StructuredSessionHandle["startTurn"]>>(
+      async () => undefined,
+    );
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "browser-evidence-restart";
+    runtime.config = { model: "codex/model", browserMcp: true };
+    runtime.launchConfig = { ...runtime.config };
+    const oldIdentity = { ...attachAuthorizedRuntime(manager, runtime) };
+
+    await manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "continue in the embedded browser",
+      config: runtime.config,
+    });
+
+    const restarted = manager.sessions.get(runtime.threadId)!;
+    const newIdentity = manager.resolveMcpCallerIdentity({
+      routing: "thread",
+      threadId: runtime.threadId,
+      launchId: restarted.mcpIdentity!.launchId,
+      serverId: "browser",
+    })!;
+    expect(newIdentity.launchId).not.toBe(oldIdentity.launchId);
+    expect(newIdentity.browserEvidenceTurnId).not.toBe(oldIdentity.browserEvidenceTurnId);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: runtime.threadId,
+        launchId: oldIdentity.launchId,
+        turnId: oldIdentity.browserEvidenceTurnId!,
+        toolName: "snapshot",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(false);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: runtime.threadId,
+        launchId: newIdentity.launchId!,
+        turnId: newIdentity.browserEvidenceTurnId!,
+        toolName: "snapshot",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(true);
+  });
+
+  it("attributes structured-child Browser proof to the current parent turn only", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const events: SupervisorEvent[] = [];
+    const manager = createManager("codex", adapter, (event) => events.push(event));
+    const parent = createInactiveRuntime("codex", adapter, structuredSession);
+    parent.threadId = "browser-evidence-parent";
+    parent.status = "idle";
+    parent.config = { model: "codex/model", browserMcp: true };
+    parent.launchConfig = { ...parent.config };
+    const parentIdentity = attachAuthorizedRuntime(manager, parent);
+    structuredSession.startTurn = vi.fn<NonNullable<StructuredSessionHandle["startTurn"]>>(
+      async () => undefined,
+    );
+    structuredSession.steerTurn = vi.fn<NonNullable<StructuredSessionHandle["steerTurn"]>>(
+      async () => undefined,
+    );
+
+    const spawnPipeline = (
+      manager as unknown as {
+        spawnPipeline: {
+          resolveMcpServersForLaunch(input: {
+            identity: McpThreadIdentity;
+          }): Promise<ResolvedMcpServer[]>;
+        };
+      }
+    ).spawnPipeline;
+    const childIdentities: McpThreadIdentity[] = [];
+    vi.spyOn(spawnPipeline, "resolveMcpServersForLaunch").mockImplementation(async (input) => {
+      childIdentities.push(input.identity);
+      return [];
+    });
+    const authorizeChild = async (threadId: string) => {
+      await manager.resolveSubagentParentMcpAccess(
+        parent.threadId,
+        { threadId, title: threadId },
+        "codex",
+        { model: "codex/model", browserMcp: true },
+      );
+      return childIdentities.at(-1)!;
+    };
+
+    const firstChild = await authorizeChild("browser-evidence-child-1");
+    const firstChildTurnId = firstChild.browserEvidenceTurnId!;
+    expect(firstChild.browserEvidenceTurnId).toBe(parentIdentity.browserEvidenceTurnId);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: firstChild.threadId!,
+        launchId: firstChild.launchId!,
+        turnId: firstChildTurnId,
+        toolName: "click",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(true);
+    expect(
+      collectRuntimeEvents(events).some(
+        (event) =>
+          event.type === "item.started" &&
+          event.threadId === parent.threadId &&
+          event.itemType === "mcp_tool_call",
+      ),
+    ).toBe(true);
+
+    parent.status = "working";
+    await manager.setPendingSteer({
+      threadId: parent.threadId,
+      prompt: "continue through the surviving child",
+      config: parent.config,
+    });
+    const nextTurnId = parent.mcpIdentity!.browserEvidenceTurnId!;
+    expect(nextTurnId).not.toBe(firstChildTurnId);
+    expect(firstChild.browserEvidenceTurnId).toBe(nextTurnId);
+    expect(structuredSession.steerTurn).toHaveBeenCalledOnce();
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: firstChild.threadId!,
+        launchId: firstChild.launchId!,
+        turnId: firstChildTurnId,
+        toolName: "click",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(false);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: firstChild.threadId!,
+        launchId: firstChild.launchId!,
+        turnId: nextTurnId,
+        toolName: "snapshot",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(true);
+
+    const nextChild = await authorizeChild("browser-evidence-child-2");
+    expect(nextChild.browserEvidenceTurnId).toBe(nextTurnId);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: nextChild.threadId!,
+        launchId: nextChild.launchId!,
+        turnId: nextTurnId,
+        toolName: "snapshot",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps interrupt-backed steer proof on the old turn until the replacement starts", async () => {
+    const interrupt = deferred();
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.startTurn = vi.fn<NonNullable<StructuredSessionHandle["startTurn"]>>(
+      async () => undefined,
+    );
+    structuredSession.interruptTurn = vi.fn<NonNullable<StructuredSessionHandle["interruptTurn"]>>(
+      () => interrupt.promise,
+    );
+    const adapter = createAdapter("codex", structuredSession);
+    const events: SupervisorEvent[] = [];
+    const manager = createManager("codex", adapter, (event) => events.push(event));
+    const parent = createInactiveRuntime("codex", adapter, structuredSession);
+    parent.threadId = "browser-evidence-interrupt-steer";
+    parent.status = "working";
+    parent.config = { model: "codex/model", browserMcp: true };
+    parent.launchConfig = { ...parent.config };
+    const parentIdentity = attachAuthorizedRuntime(manager, parent);
+    const oldTurnId = parentIdentity.browserEvidenceTurnId!;
+
+    const spawnPipeline = (
+      manager as unknown as {
+        spawnPipeline: {
+          resolveMcpServersForLaunch(input: {
+            identity: McpThreadIdentity;
+          }): Promise<ResolvedMcpServer[]>;
+        };
+      }
+    ).spawnPipeline;
+    const childIdentities: McpThreadIdentity[] = [];
+    vi.spyOn(spawnPipeline, "resolveMcpServersForLaunch").mockImplementation(async (input) => {
+      childIdentities.push(input.identity);
+      return [];
+    });
+    await manager.resolveSubagentParentMcpAccess(
+      parent.threadId,
+      { threadId: "browser-evidence-interrupt-child", title: "surviving child" },
+      "codex",
+      parent.config,
+    );
+    const childIdentity = childIdentities.at(-1)!;
+    expect(childIdentity.browserEvidenceTurnId).toBe(oldTurnId);
+
+    await manager.setPendingSteer({
+      threadId: parent.threadId,
+      prompt: "replacement after interrupt",
+      config: parent.config,
+    });
+    await vi.waitFor(() => expect(structuredSession.interruptTurn).toHaveBeenCalledOnce());
+
+    // Staging and even issuing the interrupt must leave the old nonce in
+    // place. Late parent/child work is therefore evidence for the old turn,
+    // never for the replacement that has not started yet.
+    expect(parent.mcpIdentity!.browserEvidenceTurnId).toBe(oldTurnId);
+    expect(childIdentity.browserEvidenceTurnId).toBe(oldTurnId);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: parent.threadId,
+        launchId: parentIdentity.launchId,
+        turnId: oldTurnId,
+        toolName: "snapshot",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(true);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: childIdentity.threadId!,
+        launchId: childIdentity.launchId!,
+        turnId: oldTurnId,
+        toolName: "click",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(true);
+    expect(structuredSession.startTurn).not.toHaveBeenCalled();
+
+    parent.status = "idle";
+    const internal = manager as unknown as {
+      steerCoordinator: { maybeDrainPendingSteer(session: SessionRuntime): void };
+    };
+    internal.steerCoordinator.maybeDrainPendingSteer(parent);
+
+    const replacementTurnId = parent.mcpIdentity!.browserEvidenceTurnId!;
+    expect(replacementTurnId).not.toBe(oldTurnId);
+    expect(childIdentity.browserEvidenceTurnId).toBe(replacementTurnId);
+    expect(structuredSession.startTurn).toHaveBeenCalledOnce();
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: childIdentity.threadId!,
+        launchId: childIdentity.launchId!,
+        turnId: oldTurnId,
+        toolName: "snapshot",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(false);
+    expect(
+      manager.recordBrowserMcpToolCall({
+        threadId: childIdentity.threadId!,
+        launchId: childIdentity.launchId!,
+        turnId: replacementTurnId,
+        toolName: "snapshot",
+        success: true,
+        occurredAt: Date.now(),
+      }),
+    ).toBe(true);
+
+    const runtimeEvents = collectRuntimeEvents(events);
+    const replacementUserIndex = runtimeEvents.findIndex(
+      (event) => event.type === "item.started" && event.itemType === "user_message",
+    );
+    const proofIndexes = runtimeEvents.flatMap((event, index) =>
+      event.type === "item.started" && event.itemType === "mcp_tool_call" ? [index] : [],
+    );
+    expect(replacementUserIndex).toBeGreaterThan(-1);
+    expect(proofIndexes).toHaveLength(3);
+    expect(proofIndexes.slice(0, 2).every((index) => index < replacementUserIndex)).toBe(true);
+    expect(proofIndexes[2]).toBeGreaterThan(replacementUserIndex);
+
+    interrupt.resolve();
+  });
+
   it.each(["codex", "claude", "opencode"] as const)(
     "authorizes %s Browser and App Controls during provider creation before runtime attachment",
     async (agentKind) => {
@@ -415,7 +801,7 @@ describe("ThreadSessionManager provider-session routing", () => {
         launchId: first.mcpIdentity!.launchId,
         serverId: "browser",
       }),
-    ).toBeUndefined();
+    ).toEqual(first.mcpIdentity);
 
     writeFileSync(
       settingsPath,
@@ -468,6 +854,43 @@ describe("ThreadSessionManager provider-session routing", () => {
         threadId: runtime.threadId,
         launchId: runtime.mcpIdentity.launchId,
         serverId: "app-controls",
+      }),
+    ).toEqual(runtime.mcpIdentity);
+  });
+
+  it("marks Computer Use identity when the same live task has managed Browser connected", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "thread-computer-with-browser";
+    runtime.config = { model: "codex/model", browserMcp: true, computerUse: true };
+    runtime.launchConfig = { ...runtime.config };
+    runtime.mcpIdentity = { threadId: runtime.threadId, title: "Desktop task" };
+    attachAuthorizedRuntime(manager, runtime);
+
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: runtime.threadId,
+        launchId: runtime.mcpIdentity.launchId,
+        serverId: "computer-use",
+      }),
+    ).toEqual({ ...runtime.mcpIdentity, managedBrowserConnected: true });
+
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({ disabledBuiltInMcpServers: { browser: true } }),
+      "utf8",
+    );
+    expect(
+      manager.resolveMcpCallerIdentity({
+        routing: "thread",
+        threadId: runtime.threadId,
+        launchId: runtime.mcpIdentity.launchId,
+        serverId: "computer-use",
       }),
     ).toEqual(runtime.mcpIdentity);
   });
@@ -1044,7 +1467,7 @@ describe("ThreadSessionManager start guards", () => {
       prompt: "hello",
       initialSize: { cols: 80, rows: 24 },
       presentationMode: "gui",
-      disabledBuiltInMcpServerIds: ["app-controls"],
+      disabledBuiltInMcpServerIds: ["browser", "app-controls"],
     });
 
     expect(adapter.createStructuredSession).toHaveBeenCalledWith(
@@ -1097,6 +1520,51 @@ describe("ThreadSessionManager start guards", () => {
     ).toEqual([]);
   });
 
+  it("filters initial custom MCPs with the effective forced-on Browser policy", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("opencode", structuredSession);
+    const manager = createManager("opencode", adapter);
+    const prepareMcpToolFilters = vi.fn<
+      (
+        servers: McpServer[],
+        location: ProjectLocation,
+        browserExclusive?: boolean,
+      ) => Promise<McpServer[]>
+    >(
+      async (servers: McpServer[], _location: ProjectLocation, _browserExclusive?: boolean) =>
+        servers,
+    );
+    (
+      manager as unknown as { options: { prepareMcpToolFilters: typeof prepareMcpToolFilters } }
+    ).options.prepareMcpToolFilters = prepareMcpToolFilters;
+
+    await manager.startThread({
+      threadId: "thread-effective-browser-filter",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model", browserMcp: false },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [
+        {
+          id: "neutral",
+          name: "neutral",
+          description: "",
+          enabled: true,
+          timeoutMs: 30_000,
+          transport: { type: "http", url: "https://neutral.test/mcp", headers: {} },
+        },
+      ],
+    });
+
+    expect(prepareMcpToolFilters).toHaveBeenCalledWith(
+      [expect.objectContaining({ id: "neutral" })],
+      { kind: "windows", path: "C:\\repo" },
+      true,
+    );
+  });
+
   it("preserves the trusted thread identity when live OpenCode MCP servers reload", async () => {
     const structuredSession = createStructuredSession(Promise.resolve());
     structuredSession.updateMcpServers = vi.fn<
@@ -1142,6 +1610,19 @@ describe("ThreadSessionManager start guards", () => {
     adapter.capabilities.mcpConfigSource = "agentSettings";
     adapter.capabilities.crossagentMcpRouting = "provider-session";
     const manager = createManager("opencode", adapter);
+    const prepareMcpToolFilters = vi.fn<
+      (
+        servers: McpServer[],
+        location: ProjectLocation,
+        browserExclusive?: boolean,
+      ) => Promise<McpServer[]>
+    >(
+      async (servers: McpServer[], _location: ProjectLocation, _browserExclusive?: boolean) =>
+        servers,
+    );
+    (
+      manager as unknown as { options: { prepareMcpToolFilters: typeof prepareMcpToolFilters } }
+    ).options.prepareMcpToolFilters = prepareMcpToolFilters;
     const oldServer: McpServer = {
       id: "old-server",
       name: "old-server",
@@ -1191,6 +1672,14 @@ describe("ThreadSessionManager start guards", () => {
     expect(applied.map((server) => server.id)).toContain("new-server");
     expect(applied.map((server) => server.id)).toContain("project-server");
     expect(applied.map((server) => server.id)).not.toContain("old-server");
+    expect(prepareMcpToolFilters).toHaveBeenLastCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "new-server" }),
+        expect.objectContaining({ id: "project-server" }),
+      ]),
+      { kind: "windows", path: "C:\\repo" },
+      true,
+    );
     expect(manager.sessions.get("thread-reload-current-settings")?.mcpLaunchSnapshot).toMatchObject(
       {
         mcpServers: expect.arrayContaining([

@@ -1,6 +1,13 @@
 import { z } from "zod";
 import type { McpThreadIdentity } from "../../browserMcpThread";
 import {
+  MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH,
+  MAX_BROWSER_EVIDENCE_TITLE_LENGTH,
+  MAX_BROWSER_EVIDENCE_TOOL_NAME_LENGTH,
+  MAX_BROWSER_EVIDENCE_URL_LENGTH,
+  type BrowserMcpToolCallReport,
+} from "../../browserMcpEvidence";
+import {
   authenticateAcpAgentPayloadSchema,
   clearPendingSteerPayloadSchema,
   controlThreadGoalPayloadSchema,
@@ -96,6 +103,18 @@ export const resolveMcpCallerIdentityPayloadSchema = z.object({
 });
 
 export type ResolveMcpCallerIdentityPayload = z.infer<typeof resolveMcpCallerIdentityPayloadSchema>;
+
+export const browserMcpToolCallReportSchema = z.object({
+  threadId: z.string().trim().min(1).max(1024),
+  launchId: z.string().trim().min(1).max(128),
+  turnId: z.string().trim().min(1).max(128),
+  toolName: z.string().trim().min(1).max(MAX_BROWSER_EVIDENCE_TOOL_NAME_LENGTH),
+  success: z.boolean(),
+  occurredAt: z.number().int().nonnegative(),
+  tabId: z.string().trim().min(1).max(MAX_BROWSER_EVIDENCE_TAB_ID_LENGTH).optional(),
+  url: z.string().trim().min(1).max(MAX_BROWSER_EVIDENCE_URL_LENGTH).optional(),
+  title: z.string().trim().min(1).max(MAX_BROWSER_EVIDENCE_TITLE_LENGTH).optional(),
+}) satisfies z.ZodType<BrowserMcpToolCallReport>;
 
 export const threadProcedures = {
   getCrossagentRouting: defineNoArgProcedure<CrossagentRoutingState, "supervisor">(
@@ -198,6 +217,11 @@ export const threadProcedures = {
     McpThreadIdentity | null,
     "supervisor"
   >("resolveMcpCallerIdentity", "supervisor", resolveMcpCallerIdentityPayloadSchema),
+  recordBrowserMcpToolCall: definePayloadProcedure<BrowserMcpToolCallReport, boolean, "supervisor">(
+    "recordBrowserMcpToolCall",
+    "supervisor",
+    browserMcpToolCallReportSchema,
+  ),
   getAvailableWindowsShells: defineNoArgProcedure<AvailableWindowsShell[], "supervisor">(
     "getAvailableWindowsShells",
     "supervisor",

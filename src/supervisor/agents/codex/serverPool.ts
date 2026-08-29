@@ -1,13 +1,26 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { ProjectLocation, ResolvedMcpServer } from "@/shared/contracts";
+import { hasYSpaceBrowserMcp } from "@/shared/browserExclusivePolicy";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { resolveNodeForDistro } from "../../wsl/runtime";
-import type { CreateStructuredSessionInput } from "../base";
+import {
+  batchWslCommandsAsync,
+  quotePosixShellArg,
+  type AgentEnvContext,
+  type CreateStructuredSessionInput,
+} from "../base";
 import { buildCodexMcp } from "../userMcp";
 import { buildCodexAppServerCommand } from "./argv";
 import { CodexAppServerConnection } from "./appServerRpc";
 import { buildCodexMcpSkillConflictArgs } from "./mcpSkillConflicts";
+import {
+  codexHooksFeatureFlagForSemver,
+  installCodexPlugin,
+  isCodexSemverSupportedForHooks,
+  parseCodexVersionLine,
+  probeCodexCliSemver,
+} from "./plugin/install";
 import { CodexStdioTransport } from "./stdioTransport";
 import { sanitizeChildProcessEnv } from "@/supervisor/runtime/threadSession/spawnDiagnostics";
 
@@ -31,6 +44,14 @@ const THREAD_SCOPED_MCP_SERVER_IDS = new Set(["app-controls", "browser", "comput
 const pool = new Map<string, PoolEntry>();
 const spawnedAppServers = new Set<ChildProcess>();
 const spawnedConnections = new Set<CodexAppServerConnection>();
+const reapedAppServers = new WeakSet<ChildProcess>();
+const ownsPosixAppServerProcessGroup = process.platform !== "win32";
+
+interface BrowserExclusiveHookLaunch {
+  codexHomeDir: string;
+  sqliteHomeDir: string;
+  featureFlag: string;
+}
 
 function executionRuntimeKey(location: ProjectLocation): string {
   switch (location.kind) {
@@ -51,21 +72,14 @@ function normalizedMcpServer(server: ResolvedMcpServer): ResolvedMcpServer {
   url.searchParams.delete("thread");
   url.searchParams.delete("title");
   url.searchParams.delete("disable");
-  const headers = Object.fromEntries(
-    Object.entries(server.transport.headers).map(([name, value]) => {
-      const normalizedName = name.toLowerCase();
-      const isSignedLaunchContext =
-        (normalizedName === "authorization" && value.startsWith("Bearer yspace-mcp-v1.")) ||
-        (normalizedName === "x-y-space-mcp-context" && value.startsWith("yspace-mcp-v1."));
-      return isSignedLaunchContext ? [name, `<thread-scoped:${normalizedName}>`] : [name, value];
-    }),
-  );
+  // Keep headers in the fingerprint. Codex resolves MCP header env vars from
+  // the app-server process environment, so a process cannot safely serve a
+  // second thread whose signed launch credentials differ.
   return {
     ...server,
     transport: {
       ...server.transport,
       url: url.toString(),
-      headers,
     },
   };
 }
@@ -102,16 +116,104 @@ export function codexAppServerPoolKey(
 }
 
 function spawnAppServer(command: ReturnType<typeof buildCodexAppServerCommand>): ChildProcess {
-  return spawn(command.command, command.args, {
-    cwd: command.cwd ?? process.cwd(),
-    env: {
-      ...sanitizeChildProcessEnv({ ...process.env, ...command.env }),
-      TERM: "xterm-256color",
-    },
-    stdio: ["pipe", "pipe", "pipe"],
-    shell: false,
-    windowsHide: true,
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    command.cleanup?.();
+  };
+  try {
+    const child = spawn(command.command, command.args, {
+      cwd: command.cwd ?? process.cwd(),
+      env: {
+        ...sanitizeChildProcessEnv({ ...process.env, ...command.env }),
+        TERM: "xterm-256color",
+      },
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+      windowsHide: true,
+      // Codex can leave tool and shell descendants alive after the app-server
+      // exits. A dedicated POSIX process group lets every teardown path reap
+      // the complete tree without touching the supervisor's own group.
+      detached: ownsPosixAppServerProcessGroup,
+    });
+    child.once("error", cleanup);
+    child.once("exit", cleanup);
+    return child;
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+}
+
+function terminateAppServerProcessTree(appServer: ChildProcess): void {
+  // dispose(), supervisor shutdown, and the child's exit callback can race.
+  // One final tree reap is sufficient, and on POSIX it avoids signalling a
+  // recycled process-group id after the first reap has already completed.
+  if (reapedAppServers.has(appServer)) return;
+  reapedAppServers.add(appServer);
+  terminateChildProcessTree(appServer, {
+    ownedProcessGroup: ownsPosixAppServerProcessGroup,
   });
+}
+
+function codexPluginEnvContext(location: ProjectLocation): AgentEnvContext {
+  const baseDir = process.env.PORACODE_DATA_DIR?.trim();
+  return location.kind === "wsl"
+    ? {
+        envKind: "wsl",
+        wslDistro: location.distro,
+        ...(baseDir ? { baseDir } : {}),
+      }
+    : {
+        envKind: location.kind,
+        ...(baseDir ? { baseDir } : {}),
+      };
+}
+
+async function codexHooksFeatureFlag(
+  location: ProjectLocation,
+  executablePath: string | undefined,
+): Promise<string> {
+  let version: [number, number, number] | null;
+  if (location.kind !== "wsl") {
+    version = probeCodexCliSemver();
+  } else {
+    const command = `${quotePosixShellArg(executablePath ?? "codex")} --version`;
+    const [result] = await batchWslCommandsAsync(location.distro, [command]);
+    const versionLine = result?.ok
+      ? result.stdout
+          .split("\n")
+          .map((line) => line.trim())
+          .find(Boolean)
+      : undefined;
+    version = versionLine ? parseCodexVersionLine(versionLine) : null;
+  }
+  if (!isCodexSemverSupportedForHooks(version)) {
+    throw new Error("Codex Browser policy hook requires codex-cli >= 0.122.0.");
+  }
+  return codexHooksFeatureFlagForSemver(version);
+}
+
+async function prepareBrowserExclusiveHook(
+  input: CreateStructuredSessionInput,
+  wslExecPath: string | undefined,
+  wslNodePath: string | undefined,
+): Promise<BrowserExclusiveHookLaunch | undefined> {
+  if (!hasYSpaceBrowserMcp(input.mcpServers ?? [])) return undefined;
+  const featureFlag = await codexHooksFeatureFlag(input.projectLocation, wslExecPath);
+  const ctx = codexPluginEnvContext(input.projectLocation);
+  const installed = await installCodexPlugin(ctx, {
+    ...(wslNodePath ? { resolvedNodePath: wslNodePath } : {}),
+  });
+  if (!installed.ok) {
+    throw new Error(`Codex Browser policy hook could not be staged: ${installed.reason}`);
+  }
+  return {
+    codexHomeDir: installed.paths.codexHomeDir,
+    sqliteHomeDir: installed.paths.sqliteHomeDir,
+    featureFlag,
+  };
 }
 
 async function spawnAndWire(
@@ -120,11 +222,13 @@ async function spawnAndWire(
   wslNodePath: string | undefined,
   onExit: (appServer: ChildProcess, connection: CodexAppServerConnection) => void,
 ): Promise<ServerSnapshot> {
+  const browserExclusiveHook = await prepareBrowserExclusiveHook(input, wslExecPath, wslNodePath);
   const appServer = spawnAppServer(
     buildCodexAppServerCommand(input.projectLocation, {
       ...(wslExecPath !== undefined ? { wslExecPath } : {}),
       ...(wslNodePath !== undefined ? { wslNodePath } : {}),
       ...(input.mcpServers !== undefined ? { mcpServers: input.mcpServers } : {}),
+      ...(browserExclusiveHook ? { browserExclusiveHook } : {}),
       includeMcpConfig: false,
     }),
   );
@@ -132,7 +236,12 @@ async function spawnAndWire(
   const transport = new CodexStdioTransport(appServer);
   const connection = new CodexAppServerConnection(transport);
   spawnedConnections.add(connection);
-  appServer.prependOnceListener("exit", () => onExit(appServer, connection));
+  appServer.prependOnceListener("exit", () => {
+    // The group can outlive its leader. Reap it while the original process
+    // group id is still known, even when Codex itself exits unexpectedly.
+    terminateAppServerProcessTree(appServer);
+    onExit(appServer, connection);
+  });
 
   const spawnError = await new Promise<Error | undefined>((resolve) => {
     appServer.once("error", (error) => resolve(error));
@@ -197,9 +306,7 @@ export async function acquireCodexAppServer(
       spawnedConnections.delete(snapshot.connection);
       spawnedAppServers.delete(snapshot.appServer);
       snapshot.connection.dispose(new Error("Last Codex app-server pool lease released."));
-      if (!snapshot.appServer.killed) {
-        terminateChildProcessTree(snapshot.appServer);
-      }
+      terminateAppServerProcessTree(snapshot.appServer);
     },
   };
 }
@@ -212,9 +319,7 @@ export function shutdownSpawnedCodexAppServers(): void {
   }
   spawnedConnections.clear();
   for (const appServer of spawnedAppServers) {
-    if (!appServer.killed) {
-      terminateChildProcessTree(appServer);
-    }
+    terminateAppServerProcessTree(appServer);
   }
   spawnedAppServers.clear();
 }

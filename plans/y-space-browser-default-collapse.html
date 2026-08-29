@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Y Space Embedded Browser Default &amp; Collapsed Transcript Plan</title>
+    <style>
+      :root {
+        --canvas: #f6f2e8;
+        --ink: #172026;
+        --muted: #65727a;
+        --border: #2c3338;
+        --paper: #fff;
+        --blue: #d9ecff;
+        --green: #dff5df;
+        --yellow: #fff1b8;
+        --pink: #ffe2eb;
+        --orange: #ffdfc9;
+        --shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        line-height: 1.45;
+        background:
+          linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
+          linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px), var(--canvas);
+        background-size: 28px 28px;
+      }
+      main {
+        width: min(1240px, 100%);
+        margin: 0 auto;
+        padding: 30px 22px 52px;
+      }
+      header {
+        display: grid;
+        grid-template-columns: 1.4fr 0.8fr;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(2rem, 5vw, 4.4rem);
+        line-height: 0.96;
+        letter-spacing: -0.04em;
+      }
+      h2 {
+        font-size: 1.1rem;
+        text-transform: uppercase;
+      }
+      code {
+        border: 1px solid rgba(47, 58, 66, 0.24);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.72);
+        padding: 2px 5px;
+      }
+      .hero,
+      .card,
+      details,
+      .sticky {
+        border: 2px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .hero,
+      .card,
+      details {
+        border-radius: 16px;
+        background: var(--paper);
+      }
+      .hero {
+        padding: 26px;
+      }
+      .hero p {
+        max-width: 760px;
+        margin-top: 12px;
+        color: var(--muted);
+      }
+      .meta-stack,
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .card {
+        padding: 16px;
+      }
+      .card small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.78rem;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+      .card strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 1.25rem;
+        line-height: 1.12;
+      }
+      .tag,
+      .pill {
+        display: inline-flex;
+        border: 2px solid var(--border);
+        border-radius: 999px;
+        padding: 5px 9px;
+        font-size: 0.78rem;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+      .tag {
+        margin-bottom: 12px;
+        background: var(--orange);
+      }
+      .pill {
+        margin: 0 6px 6px 0;
+      }
+      .board-section {
+        margin-top: 24px;
+      }
+      .section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .pin {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        background: #ff5a1f;
+      }
+      .sticky {
+        min-height: 128px;
+        border-radius: 3px;
+        padding: 16px;
+        transform: rotate(-0.5deg);
+      }
+      .sticky:nth-child(even) {
+        transform: rotate(0.5deg);
+      }
+      .sticky h3 {
+        margin-bottom: 8px;
+        font-size: 1.08rem;
+      }
+      .sticky p,
+      .sticky li {
+        color: #334148;
+        font-size: 0.93rem;
+      }
+      .sticky ul,
+      .sticky ol {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .bg-blue {
+        background: var(--blue);
+      }
+      .bg-green {
+        background: var(--green);
+      }
+      .bg-yellow {
+        background: var(--yellow);
+      }
+      .bg-pink {
+        background: var(--pink);
+      }
+      .bg-orange {
+        background: var(--orange);
+      }
+      summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 14px 16px;
+        font-weight: 850;
+      }
+      summary::-webkit-details-marker {
+        display: none;
+      }
+      summary::before {
+        content: "+";
+        display: inline-block;
+        width: 14px;
+        margin-right: 10px;
+        font-weight: 900;
+      }
+      details[open] summary::before {
+        content: "−";
+      }
+      .detail-body {
+        border-top: 2px solid var(--border);
+        padding: 14px 16px 16px;
+        color: #334148;
+      }
+      .detail-body ul,
+      .detail-body ol {
+        margin: 8px 0 0;
+        padding-left: 20px;
+      }
+      @media (max-width: 900px) {
+        header,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="hero" aria-labelledby="title">
+          <span class="tag">Implementation Plan</span>
+          <h1 id="title">One browser. One work disclosure. One final answer.</h1>
+          <p>
+            The live run had Y Space Browser connected, but OpenCode chose a globally discovered
+            gstack browser. This plan makes the embedded browser the only model-visible browser
+            route and folds each turn's intermediate work into one closed row.
+          </p>
+        </section>
+        <aside class="meta-stack" aria-label="Plan metadata">
+          <div class="card bg-green"><small>Decision state</small><strong>Resolved</strong></div>
+          <div class="card bg-blue">
+            <small>Branch</small><strong>y-space-browser-default-collapse</strong>
+          </div>
+          <div class="card bg-yellow"><small>Date</small><strong>2026-08-28</strong></div>
+        </aside>
+      </header>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Fast Answer</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-pink">
+            <h3>Observed failure</h3>
+            <p>
+              The exact OpenCode task loaded <code>/browse</code>, ran gstack's separate Chromium,
+              and emitted no Y Space Browser MCP calls while the visible embedded page stayed
+              unchanged.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Capability boundary</h3>
+            <p>
+              Force the built-in <code>browser</code> MCP on, filter competing browser MCPs, hide
+              provider web/search/browser skills, and inject one provider-neutral Y Space Browser
+              directive.
+            </p>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Transcript boundary</h3>
+            <p>
+              Project each user turn into one closed work group plus the tail assistant response. A
+              streaming tail response stays visible; if a later tool arrives it moves into the
+              closed group.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Architecture Decisions</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-blue">
+            <h3>Shared invariant</h3>
+            <p>
+              <code>spawnPipeline</code> keeps Y Space Browser present and removes snapshot MCPs
+              classified as Playwright, Chrome, Puppeteer, Selenium, gstack, browser-use, or
+              equivalent.
+            </p>
+          </div>
+          <div class="sticky bg-orange">
+            <h3>Provider isolation</h3>
+            <p>
+              OpenCode loses native web/search/skill and external browser MCP access; Claude gets
+              strict MCP, no Chrome, no provider skills, and no WebFetch/WebSearch; Codex loses
+              browser features, live search, browser skills, and browser-backed MCPs.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>No profile mutation</h3>
+            <p>
+              The app applies launch-scoped overlays only. It does not uninstall, rewrite, or expose
+              the contents of the user's normal OpenCode, Claude, or Codex profiles.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Implementation Map</h2>
+        </div>
+        <div class="grid two">
+          <div class="sticky bg-blue">
+            <h3>Browser policy</h3>
+            <ul>
+              <li>Add a shared browser-exclusive instruction and MCP classifier.</li>
+              <li>
+                Enforce it in OpenCode terminal/SDK, Claude terminal/SDK, and Codex TUI/app-server.
+              </li>
+              <li>Keep Pipedream and unrelated integrations intact.</li>
+              <li>Strengthen Browser MCP API guidance to say sole/default browser.</li>
+            </ul>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Collapsed work</h3>
+            <ul>
+              <li>Add a compact top-level timeline selector.</li>
+              <li>
+                Group reasoning, status narration, tools, commands, edits, searches, and browser
+                calls.
+              </li>
+              <li>Render the group closed by default with manual expansion.</li>
+              <li>Auto-close on completion and leave only the final assistant body open.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>TDD User Stories</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-yellow">
+            <h3>Visible browser proof</h3>
+            <p>
+              When a user asks an agent to test a localhost app, the visible Y Space browser page
+              must navigate and change; provider browser skills, native web tools, and Playwright
+              must not appear in the effective catalog.
+            </p>
+          </div>
+          <div class="sticky bg-blue">
+            <h3>Streaming transcript</h3>
+            <p>
+              While work runs, intermediate narration and operations remain behind one closed row. A
+              tail assistant candidate is readable until a later operation demotes it into that row.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Settled transcript</h3>
+            <p>
+              After <code>turn.completed</code>, the work row is closed and the final assistant
+              response is the only expanded content. Users can still open the work row and inspect
+              every retained item.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Verification &amp; Risks</h2>
+        </div>
+        <div class="grid two">
+          <div class="sticky bg-green">
+            <h3>Required evidence</h3>
+            <ul>
+              <li>Fail-first provider and selector/component tests.</li>
+              <li>Focused suites, full Node 24 suite, typecheck, lint, build, unsigned package.</li>
+              <li>Computer Use click-test of exact packaged app and isolated profile.</li>
+              <li>
+                Visible URL/DOM change in embedded Browser and no external browser process/path.
+              </li>
+            </ul>
+          </div>
+          <div class="sticky bg-pink">
+            <h3>Known external gate</h3>
+            <p>
+              Claude Code 2.1.210 is installed but logged out. We can fully verify its launch
+              contract and packaged UI availability, but real Claude inference requires the user to
+              authenticate; no credentials will be entered on their behalf.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Open The Cards</h2>
+        </div>
+        <details open>
+          <summary>Existing implementation reused</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                Signed task-scoped Browser MCP transport, global browser page tabs, tab
+                inventory/control tools, and browser lifecycle limits.
+              </li>
+              <li>
+                Provider-neutral resolved MCP descriptors and the three provider launch adapters.
+              </li>
+              <li>
+                Canonical runtime events, completed-turn boundaries, virtualized chat rows,
+                disclosures, and existing tool/reasoning accordions.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Changed modules</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                <code>src/supervisor/runtime/threadSession/spawnPipeline.ts</code> and a shared
+                browser policy module.
+              </li>
+              <li>
+                <code>src/supervisor/agents/opencode</code>, <code>claude</code>, and
+                <code>codex</code> launch/SDK/config translators.
+              </li>
+              <li>
+                <code>src/main/browser/mcp/tools/specs.ts</code> for unambiguous sole-browser
+                instructions.
+              </li>
+              <li>
+                <code>chatPaneSelectors.ts</code>, <code>MessageList.tsx</code>,
+                <code>ChatItemRow.tsx</code>, <code>ToolCallGroup.tsx</code>, and a new work
+                disclosure component.
+              </li>
+              <li>
+                OpenCode canonical text-part mapping so text/tool/text can produce an intermediate
+                and a final assistant item.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Options rejected</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                Prompt-only steering: the failing run proves a stronger discovered skill can win.
+              </li>
+              <li>
+                Uninstalling or rewriting global tools: destructive to the user's other workflows
+                and unnecessary.
+              </li>
+              <li>
+                Only collapsing consecutive tools: leaves the exact status narration that caused the
+                complaint visible.
+              </li>
+              <li>
+                Nested browser tabs: violates the existing one-global-tab concept and increases
+                browser residency.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Dependencies and cleanup</summary>
+          <div class="detail-body">
+            No new package is required. The implementation reuses the existing disclosure, state,
+            MCP translation, TOML parsing, and provider SDK surfaces. Provider-specific legacy
+            external-browser paths are suppressed at launch; user-owned global configuration remains
+            untouched.
+          </div>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>

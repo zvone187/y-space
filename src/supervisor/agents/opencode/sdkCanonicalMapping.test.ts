@@ -173,6 +173,104 @@ describe("sdkCanonicalMapping — text streaming", () => {
     expect(aItemId).not.toBe(bItemId);
   });
 
+  it("keeps assistant text parts around a tool as distinct chronological items", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const messageID = "msg_interleaved";
+
+    mapOpenCodeEvent(assistantMessageUpdatedEvent(messageID), state);
+    const beforeTool = mapOpenCodeEvent(
+      partUpdatedTextEvent(messageID, "prt_text_before", "I’ll inspect the app first."),
+      state,
+    );
+    const tool = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_tool",
+        sessionID: "ses_test",
+        messageID,
+        type: "tool",
+        tool: "bash",
+        callID: "call_interleaved",
+        state: {
+          status: "running",
+          input: { command: "pnpm test" },
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+    const afterTool = mapOpenCodeEvent(
+      partUpdatedTextEvent(messageID, "prt_text_after", "The browser flow passes."),
+      state,
+    );
+    const completed = mapOpenCodeEvent(assistantMessageUpdatedEvent(messageID, 200), state);
+
+    const beforeStarted = beforeTool.find(
+      (event) => event.type === "item.started" && event.itemType === "assistant_message",
+    );
+    const toolStarted = tool.find((event) => event.type === "item.started");
+    const afterStarted = afterTool.find(
+      (event) => event.type === "item.started" && event.itemType === "assistant_message",
+    );
+    if (beforeStarted?.type !== "item.started") throw new Error("expected leading assistant item");
+    if (toolStarted?.type !== "item.started") throw new Error("expected interleaved tool item");
+    if (afterStarted?.type !== "item.started") throw new Error("expected trailing assistant item");
+
+    expect(afterStarted.itemId).not.toBe(beforeStarted.itemId);
+    expect(
+      [...beforeTool, ...tool, ...afterTool].flatMap((event) =>
+        event.type === "item.started" ? [event.itemId] : [],
+      ),
+    ).toEqual([beforeStarted.itemId, toolStarted.itemId, afterStarted.itemId]);
+    expect(beforeTool.find((event) => event.type === "content.delta")).toMatchObject({
+      itemId: beforeStarted.itemId,
+      stream: "assistant_text",
+      delta: "I’ll inspect the app first.",
+    });
+    expect(afterTool.find((event) => event.type === "content.delta")).toMatchObject({
+      itemId: afterStarted.itemId,
+      stream: "assistant_text",
+      delta: "The browser flow passes.",
+    });
+    expect(
+      completed.flatMap((event) => (event.type === "item.completed" ? [event.itemId] : [])),
+    ).toEqual([beforeStarted.itemId, afterStarted.itemId]);
+  });
+
+  it("closes only the removed assistant text part", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const first = mapOpenCodeEvent(partUpdatedTextEvent("msg_1", "prt_1", "First"), state);
+    const second = mapOpenCodeEvent(partUpdatedTextEvent("msg_1", "prt_2", "Second"), state);
+    const firstItemId = first.find((event) => event.type === "item.started")?.itemId;
+    const secondItemId = second.find((event) => event.type === "item.started")?.itemId;
+
+    expect(mapOpenCodeEvent(partRemovedEvent("msg_1", "prt_1"), state)).toContainEqual({
+      type: "item.completed",
+      threadId: "thread-1",
+      itemId: firstItemId,
+    });
+    expect(
+      mapOpenCodeEvent(assistantMessageUpdatedEvent("msg_1", 200), state).filter(
+        (event) => event.type === "item.completed",
+      ),
+    ).toEqual([{ type: "item.completed", threadId: "thread-1", itemId: secondItemId }]);
+  });
+
+  it("closes every assistant text part when its message is removed", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const first = mapOpenCodeEvent(partUpdatedTextEvent("msg_1", "prt_1", "First"), state);
+    const second = mapOpenCodeEvent(partUpdatedTextEvent("msg_1", "prt_2", "Second"), state);
+    const itemIds = [...first, ...second].flatMap((event) =>
+      event.type === "item.started" ? [event.itemId] : [],
+    );
+
+    expect(
+      mapOpenCodeEvent(messageRemovedEvent("msg_1"), state).flatMap((event) =>
+        event.type === "item.completed" ? [event.itemId] : [],
+      ),
+    ).toEqual(itemIds);
+    expect(state.assistantItems.size).toBe(0);
+  });
+
   it("maps message token buckets into context usage", () => {
     const state = createOpenCodeMapperState("thread-1");
     const events = mapOpenCodeEvent(
@@ -487,6 +585,51 @@ describe("sdkCanonicalMapping — tool parts", () => {
     expect(events.find((e) => e.type === "item.started")).toMatchObject({
       itemType: "command_execution",
     });
+  });
+
+  it("completes a tool only once while retaining its identity for late terminal updates", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const part = (status: "running" | "completed", output = ""): ToolPart => ({
+      id: "prt_tool_terminal",
+      sessionID: "ses_test",
+      messageID: "msg_1",
+      type: "tool",
+      tool: "bash",
+      callID: "call_terminal",
+      state:
+        status === "running"
+          ? { status, input: { command: "pnpm test" }, time: { start: 0 } }
+          : {
+              status,
+              input: { command: "pnpm test" },
+              output,
+              title: "Tests passed",
+              metadata: {},
+              time: { start: 0, end: 10 },
+            },
+    });
+
+    const started = mapOpenCodeEvent(toolPartUpdatedEvent(part("running")), state).find(
+      (event) => event.type === "item.started",
+    );
+    if (started?.type !== "item.started") throw new Error("expected tool item");
+
+    const terminal = mapOpenCodeEvent(
+      toolPartUpdatedEvent(part("completed", "initial result")),
+      state,
+    );
+    expect(terminal.filter((event) => event.type === "item.completed")).toHaveLength(1);
+
+    const lateTerminal = mapOpenCodeEvent(
+      toolPartUpdatedEvent(part("completed", "late result details")),
+      state,
+    );
+    expect(lateTerminal.find((event) => event.type === "item.updated")).toMatchObject({
+      itemId: started.itemId,
+      payload: { result: "late result details" },
+    });
+    expect(lateTerminal.find((event) => event.type === "item.completed")).toBeUndefined();
+    expect(closeOpenItems(state)).toEqual([]);
   });
 
   it("maps lowercase read tools to categorized ACP-shaped tool calls", () => {

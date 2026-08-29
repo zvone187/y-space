@@ -209,4 +209,28 @@ describe("ComputerUseMcpIngress", () => {
       onActivity.mock.calls.map(([event]) => (event.kind === "action" ? event.toolName : null)),
     ).toEqual(["press_key", "press_key"]);
   });
+
+  it("uses the live trusted identity to reject native browser control", async () => {
+    const driver = createDriver();
+    ingress = new ComputerUseMcpIngress({
+      resolveLaunchContextIdentity: async (context) => ({
+        ...context.identity,
+        managedBrowserConnected: true,
+      }),
+      driver,
+    });
+    const info = await ingress.start();
+
+    const response = await callTool(info, "click", {
+      window: { app: "Google Chrome", id: 1 },
+      x: 10,
+      y: 20,
+    });
+    const body = (await response.json()) as {
+      result?: { isError?: boolean; content?: Array<{ text?: string }> };
+    };
+    expect(body.result?.isError).toBe(true);
+    expect(body.result?.content?.[0]?.text).toMatch(/Y Space Browser/iu);
+    expect(driver.click).not.toHaveBeenCalled();
+  });
 });

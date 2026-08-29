@@ -11,6 +11,13 @@ import type {
   PromptSegment,
 } from "@/shared/contracts";
 import { claudeProfileKind, parseClaudeProfileInstanceConfig } from "@/shared/contracts";
+import {
+  COMPETING_BROWSER_COMMAND_GLOBS,
+  COMPETING_BROWSER_COMMAND_REGEX_SOURCE,
+  COMPETING_BROWSER_SKILL_NAMES,
+  hasYSpaceBrowserMcp,
+  Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE,
+} from "@/shared/browserExclusivePolicy";
 import { inlinePromptSegmentText } from "@/shared/promptContent";
 import {
   brailleSpinnerOscTitleHint,
@@ -23,13 +30,15 @@ import {
   shortenHomePath,
   type AgentAdapter,
   type CreateStructuredSessionInput,
-  type DetectProbeCtx,
+  type DetectionSpec,
 } from "../base";
 import { buildClaudeArgs, claudeExtraArgsPosition, rewriteClaudeLaunchArgsForConfig } from "./argv";
-import { claudeCapabilities, claudeDetectionSpec, probeClaudeStatus } from "./detection";
+import { claudeCapabilities, claudeDetectionSpec } from "./detection";
+import { resolveClaudeBrowserExclusiveMcpConfig } from "./effectiveMcpConfig";
 import { probeClaudeCapabilities } from "./probe";
+import { resolveClaudeProbeEnvironment } from "./probeEnvironment";
 import { ClaudeSdkSession } from "./sdkSession";
-import { buildClaudeMcpServers } from "../userMcp";
+import { buildClaudeMcpLaunchConfig } from "../userMcp";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
   getClaudePluginPaths,
@@ -43,6 +52,15 @@ import {
 // Bump `MIN_PROTOCOL_VERSION` in src/shared/contracts/agentEvent.ts when the
 // envelope shape changes.
 const CLAUDE_PLUGIN_VERSION = readBundledClaudePluginVersion();
+
+const CLAUDE_BROWSER_SKILL_DENY_RULES = COMPETING_BROWSER_SKILL_NAMES.flatMap((name) => [
+  `Skill(${name})`,
+  `Skill(${name} *)`,
+]);
+const CLAUDE_BROWSER_COMMAND_DENY_RULES = COMPETING_BROWSER_COMMAND_GLOBS.flatMap((pattern) => [
+  `Bash(${pattern})`,
+  `PowerShell(${pattern})`,
+]);
 
 warnIfPluginManifestMissing("claude", CLAUDE_PLUGIN_VERSION);
 
@@ -252,6 +270,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
   }
 
   return {
+    browserRouting: { terminal: "exclusive", gui: "exclusive" },
     kind,
     label,
     binary: claudeDetectionSpec.binary,
@@ -323,23 +342,40 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
       return { args: ["--settings", paths.settingsPath] };
     },
     async detectInstall(ctx) {
-      const spec =
+      const location = detectProbeLocation(ctx);
+      const isolation = await resolveClaudeProbeEnvironment({
+        adapterKind: kind,
+        location,
+        ...(ctx?.baseDir ? { baseDir: ctx.baseDir } : {}),
+        ...(options.configDir ? { profileConfigDir: options.configDir } : {}),
+        ...(options.customEnv ? { customEnv: options.customEnv } : {}),
+      });
+      const baseSpec: DetectionSpec =
         options.configDir === undefined
           ? claudeDetectionSpec
-          : {
-              ...claudeDetectionSpec,
-              kind,
-              label,
-              capabilities,
-              statusProbe: (probeCtx: DetectProbeCtx) => {
-                const env = profileEnv(probeCtx.location);
-                return probeClaudeStatus(probeCtx, env ? { env } : undefined);
-              },
-              capabilitiesProbe: (probeCtx: DetectProbeCtx) => {
-                const env = profileEnv(probeCtx.location);
-                return probeClaudeCapabilities(probeCtx, env ? { env } : undefined);
-              },
-            };
+          : { ...claudeDetectionSpec, kind, label, capabilities };
+      const spec: DetectionSpec = isolation.ok
+        ? {
+            ...baseSpec,
+            probeEnv: isolation.probeEnv,
+            ...(isolation.authEnv
+              ? {
+                  capabilitiesProbe: (probeCtx) =>
+                    probeClaudeCapabilities(probeCtx, {
+                      ...(probeCtx.probeEnv ? { env: probeCtx.probeEnv } : {}),
+                      ...(isolation.authEnv ? { authMethodEnv: isolation.authEnv } : {}),
+                    }),
+                }
+              : {}),
+          }
+        : {
+            ...baseSpec,
+            // If the private target cannot be provisioned, still report binary
+            // presence but never start Claude against its canonical profile.
+            versionProbe: async () => undefined,
+            statusProbe: async () => undefined,
+            capabilitiesProbe: async () => undefined,
+          };
       const status = await detectAgentInstall(ctx, spec);
       return {
         ...status,
@@ -359,20 +395,34 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
     buildLaunchArgv(location, config, prompt, _sessionRef, launchOptions) {
       const assignedId = randomUUID();
       const args = buildClaudeArgs(config, prompt, undefined, assignedId);
-      appendClaudeMcpArgs(args, prompt, launchOptions?.mcpServers ?? []);
-      const env = profileEnv(location);
+      const launchProfileEnv = profileEnv(location);
+      const mcpEnv = appendClaudeMcpArgs(
+        args,
+        prompt,
+        launchOptions?.mcpServers ?? [],
+        location,
+        launchProfileEnv,
+      );
+      const env = { ...(launchProfileEnv ?? {}), ...mcpEnv };
       return {
         binary: "claude",
         args,
-        ...(env ? { env } : {}),
+        ...(Object.keys(env).length > 0 ? { env } : {}),
         sessionRef: createKnownSessionRef(assignedId),
       };
     },
     buildResumeArgv(location, config, prompt, sessionRef, launchOptions) {
       const args = buildClaudeArgs(config, prompt, sessionRef.providerSessionId);
-      appendClaudeMcpArgs(args, prompt, launchOptions?.mcpServers ?? []);
-      const env = profileEnv(location);
-      return { binary: "claude", args, ...(env ? { env } : {}) };
+      const launchProfileEnv = profileEnv(location);
+      const mcpEnv = appendClaudeMcpArgs(
+        args,
+        prompt,
+        launchOptions?.mcpServers ?? [],
+        location,
+        launchProfileEnv,
+      );
+      const env = { ...(launchProfileEnv ?? {}), ...mcpEnv };
+      return { binary: "claude", args, ...(Object.keys(env).length > 0 ? { env } : {}) };
     },
     extraArgsPosition: claudeExtraArgsPosition,
     rewriteLaunchArgsForConfig: rewriteClaudeLaunchArgsForConfig,
@@ -472,14 +522,53 @@ function appendClaudeMcpArgs(
   args: string[],
   prompt: string,
   servers: readonly ResolvedMcpServer[],
-): void {
-  const mcpServers = buildClaudeMcpServers(servers);
-  if (Object.keys(mcpServers).length === 0) return;
+  projectLocation: ProjectLocation,
+  launchEnv: Record<string, string> | undefined,
+): Record<string, string> {
+  const browserExclusive = hasYSpaceBrowserMcp(servers);
+  const appLaunch = buildClaudeMcpLaunchConfig(servers);
+  const launch = browserExclusive
+    ? resolveClaudeBrowserExclusiveMcpConfig({
+        projectLocation,
+        ...(launchEnv?.CLAUDE_CONFIG_DIR ? { configDir: launchEnv.CLAUDE_CONFIG_DIR } : {}),
+        ...(launchEnv ? { launchEnv } : {}),
+        appLaunch,
+      })
+    : { ...appLaunch, agents: {} };
+  if (Object.keys(launch.mcpServers).length === 0) return launch.env;
+  const browserExclusiveArgs = browserExclusive
+    ? [
+        "--no-chrome",
+        "--strict-mcp-config",
+        "--disallowedTools",
+        [
+          "WebFetch",
+          "WebSearch",
+          ...CLAUDE_BROWSER_SKILL_DENY_RULES,
+          ...CLAUDE_BROWSER_COMMAND_DENY_RULES,
+        ].join(","),
+        "--append-system-prompt",
+        Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE,
+      ]
+    : [];
+  const agentArgs =
+    Object.keys(launch.agents).length > 0 ? ["--agents", JSON.stringify(launch.agents)] : [];
   args.splice(
     claudeExtraArgsPosition(args, prompt),
     0,
+    ...browserExclusiveArgs,
+    ...agentArgs,
     "--mcp-config",
-    JSON.stringify({ mcpServers }),
+    JSON.stringify({ mcpServers: launch.mcpServers }),
     "--",
   );
+  return {
+    ...launch.env,
+    ...(browserExclusive
+      ? {
+          PORACODE_CLAUDE_BROWSER_EXCLUSIVE: "1",
+          PORACODE_BROWSER_COMMAND_DENY_REGEX: COMPETING_BROWSER_COMMAND_REGEX_SOURCE,
+        }
+      : {}),
+  };
 }

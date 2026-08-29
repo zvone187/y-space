@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { BrowserMcpToolCallReport } from "@/shared/browserMcpEvidence";
 import { createMcpLaunchContextToken, type McpLaunchContext } from "@/shared/mcpLaunchContext";
 import { BrowserMcpIngress } from "./BrowserMcpIngress";
 import type { BrowserPanelManager } from "./BrowserPanelManager";
@@ -11,6 +12,362 @@ afterEach(() => {
 });
 
 describe("BrowserMcpIngress", () => {
+  it("reports only a bounded authoritative HTTP(S) origin and omits page-controlled titles", async () => {
+    const onToolCallReport = vi.fn<(report: BrowserMcpToolCallReport) => Promise<void>>(
+      async () => undefined,
+    );
+    ingress = new BrowserMcpIngress({
+      resolveLaunchContextIdentity: async (context) => ({
+        ...context.identity,
+        browserEvidenceTurnId: "turn-safe-report",
+      }),
+      onToolCallReport,
+    });
+    let snapshotUrl =
+      "https://alice:password@example.test/reset/password?view=grid&code=oauth-code&access_token=secret&reset_token=reset-secret&session_id=session#private-fragment";
+    let snapshotTitle = "Reset link for alice@example.test — private-code";
+    const tab = {
+      tabId: "tab-safe-report",
+      snapshot: () => ({
+        url: snapshotUrl,
+        title: snapshotTitle,
+      }),
+    };
+    ingress.setManagerAccessor(
+      () =>
+        ({
+          getTab: () => tab,
+          getActiveTab: () => tab,
+          getActiveTabForThread: () => tab,
+          recordAutomationTarget: vi.fn<() => void>(),
+          ensureTabReady: vi.fn<() => Promise<void>>(async () => undefined),
+          rememberTabForThread: vi.fn<() => boolean>(() => true),
+          showAutomationCursor: vi.fn<() => Promise<void>>(async () => undefined),
+        }) as unknown as BrowserPanelManager,
+    );
+    const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-safe-report",
+      launchId: "launch-safe-report",
+    });
+
+    const response = await fetch(`${info.url}/mcp`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${launchToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "get_url",
+          arguments: { privatePageText: "never-forward-this" },
+        },
+      }),
+    });
+
+    expect((await response.json()).result.isError).toBeUndefined();
+    expect(onToolCallReport).toHaveBeenCalledWith({
+      threadId: "thread-safe-report",
+      launchId: "launch-safe-report",
+      turnId: "turn-safe-report",
+      toolName: "get_url",
+      success: true,
+      occurredAt: expect.any(Number),
+      tabId: "tab-safe-report",
+      url: "https://example.test",
+    });
+    const serialized = JSON.stringify(onToolCallReport.mock.calls[0]?.[0]);
+    expect(serialized).not.toContain("never-forward-this");
+    expect(serialized).not.toContain("oauth-code");
+    expect(serialized).not.toContain("secret");
+    expect(serialized).not.toContain("private-fragment");
+    expect(serialized).not.toContain("password");
+    expect(serialized).not.toContain("reset");
+    expect(serialized).not.toContain("alice@example.test");
+    expect(serialized).not.toContain("private-code");
+
+    snapshotUrl = "http://127.0.0.1:41739/alpha?fixture=1";
+    snapshotTitle = "Local fixture content";
+    const localhostResponse = await fetch(`${info.url}/mcp`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${launchToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "get_url", arguments: {} },
+      }),
+    });
+    expect((await localhostResponse.json()).result.isError).toBeUndefined();
+    expect(onToolCallReport.mock.calls[1]?.[0]).toMatchObject({
+      url: "http://127.0.0.1:41739",
+    });
+    expect(onToolCallReport.mock.calls[1]?.[0]).not.toHaveProperty("title");
+
+    for (const unsafeUrl of [
+      "file:///Users/alice/private.env",
+      "javascript:alert(document.domain)",
+      "data:text/html,private-page-content",
+      "custom-browser://account/private?token=secret",
+      "about:blank",
+      "not a url",
+    ]) {
+      snapshotUrl = unsafeUrl;
+      const unsafeResponse = await fetch(`${info.url}/mcp`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${launchToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: unsafeUrl,
+          method: "tools/call",
+          params: { name: "get_url", arguments: {} },
+        }),
+      });
+      expect((await unsafeResponse.json()).result.isError).toBeUndefined();
+      const unsafeReport = onToolCallReport.mock.calls.at(-1)?.[0];
+      expect(unsafeReport).toMatchObject({ tabId: "tab-safe-report" });
+      expect(unsafeReport).not.toHaveProperty("url");
+      expect(unsafeReport).not.toHaveProperty("title");
+    }
+  });
+
+  it("binds overlapping tool proof to each request's resolved tab", async () => {
+    const onToolCallReport = vi.fn<(report: BrowserMcpToolCallReport) => Promise<void>>(
+      async () => undefined,
+    );
+    ingress = new BrowserMcpIngress({
+      resolveLaunchContextIdentity: async (context) => ({
+        ...context.identity,
+        browserEvidenceTurnId: "turn-concurrent-tabs",
+      }),
+      onToolCallReport,
+    });
+    const tabA = {
+      tabId: "tab-concurrent-a",
+      snapshot: () => ({ url: "https://a.example.test/private/path", title: "A" }),
+    };
+    const tabB = {
+      tabId: "tab-concurrent-b",
+      snapshot: () => ({ url: "https://b.example.test/other/path", title: "B" }),
+    };
+    let activeTab = tabA;
+    const reloadAStarted = deferredVoid();
+    const releaseReloadA = deferredVoid();
+    ingress.setManagerAccessor(
+      () =>
+        ({
+          getTab: (tabId: string) =>
+            tabId === tabA.tabId ? tabA : tabId === tabB.tabId ? tabB : null,
+          getActiveTab: () => activeTab,
+          getActiveTabForThread: () => activeTab,
+          rememberTabForThread: vi.fn<(_threadId: string, tabId: string) => boolean>(
+            (_threadId, tabId) => {
+              activeTab = tabId === tabA.tabId ? tabA : tabB;
+              return true;
+            },
+          ),
+          recordAutomationTarget: vi.fn<() => void>(),
+          ensureTabReady: vi.fn<() => Promise<void>>(async () => undefined),
+          showAutomationCursor: vi.fn<() => Promise<void>>(async () => undefined),
+          reload: vi.fn<(tabId: string) => Promise<void>>(async (tabId) => {
+            if (tabId !== tabA.tabId) return;
+            reloadAStarted.resolve();
+            await releaseReloadA.promise;
+          }),
+        }) as unknown as BrowserPanelManager,
+    );
+    const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-concurrent-tabs",
+      launchId: "launch-concurrent-tabs",
+    });
+    const callReload = async (tabId: string) => {
+      const response = await fetch(`${info.url}/mcp`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${launchToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: tabId,
+          method: "tools/call",
+          params: { name: "reload", arguments: { tabId } },
+        }),
+      });
+      return (await response.json()) as { result: { isError?: boolean } };
+    };
+
+    const pendingA = callReload(tabA.tabId);
+    await reloadAStarted.promise;
+    let resultB: Awaited<ReturnType<typeof callReload>>;
+    try {
+      resultB = await callReload(tabB.tabId);
+    } finally {
+      releaseReloadA.resolve();
+    }
+    const resultA = await pendingA;
+    expect(resultA.result.isError).toBeUndefined();
+    expect(resultB.result.isError).toBeUndefined();
+    expect(activeTab).toBe(tabB);
+
+    expect(onToolCallReport).toHaveBeenCalledTimes(2);
+    expect(onToolCallReport.mock.calls.map(([report]) => report)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          toolName: "reload",
+          success: true,
+          tabId: tabA.tabId,
+          url: "https://a.example.test",
+        }),
+        expect.objectContaining({
+          toolName: "reload",
+          success: true,
+          tabId: tabB.tabId,
+          url: "https://b.example.test",
+        }),
+      ]),
+    );
+  });
+
+  it("does not mint successful proof for a structured screenshot timeout", async () => {
+    const onToolCallReport = vi.fn<(report: BrowserMcpToolCallReport) => Promise<void>>(
+      async () => undefined,
+    );
+    ingress = new BrowserMcpIngress({
+      resolveLaunchContextIdentity: async (context) => ({
+        ...context.identity,
+        browserEvidenceTurnId: "turn-screenshot-timeout",
+      }),
+      onToolCallReport,
+    });
+    const tab = {
+      tabId: "tab-screenshot-timeout",
+      snapshot: () => ({ url: "https://timeout.example.test/private", title: "Timeout" }),
+      webContents: {
+        capturePage: vi.fn<() => Promise<never>>(() => new Promise<never>(() => undefined)),
+      },
+      cdp: {
+        attach: vi.fn<() => Promise<void>>(async () => undefined),
+        send: vi.fn<(method: string) => Promise<unknown>>(async (method) =>
+          method === "Runtime.evaluate" ? { result: { type: "boolean", value: true } } : {},
+        ),
+      },
+    };
+    ingress.setManagerAccessor(
+      () =>
+        ({
+          getTab: () => tab,
+          getActiveTab: () => tab,
+          getActiveTabForThread: () => tab,
+          rememberTabForThread: vi.fn<() => boolean>(() => true),
+          recordAutomationTarget: vi.fn<() => void>(),
+          ensureTabReady: vi.fn<() => Promise<void>>(async () => undefined),
+          showAutomationCursor: vi.fn<() => Promise<void>>(async () => undefined),
+        }) as unknown as BrowserPanelManager,
+    );
+    const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-screenshot-timeout",
+      launchId: "launch-screenshot-timeout",
+    });
+    const response = await fetch(`${info.url}/mcp`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${launchToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "screenshot",
+          arguments: { tabId: tab.tabId, timeoutMs: 200 },
+        },
+      }),
+    });
+    const body = (await response.json()) as {
+      result: { content: Array<{ text?: string }>; isError?: boolean };
+    };
+
+    expect(body.result.isError).toBeUndefined();
+    expect(body.result.content[0]?.text).toContain('"timedOut": true');
+    expect(onToolCallReport).toHaveBeenCalledWith({
+      threadId: "thread-screenshot-timeout",
+      launchId: "launch-screenshot-timeout",
+      turnId: "turn-screenshot-timeout",
+      toolName: "screenshot",
+      success: false,
+      occurredAt: expect.any(Number),
+    });
+  });
+
+  it("reports Browser failures without tab metadata", async () => {
+    const onToolCallReport = vi.fn<(report: BrowserMcpToolCallReport) => Promise<void>>(
+      async () => undefined,
+    );
+    ingress = new BrowserMcpIngress({
+      resolveLaunchContextIdentity: async (context) => ({
+        ...context.identity,
+        browserEvidenceTurnId: "turn-failed-report",
+      }),
+      onToolCallReport,
+    });
+    ingress.setManagerAccessor(
+      () =>
+        ({
+          getActiveTabForThread: () => null,
+          getActiveTab: () => null,
+          reload: vi.fn<() => Promise<never>>(async () => {
+            throw new Error("reload failed");
+          }),
+          getTab: () => null,
+          createTab: vi.fn<() => Promise<{ tabId: string }>>(async () => ({ tabId: "unused" })),
+          touchAutomationSession: vi.fn<() => void>(),
+          recordAutomationTarget: vi.fn<() => void>(),
+          showAutomationCursor: vi.fn<() => Promise<void>>(async () => undefined),
+        }) as unknown as BrowserPanelManager,
+    );
+    const info = await ingress.start();
+    const launchToken = createMcpLaunchContextToken(info.token, "browser", {
+      threadId: "thread-failed-report",
+      launchId: "launch-failed-report",
+    });
+    const response = await fetch(`${info.url}/mcp`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${launchToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "reload", arguments: {} },
+      }),
+    });
+
+    expect((await response.json()).result.isError).toBe(true);
+    expect(onToolCallReport).toHaveBeenCalledWith({
+      threadId: "thread-failed-report",
+      launchId: "launch-failed-report",
+      turnId: "turn-failed-report",
+      toolName: "reload",
+      success: false,
+      occurredAt: expect.any(Number),
+    });
+  });
+
   it("advertises browser instructions and API discovery on initialize", async () => {
     ingress = new BrowserMcpIngress({
       resolveLaunchContextIdentity: async (context) => context.identity,
@@ -42,7 +399,9 @@ describe("BrowserMcpIngress", () => {
     };
 
     expect(body.result.serverInfo.name).toBe("browser");
-    expect(body.result.instructions).toContain("Use the browser MCP server");
+    expect(body.result.instructions).toContain("Y Space Browser is the only browser route");
+    expect(body.result.instructions).toContain("Never claim that you verified");
+    expect(body.result.instructions).toContain("exact tab id");
     expect(body.result.instructions).toContain("browser.enable");
     expect(body.result.instructions).toContain("browser.disable");
     expect(body.result.instructions).toContain("browser.api");
@@ -345,3 +704,11 @@ describe("BrowserMcpIngress", () => {
     );
   });
 });
+
+function deferredVoid(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}

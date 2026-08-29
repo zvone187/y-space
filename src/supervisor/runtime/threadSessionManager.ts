@@ -4,6 +4,13 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { spawn } from "node-pty";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import {
+  MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN,
+  MAX_BROWSER_EVIDENCE_THREADS,
+  Y_SPACE_BROWSER_EVIDENCE_SOURCE,
+  browserEvidenceActionKind,
+  type BrowserMcpToolCallReport,
+} from "@/shared/browserMcpEvidence";
+import {
   type ClearPendingSteerPayload,
   type ControlThreadGoalPayload,
   type AgentEventEnvelope,
@@ -27,6 +34,7 @@ import {
   type ThreadRuntimeSnapshot,
   type WriteTerminalPayload,
   type RuntimeEvent,
+  type ToolCallPayload,
   type McpLaunchSnapshot,
   type ResolvedMcpServer,
   disabledBuiltInMcpServerIds,
@@ -99,6 +107,13 @@ interface SubagentMcpLaunchAuthority {
   authorization: McpLaunchAuthorization;
 }
 
+interface BrowserEvidenceTurnLedger {
+  launchId: string;
+  turnId: string;
+  /** Canonical item ids, capped so a runaway page loop cannot grow this ledger. */
+  actionItemIds: string[];
+}
+
 export class ThreadSessionManager {
   readonly sessions = new Map<string, SessionRuntime>();
   readonly shellSessions = new Map<string, ShellSessionRuntime>();
@@ -123,6 +138,8 @@ export class ThreadSessionManager {
   private readonly rootMcpLaunchAuthorities = new Map<string, RootMcpLaunchAuthority>();
   /** Ephemeral structured-child authority, tied to the exact live parent. */
   private readonly subagentMcpLaunchAuthorities = new Map<string, SubagentMcpLaunchAuthority>();
+  /** App-owned proof for only the latest accepted user turn of each live task. */
+  private readonly browserEvidenceTurns = new Map<string, BrowserEvidenceTurnLedger>();
   private disposed = false;
 
   constructor(private readonly options: ThreadSessionManagerOptions) {
@@ -159,6 +176,7 @@ export class ThreadSessionManager {
       sessions: this.sessions,
       interruptStructuredTurn: (session) =>
         this.structuredInterruptWatchdog.interruptStructuredTurn(session),
+      beginBrowserEvidenceTurn: (session) => this.beginBrowserEvidenceTurnForSession(session),
       startStructuredTurn: (session, turn) => this.structuredTurnQueue.start(session, turn),
       failStructuredSession: (session, error) => this.failStructuredSession(session, error),
       resolveSkillTurnInjection: (session, segments) =>
@@ -294,6 +312,66 @@ export class ThreadSessionManager {
     return this.liveIdentityForMcpAuthorization(childAuthority.authorization, payload.serverId);
   }
 
+  /**
+   * Accept one private main-process Browser report only when its signed launch
+   * and supervisor-issued turn nonce are both still current. Failed calls,
+   * delayed callbacks, closed tasks, and prior launches produce no proof row.
+   */
+  recordBrowserMcpToolCall(payload: BrowserMcpToolCallReport): boolean {
+    if (!payload.success) return false;
+    // Connection/control and tab-directory calls prove only that the MCP is
+    // reachable. Require a real page navigation, inspection, or interaction
+    // before minting evidence used by the final-response badge.
+    if (!browserEvidenceActionKind(payload.toolName)) return false;
+    const liveIdentity = this.resolveMcpCallerIdentity({
+      routing: "thread",
+      threadId: payload.threadId,
+      launchId: payload.launchId,
+      serverId: "browser",
+    });
+    if (!liveIdentity || liveIdentity.browserEvidenceTurnId !== payload.turnId) return false;
+
+    const childAuthority = this.subagentMcpLaunchAuthorities.get(payload.threadId);
+    const ownerThreadId = childAuthority?.parentThreadId ?? payload.threadId;
+    const ledger = this.browserEvidenceTurns.get(ownerThreadId);
+    if (!ledger || ledger.turnId !== payload.turnId) return false;
+    if (!childAuthority && ledger.launchId !== payload.launchId) return false;
+    if (ledger.actionItemIds.length >= MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN) return false;
+
+    const itemId = `browser-evidence-${randomUUID()}`;
+    const browserEvidence: NonNullable<ToolCallPayload["browserEvidence"]> = {
+      source: Y_SPACE_BROWSER_EVIDENCE_SOURCE,
+      occurredAt: payload.occurredAt,
+      ...(payload.tabId ? { tabId: payload.tabId } : {}),
+      ...(payload.url ? { url: payload.url } : {}),
+      ...(payload.title ? { title: payload.title } : {}),
+    };
+    const toolPayload: ToolCallPayload = {
+      name: payload.toolName,
+      serverId: "browser",
+      status: "success",
+      browserEvidence,
+    };
+    ledger.actionItemIds.push(itemId);
+    this.enqueueRuntimeEvent(ownerThreadId, {
+      type: "item.started",
+      threadId: ownerThreadId,
+      itemId,
+      itemType: "mcp_tool_call",
+      payload: toolPayload,
+    });
+    this.enqueueRuntimeEvent(ownerThreadId, {
+      type: "item.completed",
+      threadId: ownerThreadId,
+      itemId,
+      payload: toolPayload,
+    });
+    // Make the canonical proof observable before the private IPC reply lets
+    // the Browser MCP response return to the agent.
+    this.runtimeEventRouter.flush();
+    return true;
+  }
+
   private isExactMcpLaunch(identity: McpThreadIdentity, launchId: string | undefined): boolean {
     return identity.launchId !== undefined && identity.launchId === launchId;
   }
@@ -303,6 +381,13 @@ export class ThreadSessionManager {
     // the built-in capability nonce before a restart/recovery can begin.
     this.options.releasePipedreamMcpBindings?.(authorization.identity.threadId);
     this.revokeSubagentMcpAccessForParent(authorization.identity.threadId);
+    const turnId = authorization.identity.browserEvidenceTurnId ?? randomUUID();
+    authorization.identity.browserEvidenceTurnId = turnId;
+    this.setBrowserEvidenceTurn(
+      authorization.identity.threadId,
+      authorization.identity.launchId,
+      turnId,
+    );
     this.rootMcpLaunchAuthorities.set(authorization.identity.threadId, {
       phase: "pending",
       authorization,
@@ -364,6 +449,7 @@ export class ThreadSessionManager {
       current.authorization.identity.launchId === identity.launchId
     ) {
       this.rootMcpLaunchAuthorities.delete(identity.threadId);
+      this.clearBrowserEvidenceTurn(identity.threadId, identity.launchId);
       this.options.releasePipedreamMcpBindings?.(identity.threadId);
       return;
     }
@@ -374,6 +460,7 @@ export class ThreadSessionManager {
 
   private revokeMcpAccessForThread(threadId: string): void {
     this.rootMcpLaunchAuthorities.delete(threadId);
+    this.browserEvidenceTurns.delete(threadId);
     this.revokeSubagentMcpAccessForParent(threadId);
   }
 
@@ -384,6 +471,47 @@ export class ThreadSessionManager {
         this.options.releasePipedreamMcpBindings?.(childThreadId);
       }
     }
+  }
+
+  private beginBrowserEvidenceTurnForSession(session: SessionRuntime): string | undefined {
+    const identity = session.mcpIdentity;
+    if (!identity?.launchId) return undefined;
+    const turnId = randomUUID();
+    identity.browserEvidenceTurnId = turnId;
+    const authority = this.rootMcpLaunchAuthorities.get(session.threadId);
+    if (authority && authority.authorization.identity.launchId === identity.launchId) {
+      authority.authorization.identity.browserEvidenceTurnId = turnId;
+    }
+    // Native non-interrupting steers intentionally preserve structured
+    // subagents. Rotate those live child authorities with the parent so their
+    // Browser actions remain attributable to the newly accepted user turn;
+    // children from a replaced parent instance stay stale and fail closed.
+    for (const childAuthority of this.subagentMcpLaunchAuthorities.values()) {
+      if (
+        childAuthority.parentThreadId === session.threadId &&
+        childAuthority.parentSessionInstanceId === session.instanceId
+      ) {
+        childAuthority.authorization.identity.browserEvidenceTurnId = turnId;
+      }
+    }
+    this.setBrowserEvidenceTurn(session.threadId, identity.launchId, turnId);
+    return turnId;
+  }
+
+  private setBrowserEvidenceTurn(threadId: string, launchId: string, turnId: string): void {
+    this.browserEvidenceTurns.delete(threadId);
+    while (this.browserEvidenceTurns.size >= MAX_BROWSER_EVIDENCE_THREADS) {
+      const oldestThreadId = this.browserEvidenceTurns.keys().next().value;
+      if (typeof oldestThreadId !== "string") break;
+      this.browserEvidenceTurns.delete(oldestThreadId);
+    }
+    this.browserEvidenceTurns.set(threadId, { launchId, turnId, actionItemIds: [] });
+  }
+
+  private clearBrowserEvidenceTurn(threadId: string, launchId?: string): void {
+    const ledger = this.browserEvidenceTurns.get(threadId);
+    if (!ledger || (launchId && ledger.launchId !== launchId)) return;
+    this.browserEvidenceTurns.delete(threadId);
   }
 
   private getSessionByProviderSessionId(providerSessionId: string): SessionRuntime | undefined {
@@ -465,6 +593,12 @@ export class ThreadSessionManager {
     ];
     return {
       ...identity,
+      ...(serverId === "computer-use" &&
+      launchConfig.browserMcp === true &&
+      !globallyDisabled.includes("browser") &&
+      !authorization.mcpLaunchSnapshot.disabledBuiltInMcpServerIds.includes("browser")
+        ? { managedBrowserConnected: true }
+        : {}),
       ...(disabledTools.length > 0 ? { disabledTools } : {}),
     };
   }
@@ -604,6 +738,9 @@ export class ThreadSessionManager {
       ...identity,
       threadId: identity.threadId,
       launchId: randomUUID(),
+      ...(this.browserEvidenceTurns.get(threadId)?.turnId
+        ? { browserEvidenceTurnId: this.browserEvidenceTurns.get(threadId)!.turnId }
+        : {}),
     };
     const authorization: McpLaunchAuthorization = {
       identity: childIdentity,
@@ -624,6 +761,7 @@ export class ThreadSessionManager {
         mcpLaunchSnapshot,
         identity: childIdentity,
         adapter: targetAdapter,
+        presentationMode: "gui",
       });
       if (!this.isCurrentSession(session) || Boolean(session.ignoreExit)) {
         this.releaseSubagentParentMcpAccess(threadId, childIdentity.threadId);
@@ -732,7 +870,28 @@ export class ThreadSessionManager {
       mcpServers = await this.options.applyMcpServerAuthorization(mcpServers);
     }
     if (this.options.prepareMcpToolFilters) {
-      mcpServers = await this.options.prepareMcpToolFilters(mcpServers, session.projectLocation);
+      const candidateSnapshot: McpLaunchSnapshot = {
+        ...session.mcpLaunchSnapshot,
+        mcpServers,
+        pluginBuiltInMcpServerIds: pluginContributions.builtInMcpServerIds,
+      };
+      const effectiveConfig = this.spawnPipeline.resolveMcpLaunchConfig(
+        workspaceLaunchConfig(
+          session.projectLocation,
+          session.config,
+          session.adapter,
+          candidateSnapshot.disabledBuiltInMcpServerIds,
+          candidateSnapshot.pluginBuiltInMcpServerIds,
+        ),
+        candidateSnapshot,
+        session.adapter,
+        session.threadId,
+      );
+      mcpServers = await this.options.prepareMcpToolFilters(
+        mcpServers,
+        session.projectLocation,
+        effectiveConfig.browserMcp === true,
+      );
     }
 
     return {
@@ -925,7 +1084,11 @@ export class ThreadSessionManager {
         // the message onto the running turn (subagents survive); others fall
         // back to the interrupt-drain pending-steer path.
         if (session.structuredSession.steerTurn) {
-          this.steerCoordinator.steerStructuredTurn(session, turn);
+          const browserEvidenceTurnId = this.beginBrowserEvidenceTurnForSession(session);
+          this.steerCoordinator.steerStructuredTurn(session, {
+            ...turn,
+            ...(browserEvidenceTurnId ? { browserEvidenceTurnId } : {}),
+          });
           return;
         }
         this.steerCoordinator.stagePendingSteer(session, turn);
@@ -939,7 +1102,11 @@ export class ThreadSessionManager {
         this.steerCoordinator.maybeDrainPendingSteer(session);
         return;
       }
-      this.structuredTurnQueue.start(session, turn);
+      const browserEvidenceTurnId = this.beginBrowserEvidenceTurnForSession(session);
+      this.structuredTurnQueue.start(session, {
+        ...turn,
+        ...(browserEvidenceTurnId ? { browserEvidenceTurnId } : {}),
+      });
       return;
     }
 
@@ -956,6 +1123,7 @@ export class ThreadSessionManager {
       ptySegments === effectiveSegments
         ? prompt
         : this.formatSegmentsForPrompt(session, ptySegments, payload.prompt);
+    this.beginBrowserEvidenceTurnForSession(session);
     await writeSubmittedPrompt(
       pty,
       session.adapter.buildDirectInput?.(
@@ -1477,6 +1645,7 @@ export class ThreadSessionManager {
     this.sessionsBySessionId.clear();
     this.rootMcpLaunchAuthorities.clear();
     this.subagentMcpLaunchAuthorities.clear();
+    this.browserEvidenceTurns.clear();
 
     for (const shell of this.shellSessions.values()) {
       shell.ignoreExit = true;

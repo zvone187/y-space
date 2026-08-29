@@ -1,11 +1,12 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentKind, ThreadConfig } from "@/shared/contracts";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { SessionRuntime } from "./sessionTypes";
 import type { ThreadSessionManagerOptions } from "./threadSession/managerOptions";
+import { BROWSER_MCP_TOKEN_ENV, BROWSER_MCP_URL_ENV } from "../agents/browserMcp";
 
 const harness = vi.hoisted(() => {
   const spawn = vi.fn<
@@ -75,6 +76,13 @@ const CONFIG_WITH_BROWSER: ThreadConfig = { ...CONFIG, browserMcp: true };
 
 const managersToDispose: ThreadSessionManager[] = [];
 const tempDirs: string[] = [];
+const savedBrowserMcpUrl = process.env[BROWSER_MCP_URL_ENV];
+const savedBrowserMcpToken = process.env[BROWSER_MCP_TOKEN_ENV];
+
+beforeEach(() => {
+  process.env[BROWSER_MCP_URL_ENV] = "http://127.0.0.1:43199";
+  process.env[BROWSER_MCP_TOKEN_ENV] = "restart-terminal-test-browser-token";
+});
 
 afterEach(async () => {
   for (const manager of managersToDispose.splice(0)) {
@@ -86,6 +94,10 @@ afterEach(async () => {
   harness.spawn.mockClear();
   primeMock.mockReset();
   primeMock.mockImplementation(() => Promise.resolve(undefined));
+  if (savedBrowserMcpUrl === undefined) delete process.env[BROWSER_MCP_URL_ENV];
+  else process.env[BROWSER_MCP_URL_ENV] = savedBrowserMcpUrl;
+  if (savedBrowserMcpToken === undefined) delete process.env[BROWSER_MCP_TOKEN_ENV];
+  else process.env[BROWSER_MCP_TOKEN_ENV] = savedBrowserMcpToken;
 });
 
 function createManager(
@@ -134,6 +146,7 @@ function createTerminalAdapter(
   } = {},
 ): AgentAdapter {
   return {
+    browserRouting: { terminal: "exclusive" },
     kind: AGENT_KIND,
     label: AGENT_KIND,
     binary: AGENT_KIND,

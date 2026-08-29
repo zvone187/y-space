@@ -481,6 +481,12 @@ describe("experimentActions", () => {
 
     expect(id).toBeTruthy();
     expect(mocks.bridge.gitAddWorktree).toHaveBeenCalledTimes(2);
+    expect(
+      mocks.bridge.gitAddWorktree.mock.calls.map((call) => (call[0] as { branch: string }).branch),
+    ).toEqual([
+      expect.stringMatching(/^y-space\/experiment-/u),
+      expect.stringMatching(/^y-space\/experiment-/u),
+    ]);
     expect(mocks.bridge.dbSetState.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.bridge.gitAddWorktree.mock.invocationCallOrder[0]!,
     );

@@ -41,7 +41,7 @@ import {
   growingStreamLength,
   selectCompletedTurnForEntry,
   selectRuntimeItemById,
-  type ChatTimelineEntry,
+  type ChatDisplayTimelineEntry,
 } from "../chatPaneSelectors";
 import { ChatItemRow } from "./items/ChatItemRow";
 import { chatMessageSurfaceClass } from "./items/chatMessageSurface";
@@ -70,7 +70,7 @@ export interface CheckpointRevertActions {
 interface MessageListProps {
   threadId: string;
   threadConfig?: ThreadConfig;
-  entries: readonly ChatTimelineEntry[];
+  entries: readonly ChatDisplayTimelineEntry[];
   isTurnActive?: boolean;
   markTailAsLive?: boolean;
   setScrollContainer?: (element: HTMLDivElement | null) => void;
@@ -104,6 +104,8 @@ interface MessageListProps {
    * the most recent completed turn while the thread is idle).
    */
   suppressInlineTurnAnchorId?: string | null;
+  /** Item currently targeted by Find; activity disclosures reveal it on demand. */
+  revealedItemId?: string | null;
   /**
    * Lets the chat Find controller drive the virtualizer to scroll a matched
    * row into the rendered window before highlighting it. Registered with the
@@ -151,6 +153,7 @@ export function MessageList({
   checkpointActions,
   projectLocation,
   suppressInlineTurnAnchorId = null,
+  revealedItemId = null,
   registerScrollToIndex,
 }: MessageListProps) {
   const hasItems = entries.length > 0;
@@ -285,8 +288,8 @@ export function MessageList({
     return useAppStore.subscribe(selectLastItemIsAssistantMessage, updateBottomMask);
   }, [entries, threadId]);
 
-  // The "live tail" index drives the auto-expand on `ToolCallGroup`. Trailing
-  // empty/in-flight reasoning items don't count: an agent emitting a reasoning
+  // The live-tail index drives streaming measurement for the active display
+  // row. Trailing empty/in-flight reasoning items don't count: an agent emitting a reasoning
   // bracket between tool calls would otherwise collapse the group prematurely
   // (and it often completes empty and gets dropped, causing a flicker). Only
   // once reasoning actually has text — or any other item arrives — does the
@@ -423,7 +426,7 @@ export function MessageList({
         data={entries}
         dataKey={threadId}
         estimatedItemSize={DEFAULT_ROW_ESTIMATE_PX}
-        extraData={`${lastLiveIndex}:${isTurnActive}:${markTailAsLive}:${suppressInlineTurnAnchorId ?? ""}:${canRevertCheckpoints}`}
+        extraData={`${lastLiveIndex}:${isTurnActive}:${markTailAsLive}:${suppressInlineTurnAnchorId ?? ""}:${canRevertCheckpoints}:${revealedItemId ?? ""}`}
         getFixedItemSize={(entry) =>
           getFixedTimelineEntrySize(entry, threadId, scrollElementRef.current?.clientWidth)
         }
@@ -452,8 +455,9 @@ export function MessageList({
             threadId={threadId}
             entry={entry}
             index={index}
-            isLastEntry={markTailAsLive && index === lastLiveIndex}
+            isLastEntry={markTailAsLive && isTurnActive && index === lastLiveIndex}
             isTurnActive={isTurnActive}
+            revealedItemId={revealedItemId}
             remeasureElement={remeasureRowElement}
             {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
             suppressInlineTurnAnchorId={suppressInlineTurnAnchorId}
@@ -496,10 +500,11 @@ export function MessageList({
 
 type VirtualChatListRowProps = {
   threadId: string;
-  entry: ChatTimelineEntry;
+  entry: ChatDisplayTimelineEntry;
   index: number;
   isLastEntry: boolean;
   isTurnActive: boolean;
+  revealedItemId: string | null;
   remeasureElement: (
     itemKey: string,
     element: HTMLDivElement | null,
@@ -517,6 +522,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   index,
   isLastEntry,
   isTurnActive,
+  revealedItemId,
   remeasureElement,
   onVirtualizerLayoutChange,
   suppressInlineTurnAnchorId,
@@ -654,6 +660,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
             onHeightChange={remeasureRow}
             {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
             isTurnActive={isTurnActive}
+            revealedItemId={revealedItemId}
             checkpointRevert={
               checkpointRevertItemId ? { itemId: checkpointRevertItemId, onRequestRevert } : null
             }
@@ -687,12 +694,12 @@ function CompletedTurnIndicator({ record }: { threadId: string; record: Complete
 function computeLiveTailIndex(
   state: AppStoreState,
   threadId: string,
-  entries: readonly ChatTimelineEntry[],
+  entries: readonly ChatDisplayTimelineEntry[],
 ): number {
   const items = state.runtimeItemsByIdByThread[threadId];
   for (let i = entries.length - 1; i >= 0; i -= 1) {
     const entry = entries[i]!;
-    if (entry.kind === "tool_call_group") return i;
+    if (entry.kind !== "item") return i;
     const item = items?.[entry.id];
     if (item?.type === "reasoning" && !(item.streams.reasoning_text ?? "").trim()) continue;
     return i;
@@ -703,10 +710,12 @@ function computeLiveTailIndex(
 function isLastTimelineEntryAssistantMessage(
   state: AppStoreState,
   threadId: string,
-  entries: readonly ChatTimelineEntry[],
+  entries: readonly ChatDisplayTimelineEntry[],
 ): boolean {
   const lastEntry = entries[entries.length - 1];
-  if (!lastEntry || lastEntry.kind !== "item") return false;
+  if (!lastEntry) return false;
+  if (lastEntry.kind === "assistant_message_group") return true;
+  if (lastEntry.kind !== "item") return false;
   return state.runtimeItemsByIdByThread[threadId]?.[lastEntry.id]?.type === "assistant_message";
 }
 
@@ -721,7 +730,7 @@ function liveStreamMeasureToken(item: RuntimeChatItem | undefined): string | nul
 }
 
 function getTimelineEntryType(
-  entry: ChatTimelineEntry,
+  entry: ChatDisplayTimelineEntry,
   threadId: string,
   index: number,
   isLiveTail: boolean,
@@ -734,6 +743,12 @@ function getTimelineEntryType(
     completedTurn.anchorItemId !== null &&
     completedTurn.anchorItemId !== suppressInlineTurnAnchorId;
   const rowSuffix = hasInlineTurn ? ":turn" : "";
+  if (entry.kind === "turn_activity_group") {
+    return `${isLiveTail ? "turn_activity_group:live" : entry.kind}${rowSuffix}`;
+  }
+  if (entry.kind === "assistant_message_group") {
+    return `${isLiveTail ? "assistant_message_group:live" : entry.kind}${rowSuffix}`;
+  }
   if (entry.kind === "tool_call_group") {
     return `${isLiveTail ? "tool_call_group:live" : entry.kind}${rowSuffix}`;
   }
@@ -765,7 +780,7 @@ function getTimelineEntryType(
 }
 
 function getFixedTimelineEntrySize(
-  entry: ChatTimelineEntry,
+  entry: ChatDisplayTimelineEntry,
   threadId: string,
   listWidth: number | undefined,
 ): number | undefined {

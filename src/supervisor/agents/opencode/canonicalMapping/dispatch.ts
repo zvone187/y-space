@@ -32,9 +32,11 @@ import {
 } from "./subAgents";
 import {
   appendDelta,
+  completeAssistantItem,
+  completeAssistantItemsForMessage,
   completeReasoningItem,
   emitTextDelta,
-  ensureAssistantItemForMessage,
+  ensureAssistantItemForPart,
   ensureReasoningItemForPart,
 } from "./textItems";
 import { classifyToolItemType } from "./toolClassification";
@@ -65,7 +67,7 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
       return;
     }
     state.partTypes.set(part.id, "text");
-    const itemId = ensureAssistantItemForMessage(state, part.messageID, events);
+    const itemId = ensureAssistantItemForPart(state, part.id, part.messageID, events);
     emitTextDelta(state, part.id, itemId, part.text, "assistant_text", events);
     return;
   }
@@ -85,8 +87,12 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
   }
   if (part.type === "tool") {
     const existing = state.toolItems.get(part.id);
-    const itemType = existing?.itemType ?? classifyToolItemType(part.tool);
-    const itemId = existing?.itemId ?? newItemId("tool");
+    const tracked = existing ?? {
+      itemType: classifyToolItemType(part.tool),
+      itemId: newItemId("tool"),
+      completed: false,
+    };
+    const { itemType, itemId } = tracked;
     const isTask = normalizeToolName(part.tool) === "task";
     const basePayload = toolPayload(itemType, part.tool, part.state, part.metadata);
     // Preserve any progress we've already populated from the child session
@@ -99,7 +105,7 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
       : basePayload;
     if (isTask) state.taskToolPayloads.set(part.id, payload);
     if (!existing) {
-      state.toolItems.set(part.id, { itemId, itemType });
+      state.toolItems.set(part.id, tracked);
       events.push({
         type: "item.started",
         threadId: state.threadId,
@@ -122,13 +128,17 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
         payload,
       });
     }
-    if (part.state.status === "completed" || part.state.status === "error") {
+    const isTerminal = part.state.status === "completed" || part.state.status === "error";
+    if (isTerminal && !tracked.completed) {
       events.push({
         type: "item.completed",
         threadId: state.threadId,
         itemId,
         payload,
       });
+      tracked.completed = true;
+    }
+    if (isTerminal) {
       if (isTask) {
         state.taskToolPayloads.delete(part.id);
         // Drop the pending entry if it was never linked.
@@ -172,7 +182,7 @@ function mapCanonicalEvent(
         const itemId = ensureReasoningItemForPart(state, partID, messageID, events);
         appendDelta(state, partID, itemId, delta, "reasoning_text", events);
       } else if (route === "text") {
-        const itemId = ensureAssistantItemForMessage(state, messageID, events);
+        const itemId = ensureAssistantItemForPart(state, partID, messageID, events);
         appendDelta(state, partID, itemId, delta, "assistant_text", events);
       }
       return events;
@@ -200,13 +210,16 @@ function mapCanonicalEvent(
       }
       const tool = state.toolItems.get(partID);
       if (tool) {
-        events.push({
-          type: "item.completed",
-          threadId: state.threadId,
-          itemId: tool.itemId,
-        });
+        if (!tool.completed) {
+          events.push({
+            type: "item.completed",
+            threadId: state.threadId,
+            itemId: tool.itemId,
+          });
+        }
         state.toolItems.delete(partID);
       }
+      completeAssistantItem(state, messageID, partID, events);
       completeReasoningItem(state, partID, events);
       state.emittedText.delete(partID);
       state.partTypes.delete(partID);
@@ -254,15 +267,7 @@ function mapCanonicalEvent(
             events.push(spentEvent);
           }
         }
-        const itemId = state.assistantItems.get(info.id);
-        if (itemId) {
-          events.push({
-            type: "item.completed",
-            threadId: state.threadId,
-            itemId,
-          });
-          state.assistantItems.delete(info.id);
-        }
+        completeAssistantItemsForMessage(state, info.id, events);
         for (const [partID, entry] of state.reasoningItems) {
           if (entry.messageID !== info.id) continue;
           events.push({
@@ -278,11 +283,7 @@ function mapCanonicalEvent(
     }
     case "message.removed": {
       const { messageID } = event.properties;
-      const a = state.assistantItems.get(messageID);
-      if (a) {
-        events.push({ type: "item.completed", threadId: state.threadId, itemId: a });
-        state.assistantItems.delete(messageID);
-      }
+      completeAssistantItemsForMessage(state, messageID, events);
       const u = state.userItems.get(messageID);
       if (u) {
         events.push({ type: "item.completed", threadId: state.threadId, itemId: u });
@@ -290,6 +291,7 @@ function mapCanonicalEvent(
       }
       state.nonOptimisticUserMessages.delete(messageID);
       state.userMessageTextParts.delete(messageID);
+      state.messageRoles.delete(messageID);
       return events;
     }
     case "permission.asked": {

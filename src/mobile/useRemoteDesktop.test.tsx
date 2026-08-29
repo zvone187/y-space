@@ -774,7 +774,7 @@ describe("useRemoteDesktop", () => {
         transferUncommitted: false,
         keepChangesInSource: false,
       });
-      expect(addPayload.branch).toEqual(expect.stringMatching(/^poracode\//));
+      expect(addPayload.branch).toEqual(expect.stringMatching(/^y-space\//));
       // No git summary for the thread → no startPoint (host falls back to HEAD).
       expect(addPayload.startPoint).toBeUndefined();
       expect(client.sendThreadCommand).toHaveBeenCalledWith({

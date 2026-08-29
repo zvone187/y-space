@@ -5,6 +5,12 @@ export interface ToolContext {
   manager: BrowserPanelManager;
   allowEval: boolean;
   allowDataAccess: boolean;
+  /**
+   * Exact tab selected by this request's dispatch path. The context is created
+   * per MCP call, so proof can bind to this immutable request-local identity
+   * instead of rereading the thread's mutable active tab after an await.
+   */
+  resolvedTabIdForToolCall?: string;
   /** Calling thread + its task title (from the MCP URL) — agent tabs join a
    *  per-thread group named after the task. */
   threadId?: string;

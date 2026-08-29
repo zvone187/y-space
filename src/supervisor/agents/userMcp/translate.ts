@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import type { ResolvedMcpServer } from "@/shared/contracts";
+import {
+  COMPETING_BROWSER_COMMAND_GLOBS,
+  COMPETING_BROWSER_SKILL_NAMES,
+  hasYSpaceBrowserMcp,
+} from "@/shared/browserExclusivePolicy";
 
 export type ClaudeMcpServerConfig =
   | {
@@ -45,6 +50,60 @@ export function buildClaudeMcpServers(
       ];
     }),
   );
+}
+
+export interface ClaudeMcpLaunchConfig {
+  mcpServers: Record<string, ClaudeMcpServerConfig>;
+  env: Record<string, string>;
+}
+
+function claudeMcpEnvVar(
+  server: Pick<ResolvedMcpServer, "id" | "name">,
+  kind: "ENV" | "HEADER",
+  key: string,
+): string {
+  return `PORACODE_MCP_CLAUDE_${envLabel(server.name, "SERVER")}_${envIdentityHash(server.name, server.id)}_${kind}_${envLabel(key, "VALUE")}_${envIdentityHash(kind, key)}`;
+}
+
+/**
+ * Build Claude's launch-scoped MCP projection without placing credentials in
+ * `--mcp-config` (or the SDK-spawned equivalent). Claude expands `${VAR}` in
+ * MCP env and header values from the child environment.
+ */
+export function buildClaudeMcpLaunchConfig(
+  servers: readonly ResolvedMcpServer[],
+): ClaudeMcpLaunchConfig {
+  const mcpServers = buildClaudeMcpServers(servers);
+  const env: Record<string, string> = {};
+
+  for (const server of servers) {
+    const transport = server.transport;
+    const config = mcpServers[server.name];
+    if (!config) continue;
+
+    if (transport.type === "stdio" && config.type === "stdio") {
+      config.env = Object.fromEntries(
+        Object.entries(transport.env).map(([key, value]) => {
+          const envVar = claudeMcpEnvVar(server, "ENV", key);
+          env[envVar] = value;
+          return [key, `\${${envVar}}`];
+        }),
+      );
+      continue;
+    }
+
+    if (transport.type !== "stdio" && config.type !== "stdio") {
+      config.headers = Object.fromEntries(
+        Object.entries(transport.headers).map(([key, value]) => {
+          const envVar = claudeMcpEnvVar(server, "HEADER", key);
+          env[envVar] = value;
+          return [key, `\${${envVar}}`];
+        }),
+      );
+    }
+  }
+
+  return { mcpServers, env };
 }
 
 export type CursorSdkMcpServerConfig =
@@ -189,6 +248,40 @@ export interface OpenCodeMcpLaunchConfig {
   env: Record<string, string>;
 }
 
+const OPEN_CODE_EXTERNAL_BROWSER_MCPS = [
+  "playwright",
+  "chrome",
+  "chromium",
+  "chrome-devtools",
+  "chrome_devtools",
+  "puppeteer",
+  "selenium",
+  "gstack",
+  "stagehand",
+  "browserbase",
+  "browserstack",
+  "browserless",
+  "firefox",
+  "webkit",
+  "webdriver",
+  "node_repl",
+  "browser-use",
+  "browser_use",
+] as const;
+
+export function buildOpenCodeBrowserExclusiveConfig(): Record<string, unknown> {
+  return {
+    tools: { webfetch: false, websearch: false },
+    permission: {
+      skill: Object.fromEntries(COMPETING_BROWSER_SKILL_NAMES.map((name) => [name, "deny"])),
+      bash: Object.fromEntries(COMPETING_BROWSER_COMMAND_GLOBS.map((pattern) => [pattern, "deny"])),
+    },
+    mcp: Object.fromEntries(
+      OPEN_CODE_EXTERNAL_BROWSER_MCPS.map((name) => [name, { enabled: false }]),
+    ),
+  };
+}
+
 function openCodeMcpEnvVar(
   server: Pick<ResolvedMcpServer, "id" | "name">,
   kind: "ENV" | "HEADER",
@@ -204,6 +297,7 @@ function openCodeMcpEnvVar(
  */
 export function buildOpenCodeMcpLaunchConfig(
   servers: readonly ResolvedMcpServer[],
+  resolvedBrowserMcpNames: readonly string[] = [],
 ): OpenCodeMcpLaunchConfig {
   const mcp = buildOpenCodeMcp(servers);
   const env: Record<string, string> = {};
@@ -237,7 +331,21 @@ export function buildOpenCodeMcpLaunchConfig(
     }
   }
 
-  return { configContent: JSON.stringify({ mcp }), env };
+  const browserExclusive = hasYSpaceBrowserMcp(servers);
+  const browserPolicy = browserExclusive ? buildOpenCodeBrowserExclusiveConfig() : undefined;
+  return {
+    configContent: JSON.stringify({
+      ...(browserPolicy ?? {}),
+      mcp: {
+        ...mcp,
+        ...((browserPolicy?.mcp as Record<string, unknown> | undefined) ?? {}),
+        ...(browserExclusive
+          ? Object.fromEntries(resolvedBrowserMcpNames.map((name) => [name, { enabled: false }]))
+          : {}),
+      },
+    }),
+    env,
+  };
 }
 
 export interface AcpNamedValue {
@@ -399,8 +507,22 @@ export function buildCodexMcp(servers: readonly ResolvedMcpServer[]): CodexMcp {
         serverConfig.args = transport.args;
       }
       if (Object.keys(transport.env).length > 0) {
-        args.push("-c", `${key}.env=${tomlInlineTable(transport.env)}`);
-        serverConfig.env = transport.env;
+        const envVars = Object.keys(transport.env);
+        for (const [envName, envValue] of Object.entries(transport.env)) {
+          const existingValue = env[envName];
+          if (existingValue !== undefined && existingValue !== envValue) {
+            throw new Error(
+              `Codex MCP servers require different values for environment variable ${envName}; refusing to expose either value through launch arguments.`,
+            );
+          }
+          env[envName] = envValue;
+        }
+        // Codex's stdio `env_vars` setting forwards named variables from the
+        // provider process to this MCP child. Values remain launch-scoped in
+        // the provider environment instead of being serialized into `-c`
+        // arguments or structured thread config.
+        args.push("-c", `${key}.env_vars=${tomlStringArray(envVars)}`);
+        serverConfig.env_vars = envVars;
       }
       if (transport.cwd) {
         args.push("-c", `${key}.cwd=${tomlString(transport.cwd)}`);
@@ -427,6 +549,20 @@ export function buildCodexMcp(servers: readonly ResolvedMcpServer[]): CodexMcp {
         serverConfig.bearer_token_env_var = envVar;
         env[envVar] = token;
       }
+    }
+    args.push("-c", `${key}.enabled=true`);
+    serverConfig.enabled = true;
+    if (server.id === "browser") {
+      // Codex 0.150+ defers MCP tools whenever the model advertises tool
+      // search. Some Responses Lite models (notably gpt-5.6-sol) can then omit
+      // tool_search itself, leaving a successfully initialized Browser MCP
+      // unreachable to the model. The embedded Browser is Y Space's required,
+      // default browser route, so fail the launch if it cannot initialize and
+      // keep its tools on the model's initial/direct surface.
+      args.push("-c", `${key}.required=true`);
+      serverConfig.required = true;
+      args.push("-c", `${key}.omit_tools_from=${tomlStringArray(["deferred"])}`);
+      serverConfig.omit_tools_from = ["deferred"];
     }
     args.push("-c", `${key}.tool_timeout_sec=${Math.ceil(server.timeoutMs / 1000)}`);
     serverConfig.tool_timeout_sec = Math.ceil(server.timeoutMs / 1000);

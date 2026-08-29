@@ -308,6 +308,10 @@ describe("browser MCP tool registry", () => {
     expect(BROWSER_MCP_INSTRUCTIONS).toContain("call browser.api");
     expect(BROWSER_MCP_INSTRUCTIONS).toContain("browser.enable");
     expect(BROWSER_MCP_INSTRUCTIONS).toContain("browser.disable");
+    expect(BROWSER_MCP_INSTRUCTIONS).toContain("current turn");
+    expect(BROWSER_MCP_INSTRUCTIONS).toContain("exact tab id");
+    expect(BROWSER_MCP_INSTRUCTIONS).toContain("URL or title");
+    expect(BROWSER_MCP_INSTRUCTIONS).toContain("page result you observed");
     expect(formatted.content[0]?.type).toBe("text");
     expect(formatted.content[0]?.text).toContain('"workflows"');
     expect(formatted.content[0]?.text).toContain('"args"');

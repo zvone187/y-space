@@ -1,3 +1,8 @@
+import type { ChildProcess } from "node:child_process";
+import { once as waitForEvent } from "node:events";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   CanUseTool,
@@ -41,7 +46,8 @@ const mockBase = vi.hoisted(() => ({
 }));
 
 const mockProcessTree = vi.hoisted(() => ({
-  terminateChildProcessTree: vi.fn<(child: { pid?: number }) => void>(),
+  terminateChildProcessTree:
+    vi.fn<(child: { pid?: number }, options?: { ownedProcessGroup?: boolean }) => void>(),
 }));
 
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -80,6 +86,22 @@ function makeFakeSpawnedChild(pid: number): SpawnedProcess {
     pid,
     once: vi.fn<(event: string, listener: (...args: unknown[]) => void) => void>(),
   } as unknown as SpawnedProcess;
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForProcessExit(pid: number, timeoutMs = 3_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (isProcessAlive(pid) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
 }
 
 function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
@@ -337,6 +359,224 @@ describe("ClaudeSdkSession", () => {
     await session.dispose();
   });
 
+  it("makes Y Space Browser the sole browser route in SDK query options", async () => {
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-browser-policy",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+      env: {
+        CLAUDE_CONFIG_DIR: join(tmpdir(), "y-space-test-empty-claude-sdk-browser-profile"),
+      },
+      mcpServers: [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:43210/mcp",
+            headers: { Authorization: "Bearer browser-token" },
+          },
+        },
+      ],
+    });
+    session.setListener({
+      onRuntimeEvent: () => {},
+      onUpdate: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread(config);
+
+    const queryInput = mockSdk.query.mock.calls[0]?.[0] as {
+      options?: Record<string, unknown>;
+    };
+    expect(queryInput.options).toMatchObject({
+      strictMcpConfig: true,
+      disallowedTools: expect.arrayContaining([
+        "WebFetch",
+        "WebSearch",
+        "Skill(gstack)",
+        "Skill(control-in-app-browser *)",
+        "Skill(playwright)",
+        "Bash(*playwright*)",
+        "Bash(*open -a*Safari*)",
+        "Bash(open *https://*)",
+        "Bash(xdg-open *https://*)",
+        "Bash(gio open *https://*)",
+        "PowerShell(Start-Process *https://*)",
+        "PowerShell(start *https://*)",
+        "PowerShell(explorer.exe *https://*)",
+        "Bash(google-chrome*)",
+        "PowerShell(*\\msedge.exe*)",
+        "Bash(sh -lc 'open *https://*)",
+        "Bash(zsh -lc 'firefox*)",
+        "Bash(bash -c 'open *https://*)",
+        "Bash(env DISPLAY=* firefox*)",
+        "Bash(FOO=* firefox*)",
+      ]),
+      extraArgs: expect.objectContaining({ "no-chrome": null }),
+      mcpServers: {
+        browser: {
+          type: "http",
+          url: "http://127.0.0.1:43210/mcp",
+          headers: {
+            Authorization: expect.stringMatching(/^\$\{PORACODE_MCP_CLAUDE_/u),
+          },
+        },
+      },
+      systemPrompt: {
+        type: "preset",
+        preset: "claude_code",
+        append: expect.stringMatching(/Y Space Browser/iu),
+      },
+    });
+    expect(queryInput.options).not.toHaveProperty("skills");
+    expect(queryInput.options?.disallowedTools).not.toContain("Skill");
+    expect(queryInput.options?.extraArgs).not.toHaveProperty("disable-slash-commands");
+    expect(JSON.stringify(queryInput.options?.mcpServers)).not.toContain("browser-token");
+    const queryEnv = queryInput.options?.env as Record<string, string> | undefined;
+    expect(
+      Object.entries(queryEnv ?? {}).some(
+        ([name, value]) => /^PORACODE_MCP_CLAUDE_/u.test(name) && value === "Bearer browser-token",
+      ),
+    ).toBe(true);
+    expect(queryInput.options?.disallowedTools).not.toContain("Skill(qa)");
+    const guidance = (queryInput.options?.systemPrompt as { append?: string } | undefined)?.append;
+    expect(guidance).toMatch(/(?:only|sole).{0,80}browser|browser.{0,80}(?:only|sole)/iu);
+    expect(guidance).toContain("current turn");
+    expect(guidance).toContain("exact tab id");
+    expect(guidance).toContain("URL or title");
+    expect(guidance).toContain("page result you observed");
+
+    await session.dispose();
+  });
+
+  it("shadows every unmanaged Claude profile MCP without mutating provider files", async () => {
+    const root = mkdtempSync(join(tmpdir(), "y-space-claude-sdk-profile-"));
+    let session: ClaudeSdkSession | undefined;
+    try {
+      const profileDir = join(root, "profile");
+      const projectDir = join(root, "project");
+      mkdirSync(join(profileDir, "agents"), { recursive: true });
+      mkdirSync(projectDir, { recursive: true });
+      const statePath = join(profileDir, ".claude.json");
+      const agentPath = join(profileDir, "agents", "profile-helper.md");
+      const filteredAgentPath = join(profileDir, "agents", "legacy-browser-helper.md");
+      writeFileSync(
+        statePath,
+        JSON.stringify({
+          mcpServers: {
+            "profile-safe": {
+              type: "http",
+              url: "${PROFILE_MCP_URL}",
+              headers: { Authorization: "Bearer ${PROFILE_MCP_TOKEN}" },
+            },
+            playwright: { command: "npx", args: ["@playwright/mcp"] },
+          },
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        agentPath,
+        "---\nname: profile-helper\ndescription: Uses the safe profile MCP\nmcpServers:\n  - profile-safe\n---\nUse the safe profile MCP.\n",
+        "utf8",
+      );
+      writeFileSync(
+        filteredAgentPath,
+        "---\nname: legacy-browser-helper\ndescription: Previously used Playwright\nmcpServers:\n  - playwright\n---\nTest the website with the available browser.\n",
+        "utf8",
+      );
+      const originalState = readFileSync(statePath, "utf8");
+      const originalAgent = readFileSync(agentPath, "utf8");
+      const originalFilteredAgent = readFileSync(filteredAgentPath, "utf8");
+      const fake = createFakeQuery();
+      mockSdk.query.mockReturnValue(fake.runtime);
+      mockBinaryResolver.resolveAgentBinaryPath.mockReturnValue("/usr/local/bin/claude");
+      session = await ClaudeSdkSession.create({
+        threadId: "thread-claude-profile-mcp",
+        projectLocation: { kind: "posix", path: projectDir },
+        config,
+        presentationMode: "gui",
+        env: {
+          CLAUDE_CONFIG_DIR: profileDir,
+          PROFILE_MCP_URL: "https://profile.example.test/mcp",
+          PROFILE_MCP_TOKEN: "profile-secret",
+        },
+        mcpServers: [
+          {
+            id: "browser",
+            name: "browser",
+            timeoutMs: 30_000,
+            transport: {
+              type: "http",
+              url: "http://127.0.0.1:43210/mcp",
+              headers: { Authorization: "Bearer browser-secret" },
+            },
+          },
+          {
+            id: "pipedream",
+            name: "pipedream",
+            timeoutMs: 30_000,
+            transport: {
+              type: "http",
+              url: "https://mcp.pipedream.example.test",
+              headers: { Authorization: "Bearer pipedream-secret" },
+            },
+          },
+        ],
+      });
+      session.setListener({
+        onRuntimeEvent: () => {},
+        onUpdate: () => {},
+        onError: () => {},
+        onClose: () => {},
+      });
+
+      await session.openThread(config);
+
+      const queryInput = mockSdk.query.mock.calls[0]?.[0] as {
+        options?: Record<string, unknown>;
+      };
+      const queryServers = queryInput.options?.mcpServers as Record<string, unknown>;
+      const queryAgents = queryInput.options?.agents as Record<string, unknown>;
+      expect(Object.keys(queryServers).sort()).toEqual(["browser", "pipedream"]);
+      expect(queryServers).not.toHaveProperty("playwright");
+      expect(queryAgents).toMatchObject({
+        "profile-helper": {
+          mcpServers: [
+            {
+              browser: expect.objectContaining({ url: "http://127.0.0.1:43210/mcp" }),
+            },
+          ],
+        },
+        "legacy-browser-helper": {
+          mcpServers: [
+            {
+              browser: expect.objectContaining({ url: "http://127.0.0.1:43210/mcp" }),
+            },
+          ],
+        },
+      });
+      const serialized = JSON.stringify({ mcpServers: queryServers, agents: queryAgents });
+      expect(serialized).not.toContain("profile-secret");
+      expect(serialized).not.toContain("pipedream-secret");
+      const queryEnv = queryInput.options?.env as Record<string, string>;
+      expect(Object.values(queryEnv)).toContain("profile-secret");
+      expect(Object.values(queryEnv)).toContain("Bearer pipedream-secret");
+      expect(readFileSync(statePath, "utf8")).toBe(originalState);
+      expect(readFileSync(agentPath, "utf8")).toBe(originalAgent);
+      expect(readFileSync(filteredAgentPath, "utf8")).toBe(originalFilteredAgent);
+    } finally {
+      await session?.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("force-kills the spawned process tree on dispose", async () => {
     const fake = createFakeQuery();
     mockSdk.query.mockReturnValue(fake.runtime);
@@ -374,6 +614,111 @@ describe("ClaudeSdkSession", () => {
       expect.objectContaining({ pid: 4242 }),
     );
   });
+
+  it.skipIf(process.platform === "win32")(
+    "owns and reaps the native POSIX Claude process group on dispose",
+    async () => {
+      const actualChildProcess =
+        await vi.importActual<typeof import("node:child_process")>("node:child_process");
+      const actualProcessTree =
+        await vi.importActual<typeof import("@/shared/processTree")>("@/shared/processTree");
+      mockChildProcess.spawn.mockImplementation(actualChildProcess.spawn);
+      mockProcessTree.terminateChildProcessTree.mockImplementation(
+        actualProcessTree.terminateChildProcessTree,
+      );
+      mockBinaryResolver.resolveAgentBinaryPath.mockReturnValue(process.execPath);
+      const root = mkdtempSync(join(tmpdir(), "y-space-claude-posix-group-"));
+      const descendantPidPath = join(root, "descendant.pid");
+      let session: ClaudeSdkSession | undefined;
+      let spawned: ChildProcess | undefined;
+      let descendantPid: number | undefined;
+      try {
+        const fake = createFakeQuery();
+        mockSdk.query.mockReturnValue(fake.runtime);
+        session = await ClaudeSdkSession.create({
+          threadId: "thread-claude-posix-group",
+          projectLocation: { kind: "posix", path: root },
+          config,
+          presentationMode: "gui",
+        });
+        session.setListener({
+          onRuntimeEvent: () => {},
+          onUpdate: () => {},
+          onError: () => {},
+          onClose: () => {},
+        });
+        await session.openThread(config);
+
+        const queryInput = mockSdk.query.mock.calls[0]?.[0] as {
+          options?: { spawnClaudeCodeProcess?: (opts: SpawnOptions) => SpawnedProcess };
+        };
+        const spawnHook = queryInput.options?.spawnClaudeCodeProcess;
+        expect(spawnHook).toBeTypeOf("function");
+        const script = [
+          'const { spawn } = require("node:child_process");',
+          'const { writeFileSync } = require("node:fs");',
+          'const descendant = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });',
+          "writeFileSync(process.argv[1], String(descendant.pid));",
+          "setInterval(() => {}, 1000);",
+        ].join("\n");
+        spawned = spawnHook!({
+          command: process.execPath,
+          args: ["-e", script, descendantPidPath],
+          cwd: root,
+          env: process.env,
+        } as SpawnOptions) as unknown as ChildProcess;
+
+        const deadline = Date.now() + 3_000;
+        while (descendantPid === undefined && Date.now() < deadline) {
+          try {
+            descendantPid = Number(readFileSync(descendantPidPath, "utf8"));
+          } catch {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+          }
+        }
+        expect(Number.isInteger(descendantPid) && descendantPid! > 0).toBe(true);
+        expect(isProcessAlive(spawned.pid!)).toBe(true);
+        expect(isProcessAlive(descendantPid!)).toBe(true);
+
+        await session.dispose();
+        session = undefined;
+        if (spawned.exitCode === null) {
+          await Promise.race([
+            waitForEvent(spawned, "exit"),
+            new Promise((resolve) => setTimeout(resolve, 3_000)),
+          ]);
+        }
+        await Promise.all([waitForProcessExit(spawned.pid!), waitForProcessExit(descendantPid!)]);
+
+        expect(isProcessAlive(spawned.pid!)).toBe(false);
+        expect(isProcessAlive(descendantPid!)).toBe(false);
+        expect(mockProcessTree.terminateChildProcessTree).toHaveBeenCalledWith(
+          expect.objectContaining({ pid: spawned.pid }),
+          { ownedProcessGroup: true },
+        );
+        expect(mockProcessTree.terminateChildProcessTree).toHaveBeenCalledTimes(1);
+      } finally {
+        await session?.dispose();
+        const leaderPid = spawned?.pid;
+        if (leaderPid && leaderPid > 0) {
+          try {
+            process.kill(-leaderPid, "SIGKILL");
+          } catch {
+            // The owned group was already reaped.
+          }
+        }
+        if (descendantPid && descendantPid > 0 && isProcessAlive(descendantPid)) {
+          try {
+            process.kill(descendantPid, "SIGKILL");
+          } catch {
+            // Already gone.
+          }
+        }
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+    15_000,
+  );
 
   it("switches the SDK permission mode for plan turns instead of changing the base policy", async () => {
     const fake = createFakeQuery();
@@ -508,6 +853,96 @@ describe("ClaudeSdkSession", () => {
     });
 
     await session.dispose();
+  });
+
+  it("denies runtime-mediated page retrieval before opening a permission request", async () => {
+    const browserProject = mkdtempSync(join(tmpdir(), "y-space-claude-sdk-command-policy-"));
+    writeFileSync(
+      join(browserProject, "browser-script.js"),
+      "await fetch('https://private.example.test/path?token=do-not-log');\n",
+    );
+    writeFileSync(join(browserProject, "safe-script.js"), "console.log('safe');\n");
+    writeFileSync(
+      join(browserProject, "package.json"),
+      JSON.stringify({
+        scripts: {
+          e2e: "playwright test",
+          check: "node safe-script.js",
+          postcheck: "node browser-script.js",
+        },
+      }),
+    );
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const runtimeEvents: RuntimeEvent[] = [];
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-browser-command-deny",
+      projectLocation: { kind: "posix", path: browserProject },
+      config,
+      presentationMode: "gui",
+      mcpServers: [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:43210/mcp",
+            headers: { Authorization: "Bearer browser-token" },
+          },
+        },
+      ],
+    });
+    session.setListener({
+      onRuntimeEvent: (event) => runtimeEvents.push(event),
+      onUpdate: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread(config);
+    const queryInput = mockSdk.query.mock.calls[0]?.[0] as {
+      options?: { canUseTool?: CanUseTool };
+    };
+    const canUseTool = queryInput.options?.canUseTool;
+    if (!canUseTool) throw new Error("missing canUseTool");
+
+    await expect(
+      canUseTool(
+        "Bash",
+        { command: `python3 -c "import requests; requests.get('https://example.test')"` },
+        {
+          signal: new AbortController().signal,
+          toolUseID: "toolu_browser_bypass",
+          requestId: "req_browser_bypass",
+        },
+      ),
+    ).resolves.toEqual({
+      behavior: "deny",
+      message: "Use the embedded Y Space Browser for web and browser work.",
+    });
+    for (const command of ["node browser-script.js", "npm run e2e", "npm run check"]) {
+      await expect(
+        canUseTool(
+          "Bash",
+          { command },
+          {
+            signal: new AbortController().signal,
+            toolUseID: `toolu_${command}`,
+            requestId: `req_${command}`,
+          },
+        ),
+      ).resolves.toEqual({
+        behavior: "deny",
+        message: "Use the embedded Y Space Browser for web and browser work.",
+      });
+    }
+    expect(runtimeEvents).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "request.opened" })]),
+    );
+
+    await session.dispose();
+    rmSync(browserProject, { recursive: true, force: true });
   });
 
   it("resumes with the persisted session id without adopting transient hook ids", async () => {
@@ -788,6 +1223,8 @@ describe("ClaudeSdkSession", () => {
   it("spawns WSL GUI sessions directly via wsl.exe without a login shell", async () => {
     const fake = createFakeQuery();
     mockSdk.query.mockReturnValue(fake.runtime);
+    const spawnedChild = makeFakeSpawnedChild(1234);
+    mockChildProcess.spawn.mockReturnValue(spawnedChild);
     mockBase.getWslProjectShellEnv.mockImplementation((_distro, cwd) =>
       cwd === "/home/demo/project"
         ? {
@@ -831,7 +1268,9 @@ describe("ClaudeSdkSession", () => {
         CLAUDE_AGENT_SDK_CLIENT_APP: "poracode",
         LOCALAPPDATA: "C:\\Users\\demo\\AppData\\Local",
         PATH: "C:\\Windows\\System32",
-        FOO: "bar",
+        FOO: "claude-sdk-inline-env-sentinel",
+        PORACODE_MCP_CLAUDE_BROWSER_ABC_HEADER_AUTHORIZATION_DEF:
+          "claude-sdk-wsl-mcp-secret-sentinel",
       },
       signal,
     });
@@ -854,24 +1293,28 @@ describe("ClaudeSdkSession", () => {
     expect(shellArgs.slice(0, 2)).toEqual(["/bin/sh", "-c"]);
     expect(args).not.toContain("-l");
     expect(args).not.toContain("-i");
-    expect(shellArgs[2]).toBe(
-      posixPrivilegedEnvironmentUnsetPrefix() +
-        [
-          "export PATH='/home/demo/.nvm/versions/node/v24/bin:/usr/bin:/bin'",
-          "export NVM_DIR='/home/demo/.nvm'",
-          "export LS_COLORS='rs=0:di=01;34:ln=01'",
-          "export BROWSER='/bin/true'",
-          "export CLAUDE_AGENT_SDK_CLIENT_APP='poracode'",
-          "export FOO='bar'",
-          "exec '/home/demo/.local/bin/claude' 'chat' '--json'",
-        ].join("; "),
+    expect(JSON.stringify(args)).not.toContain("claude-sdk-wsl-mcp-secret-sentinel");
+    expect(JSON.stringify(args)).not.toContain("claude-sdk-inline-env-sentinel");
+    expect(JSON.stringify(args)).not.toContain(
+      "/home/demo/.nvm/versions/node/v24/bin:/usr/bin:/bin",
     );
+    expect(JSON.stringify(args)).not.toContain("/bin/true");
+    expect(shellArgs[2]).toContain(posixPrivilegedEnvironmentUnsetPrefix());
+    expect(shellArgs[2]).toContain("__y_space_launch_env_file");
+    expect(shellArgs[2]).toContain("exec '/home/demo/.local/bin/claude' 'chat' '--json'");
     expect(options).toMatchObject({
       env: process.env,
       signal,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
+
+    const once = spawnedChild.once as unknown as {
+      mock: { calls: Array<[string, (...args: unknown[]) => void]> };
+    };
+    for (const [event, listener] of once.mock.calls) {
+      if (event === "exit") listener(0, null);
+    }
 
     await session.dispose();
   });

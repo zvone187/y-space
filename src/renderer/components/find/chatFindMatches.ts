@@ -1,5 +1,5 @@
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
-import type { ChatTimelineEntry } from "@/renderer/components/thread/ChatPane/chatPaneSelectors";
+import type { ChatDisplayTimelineEntry } from "@/renderer/components/thread/ChatPane/chatPaneSelectors";
 import { countOccurrences } from "./findText";
 
 /** One match within the chat transcript: which timeline row, and which
@@ -67,28 +67,48 @@ export function getChatItemSearchText(item: RuntimeChatItem): string {
 }
 
 /**
- * Flatten the thread's timeline into an ordered match list. Tool-call groups are
- * skipped (the v1 scope is the readable conversation). Each occurrence becomes
- * one entry so prev/next steps through every hit.
+ * Flatten the displayed thread timeline into an ordered match list. Activity
+ * groups keep their outer virtual-row index while matches retain the nested item
+ * id, allowing Find to open the disclosure and highlight the exact message.
+ * Tool output itself remains outside the searchable conversation scope.
  */
 export function collectChatMatches(
   itemsById: Record<string, RuntimeChatItem> | undefined,
-  entries: readonly ChatTimelineEntry[],
+  entries: readonly ChatDisplayTimelineEntry[],
   query: string,
   caseSensitive: boolean,
 ): ChatFindMatch[] {
   if (!query || !itemsById) return [];
   const matches: ChatFindMatch[] = [];
   entries.forEach((entry, itemIndex) => {
-    if (entry.kind !== "item") return;
-    const item = itemsById[entry.id];
-    if (!item) return;
-    const text = getChatItemSearchText(item);
-    if (!text) return;
-    const count = countOccurrences(text, query, caseSensitive);
-    for (let occurrence = 0; occurrence < count; occurrence += 1) {
-      matches.push({ itemId: entry.id, itemIndex, occurrence });
+    if (entry.kind === "turn_activity_group") {
+      for (const activityEntry of entry.entries) {
+        collectEntryMatches(itemsById, activityEntry, itemIndex, query, caseSensitive, matches);
+      }
+      return;
     }
+    collectEntryMatches(itemsById, entry, itemIndex, query, caseSensitive, matches);
   });
   return matches;
+}
+
+function collectEntryMatches(
+  itemsById: Record<string, RuntimeChatItem>,
+  entry: Exclude<ChatDisplayTimelineEntry, { kind: "turn_activity_group" }>,
+  itemIndex: number,
+  query: string,
+  caseSensitive: boolean,
+  matches: ChatFindMatch[],
+): void {
+  const itemIds = entry.kind === "item" ? [entry.id] : entry.itemIds;
+  for (const itemId of itemIds) {
+    const item = itemsById[itemId];
+    if (!item) continue;
+    const text = getChatItemSearchText(item);
+    if (!text) continue;
+    const count = countOccurrences(text, query, caseSensitive);
+    for (let occurrence = 0; occurrence < count; occurrence += 1) {
+      matches.push({ itemId, itemIndex, occurrence });
+    }
+  }
 }

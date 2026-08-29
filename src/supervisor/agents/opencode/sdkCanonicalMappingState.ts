@@ -23,8 +23,8 @@ export interface OpenCodeSubAgentSessionState {
 
 export interface OpenCodeMapperState {
   threadId: string;
-  /** Map AssistantMessage.id → canonical assistant item id. */
-  assistantItems: Map<string, string>;
+  /** Map AssistantMessage.id → text Part.id → canonical assistant item id. */
+  assistantItems: Map<string, Map<string, string>>;
   /** Map UserMessage.id → canonical user item id. */
   userItems: Map<string, string>;
   /** User messages created without a renderer-owned optimistic row. */
@@ -33,8 +33,8 @@ export interface OpenCodeMapperState {
   userMessageTextParts: Map<string, Map<string, string>>;
   /** Map reasoning Part.id → canonical reasoning item id + parent messageID. */
   reasoningItems: Map<string, { itemId: string; messageID: string }>;
-  /** Map tool Part.id → { itemId, itemType }. */
-  toolItems: Map<string, { itemId: string; itemType: CanonicalItemType }>;
+  /** Map tool Part.id → its retained canonical identity and completion state. */
+  toolItems: Map<string, { itemId: string; itemType: CanonicalItemType; completed: boolean }>;
   /**
    * Map Part.id → its type, set by `message.part.updated`. Used to route
    * incoming `message.part.delta` events: OpenCode emits `field: "text"` for

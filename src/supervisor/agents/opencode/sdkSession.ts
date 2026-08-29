@@ -27,6 +27,7 @@ import type {
   ThreadStatus,
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
+import { hasYSpaceBrowserMcp } from "@/shared/browserExclusivePolicy";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,
@@ -250,11 +251,14 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       return id;
     }
 
-    const permission = buildOpenCodePermissionRules(config.approvalPolicy);
+    const permission = buildOpenCodePermissionRules(
+      config.approvalPolicy,
+      hasYSpaceBrowserMcp(this.mcpServers ?? []),
+    );
     const createSession = (server: typeof acquired) =>
       server.client.session.create({
         directory: this.sdkDirectory,
-        title: `poracode/${this.threadId.slice(0, 8)}`,
+        title: `y-space/${this.threadId.slice(0, 8)}`,
         ...(permission ? { permission } : {}),
       });
     let created: Awaited<ReturnType<typeof acquired.client.session.create>>;
@@ -540,9 +544,10 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
   }
 
   private permissionSyncKey(config: ThreadConfig): string {
-    const permission = buildOpenCodePermissionRules(config.approvalPolicy);
+    const browserExclusive = hasYSpaceBrowserMcp(this.mcpServers ?? []);
+    const permission = buildOpenCodePermissionRules(config.approvalPolicy, browserExclusive);
     const base = permission
-      ? "full-access"
+      ? `full-access:${browserExclusive ? "browser-exclusive" : "default"}`
       : `supervised:${config.mode === "plan" ? "plan" : "build"}`;
     const deniedMcpTools = this.disabledMcpPermissionRules()
       .map((rule) => rule.permission)
@@ -567,7 +572,10 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
 
     const acquired = this.requireAcquired();
     const sessionID = this.requireSessionId();
-    const fullAccessPermission = buildOpenCodePermissionRules(config.approvalPolicy);
+    const fullAccessPermission = buildOpenCodePermissionRules(
+      config.approvalPolicy,
+      hasYSpaceBrowserMcp(this.mcpServers ?? []),
+    );
     const deniedMcpTools = this.disabledMcpPermissionRules();
 
     if (fullAccessPermission) {
@@ -746,13 +754,24 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
 
   /**
    * Apply a new provider-level MCP set to this directory instance (OpenCode
-   * settings "Save") without replacing the acquisition or shared SSE stream.
+   * settings "Save"). A browser-presence toggle replaces the acquisition
+   * because that policy is process-scoped; other changes keep the live server.
    * No-op before activation — the launch path already uses the latest set.
    */
   async updateMcpServers(mcpServers: readonly ResolvedMcpServer[]): Promise<void> {
+    const browserPresenceChanged =
+      hasYSpaceBrowserMcp(this.mcpServers ?? []) !== hasYSpaceBrowserMcp(mcpServers);
     this.mcpServers = mcpServers;
     this.appliedPermissionSyncKey = undefined;
     if (!this.activated || this.disposed || !this.acquired) return;
+    // Browser exclusivity is injected through OPENCODE_CONFIG_CONTENT when the
+    // server process launches. Directory-level MCP updates cannot add or remove
+    // those provider-native browser/search denies, so move the live session to
+    // the pool whose launch policy matches the new MCP set.
+    if (browserPresenceChanged) {
+      await this.reacquireOpenCodeServer();
+      return;
+    }
     try {
       await this.acquired.updateMcpServers(mcpServers);
     } catch (cause) {

@@ -3,11 +3,15 @@ export {
   groupedIpcProcedures,
   ipcProcedureMap,
   MAIN_LOCAL_PROCEDURE_NAMES,
+  RENDERER_IPC_PROCEDURE_NAMES,
+  SUPERVISOR_INTERNAL_PROCEDURE_NAMES,
   type IpcProcedureMap,
   type IpcProcedureName,
   type IpcProcedurePayload,
   type IpcProcedureResult,
   type MainLocalProcedureName,
+  type RendererIpcProcedureName,
+  type SupervisorInternalProcedureName,
   type SupervisorProcedureName,
 } from "./procedureMap";
 export {

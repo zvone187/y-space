@@ -1,28 +1,38 @@
 {
-  "version": 3,
+  "version": 5,
   "project": "Y Space",
-  "branch": "y-space-minimal-branding",
+  "branch": "y-space-browser-default-collapse",
   "platform": "macOS Apple Silicon desktop",
   "testedOn": "2026-08-28",
-  "status": "complete_with_external_blockers",
+  "status": "complete_with_external_authorization_gates",
+  "currentPhase": {
+    "name": "Embedded-browser exclusivity and compact turns",
+    "baseBranch": "y-space-minimal-branding",
+    "baseCommit": "5cff3e06",
+    "baseline": "887 passed files, 5 skipped files, 9,926 passed tests, and 85 skipped tests under Node 24.13.0",
+    "failFirst": "11 focused files failed as designed: 17 failed, 241 passed, and 1 skipped. Failures cover all three provider boundaries, OpenCode chronological mapping, compact projection, whole-turn disclosure, and live tool-group collapse.",
+    "implementationStatus": "complete"
+  },
   "build": {
-    "kind": "unsigned ad-hoc macOS package",
+    "kind": "final verified unsigned ad-hoc macOS package",
     "app": "release/mac-arm64/Y Space.app",
     "dmg": "release/Y-Space-1.6.6-arm64.dmg",
     "architecture": "arm64",
-    "sha256": "5cd6e6964f772721fc904e7d3ec335b0277501e5636570ccf7ed3c2c94b4131f",
-    "bytes": 155866606,
+    "sha256": "306a7143eb59a682aa8532b8835e7e83f239b7a4b73243b61136f2e188a32ffa",
+    "bytes": 156279617,
+    "appAsarSha256": "86537dbeb79f1df3cd1124f0729a8d0bd0ec8207c5005b1762b2a175ffd1cb16",
+    "executableSha256": "02a4c01b2c7adbdb277b7f8fe8bcc7c3fe67388a30d69a23c374c8f834508b8a",
     "codesign": "codesign --verify --deep --strict passed; ad-hoc/runtime signature with no Team ID",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
       "status": "pass on the final source state under the repository's pinned Node.js runtime",
-      "passedFiles": 887,
+      "passedFiles": 912,
       "skippedFiles": 5,
-      "passedTests": 9926,
+      "passedTests": 10343,
       "skippedTests": 85,
-      "durationSeconds": 102.98
+      "durationSeconds": 126.46
     },
     "targetedBranding": {
       "status": "pass",
@@ -499,6 +509,190 @@
         "implementation assets/qa-screenshots/branding-appearance-final.jpg"
       ],
       "status": "pass"
+    },
+    {
+      "id": "YS-BROWSER-EXCLUSIVE-E2E-001",
+      "title": "OpenCode visibly operates only the embedded Y Space browser",
+      "userStory": "As an OpenCode user, I want browser testing to happen in the browser tab I can see, rather than in an invisible external Chromium session.",
+      "setup": "Launch the new unsigned package with an isolated profile, a localhost fixture with visible state changes, and the configured OpenCode models. Keep the user's normal OpenCode profile unchanged.",
+      "instrumentation": "Capture the global browser tab strip and page before/during/after the run, canonical tool events, launch-scoped effective config, and child-process summaries without environment values.",
+      "steps": [
+        "Start an OpenCode GUI task and ask it to open the localhost fixture, change a named input, submit it, verify the resulting DOM text, and report the active global browser tab.",
+        "Repeat with a second configured OpenCode model and ask it to find and reuse the first browser tab before creating one disposable peer tab.",
+        "Inspect the visible page and process/tool evidence, then close the disposable tab through the agent."
+      ],
+      "expected": [
+        "The visible embedded page navigates and changes while the agent is running, and the agent reports the exact Y Space tab ID, URL, title, and resulting DOM text.",
+        "Only Y Space Browser tools are model-visible for browser work; no /browse, gstack, Playwright, Chrome, WebFetch, or WebSearch route is invoked.",
+        "No external/headless browser helper remains, unrelated integrations still work, and the disposable tab is released."
+      ],
+      "proofToCapture": [
+        "Before/during/after packaged-app screenshots",
+        "Redacted canonical browser tool sequence",
+        "Redacted process summary and unchanged-profile checksum"
+      ],
+      "manualEvidence": [
+        "The final packaged app visibly selected OpenCode Big Pickle, found Codex's existing Alpha global Browser tab, changed the form to QA-FINAL-OPENCODE-LATEST, clicked Save, and displayed the new saved status while Working stayed collapsed.",
+        "The settled answer reported active tab tab-36536349-d6cd-4b71-a8d3-e73e59c7a65e, the exact localhost URL and title, one remaining tab, and Browser verified · 6 actions.",
+        "No external browser process appeared; the user's pre-existing Google Chrome PID 685 remained unchanged. The launch-scoped profile and command-gate suites passed without changing the normal OpenCode profile."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/browser-exclusive-opencode-working-final.jpeg",
+        "implementation assets/qa-screenshots/browser-exclusive-opencode-settled-final.jpeg"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "YS-BROWSER-EXCLUSIVE-E2E-002",
+      "title": "Codex visibly operates only the embedded Y Space browser",
+      "userStory": "As a Codex user, I want the embedded browser to be its default and only browser route in both terminal and structured tasks.",
+      "setup": "Use the same isolated packaged profile and localhost fixture with one Codex terminal task and one Codex GUI task.",
+      "instrumentation": "Record effective Codex overrides, model-visible MCP inventory, visible browser state, and process summaries without reading user credentials or unrelated config content.",
+      "steps": [
+        "Ask the GUI task to find or open the fixture, perform a visible interaction, verify the result, and capture browser evidence.",
+        "Repeat the visible interaction from a terminal-presentation task.",
+        "Verify disabled Codex browser features, search, browser-backed MCPs, and browser skills cannot be selected while Y Space Browser remains available."
+      ],
+      "expected": [
+        "Both presentation modes operate the exact visible Y Space browser and preserve the global tab model.",
+        "Codex native browser, in-app-browser, external-browser, live web search, and configured external browser MCP/skill paths are launch-disabled.",
+        "Normal Codex profile files are byte-for-byte unchanged."
+      ],
+      "proofToCapture": [
+        "Packaged GUI and terminal screenshots",
+        "Redacted override/tool inventory",
+        "Before/after profile checksums"
+      ],
+      "manualEvidence": [
+        "The final packaged app visibly selected Codex GPT-5.6 Sol and used 15 nested mcp__browser__ calls through the isolated Code Mode host; no shell or external-browser route performed the page work.",
+        "Codex saved QA-CODEX-FINAL in Alpha, created Beta as a second global Browser peer, reached Count: 2, listed both tabs, closed Beta, returned to Alpha, and reported the exact surviving tab ID with Browser verified · 11 actions.",
+        "The packaged Codex process used a private CODEX_HOME and the user's completed CODEX_SQLITE_HOME, initialized successfully, created no private SQLite backfill database, and left no helper after quit. Terminal and structured launch contracts are covered by passing regressions; the visible click run exercised the structured GUI path."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg",
+        "implementation assets/qa-screenshots/browser-exclusive-codex-5-6-sol-settled-final.jpeg"
+      ],
+      "status": "pass_gui_and_terminal_contract"
+    },
+    {
+      "id": "YS-BROWSER-EXCLUSIVE-E2E-003",
+      "title": "Claude launch contract exposes only Y Space Browser",
+      "userStory": "As a Claude Code user, I want the same visible embedded-browser behavior without Claude Chrome, native web tools, or inherited browser skills competing for the task.",
+      "setup": "Use Claude Code 2.1.210 in the isolated packaged profile. The currently logged-out CLI is sufficient for launch-contract verification; live inference requires the user to authenticate first.",
+      "instrumentation": "Capture redacted terminal argv/SDK options and MCP inventory. Never enter credentials or mutate Claude's normal profile.",
+      "steps": [
+        "Start terminal and GUI Claude tasks far enough to inspect their launch contracts.",
+        "Verify strict MCP, no Chrome, WebFetch/WebSearch denial, targeted suppression of browser-driving skills and commands, preservation of unrelated skills/MCPs, credentials absent from argv, and sole-browser guidance.",
+        "After user authentication, repeat the localhost visible-interaction scenario in both presentation modes."
+      ],
+      "expected": [
+        "Both launch paths contain only the Y Space Browser route for browser work and retain unrelated skills and MCPs.",
+        "The logged-out state fails before inference without exposing credentials or altering account state.",
+        "After authentication, the visible embedded page changes and no external browser route runs."
+      ],
+      "proofToCapture": [
+        "Redacted CLI and SDK launch contracts",
+        "Logged-out blocker evidence",
+        "Post-auth packaged screenshots when available"
+      ],
+      "manualEvidence": [
+        "A fresh packaged thread stopped honestly at Sign in required — Claude Code: Run claude auth login before this thread can run.",
+        "Launch-contract tests passed for strict MCP configuration, Claude Chrome disablement, WebFetch/WebSearch denial, browser-skill suppression, private profile projection, and process-group cleanup.",
+        "No credential was entered and no normal Claude profile was changed."
+      ],
+      "status": "pass_launch_contract_live_inference_blocked_by_external_auth"
+    },
+    {
+      "id": "YS-COMPACT-TURN-E2E-001",
+      "title": "A running turn shows one closed work disclosure and a visible answer candidate",
+      "userStory": "As a user, I want the conversation to stay calm while the agent works, while still letting me inspect progress when I choose.",
+      "setup": "Run a packaged localhost browser task that emits reasoning, narration, commands, multiple tools, and at least two assistant text parts separated by a tool.",
+      "instrumentation": "Capture the chat during streaming and the canonical item order.",
+      "steps": [
+        "Observe the turn while reasoning, narration, and the first tools arrive without opening the disclosure.",
+        "Open the disclosure manually while the turn is live and confirm new operations append inside the same row.",
+        "Observe a tail assistant candidate, then cause a later tool to arrive."
+      ],
+      "expected": [
+        "All intermediate work is behind one initially closed Working disclosure and its heavy body is not mounted while closed.",
+        "Manual live expansion persists and there is never a second top-level work disclosure for the turn.",
+        "The tail assistant candidate is visible until the later tool arrives, then moves into the disclosure in chronological order without duplication."
+      ],
+      "proofToCapture": [
+        "Streaming closed-state screenshot",
+        "Streaming manually expanded screenshot",
+        "Canonical item-order record"
+      ],
+      "manualEvidence": [
+        "During both final Codex and OpenCode runs the transcript showed one compact Working row while Browser operations continued visibly in the right workspace; no command or tool stream was expanded by default.",
+        "The OpenCode chronological mapping and live work-group expansion behavior are covered by passing canonical mapping and component regressions."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg",
+        "implementation assets/qa-screenshots/browser-exclusive-opencode-working-final.jpeg"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "YS-COMPACT-TURN-E2E-002",
+      "title": "A settled turn collapses all work and leaves only the final answer expanded",
+      "userStory": "As a user, I want completed conversations to read like Codex: my prompt, one quiet work row, and the final answer.",
+      "setup": "Complete the packaged task from YS-COMPACT-TURN-E2E-001 and prepare a second turn containing a question/answer boundary.",
+      "instrumentation": "Capture the completed chat, accessibility state, manual expansion, and Find behavior.",
+      "steps": [
+        "Let the first turn complete while its disclosure is manually open.",
+        "Expand the settled Worked disclosure, inspect all retained items, collapse it again, and search for text from an intermediate item.",
+        "Run the question/answer turn and verify the question and later user response stay outside the work row."
+      ],
+      "expected": [
+        "Completion automatically closes the disclosure and the final assistant message is the only expanded response content.",
+        "Manual expansion retains every intermediate item and Find maps a hidden match to the correct visible work row without index drift.",
+        "Questions and user messages remain independently visible and keyboard/accessibility semantics remain valid."
+      ],
+      "proofToCapture": [
+        "Completed final-only screenshot",
+        "Expanded historical-work screenshot",
+        "Find and accessibility-state evidence"
+      ],
+      "manualEvidence": [
+        "Codex settled to Worked · 38 steps and OpenCode to Worked · 24 steps, both closed by default with the final answer and Browser proof badge visible.",
+        "Computer Use expanded and collapsed each settled disclosure; intermediate MCP/thought detail appeared only while open, and the final answer remained visible after collapse.",
+        "Projection, question boundaries, hidden-match mapping, and accessibility semantics pass component regressions."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/browser-exclusive-codex-5-6-sol-settled-final.jpeg",
+        "implementation assets/qa-screenshots/browser-exclusive-opencode-settled-final.jpeg"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "YS-BROWSER-EXCLUSIVE-E2E-004",
+      "title": "Repeated browser turns clean up tabs, guests, and launch overlays",
+      "userStory": "As a long-running desktop user, I want repeated agent browser tests without accumulating invisible browsers, webviews, sessions, or transcript render work.",
+      "setup": "Use an isolated packaged profile, localhost-only pages, one retained anchor page, and repeated create/activate/close batches within documented metadata and live-webview limits.",
+      "instrumentation": "Sample Y Space main/browser-core RSS, guest-renderer counts, global tab metadata, provider processes, and closed disclosure DOM size at warm baseline, peak, and cleanup.",
+      "steps": [
+        "Warm the profile, capture a median baseline, and execute repeated agent-owned browser-tab batches.",
+        "At each peak verify tab inventory and the six-live-ordinary-webview cap, then close every batch tab and wait for cleanup.",
+        "Close the anchor, quit, confirm no isolated helpers remain, relaunch, and verify disposable pages do not restore."
+      ],
+      "expected": [
+        "Settled guest-renderer count never exceeds six and returns to baseline after cleanup; no external browser process appears.",
+        "Closed work bodies remain unmounted, tab metadata stays bounded, and cleaned browser-core memory has no repeatable positive leak slope.",
+        "No isolated helper survives quit and only intended tabs restore."
+      ],
+      "proofToCapture": [
+        "Machine-readable soak samples",
+        "Peak and cleanup screenshots",
+        "Post-quit and relaunch process/tab evidence"
+      ],
+      "manualEvidence": [
+        "The established two-cycle soak retained the six-live-guest ceiling, returned to baseline after cleanup, and showed no repeatable leak signal.",
+        "In the final package Codex created and closed a disposable Beta browser. After clean quit every Y Space/agent/browser helper exited; relaunch restored only Alpha and did not recreate Beta.",
+        "The user's existing Google Chrome PID 685 remained untouched throughout both final provider runs and the restart check."
+      ],
+      "artifact": "implementation assets/browser-memory-soak.json",
+      "status": "pass_no_leak_signal"
     }
   ]
 }

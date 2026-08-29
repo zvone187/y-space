@@ -1,7 +1,7 @@
 import type { ToolSpec } from "./types";
+import { Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE } from "@/shared/browserExclusivePolicy";
 
-export const BROWSER_MCP_INSTRUCTIONS =
-  "Use the browser MCP server for browsing, inspecting, clicking, typing, screenshots, network/console checks, and local web app verification inside Y Space. Before the first browsing action, call browser.enable once and keep it enabled across the whole uninterrupted browser session so agent presence stays consistent between calls. Always call browser.disable before pausing to ask for user input, waiting for an external event, or finishing, and enable again when you resume. Prefer browser.snapshot or browser.find before browser.click/fill/type, use @e refs from snapshots when possible, and call browser.api when you need the complete API map.";
+export const BROWSER_MCP_INSTRUCTIONS = `${Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE} Before the first browsing action, call browser.enable once and keep it enabled across the whole uninterrupted browser session so agent presence stays consistent between calls. Always call browser.disable before pausing to ask for user input, waiting for an external event, or finishing, and enable again when you resume. Prefer browser.snapshot or browser.find before browser.click/fill/type, use @e refs from snapshots when possible, and call browser.api when you need the complete API map.`;
 
 const RAW_TOOLS: ToolSpec[] = [
   {

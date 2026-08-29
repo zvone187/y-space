@@ -3,20 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space — Final Implementation Report</title>
+    <title>Y Space — Browser Default &amp; Compact Turns</title>
     <style>
       :root {
-        --canvas: #f6f2e8;
-        --ink: #172026;
-        --muted: #65727a;
-        --border: #2c3338;
+        --canvas: #fffaf4;
+        --ink: #1e1b18;
+        --muted: #716a63;
+        --border: #2f2a25;
         --paper: #ffffff;
-        --blue: #d9ecff;
-        --green: #dff5df;
-        --yellow: #fff1b8;
-        --pink: #ffe2eb;
-        --purple: #eadfff;
-        --shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
+        --orange: #ff6b22;
+        --orange-soft: #ffe3cf;
+        --green: #e4f6df;
+        --blue: #e3f0ff;
+        --yellow: #fff2bd;
+        --pink: #ffe2e8;
+        --purple: #eee6ff;
+        --shadow: 7px 7px 0 rgba(47, 42, 37, 0.15);
         font-family:
           Inter,
           ui-sans-serif,
@@ -31,8 +33,8 @@
       }
       body {
         background:
-          linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
-          linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px), var(--canvas);
+          linear-gradient(90deg, rgba(47, 42, 37, 0.06) 1px, transparent 1px),
+          linear-gradient(rgba(47, 42, 37, 0.06) 1px, transparent 1px), var(--canvas);
         background-size: 28px 28px;
         color: var(--ink);
         line-height: 1.45;
@@ -56,37 +58,34 @@
         margin: 0;
       }
       h1 {
-        font-size: clamp(2.2rem, 6vw, 4.8rem);
-        line-height: 0.95;
+        font-size: clamp(2rem, 5vw, 4.2rem);
+        line-height: 0.98;
       }
       h2 {
         font-size: 1.05rem;
-        letter-spacing: 0.04em;
         text-transform: uppercase;
       }
       a {
-        color: #0f5f85;
-        font-weight: 800;
+        color: #a83a00;
+        font-weight: 780;
         text-decoration: none;
       }
       code {
-        background: rgba(255, 255, 255, 0.72);
-        border: 1px solid rgba(47, 58, 66, 0.24);
+        background: rgba(255, 255, 255, 0.75);
+        border: 1px solid rgba(47, 42, 37, 0.23);
         border-radius: 6px;
         padding: 2px 5px;
       }
       .hero,
       .card,
-      .sticky,
       details,
-      .shot {
+      .sticky {
         border: 2px solid var(--border);
         box-shadow: var(--shadow);
       }
       .hero,
       .card,
-      details,
-      .shot {
+      details {
         background: var(--paper);
         border-radius: 16px;
       }
@@ -96,7 +95,7 @@
       .hero p {
         color: var(--muted);
         margin-top: 12px;
-        max-width: 780px;
+        max-width: 760px;
       }
       .meta-stack,
       .grid {
@@ -108,9 +107,6 @@
       }
       .grid.three {
         grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-      .grid.four {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
       }
       .card {
         padding: 16px;
@@ -124,10 +120,9 @@
       }
       .card strong {
         display: block;
-        font-size: 1.25rem;
+        font-size: 1.22rem;
         line-height: 1.15;
         margin-top: 4px;
-        overflow-wrap: anywhere;
       }
       .tag,
       .pill {
@@ -140,14 +135,14 @@
         text-transform: uppercase;
       }
       .tag {
-        background: var(--green);
+        background: var(--orange-soft);
         margin-bottom: 12px;
       }
       .pill {
         margin: 0 6px 6px 0;
       }
       .board-section {
-        margin-top: 26px;
+        margin-top: 24px;
       }
       .section-title {
         align-items: center;
@@ -156,7 +151,7 @@
         margin-bottom: 12px;
       }
       .pin {
-        background: #ff6b57;
+        background: var(--orange);
         border: 2px solid var(--border);
         border-radius: 50%;
         height: 16px;
@@ -164,12 +159,12 @@
       }
       .sticky {
         border-radius: 3px;
-        min-height: 138px;
+        min-height: 128px;
         padding: 16px;
-        transform: rotate(-0.45deg);
+        transform: rotate(-0.55deg);
       }
       .sticky:nth-child(even) {
-        transform: rotate(0.45deg);
+        transform: rotate(0.55deg);
       }
       .sticky h3 {
         font-size: 1.08rem;
@@ -177,18 +172,21 @@
       }
       .sticky p,
       .sticky li {
-        color: #334148;
-        font-size: 0.92rem;
+        color: #453f39;
+        font-size: 0.93rem;
       }
       .sticky ul {
         margin: 8px 0 0;
         padding-left: 18px;
       }
-      .bg-blue {
-        background: var(--blue);
+      .bg-orange {
+        background: var(--orange-soft);
       }
       .bg-green {
         background: var(--green);
+      }
+      .bg-blue {
+        background: var(--blue);
       }
       .bg-yellow {
         background: var(--yellow);
@@ -202,53 +200,74 @@
       summary {
         cursor: pointer;
         font-weight: 850;
+        list-style: none;
         padding: 14px 16px;
+      }
+      summary::-webkit-details-marker {
+        display: none;
+      }
+      summary:before {
+        content: "+";
+        display: inline-block;
+        font-weight: 900;
+        margin-right: 10px;
+        width: 14px;
+      }
+      details[open] summary:before {
+        content: "−";
       }
       .detail-body {
         border-top: 2px solid var(--border);
-        color: #334148;
+        color: #453f39;
         padding: 14px 16px 16px;
       }
       .detail-body ul {
         margin: 8px 0 0;
         padding-left: 18px;
       }
+      .evidence {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .evidence figure {
+        background: var(--paper);
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        margin: 0;
+        overflow: hidden;
+      }
+      .evidence img {
+        display: block;
+        height: auto;
+        width: 100%;
+      }
+      .evidence figcaption {
+        color: var(--muted);
+        font-size: 0.83rem;
+        padding: 9px 11px;
+      }
       table {
         border-collapse: collapse;
-        font-size: 0.88rem;
-        margin-top: 10px;
         width: 100%;
       }
       th,
       td {
-        border: 1px solid rgba(47, 58, 66, 0.35);
+        border-bottom: 1px solid #d7d0c8;
         padding: 8px;
         text-align: left;
         vertical-align: top;
       }
       th {
-        background: var(--blue);
-      }
-      .shot {
-        overflow: hidden;
-      }
-      .shot img {
-        display: block;
-        height: 260px;
-        object-fit: cover;
-        object-position: top;
-        width: 100%;
-      }
-      .shot figcaption {
         color: var(--muted);
-        font-size: 0.86rem;
-        padding: 10px 12px;
+        font-size: 0.78rem;
+        text-transform: uppercase;
       }
       @media (max-width: 900px) {
         header,
         .grid.two,
         .grid.three,
-        .grid.four {
+        .evidence {
           grid-template-columns: 1fr;
         }
       }
@@ -259,634 +278,301 @@
       <header>
         <section class="hero" aria-labelledby="title">
           <span class="tag">Post-implementation handoff</span>
-          <h1 id="title">Y Space, refined</h1>
+          <h1 id="title">Y Space now uses its own Browser</h1>
           <p>
-            The desktop app now presents a calm white-and-orange product shell with native system
-            typography, lighter glass surfaces, strong contrast, one compact footer menu, and the
-            same agent-connected global browser, tool, and document tab model underneath.
-          </p>
-          <p>
-            Branding PR: <code>https://github.com/zvone187/y-space/pull/2</code> ·
-            <a href="https://github.com/zvone187/y-space/pull/1">base feature PR #1</a>
+            The final unsigned ARM64 package makes the visible embedded Browser the default and sole
+            browser route for agents, uses one global tab model, and collapses intermediate work
+            like Codex.
           </p>
         </section>
         <aside class="meta-stack" aria-label="Report metadata">
           <div class="card bg-green">
-            <small>Status</small><strong>Ready · external gates disclosed</strong>
+            <small>Status</small><strong>Pass · external auth gates disclosed</strong>
           </div>
           <div class="card bg-blue">
-            <small>Final targeted QA</small><strong>80 / 80 passed</strong>
+            <small>Branch</small><strong>y-space-browser-default-collapse</strong>
           </div>
           <div class="card bg-yellow">
-            <small>Branch</small><strong>y-space-minimal-branding</strong>
+            <small>Date / platform</small><strong>2026-08-28 · macOS ARM64</strong>
           </div>
-          <div class="card bg-purple"><small>Date</small><strong>2026-08-28</strong></div>
         </aside>
       </header>
 
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Outcome</h2>
+          <h2>Fast Answer</h2>
         </div>
         <div class="grid three">
-          <article class="sticky bg-green">
-            <h3>Quiet product shell</h3>
+          <div class="sticky bg-green">
+            <h3>Working now</h3>
             <p>
-              Warm whites, very light gray hierarchy, restrained glass, and bright orange accents
-              replace the denser developer-tool presentation.
+              Codex GPT-5.6 Sol and OpenCode Big Pickle visibly drove the same embedded Browser,
+              changed localhost pages, managed global tabs, and returned authenticated Browser
+              proof.
             </p>
-          </article>
-          <article class="sticky bg-blue">
-            <h3>One global tab concept</h3>
-            <p>
-              Browser pages, tools, source files, Markdown, PDF, XLS, and XLSX remain peers in one
-              draggable, keyboard-accessible top strip—never a browser-within-browser tab row.
-            </p>
-          </article>
-          <article class="sticky bg-yellow">
-            <h3>Capability preserved</h3>
-            <p>
-              Codex and OpenCode still manage embedded tabs directly. Browser metadata is bounded at
-              30 and ordinary live guests remain true-LRU capped at six.
-            </p>
-          </article>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Minimal visual system</h2>
-        </div>
-        <div class="grid four">
-          <article class="sticky bg-green">
-            <h3>White + orange</h3>
-            <p>
-              Fresh profiles settle on white with warm-neutral surfaces, hairline borders, dark
-              text, and <code>#ff5a1f</code> reserved for active and primary moments.
-            </p>
-          </article>
-          <article class="sticky bg-blue">
-            <h3>Familiar typography</h3>
-            <p>
-              Ordinary labels and prose use the native macOS/system sans stack. Monospace remains
-              only where code, paths, terminal output, or technical identifiers need it.
-            </p>
-          </article>
-          <article class="sticky bg-yellow">
-            <h3>One footer menu</h3>
-            <p>
-              Four persistent utility icons became one More menu, including sidebar visibility.
-              Workspace, Usage, shortcuts, updates, Remote Access, and Settings stay named.
-            </p>
-          </article>
-          <article class="sticky bg-pink">
-            <h3>Contrast by contract</h3>
-            <p>
-              Accent text meets 4.5:1, control borders meet 3:1, focus rings remain visible, and
-              enabled muted text is solid rather than washed out by alpha.
-            </p>
-          </article>
-        </div>
-        <details open>
-          <summary>What was deliberately removed or simplified</summary>
-          <div class="detail-body">
-            Ambient Git line counts, repeated branch/project metadata, the always-visible thread
-            tool rail, developer-oriented descriptions, and the legacy four-icon footer no longer
-            compete with the user's work. Appearance copy now says things such as
-            <strong>Chat text size</strong> and describes the frosted-glass effect in plain
-            language.
           </div>
-        </details>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Browser lifecycle</h2>
-        </div>
-        <div class="grid four">
-          <article class="sticky bg-blue">
-            <h3>Independent page</h3>
+          <div class="sticky bg-orange">
+            <h3>Conversation is calm</h3>
             <p>
-              Every browser global tab owns one URL, history, title, page state, and agent target.
+              Reasoning, commands, and tools live in one closed <strong>Working/Worked</strong> row.
+              The final response stays visible, and history expands only on request.
             </p>
-          </article>
-          <article class="sticky bg-green">
-            <h3>True LRU</h3>
-            <p>
-              User and agent activation promote the target. The active page is protected and the
-              least-recent inactive ordinary page is suspended first.
-            </p>
-          </article>
-          <article class="sticky bg-purple">
-            <h3>Safe resume</h3>
-            <p>
-              Bounded metadata restores pages on demand. Sensitive URLs stay memory-only and are
-              redacted to <code>about:blank</code> in persistence.
-            </p>
-          </article>
-          <article class="sticky bg-pink">
-            <h3>Real teardown</h3>
-            <p>
-              Eviction and close unmount webviews, detach DOM/global listeners, suspend CDP
-              controllers, clear manager state, and ignore stale async callbacks.
-            </p>
-          </article>
-        </div>
-        <details open>
-          <summary>Packaged process evidence</summary>
-          <div class="detail-body">
-            Nine browser pages were present as global-tab metadata, but the packaged process list
-            contained only four browser renderer processes plus the main renderer. That observed
-            live set stayed below the six-page ordinary ceiling instead of retaining one renderer
-            per metadata tab.
           </div>
-        </details>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Manual packaged QA</h2>
+          <div class="sticky bg-yellow">
+            <h3>Only remaining gates</h3>
+            <p>
+              Claude live inference needs <code>claude auth login</code>. Persistent Pipedream
+              OAuth/account grants still require explicit user authorization. Neither was
+              fabricated.
+            </p>
+          </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Flow</th>
-              <th>Result</th>
-              <th>Observed evidence</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Fresh visual baseline</td>
-              <td>Pass</td>
-              <td>
-                A fresh isolated profile settled on the white welcome workspace with warm-neutral
-                surfaces, thin dividers, dark text, and restrained bright-orange interaction states.
-              </td>
-            </tr>
-            <tr>
-              <td>Sidebar footer</td>
-              <td>Pass</td>
-              <td>
-                The final package showed only the More control in the footer. Its menu exposed
-                Workspace, Usage, Pull requests, Schedules, What's New, Remote Access Off, Settings,
-                and Hide sidebar as named items. Hiding left one collapsed-rail More control whose
-                menu exposed Show sidebar; selecting it restored the expanded sidebar.
-              </td>
-            </tr>
-            <tr>
-              <td>Compact panel docking</td>
-              <td>Pass</td>
-              <td>
-                Computer Use dragged the final packaged Files grip into the lower right-panel half.
-                Y Space rendered the split and announced the exact panel-tab to right-panel drop;
-                closing it preserved both browser peers.
-              </td>
-            </tr>
-            <tr>
-              <td>Typography and Appearance</td>
-              <td>Pass</td>
-              <td>
-                Ordinary product UI used native system typography. Settings used concise copy such
-                as Chat text size and plain-language frosted-glass descriptions; monospace remained
-                limited to genuinely technical content.
-              </td>
-            </tr>
-            <tr>
-              <td>Quiet update check</td>
-              <td>Pass</td>
-              <td>
-                No update-error toast appeared during a 35-second wait beyond the scheduled check
-                for the fork with no published GitHub versions. Real update failures remain visible.
-              </td>
-            </tr>
-            <tr>
-              <td>Saved dark appearance</td>
-              <td>Automated contract</td>
-              <td>
-                Theme preset and settings-migration tests verify that explicit saved appearance is
-                honored. A saved-dark profile was not manually re-captured in the final package, so
-                this report does not claim a manual dark-theme pass.
-              </td>
-            </tr>
-            <tr>
-              <td>Global browser peers</td>
-              <td>Pass</td>
-              <td>
-                Alpha, Gamma, and DuckDuckGo appeared in the sole global strip; no nested strip.
-              </td>
-            </tr>
-            <tr>
-              <td>Browser create/switch/close</td>
-              <td>Pass</td>
-              <td>
-                Cmd+T created a peer browser tab; switching preserved state; guest Cmd+W selected
-                adjacent Files.
-              </td>
-            </tr>
-            <tr>
-              <td>Top-right tools</td>
-              <td>Pass</td>
-              <td>
-                Files, Git, Usage, Notes, Browser, and Terminal opened or focused peer global tabs.
-              </td>
-            </tr>
-            <tr>
-              <td>Documents</td>
-              <td>Pass</td>
-              <td>
-                Source, Markdown, PDF, XLS, XLSX, and malformed-workbook handling stayed inside Y
-                Space.
-              </td>
-            </tr>
-            <tr>
-              <td>Mixed-tab keyboard access</td>
-              <td>Pass</td>
-              <td>
-                Ctrl+Tab cycled between browser peers and crossed from the last browser into Files,
-                including while the browser address field was focused.
-              </td>
-            </tr>
-            <tr>
-              <td>Bounded browser residency</td>
-              <td>Pass</td>
-              <td>
-                A packaged two-cycle churn run created and closed 30 disposable browser peers.
-                Metadata reached 30 and rejected a 31st tab; both peaks held exactly 6 guest
-                renderers, and both cleanups returned to the 4-renderer baseline. Final browser-core
-                RSS was only 0.9% above baseline, original tabs survived intact, closed disposable
-                tabs did not restore, and no helper survived quit.
-              </td>
-            </tr>
-            <tr>
-              <td>Codex browser control</td>
-              <td>Pass</td>
-              <td>
-                gpt-5.6-luna listed pages, edited Alpha, reused Gamma, ran its request, and captured
-                a screenshot. A second packaged run visibly selected gpt-5.6-sol, reused the
-                existing Example Domain tab without changing the 10-tab inventory, read its exact
-                URL/title/H1, captured a Browser screenshot, and returned Idle.
-              </td>
-            </tr>
-            <tr>
-              <td>OpenCode models</td>
-              <td>Pass</td>
-              <td>
-                Both live CLI model checks passed. In the final package, ZAI GLM-4.5-Flash used only
-                Y Space Browser tools, listed all 9 tabs, opened or focused Example Domain without
-                external browser control, captured a 39,346-byte 1140×1646 screenshot, and returned
-                Idle. A second packaged run visibly selected OpenCode GPT-5.6 Terra, created one
-                example.org peer from a 10-tab baseline, captured it, closed only that disposable
-                page, and returned to the same 10 tabs with the original example.com page active.
-              </td>
-            </tr>
-            <tr>
-              <td>Cookie-file import</td>
-              <td>Pass</td>
-              <td>
-                The native picker imported the harmless example.com fixture with 1 cookie accepted
-                and 0 rejected. No browser extension or external browser was used.
-              </td>
-            </tr>
-            <tr>
-              <td>Pipedream environment and live API</td>
-              <td>Read-only pass</td>
-              <td>
-                The packaged native picker accepted a harmless fixture, safely rejected its fake
-                credentials, and then forgot the saved path. The ignored mode-600 real file then
-                passed production client-credentials exchange plus read-only project, app-catalog (1
-                Slack sample), and credential-excluding account-list requests (0 accounts for a
-                synthetic QA user). No Connect token, OAuth account grant, or account mutation was
-                created. In the final package, BYO Connect rendered Ready, a hands-on Slack search
-                returned its Connect action, and Connected accounts stayed empty; Connect was not
-                clicked. Clean quit left no Pipedream path or connection-store JSON. Six focused
-                Pipedream boundary files also passed all 34 tests.
-              </td>
-            </tr>
-            <tr>
-              <td>Native app menu</td>
-              <td>Pass</td>
-              <td>The macOS menu showed About Y Space and Quit Y Space.</td>
-            </tr>
-            <tr>
-              <td>Claude Code</td>
-              <td>External blocker</td>
-              <td>
-                2.1.210 is installed but logged out. A no-tools/no-session Sonnet smoke request
-                stopped before inference with the same authentication blocker; user login is
-                required for a live model run.
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </section>
 
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Visual evidence</h2>
+          <h2>What Changed</h2>
         </div>
         <div class="grid three">
-          <figure class="shot">
-            <img
-              src="qa-screenshots/branding-welcome-package-final.jpg"
-              alt="Final Y Space white and orange welcome workspace with one compact footer menu"
-            />
-            <figcaption>
-              Final package: white/orange welcome, native typography, single More menu, and no
-              update-error toast after the scheduled check.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/branding-appearance-final.jpg"
-              alt="Final Y Space Appearance settings with simplified product language"
-            />
-            <figcaption>
-              Appearance: consumer-facing language, lighter surfaces, and familiar system type.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/branding-dock-handle-package-final.jpg"
-              alt="Final packaged Y Space browser workspace split with the Files panel after a compact-menu drag"
-            />
-            <figcaption>
-              Final package: Computer Use dragged the compact Files grip into a live right-panel
-              split, then closed it without disturbing either browser peer.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/branding-browser-global-tab-final.jpg"
-              alt="Embedded browser shown as a peer in the global Y Space tab strip"
-            />
-            <figcaption>
-              Branding-layer QA retained the browser as a first-class peer in the one global strip.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/final-single-global-browser-tabs.jpeg"
-              alt="Browser pages shown as peer tabs in the global workspace strip"
-            />
-            <figcaption>
-              Final package: independent browser pages in the one global strip.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/global-xlsx-tab.jpeg"
-              alt="XLSX workbook rendered in a global Y Space tab"
-            />
-            <figcaption>Spreadsheet preview as a peer document tab.</figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/global-pdf-tab-fixed.jpeg"
-              alt="Two-page PDF rendered in the packaged Y Space application"
-            />
-            <figcaption>Two-page PDF rendered inside the packaged desktop app.</figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/final-opencode-browser-control-success.jpeg"
-              alt="Successful OpenCode GLM-4.5-Flash control of Y Space embedded browser tabs"
-            />
-            <figcaption>
-              OpenCode used only built-in Browser tools, listed 9 tabs, and focused Example Domain.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/final-codex-gpt56-sol-browser-control.jpeg"
-              alt="Codex GPT-5.6 Sol controlling the existing Y Space Example Domain browser tab"
-            />
-            <figcaption>
-              Codex 5.6 Sol reused the existing browser page, read URL/title/H1, and captured it.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
-              alt="OpenCode GPT-5.6 Terra creating and cleaning up a Y Space browser peer tab"
-            />
-            <figcaption>
-              OpenCode GPT-5.6 Terra created one browser peer, captured it, and restored the
-              original 10-tab inventory.
-            </figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/final-cookie-file-import-success.jpeg"
-              alt="Successful extension-free cookie-file import in Y Space"
-            />
-            <figcaption>Harmless cookie fixture imported: 1 accepted, 0 rejected.</figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/final-pipedream-fixture-rejected-safely.jpeg"
-              alt="Pipedream harmless fixture rejected safely in packaged Y Space"
-            />
-            <figcaption>Fake Pipedream credentials rejected safely without disclosure.</figcaption>
-          </figure>
-          <figure class="shot">
-            <img
-              src="qa-screenshots/final-pipedream-fixture-forgotten.jpeg"
-              alt="Pipedream environment file forgotten in packaged Y Space"
-            />
-            <figcaption>
-              Saved environment-file path forgotten; state returned to unconfigured.
-            </figcaption>
-          </figure>
+          <div class="sticky bg-blue">
+            <h3>Browser-exclusive agents</h3>
+            <p>
+              Codex, Claude Code, and OpenCode receive Y Space Browser by default. Competing web
+              search, Chrome, Playwright, gstack, browser MCP, skill, and command routes are removed
+              only from that launch.
+            </p>
+          </div>
+          <div class="sticky bg-purple">
+            <h3>One global tab system</h3>
+            <p>
+              Every browser page is a peer of Files, Git, Terminal, Notes, PDFs, and spreadsheets.
+              Agents can enumerate, find, activate, create, and close those exact visible tabs.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Bounded lifecycle</h3>
+            <p>
+              Live browser guests remain LRU-bounded, closed pages dispose their guests, tab
+              metadata is capped, provider process groups are reaped, and disposable tabs do not
+              restore.
+            </p>
+          </div>
         </div>
       </section>
 
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Verification</h2>
+          <h2>Checks And Evidence</h2>
         </div>
         <div class="grid two">
-          <article class="sticky bg-green">
-            <h3>Final targeted</h3>
+          <div class="sticky bg-green">
+            <h3>Automated · all green</h3>
             <ul>
-              <li>15 branding/footer/tab/theme/updater files passed</li>
-              <li>80 / 80 tests passed</li>
-              <li>Earlier broader focused pass: 21 files / 150 tests</li>
-              <li>TypeScript typecheck passed</li>
-              <li>Lint and type-aware lint passed</li>
-              <li>Format and i18n passed: 3,275 messages, 0 missing</li>
+              <li>912 test files passed, 5 skipped.</li>
+              <li>10,343 tests passed, 85 skipped.</li>
+              <li>
+                Typecheck, regular/type-aware lint, format (3,031 files), and diff check passed.
+              </li>
+              <li>ARM64 package and deep/strict ad-hoc signature verified.</li>
             </ul>
-          </article>
-          <article class="sticky bg-pink">
-            <h3>Final full suite</h3>
-            <ul>
-              <li>887 files / 9,926 tests passed</li>
-              <li>5 files / 85 tests intentionally skipped</li>
-              <li>102.98 seconds under pinned Node.js 24.13.0</li>
-              <li>No branding, contrast, footer, theme, updater, or tab regression failed</li>
-            </ul>
-          </article>
-          <article class="sticky bg-yellow">
-            <h3>Browser lifecycle</h3>
-            <ul>
-              <li>30 browser peers created and closed by hand</li>
-              <li>30-tab metadata ceiling enforced</li>
-              <li>6 live guest renderers at both peaks</li>
-              <li>4 live guest renderers after both cleanups</li>
-              <li>Final browser-core RSS: +0.9%</li>
-              <li>0 packaged processes left after quit</li>
-            </ul>
-          </article>
-          <article class="sticky bg-blue">
-            <h3>Package</h3>
-            <ul>
-              <li>Apple Silicon app and DMG built</li>
-              <li>Deep/strict code-sign verification passed</li>
-              <li>Thin ARM64, unsigned/ad-hoc runtime signature, no Team ID</li>
-              <li>DMG size: 155,863,366 bytes</li>
-              <li>Packaged icon matches the source icon byte-for-byte</li>
-              <li>Website typecheck and production build passed</li>
-              <li>Next 16.3.1 generated 62 / 62 static pages</li>
-            </ul>
-          </article>
-          <article class="sticky bg-purple">
-            <h3>DMG SHA-256</h3>
-            <p><code>5cd6e6964f772721fc904e7d3ec335b0277501e5636570ccf7ed3c2c94b4131f</code></p>
-          </article>
-        </div>
-        <details>
-          <summary>Why the latest full-suite result is not presented as completely clean</summary>
-          <div class="detail-body">
-            After the final copy and optional-updater adjustment, the parallel full run hit a child
-            process timeout in <code>probeMcpServer.test.ts</code> and a render deadline in
-            <code>ChatPane.test.tsx</code>. Both files passed immediately when rerun together in
-            isolation (76 / 76 tests). A separate accidental command that expanded to the whole
-            suite was stopped after unrelated stress failures and is not counted as final evidence.
           </div>
-        </details>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Security and integration boundaries</h2>
-        </div>
-        <div class="grid two">
-          <article class="sticky bg-yellow">
-            <h3>Cookie import</h3>
-            <p>
-              Extension-free file import passed in the final package with a harmless example.com
-              fixture: 1 accepted and 0 rejected. Encrypted pairing remains available, but no Chrome
-              or Brave extension was installed, as directed.
-            </p>
-          </article>
-          <article class="sticky bg-pink">
-            <h3>Pipedream</h3>
-            <p>
-              The native environment-file path passed its packaged safety flow: a harmless fixture
-              was accepted, fake credentials were rejected without leakage, and the saved path was
-              forgotten. The real ignored mode-600 file then passed the production token broker and
-              read-only project, catalog, and credential-excluding account-list APIs without
-              exposing values. The final packaged UI also rendered Ready and returned the live Slack
-              catalog without persisting connection state. Live OAuth/account connection still
-              awaits explicit authorization.
-            </p>
-          </article>
+          <div class="sticky bg-blue">
+            <h3>Hands-on desktop QA</h3>
+            <ul>
+              <li>Codex: 15 Browser calls, 2 tabs, Alpha saved, Beta count 2, 1 tab retained.</li>
+              <li>OpenCode: existing Alpha found and saved through 6 Browser actions.</li>
+              <li>Both work histories expanded/collapsed manually.</li>
+              <li>Quit/relaunch removed helpers and did not restore closed Beta.</li>
+            </ul>
+          </div>
         </div>
       </section>
 
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Implementation decisions and handoff</h2>
+          <h2>Visual Proof</h2>
+        </div>
+        <div class="evidence">
+          <figure>
+            <img
+              src="qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg"
+              alt="Codex working with two embedded Browser tabs while work stays collapsed"
+            />
+            <figcaption>
+              Codex working: two global Browser peers are visible while the transcript stays
+              compact.
+            </figcaption>
+          </figure>
+          <figure>
+            <img
+              src="qa-screenshots/browser-exclusive-codex-5-6-sol-settled-final.jpeg"
+              alt="Codex settled with a collapsed work row and verified final answer"
+            />
+            <figcaption>
+              Codex settled: 38 work steps collapsed, final answer visible, 11-action Browser proof.
+            </figcaption>
+          </figure>
+          <figure>
+            <img
+              src="qa-screenshots/browser-exclusive-opencode-working-final.jpeg"
+              alt="OpenCode editing the embedded Alpha page while work stays collapsed"
+            />
+            <figcaption>
+              OpenCode working: the visible Alpha form has already changed while operations remain
+              collapsed.
+            </figcaption>
+          </figure>
+          <figure>
+            <img
+              src="qa-screenshots/browser-exclusive-opencode-settled-final.jpeg"
+              alt="OpenCode settled with a collapsed work row and verified final answer"
+            />
+            <figcaption>
+              OpenCode settled: 24 work steps collapsed, exact tab data and six-action proof
+              visible.
+            </figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Open The Cards</h2>
         </div>
         <details open>
-          <summary>How the visual cleanup was implemented</summary>
+          <summary>Implementation summary</summary>
           <div class="detail-body">
             <ul>
               <li>
-                Shared theme tokens define the white-first light palette, orange interaction colors,
-                solid muted text, minimum accent contrast, minimum control-border contrast, focus
-                rings, and adaptive glass surfaces.
+                Launch-scoped private profiles preserve the user's normal Codex, Claude, and
+                OpenCode files while suppressing competing browser capabilities.
               </li>
               <li>
-                Ordinary renderer UI now inherits the native system-sans stack. Existing monospace
-                styling remains scoped to code, paths, terminal content, and technical identifiers.
+                Codex keeps ordinary tools direct and runs managed Browser MCP calls through its
+                isolated Code Mode host. <code>CODEX_SQLITE_HOME</code> reuses the completed user
+                database without poisoning the private hook/config home.
               </li>
               <li>
-                The legacy workspace switcher/update/What's New footer components and thread tool
-                rail were removed. One menu owns those destinations and attention states.
+                Browser proof is app-owned, same-turn, request-local, privacy-bounded, and
+                correlated to observed tab/action evidence.
               </li>
               <li>
-                User-facing Appearance copy was simplified and translated across all 12 catalogs.
-              </li>
-              <li>
-                The updater suppresses only the exact optional “no published GitHub versions” case;
-                manifest, signature, download, disk, network, and unexpected failures stay visible.
+                Compact turn projection preserves chronological provider text around tools, question
+                boundaries, hidden Find matches, and accessibility semantics.
               </li>
             </ul>
           </div>
         </details>
         <details>
-          <summary>Pass-criteria disposition</summary>
+          <summary>Exact validation</summary>
           <div class="detail-body">
-            Branding criteria PC-41 and PC-43 through PC-48 pass. PC-42 has a fresh-light manual
-            pass plus automated saved-theme coverage; a final manual saved-dark capture was not
-            repeated. PC-49 carries the explicitly disclosed two full-parallel-load flakes, both of
-            which passed in immediate isolation. Account-gated criteria remain listed below and in
-            <a href="pass-criteria.md">the complete pass-criteria record</a>.
+            <table>
+              <thead>
+                <tr>
+                  <th>Check</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>pnpm test</code></td>
+                  <td>912 passed files / 5 skipped; 10,343 passed tests / 85 skipped; 126.46 s</td>
+                </tr>
+                <tr>
+                  <td><code>pnpm typecheck</code></td>
+                  <td>Pass</td>
+                </tr>
+                <tr>
+                  <td><code>pnpm lint</code></td>
+                  <td>Pass, including type-aware lint with warnings denied</td>
+                </tr>
+                <tr>
+                  <td><code>pnpm fmt:check</code></td>
+                  <td>Pass, 3,031 files</td>
+                </tr>
+                <tr>
+                  <td><code>git diff --check</code></td>
+                  <td>Pass</td>
+                </tr>
+                <tr>
+                  <td>Package inspection</td>
+                  <td>
+                    Thin ARM64; deep/strict codesign pass; ad hoc hardened runtime; Y Space /
+                    Productivity identity
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </details>
         <details>
-          <summary>QA assumptions and boundaries</summary>
-          <div class="detail-body">
-            Final packaged branding QA used an isolated profile and command-line mock Keychain only
-            to avoid macOS Keychain prompts caused by repeated ad-hoc QA builds. This did not alter
-            production source or behavior; no normal user profile was read or modified. One older
-            isolated QA window was briefly raised read-only while resolving an ambiguous app name,
-            then all actions returned to the exact final package path. Older global-tab screenshots
-            prove the wider feature layer, while the final welcome, docking, and Appearance captures
-            prove the consolidated footer, compact grip, and latest copy. No manual dark-theme claim
-            is made.
-          </div>
-        </details>
-        <details open>
-          <summary>External follow-ups—not implementation failures</summary>
+          <summary>Artifact integrity</summary>
           <div class="detail-body">
             <ul>
               <li>
-                Run <code>claude auth login</code> before a live Claude Code browser-control pass.
+                DMG: <code>release/Y-Space-1.6.6-arm64.dmg</code> · 156,279,617 bytes · SHA-256
+                <code>306a7143eb59a682aa8532b8835e7e83f239b7a4b73243b61136f2e188a32ffa</code>
               </li>
               <li>
-                Explicitly authorize a Pipedream OAuth/account grant before connected-account and
-                disconnect testing. Client-credentials and read-only APIs already pass.
+                <code>app.asar</code> SHA-256:
+                <code>86537dbeb79f1df3cd1124f0729a8d0bd0ec8207c5005b1762b2a175ffd1cb16</code>
               </li>
               <li>
-                The unsigned build may require macOS Gatekeeper confirmation on another machine.
+                Executable SHA-256:
+                <code>02a4c01b2c7adbdb277b7f8fe8bcc7c3fe67388a30d69a23c374c8f834508b8a</code>
+              </li>
+              <li>
+                The unsigned build was QA-launched with the explicit mock-keychain flag because
+                macOS can block unsigned binaries at Keychain access. Production code does not
+                auto-enable that flag.
               </li>
             </ul>
           </div>
         </details>
         <details>
-          <summary>Final artifacts</summary>
+          <summary>Authorization gates and deferred work</summary>
           <div class="detail-body">
             <ul>
-              <li><a href="../release/Y-Space-1.6.6-arm64.dmg">ARM64 Y Space DMG</a></li>
-              <li><a href="qa-e2e-tests.json">Structured QA evidence</a></li>
-              <li><a href="pass-criteria.md">Pass criteria and final disposition</a></li>
-              <li><a href="browser-memory-soak.json">Browser memory-soak evidence</a></li>
               <li>
-                Branding PR: <code>https://github.com/zvone187/y-space/pull/2</code> (target:
-                <code>y-space-browser-integrations</code>)
+                Claude Code 2.1.210 is installed but logged out. The packaged app reports the login
+                requirement before inference; launch contracts pass.
               </li>
-              <li><a href="https://github.com/zvone187/y-space/pull/1">Base feature PR #1</a></li>
+              <li>
+                No persistent Pipedream OAuth or account connection was created without the separate
+                authorization it requires. Read-only credential/catalog probes and boundary tests
+                passed without exposing values.
+              </li>
+              <li>
+                No Chrome or Brave extension was installed, matching the user's explicit direction.
+                Extension-free cookie-file import and automated cookie-security contracts remain
+                green.
+              </li>
             </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Artifacts and handoff</summary>
+          <div class="detail-body">
+            <p>
+              <span class="pill bg-green">Ready for review</span
+              ><span class="pill bg-orange">Unsigned build</span
+              ><span class="pill bg-yellow">Do not merge automatically</span>
+            </p>
+            <ul>
+              <li><a href="qa-e2e-tests.json">Structured QA record</a></li>
+              <li><a href="pass-criteria.md">Pass criteria and final outcome</a></li>
+              <li><a href="browser-memory-soak.json">Browser memory soak</a></li>
+              <li><a href="../release/Y-Space-1.6.6-arm64.dmg">Unsigned ARM64 DMG</a></li>
+            </ul>
+            <p>
+              The branch is prepared for a fork PR; the final task response records the review link.
+              No merge or force-push is authorized.
+            </p>
           </div>
         </details>
       </section>

@@ -150,9 +150,7 @@ export function AboutSettings() {
               <BrandWordmark />
             </p>
             <p className="text-xs text-muted">
-              <Trans>
-                AI agent orchestrator — manage coding agents via Terminal and Native ACP.
-              </Trans>
+              <Trans>Your focused workspace for agents, files, and the web.</Trans>
             </p>
           </div>
         </div>

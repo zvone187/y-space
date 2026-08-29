@@ -125,6 +125,11 @@ msgstr "{0, plural, one {# công cụ} other {# công cụ}}"
 msgid "{0, plural, one {# use} other {# uses}}"
 msgstr "{0, plural, other {# lần dùng}}"
 
+#. placeholder {0}: state.actionCount
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "{0, plural, one {Browser verified · # action} other {Browser verified · # actions}}"
+msgstr ""
+
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "{0, plural, one {Candidate (#)} other {Candidates (#)}}"
@@ -400,6 +405,10 @@ msgstr "Đã chọn {0}/{1}"
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0}mo ago"
 msgstr "{0} tháng trước"
+
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
+msgid "{activityCount, plural, one {Worked · # step} other {Worked · # steps}}"
+msgstr "{activityCount, plural, one {Đã hoàn thành · # bước} other {Đã hoàn thành · # bước}}"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "{agent} reported authentication success, but Y Space could not verify it. Configure {agent} directly, then try again."
@@ -942,8 +951,12 @@ msgid "Add a project to use GitHub Actions."
 msgstr "Thêm dự án để sử dụng GitHub Actions."
 
 #: src/renderer/components/skills/SkillsManager.tsx
-msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
-msgstr "Thêm skill vào .agents/skills hoặc .poracode/skills, hoặc nhập từ nhà cung cấp khác."
+msgid "Add a skill from your workspace or import one from another provider."
+msgstr ""
+
+#: src/renderer/components/skills/SkillsManager.tsx
+#~ msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
+#~ msgstr "Thêm skill vào .agents/skills hoặc .poracode/skills, hoặc nhập từ nhà cung cấp khác."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Add a skill to .agents/skills or import one from another provider."
@@ -1209,8 +1222,8 @@ msgstr "Các agent phân loại công việc được ủy quyền bằng thẻ 
 #~ msgstr "AI"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
-msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
-msgstr "Trình điều phối tác nhân AI - quản lý các tác nhân mã hóa thông qua Terminal và Native ACP."
+#~ msgid "AI agent orchestrator — manage coding agents via Terminal and Native ACP."
+#~ msgstr "Trình điều phối tác nhân AI - quản lý các tác nhân mã hóa thông qua Terminal và Native ACP."
 
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
@@ -1967,7 +1980,6 @@ msgstr "Duyệt, kiểm tra và thử nghiệm trang web trong trình duyệt t�
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
-#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Browser"
 msgstr "Trình duyệt"
@@ -1995,6 +2007,10 @@ msgstr "Đã bật MCP trình duyệt cho chủ đề này"
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Browser menu"
 msgstr "Trình đơn trình duyệt"
+
+#: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+msgid "Browser not verified"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13875,8 +13891,12 @@ msgstr "Sử dụng chữ cái, chữ số, dấu chấm, dấu gạch ngang ho�
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
-msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
-msgstr "Dùng một thư mục toàn cục, hoặc lồng các cây làm việc bên trong mỗi dự án tại .poracode/worktrees."
+msgid "Use one global folder, or keep each project's worktrees with that project."
+msgstr ""
+
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#~ msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
+#~ msgstr "Dùng một thư mục toàn cục, hoặc lồng các cây làm việc bên trong mỗi dự án tại .poracode/worktrees."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
@@ -14390,6 +14410,7 @@ msgid "Working tree clean"
 msgstr "Cây làm việc sạch sẽ"
 
 #: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/TurnActivityGroup.tsx
 msgid "Working…"
 msgstr "Đang làm việc…"
 
@@ -14583,8 +14604,12 @@ msgstr "Y Space sẽ khởi động lại, sao lưu dữ liệu hiện tại r�
 #~ msgstr "Y Space sẽ khởi động lại, sao lưu dữ liệu hiện tại và thay thế bằng bản sao đầy đủ của dữ liệu Y Space."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
-msgid "Y Space's built-in browser tools."
-msgstr "Công cụ trình duyệt tích hợp sẵn của Y Space."
+#~ msgid "Y Space's built-in browser tools."
+#~ msgstr "Công cụ trình duyệt tích hợp sẵn của Y Space."
+
+#: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
+msgid "Your focused workspace for agents, files, and the web."
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

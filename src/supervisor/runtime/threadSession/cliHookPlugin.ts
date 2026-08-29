@@ -8,6 +8,13 @@ import type {
 } from "@/shared/contracts";
 import { createKnownSessionRef } from "../../agents/base";
 import { hookDebugSpawn } from "../hookDebug";
+import {
+  assertBrowserExclusiveHookResolution,
+  CLAUDE_BROWSER_HOOK_UNAVAILABLE_MESSAGE,
+  CODEX_BROWSER_HOOK_UNAVAILABLE_MESSAGE,
+  isBrowserExclusiveHookRequired,
+  OPENCODE_BROWSER_HOOK_UNAVAILABLE_MESSAGE,
+} from "../cliHookPluginCoordinator";
 import type { ThreadOutputPipeline } from "../threadOutputPipeline";
 import type { SessionRuntime } from "../sessionTypes";
 import { hookDebugProjectLabel } from "./helpers";
@@ -98,8 +105,22 @@ export class CliHookSessionCoordinator {
   ): Promise<{ env: Record<string, string>; extraArgs: string[] }> {
     const adapter = this.ctx.options.adapters.get(agentKind);
     const liveInputMode = adapter?.capabilities.liveInputMode ?? "terminal";
+    const browserHookRequired = isBrowserExclusiveHookRequired(
+      agentKind,
+      mcpServers,
+      liveInputMode,
+    );
 
     if (!this.ctx.options.resolvePluginEnvForSpawn) {
+      if (browserHookRequired) {
+        throw new Error(
+          agentKind === "claude"
+            ? CLAUDE_BROWSER_HOOK_UNAVAILABLE_MESSAGE
+            : agentKind === "opencode"
+              ? OPENCODE_BROWSER_HOOK_UNAVAILABLE_MESSAGE
+              : CODEX_BROWSER_HOOK_UNAVAILABLE_MESSAGE,
+        );
+      }
       hookDebugSpawn({
         threadId,
         agentKind,
@@ -118,6 +139,7 @@ export class CliHookSessionCoordinator {
         ...(mcpServers.length > 0 ? { mcpServers } : {}),
       });
       const merged = resolved ?? { env: {}, extraArgs: [] };
+      assertBrowserExclusiveHookResolution(agentKind, browserHookRequired, resolved);
       const hookUrl = merged.env.PORACODE_HOOK_URL;
       const hasHookEnv = Boolean(hookUrl);
 
@@ -160,6 +182,21 @@ export class CliHookSessionCoordinator {
 
       return merged;
     } catch (error) {
+      if (browserHookRequired) {
+        console.warn(
+          `[supervisor] required ${agentKind} Browser command hook resolution failed; launch blocked.`,
+        );
+        // Do not attach the provider/install error as `cause`: it can contain
+        // private paths or process output, while this launch error crosses the UI boundary.
+        // oxlint-disable-next-line eslint/preserve-caught-error
+        throw new Error(
+          agentKind === "claude"
+            ? CLAUDE_BROWSER_HOOK_UNAVAILABLE_MESSAGE
+            : agentKind === "opencode"
+              ? OPENCODE_BROWSER_HOOK_UNAVAILABLE_MESSAGE
+              : CODEX_BROWSER_HOOK_UNAVAILABLE_MESSAGE,
+        );
+      }
       console.warn("[supervisor] CLI hook plugin env resolution failed:", error);
       hookDebugSpawn({
         threadId,
