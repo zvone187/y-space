@@ -184,7 +184,11 @@ export function BrowserToolbar(props: {
     );
 
   return (
-    <div className="flex items-center gap-1 border-b border-border bg-[var(--content-background)] px-1.5 py-0.5">
+    <div
+      role="toolbar"
+      aria-label={t`Browser`}
+      className="poracode-browser-chrome mx-1.5 mb-1 flex items-center gap-1 px-1.5 py-1"
+    >
       <button
         type="button"
         className={toolbarButtonClass}

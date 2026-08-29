@@ -128,7 +128,7 @@ msgstr "{0, plural, one {# использование} few {# использов
 #. placeholder {0}: state.actionCount
 #: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
 msgid "{0, plural, one {Browser verified · # action} other {Browser verified · # actions}}"
-msgstr ""
+msgstr "{0, plural, one {Проверено в браузере · # действие} few {Проверено в браузере · # действия} many {Проверено в браузере · # действий} other {Проверено в браузере · # действия}}"
 
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
@@ -952,7 +952,7 @@ msgstr "Добавьте проект, чтобы использовать GitHu
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Add a skill from your workspace or import one from another provider."
-msgstr ""
+msgstr "Добавьте навык из своего рабочего пространства или импортируйте его из другого сервиса."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
@@ -1977,6 +1977,7 @@ msgstr "Просматривайте, изучайте и тестируйте �
 #: src/renderer/components/plugins/pluginCopy.ts
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
@@ -2010,7 +2011,7 @@ msgstr "Меню браузера"
 
 #: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
 msgid "Browser not verified"
-msgstr ""
+msgstr "Не проверено в браузере"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13892,7 +13893,7 @@ msgstr "Используйте буквы, цифры, точки, дефисы 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Use one global folder, or keep each project's worktrees with that project."
-msgstr ""
+msgstr "Используйте одну общую папку или храните рабочие деревья каждого проекта вместе с соответствующим проектом."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #~ msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
@@ -14609,7 +14610,7 @@ msgstr "Y Space перезапустится, создаст резервную 
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Your focused workspace for agents, files, and the web."
-msgstr ""
+msgstr "Ваше специализированное рабочее пространство для агентов, файлов и веба."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

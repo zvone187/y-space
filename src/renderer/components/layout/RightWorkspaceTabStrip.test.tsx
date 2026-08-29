@@ -64,15 +64,29 @@ describe("RightWorkspaceTabStrip", () => {
       />,
     );
 
+    const tablist = screen.getByRole("tablist", { name: "Tabs" });
     expect(screen.getAllByRole("tablist")).toHaveLength(1);
+    expect(tablist.parentElement).toHaveClass(
+      "poracode-workspace-tab-strip",
+      "poracode-glass-chrome",
+    );
     expect(screen.getByRole("button", { name: "Open workspace tools" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Git" }).parentElement).toHaveClass(
+      "poracode-workspace-tab",
       "border-b-2",
       "border-[var(--accent)]",
-      "rounded-none",
+      "rounded-lg",
+    );
+    expect(screen.getByRole("tab", { name: "Git" }).parentElement).toHaveAttribute(
+      "data-selected",
+      "true",
     );
     expect(screen.getByRole("tab", { name: "Files" }).parentElement).not.toHaveClass(
       "border-[var(--accent)]",
+    );
+    expect(screen.getByRole("tab", { name: "Files" }).parentElement).toHaveAttribute(
+      "data-selected",
+      "false",
     );
   });
 

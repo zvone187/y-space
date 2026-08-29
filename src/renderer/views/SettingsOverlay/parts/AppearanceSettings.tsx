@@ -172,7 +172,7 @@ export function AppearanceSettings() {
             className="w-[220px] shrink-0"
             minValue={glassTintMinimum}
             maxValue={100}
-            step={appearance === "light" ? 1 : 5}
+            step={1}
             value={glassTint}
             onChange={previewGlassTint}
             onChangeEnd={(next) => {

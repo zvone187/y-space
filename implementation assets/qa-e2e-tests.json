@@ -1,39 +1,40 @@
 {
-  "version": 6,
+  "version": 7,
   "project": "Y Space",
-  "branch": "y-space-browser-default-collapse",
+  "branch": "y-space-glass-polish",
   "platform": "macOS Apple Silicon desktop",
   "testedOn": "2026-08-28",
-  "status": "complete_with_external_authorization_gates",
+  "status": "glass_polish_verified",
   "currentPhase": {
-    "name": "Embedded-browser exclusivity and compact turns",
-    "baseBranch": "y-space-minimal-branding",
-    "baseCommit": "5cff3e06",
-    "baseline": "887 passed files, 5 skipped files, 9,926 passed tests, and 85 skipped tests under Node 24.13.0",
-    "failFirst": "11 focused files failed as designed: 17 failed, 241 passed, and 1 skipped. Failures cover all three provider boundaries, OpenCode chronological mapping, compact projection, whole-turn disclosure, and live tool-group collapse.",
+    "name": "Modern restrained glass polish",
+    "baseBranch": "fork/y-space-browser-default-collapse",
+    "baseCommit": "9fdadda3",
+    "baseline": "912 passed files, 5 skipped files, 10,345 passed tests, and 85 skipped tests under Node 24.13.0 after preparing the ignored WSL helper bundle",
+    "failFirst": "Three focused files failed as designed: 8 failed and 9 passed. Failures cover sidebar frosting defaults/floors, shared glass material contracts, browser/thread content-plane boundaries, the 20px composer, reduced-transparency fallback, and global-tab capsule semantics.",
     "implementationStatus": "complete",
-    "postAuditHardening": "Adapters without an exclusive embedded-browser route remain launchable without Browser being forced on; an explicit unsupported Browser request still fails closed. OpenCode's visible status drop is now y-space-status, and launch migration removes legacy Poracode/Lightcode drops."
+    "performanceBoundary": "Real backdrop blur is limited to stable shared chrome. Browser/thread content planes, browser hosts, webviews, and individual global tabs stay unfiltered.",
+    "reviewStatus": "Fresh diff review completed. Reduced-transparency cascade priority and dark-mode highlight density findings were fixed and covered by a focused regression."
   },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
     "app": "release/mac-arm64/Y Space.app",
     "dmg": "release/Y-Space-1.6.6-arm64.dmg",
     "architecture": "arm64",
-    "sha256": "c76b25b64cc0888fd8e6e70d109d4dc0ecf41204043a868531404dd61a3a5dc7",
-    "bytes": 156279316,
-    "appAsarSha256": "bb3158baeaa2e2a15e5c8c199b673eb7c0dc22a111715562d45687c41c59786c",
-    "executableSha256": "899580987f5d52739cd1be8f3e214f1263348296d4608200f2db1c124005bff2",
+    "sha256": "a4cac2968027c07012e760fa3e800a25147b04beff227a38401cd3f26124db2f",
+    "bytes": 156275751,
+    "appAsarSha256": "655f328778c00d9b1459f2c2a07994dddad2728911f7826ca12f7bb7e0a055bb",
+    "executableSha256": "11a1b210e43079f97fe93ffee664bba209b8a48077b4b8ef176ec75d39bf04a4",
     "codesign": "codesign --verify --deep --strict passed; ad-hoc/runtime signature with no Team ID",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
-      "status": "pass on the final source state under the repository's pinned Node.js runtime",
+      "status": "pass on the final reviewed source state under Node.js 24.13.0",
       "passedFiles": 912,
       "skippedFiles": 5,
-      "passedTests": 10345,
+      "passedTests": 10349,
       "skippedTests": 85,
-      "durationSeconds": 115.21
+      "durationSeconds": 199.89
     },
     "targetedBranding": {
       "status": "pass",
@@ -43,17 +44,23 @@
       "appearanceSearchBrandPass": "4 files and 29 tests",
       "autoUpdaterPass": "1 file and 16 tests"
     },
+    "glassPolish": {
+      "status": "pass",
+      "initialFocusedPass": "10 files and 127 tests",
+      "finalReviewRegressionPass": "1 file and 11 tests",
+      "coverage": "sidebar platform defaults and floors, one global glass tab strip, bounded glass markers, content-plane blur exclusion, reduced-transparency cascade priority, dark-aware edge/elevation tokens, browser toolbar/omnibox markers, composer geometry, and the unsnapped 82% dark slider default"
+    },
     "checks": {
       "typecheck": "pass",
       "lint": "pass",
       "typeAwareLint": "pass",
       "format": "pass",
-      "i18n": "pass: 3,275 extracted messages and 0 missing across 12 translated catalogs",
+      "i18n": "pass: 3,281 extracted messages and 0 missing across 12 translated catalogs",
       "websiteTypecheck": "pass",
       "diffCheck": "pass"
     },
     "productionBuilds": {
-      "desktop": "pass on final source; packaged as the thin ARM64 app and DMG above",
+      "desktop": "pass on final source; packaged and hands-on tested as the thin ARM64 app and DMG above",
       "website": "pass with Next 16.3.1; 62 of 62 static pages generated"
     }
   },
@@ -695,6 +702,109 @@
       ],
       "artifact": "implementation assets/browser-memory-soak.json",
       "status": "pass_no_leak_signal"
+    },
+    {
+      "id": "YS-GLASS-E2E-001",
+      "title": "Light-mode glass chrome reads as modern Y Space",
+      "userStory": "As a user, I want a bright, calm desktop that feels like modern Apple/Codex chrome while keeping the orange Y Space identity.",
+      "setup": "Launch the unsigned packaged app in light mode with translucent sidebar enabled, one representative task open, and one embedded browser peer visible.",
+      "instrumentation": "Capture a full-window screenshot at the current desktop size and inspect computed/visible state through Computer Use only.",
+      "steps": [
+        "Observe the native sidebar, thread header, global workspace strip, browser toolbar/address field, and composer at rest.",
+        "Focus the composer and open one overflow or browser menu.",
+        "Compare the result with the pre-change flat light-mode screenshot."
+      ],
+      "expected": [
+        "The sidebar is visibly frosted while text stays crisp; stable chrome has soft radius, edge highlight, and restrained depth.",
+        "The global strip remains the only tab concept and uses one orange selected indicator.",
+        "Content, transcript, and web page pixels are not blurred; no dark-theme surface remains in the light shell."
+      ],
+      "proofToCapture": ["Full light-mode window", "Focused composer", "Open glass menu"],
+      "evidence": [
+        "The final unsigned packaged ARM64 app opened in light mode with macOS sidebar frosting at the new 90% default.",
+        "The thread header, one global tab rail, Browser toolbar/address field, and 20px composer read as a single restrained glass language while transcript and web content remained crisp.",
+        "The focused composer retained diffuse elevation plus a single orange focus edge; the Browser menu exposed New tab, Bookmarks, History, Take Screenshot, Hard Reload, Copy Current URL, Clear Cookies, Clear Cache, and Settings.",
+        "No dark surface remained in the light shell and muted sidebar text stayed legible."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/glass-polish-light-final.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-light-expanded.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-browser-menu.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-appearance-90.jpeg"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "YS-GLASS-E2E-002",
+      "title": "Rounded chrome preserves global-tab and browser interaction",
+      "userStory": "As a user, I want the softer design without losing precise desktop controls.",
+      "setup": "Use the final packaged app with one retained Browser page, then create disposable Browser peers in the sole global strip.",
+      "instrumentation": "Use Computer Use to click, type, resize, switch surfaces, exercise keyboard traversal, and attempt the native HTML tab drag gesture; capture the resulting selected states.",
+      "steps": [
+        "Switch global tabs with mouse and keyboard, reorder one tab, and close a disposable tab.",
+        "Navigate through the rounded address field, reload, open the browser menu, and return to the task.",
+        "Resize the right pane and confirm no clipping, dead drag region, or hidden control appears."
+      ],
+      "expected": [
+        "Exactly one global tab remains selected/tabbable and every hit target works across the softened geometry.",
+        "Browser navigation changes the embedded page and preserves the resident-tab lifecycle.",
+        "The pane resize boundary stays square, discoverable, and functional."
+      ],
+      "proofToCapture": [
+        "Mixed selected global tabs",
+        "Navigated embedded page",
+        "Narrow resized layout"
+      ],
+      "evidence": [
+        "Computer Use created a second embedded Browser as a peer in the sole global tablist; no nested browser tabs appeared.",
+        "The second page navigated through the rounded omnibox to https://example.org, reported Example Domain, and switching back restored the original https://example.com page.",
+        "Mouse selection plus Left/Right keyboard traversal changed the selected global Browser peer while preserving exactly one selected tab.",
+        "The Browser menu remained operable, the right split resized from the balanced layout to a narrow task pane without clipping Browser controls, and closing the disposable peer left the original page selected.",
+        "Computer Use attempted the native HTML drag gesture from the second Browser peer toward the first, but its synthesized drag did not change order. Existing reducer coverage verifies reorder state behavior, and this visual change did not modify the established drag handlers."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/glass-polish-light-two-tabs.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-browser-navigation.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-narrow-layout.jpeg"
+      ],
+      "status": "pass_with_drag_synthesis_limit"
+    },
+    {
+      "id": "YS-GLASS-E2E-003",
+      "title": "Accessibility and browser-memory glass regression",
+      "userStory": "As a user, I want glass that remains readable and does not multiply GPU or browser memory cost.",
+      "setup": "Use the packaged app with reduced transparency and dark mode available for regression, plus more than six ordinary browser metadata tabs in an isolated profile.",
+      "instrumentation": "Inspect visible fallbacks, DOM class boundaries, resident guest count, and process memory before/after tab switching.",
+      "steps": [
+        "Enable reduced transparency and verify new glass surfaces become opaque; briefly inspect dark mode, then return to light.",
+        "Open/switch enough browser peers to exercise the six-resident LRU cap.",
+        "Close disposable peers, wait for cleanup, and compare guest count and browser-core memory with the warm baseline."
+      ],
+      "expected": [
+        "Opaque fallbacks retain legible boundaries, text, and orange focus/selection states.",
+        "No browser host, content plane, individual tab, or webview receives blur/filter/will-change.",
+        "Resident ordinary guests stay capped at six and cleanup returns to the process/residency baseline; the single-cycle RSS sample is recorded without claiming a memory trend."
+      ],
+      "proofToCapture": [
+        "Reduced-transparency screenshot",
+        "Dark-mode regression screenshot",
+        "Guest and memory sample"
+      ],
+      "evidence": [
+        "Computer Use enabled macOS Reduce transparency, confirmed the packaged shell changed to opaque legible chrome, captured evidence, and restored the original off setting.",
+        "The packaged Appearance screen reported the corrected macOS dark default at exactly 82%; the main dark app kept restrained theme-aware edge highlights and readable orange states before returning to light 90%.",
+        "Computer Use opened seven disposable Browser peers for eight global browser tabs. Process sampling reported one app renderer plus exactly six resident ordinary Browser guests at peak.",
+        "Closing all seven disposable peers returned the app to one global Browser page, one Browser guest, and the two-renderer baseline.",
+        "Cleanup renderer RSS was 259,712 KiB versus the 215,472 KiB pre-peak sample. That one-cycle 20.5% delta is inconclusive for memory-leak detection and is not presented as a no-leak signal.",
+        "CSS regressions prohibit backdrop-filter on browser hosts, Browser/thread content planes, webviews, or individual tabs and force the composer fallback to outrank its later base rule."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/glass-polish-reduced-transparency.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-dark-regression.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-eight-tabs.jpeg"
+      ],
+      "artifact": "implementation assets/glass-browser-residency-qa.json",
+      "status": "pass_residency_and_accessibility_memory_inconclusive"
     }
   ]
 }

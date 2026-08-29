@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space — Embedded Browser &amp; Compact Turns Readiness</title>
+    <title>Y Space — Modern Glass Polish Readiness</title>
     <style>
       :root {
         --canvas: #f6f2e8;
@@ -255,20 +255,18 @@
       <header>
         <div class="hero">
           <span class="tag">Pre-implementation report</span>
-          <h1>Embedded browser by default. Quiet turns by default.</h1>
+          <h1>Bright glass. Quiet depth. Still unmistakably Y Space.</h1>
           <p>
-            The exact failing OpenCode task had Y Space Browser connected but selected a discovered
-            gstack browser and separate headless Chromium. The visible embedded page never changed.
-            This implementation will make Y Space Browser the sole launch-scoped browser route and
-            present every turn as one closed work row plus the final answer.
+            This focused visual iteration makes the existing white-and-orange desktop feel softer
+            and more modern. Real blur stays on a few stable shell surfaces; thread and browser
+            content remain opaque and fast. Pane structure, one global tab model, and embedded
+            browser lifecycle limits do not change.
           </p>
         </div>
         <div class="stack">
           <div class="card green"><small>Readiness</small><strong>Ready to implement</strong></div>
-          <div class="card blue">
-            <small>Branch</small><strong>y-space-browser-default-collapse</strong>
-          </div>
-          <div class="card yellow"><small>Base</small><strong>5cff3e06</strong></div>
+          <div class="card blue"><small>Branch</small><strong>y-space-glass-polish</strong></div>
+          <div class="card yellow"><small>Base</small><strong>9fdadda3</strong></div>
         </div>
       </header>
 
@@ -282,24 +280,25 @@
             <h3>Environment clean</h3>
             <p>
               A new matching worktree and branch were created from
-              <code>fork/y-space-minimal-branding</code>. Dependencies and Husky are installed. The
-              ignored <code>.env.pipedream</code> remains mode 0600 and its values were never
-              printed.
+              <code>fork/y-space-browser-default-collapse</code>. Dependencies, Husky, the ignored
+              Pipedream environment, native SQLite binding, and ignored WSL helper assets are
+              prepared without printing credential values.
             </p>
           </article>
           <article class="note blue">
             <h3>Baseline green</h3>
             <p>
-              Serialized Node 24.13.0 baseline: 887 passed files, 5 skipped files, 9,926 passed
-              tests, and 85 skipped tests. Native server preparation also passed.
+              Node 24.13.0 baseline: 912 passed files, 5 skipped files, 10,345 passed tests, and 85
+              skipped tests. The initial missing-helper failure was a clean-worktree setup issue and
+              passed after the generated bundle was prepared.
             </p>
           </article>
           <article class="note yellow">
             <h3>Fail-first captured</h3>
             <p>
-              Eleven focused files fail for the missing behavior: 17 failed, 241 passed, 1 skipped.
-              The failures cover provider isolation, chronology, compact projection, whole-turn
-              disclosure, and live group collapse.
+              Three focused files fail for the missing design: 8 failed and 9 passed. They lock the
+              sidebar frosting floors, shared glass contract, 20px composer, softened browser and
+              thread chrome, content-plane exclusions, and global-tab capsule semantics.
             </p>
           </article>
         </div>
@@ -308,35 +307,25 @@
       <section>
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Observed defect and invariant</h2>
+          <h2>Design opportunity and invariant</h2>
         </div>
         <div class="grid two">
           <article class="note pink">
-            <h3>Live proof</h3>
+            <h3>What feels flat today</h3>
             <ul>
-              <li>OpenCode loaded <code>/browse</code> from the discovered gstack skills.</li>
-              <li>
-                It ran a separate headless Chromium and saved screenshots under <code>/tmp</code>.
-              </li>
-              <li>No Y Space Browser MCP event appeared, although the MCP was connected.</li>
-              <li>
-                The visible Y Space page stayed on Claude Login while the transcript claimed browser
-                testing.
-              </li>
+              <li>The light sidebar is technically translucent but its 98% tint reads opaque.</li>
+              <li>The global tab rail and browser toolbar are flush, square separators.</li>
+              <li>The composer already blurs but its material reads like a plain white card.</li>
+              <li>Softening every pane would create visual noise and costly compositor layers.</li>
             </ul>
           </article>
           <article class="note orange">
-            <h3>New invariant</h3>
+            <h3>New visual invariant</h3>
             <ul>
-              <li>
-                Y Space Browser is forced on unless the global Browser hard-disable is active.
-              </li>
-              <li>
-                When present, it is the sole model-visible route for browser navigation,
-                interaction, inspection, and screenshots.
-              </li>
-              <li>Policy overlays are per launch and never mutate normal provider profiles.</li>
-              <li>Unrelated MCPs, explicit Y Space skills, and Pipedream remain intact.</li>
+              <li>One glass capsule contains every global workspace tab.</li>
+              <li>Real blur is limited to stable shell chrome, never a tab or webview.</li>
+              <li>Browser/thread toolbars imitate glass with paint-only highlights and shadows.</li>
+              <li>Orange remains the only strong action, focus, and selected accent.</li>
             </ul>
           </article>
         </div>
@@ -357,60 +346,52 @@
           </thead>
           <tbody>
             <tr>
-              <td>Shared spawn pipeline</td>
+              <td>Theme material tokens</td>
               <td>
-                Force Browser on, honor only the global hard-disable, classify and remove competing
-                browser MCP descriptors.
-              </td>
-              <td>3 failures</td>
-            </tr>
-            <tr>
-              <td>OpenCode CLI + SDK</td>
-              <td>
-                Disable native web tools and provider Skill discovery, deny external browser tool
-                namespaces after wildcard allow rules, and keep Y Space Browser.
-              </td>
-              <td>3 failures</td>
-            </tr>
-            <tr>
-              <td>Claude CLI + SDK</td>
-              <td>
-                Use strict MCP, no Chrome, no slash commands/provider skills, WebFetch/WebSearch
-                denial, and sole-browser guidance.
+                Add a 14px shared chrome radius, specular gradient, stronger stable blur,
+                glass-local muted ink, and light/dark variants.
               </td>
               <td>2 failures</td>
             </tr>
             <tr>
-              <td>Codex TUI + app-server</td>
+              <td>Native sidebar</td>
               <td>
-                Disable native/in-app/external browser features, live web search, browser-backed
-                MCPs, and browser skills while preserving unrelated skills.
+                Use platform-specific light defaults and safety floors: 90/88 on macOS and 94/92 on
+                Windows, with contrast-safe muted text.
               </td>
-              <td>2 failures</td>
+              <td>3 failures</td>
             </tr>
             <tr>
-              <td>OpenCode mapping</td>
+              <td>Global tab strip</td>
               <td>
-                Map text part A → tool → text part B to separate canonical assistant items in
-                provider chronology.
+                Convert the one outer strip into a rounded glass capsule; use a faint selected fill
+                plus the existing orange underline without adding blur per tab.
               </td>
               <td>1 failure</td>
             </tr>
             <tr>
-              <td>Transcript projection</td>
+              <td>Composer</td>
               <td>
-                Project each user turn into one work disclosure and an optional visible tail
-                assistant response.
+                Increase the shell to 20px, reuse the shared glass edge and specular highlight, and
+                retain diffuse elevation in the focused orange state.
               </td>
-              <td>4 failures + missing component suite</td>
+              <td>1 failure</td>
             </tr>
             <tr>
-              <td>Disclosure behavior</td>
+              <td>Browser and thread chrome</td>
               <td>
-                Start live tool/work groups closed, retain manual live expansion, unmount closed
-                bodies, and auto-close on settlement.
+                Add narrow semantic markers and faux-glass paint to the toolbars and address field;
+                mark content planes explicitly and keep them unfiltered.
               </td>
-              <td>2 failures + missing component suite</td>
+              <td>1 failure</td>
+            </tr>
+            <tr>
+              <td>Accessibility</td>
+              <td>
+                Make reduced transparency opaque, preserve higher-contrast boundaries, and test
+                worst-case light-material text contrast at or above 4.5:1.
+              </td>
+              <td>Contract coverage</td>
             </tr>
           </tbody>
         </table>
@@ -423,52 +404,46 @@
         </div>
         <div class="grid three">
           <article class="note blue">
-            <h3>OpenCode</h3>
+            <h3>Resting light shell</h3>
             <p>
-              Run two configured models in the exact unsigned package. Each must visibly navigate
-              and mutate a localhost page, enumerate the global browser tabs, reuse a tab, and close
-              a disposable peer without gstack, Playwright, native web tools, or an external browser
-              process.
+              Launch the unsigned package with a representative task and embedded browser visible.
+              Capture sidebar, thread header, one global tab strip, browser controls, and composer.
             </p>
           </article>
           <article class="note green">
-            <h3>Codex</h3>
+            <h3>Focus and menus</h3>
             <p>
-              Repeat in GUI and terminal presentation. Record the visible embedded state, Browser
-              MCP events, launch overrides, and unchanged normal profile. Native browser/search
-              routes must not appear.
+              Focus the composer, open a browser or overflow menu, and verify the orange focus
+              state, glass depth, text clarity, dismissal, and keyboard semantics.
             </p>
           </article>
           <article class="note pink">
-            <h3>Claude</h3>
+            <h3>Global tabs</h3>
             <p>
-              Verify terminal and SDK launch contracts while logged out. Live inference remains an
-              explicit user-authentication gate; after login, repeat the same visible localhost
-              scenario without entering credentials on the user's behalf.
+              Switch Browser, Files, Git, and a document with mouse and keyboard; reorder and close
+              a disposable peer. One tablist and one selected orange indicator must remain.
             </p>
           </article>
           <article class="note yellow">
-            <h3>Streaming turn</h3>
+            <h3>Embedded browser</h3>
             <p>
-              Confirm one initially closed Working row, no mounted heavy body, persistent manual
-              expansion, a visible tail answer candidate, and correct demotion of that candidate
-              when a later tool arrives.
+              Type into the rounded address field, navigate, reload, open the browser menu, and
+              resize the pane. Web content must stay crisp and every control must remain clickable.
             </p>
           </article>
           <article class="note orange">
-            <h3>Settled turn</h3>
+            <h3>Accessibility</h3>
             <p>
-              Confirm the row auto-closes and only the final answer remains expanded. Reopen it,
-              inspect retained chronology, search hidden text, and verify questions/user messages
-              stay outside.
+              Verify reduced-transparency opaque fallbacks and a brief dark-mode regression, then
+              return to the requested light appearance. Check all boundaries and muted text.
             </p>
           </article>
           <article class="note green">
-            <h3>Cleanup</h3>
+            <h3>Layer and memory guard</h3>
             <p>
-              Repeat browser-tab churn in an isolated profile. Enforce six live ordinary guests and
-              thirty metadata entries, return to baseline after cleanup, leave no helper after quit,
-              and restore no disposable pages.
+              Exercise more than six browser metadata tabs in an isolated profile. Confirm only the
+              single strip blurs, resident guests stay capped at six, and cleanup has no new leak
+              slope.
             </p>
           </article>
         </div>
@@ -480,36 +455,34 @@
           <h2>Risks and controls</h2>
         </div>
         <details open>
-          <summary>Provider configuration precedence</summary>
+          <summary>Too much glass</summary>
           <div class="detail">
-            Prompt steering alone is insufficient. Enforcement must occur after provider/global
-            discovery and after permissive wildcard rules, with tests for both terminal and
-            structured launch paths.
+            Glass is restricted to the native sidebar, global strip, composer, and small menus.
+            Browser/thread toolbars use faux material; panes and content remain opaque.
           </div>
         </details>
         <details>
-          <summary>Transcript virtualization and Find</summary>
+          <summary>Contrast over unknown wallpaper</summary>
           <div class="detail">
-            The compact display type stays separate from the raw canonical timeline. Group rows
-            expose stable IDs and underlying item IDs so measurement, completion anchors, search
-            mapping, subagents, and history remain correct.
+            Platform-specific frosting floors keep a theme scrim behind text. Glass-local muted ink
+            clears 4.5:1 in pessimistic light blends, and reduced transparency paints solid
+            surfaces.
           </div>
         </details>
         <details>
           <summary>Memory and browser residency</summary>
           <div class="detail">
             Closed work bodies are unmounted. Existing browser LRU limits remain unchanged: six
-            ordinary live webviews, four sensitive live webviews, and thirty ordinary metadata
-            entries. Repeated packaged cleanup is a release gate.
+            ordinary live webviews, four sensitive live webviews, and thirty metadata entries. No
+            filter, rounded clipping, opacity, or persistent will-change touches browser guests.
           </div>
         </details>
         <details>
-          <summary>External authorization</summary>
+          <summary>Interaction geometry</summary>
           <div class="detail">
-            Claude Code 2.1.210 is installed but <code>loggedIn=false</code>. Launch behavior can be
-            fully verified now; a real Claude inference/browser run cannot honestly pass until the
-            user authenticates. No Pipedream OAuth/account grant or provider credential mutation is
-            part of this follow-up.
+            Structural pane edges and resize handles stay square. New radius is applied inside those
+            boundaries, with global-tab roving focus, drag/reorder, close targeting, browser
+            actions, and macOS drag regions covered by regression tests and hands-on clicks.
           </div>
         </details>
       </section>
@@ -523,11 +496,12 @@
           <span class="status">Ready</span>
           <strong>Production implementation may begin.</strong>
           <p style="margin-top: 8px; color: var(--muted)">
-            No new dependency is planned. The work reuses the provider adapters, resolved MCP
-            transport, canonical runtime events, disclosures, virtualized list, browser lifecycle
-            controls, and existing packaging workflow. Completion requires focused and full
-            verification, an unsigned package, hands-on Computer Use proof, a Husky-validated
-            commit, and a stacked pull request. No merge or force push is authorized.
+            No new dependency is planned. The work reuses the existing theme tokens, native material
+            integration, one global tab strip, composer, browser lifecycle controls, reduced-
+            transparency fallback, and packaging workflow. Completion requires focused and full
+            verification, an unsigned package, hands-on Computer Use proof, a Husky-validated local
+            commit, and an evidence-backed handoff. No pull request was requested; no merge or force
+            push is authorized.
           </p>
         </div>
       </section>

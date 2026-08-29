@@ -5,6 +5,10 @@ import { contrastRatio } from "./colorMath";
 
 const styles = readFileSync(join(process.cwd(), "src/renderer/styles.css"), "utf8");
 
+function sourceFor(path: string): string {
+  return readFileSync(join(process.cwd(), path), "utf8");
+}
+
 function ruleFor(selector: string): string {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = styles.match(new RegExp(`${escapedSelector}\\s*\\{([^}]+)\\}`));
@@ -100,11 +104,11 @@ describe("base control styles", () => {
   });
 
   it("uses a calm elevated composer with one orange send action", () => {
-    expect(exactRuleFor(".poracode-composer-shell")).toContain("border-radius: 18px");
+    expect(exactRuleFor(".poracode-composer-shell")).toContain("border-radius: 20px");
     expect(exactRuleFor(".poracode-composer-shell")).toContain(
       "backdrop-filter: var(--glass-backdrop)",
     );
-    expect(exactRuleFor(".poracode-composer-shell")).toContain("0 8px 28px");
+    expect(exactRuleFor(".poracode-composer-shell")).toContain("0 12px 36px");
     expect(exactRuleFor(".poracode-composer-shell:focus-within")).toContain("var(--accent)");
     expect(exactRuleFor(".poracode-composer-shell:focus-within")).toContain(
       "border-color: var(--accent)",
@@ -115,13 +119,76 @@ describe("base control styles", () => {
     expect(styles).not.toContain("poracode-composer-border-spin");
   });
 
+  it("gives reusable glass chrome a soft bounded material contract", () => {
+    const glassRule = exactRuleFor(".poracode-glass-chrome");
+    expect(glassRule).toContain("border: 1px solid var(--glass-border)");
+    expect(glassRule).toContain("border-radius: var(--glass-chrome-radius)");
+    expect(glassRule).toContain("background: var(--glass-surface)");
+    expect(glassRule).toContain("background-image: var(--glass-specular)");
+    expect(glassRule).toContain("backdrop-filter: var(--glass-backdrop)");
+    expect(glassRule).toContain("-webkit-backdrop-filter: var(--glass-backdrop)");
+    expect(glassRule).toContain("box-shadow: var(--glass-shadow)");
+
+    expect(styles).toContain("--glass-chrome-radius: 14px");
+    expect(styles).toContain("--glass-muted: #504f4c");
+    expect(contrastRatio("#504f4c", "#cccccc")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("softens browser and thread chrome without blurring content planes", () => {
+    const browserToolbar = sourceFor(
+      "src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx",
+    );
+    const browserPanel = sourceFor(
+      "src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx",
+    );
+    const threadView = sourceFor("src/renderer/components/thread/ThreadView.tsx");
+    const omnibox = sourceFor(
+      "src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserOmnibox.tsx",
+    );
+
+    expect(browserToolbar).toContain('role="toolbar"');
+    expect(browserToolbar).toContain("poracode-browser-chrome");
+    expect(browserPanel).toContain("poracode-browser-content-plane");
+    expect(threadView).toContain("poracode-thread-header-glass");
+    expect(threadView).toContain("poracode-thread-content-plane");
+    expect(omnibox).toContain("poracode-browser-omnibox");
+
+    expect(styles).toMatch(
+      /\.poracode-thread-header-glass,\s*\.poracode-browser-chrome\s*\{[^}]*border:\s*1px solid var\(--glass-border\);[^}]*border-radius:\s*12px;[^}]*background-image:\s*var\(--glass-specular\);[^}]*box-shadow:/s,
+    );
+    const cssWithoutComments = styles.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const rule of cssWithoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selector = rule[1] ?? "";
+      const declarations = rule[2] ?? "";
+      if (!declarations.includes("backdrop-filter")) continue;
+      expect(selector).not.toMatch(
+        /webview|data-y-space-browser-host|poracode-browser-content-plane|poracode-thread-content-plane/,
+      );
+    }
+  });
+
   it("limits translucent chrome to stable shell surfaces with an opaque accessibility fallback", () => {
     expect(styles).toMatch(
-      /\.poracode-workspace-tab-strip,\s*\.popover,\s*\.dropdown__popover,\s*\.poracode-composer-shell\s*\{[^}]*background:\s*var\(--glass-surface\);[^}]*backdrop-filter:\s*var\(--glass-backdrop\);/s,
+      /\.poracode-glass-chrome\s*\{[^}]*background:\s*var\(--glass-surface\);[^}]*backdrop-filter:\s*var\(--glass-backdrop\);/s,
     );
     expect(ruleFor(".poracode-workspace-tab-strip")).toContain("border-color: var(--glass-border)");
     expect(styles).toMatch(
-      /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?\.poracode-workspace-tab-strip,[\s\S]*?\.poracode-composer-shell\s*\{[^}]*background:\s*var\(--overlay\);[^}]*backdrop-filter:\s*none;/,
+      /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?\.poracode-glass-chrome,[\s\S]*?\.poracode-browser-chrome\s*\{[^}]*background:\s*var\(--overlay\);[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/,
+    );
+    expect(styles).toMatch(
+      /@media \(prefers-reduced-transparency: reduce\)[\s\S]*?\.poracode-glass-chrome\.poracode-composer-shell,[\s\S]*?\{[^}]*background:\s*var\(--overlay\);[^}]*backdrop-filter:\s*none;[^}]*-webkit-backdrop-filter:\s*none;/,
+    );
+  });
+
+  it("uses theme-aware glass edge and elevation tokens", () => {
+    expect(styles).toContain("--glass-edge-highlight: rgb(255 255 255 / 0.62)");
+    expect(styles).toContain("--glass-edge-highlight-strong: rgb(255 255 255 / 0.74)");
+    expect(styles).toContain("--glass-elevation: rgb(24 20 16 / 0.09)");
+    expect(styles).toMatch(
+      /\.dark,[^{]*\[data-theme="dark"\]\s*\{[^}]*--glass-edge-highlight:\s*rgb\(255 255 255 \/ 0\.07\);[^}]*--glass-edge-highlight-strong:\s*rgb\(255 255 255 \/ 0\.09\);[^}]*--glass-elevation:\s*rgb\(0 0 0 \/ 0\.3\);/s,
+    );
+    expect(exactRuleFor(".poracode-composer-shell")).toContain(
+      "inset 0 1px 0 var(--glass-edge-highlight-strong)",
     );
   });
 });

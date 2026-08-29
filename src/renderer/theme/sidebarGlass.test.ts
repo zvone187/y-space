@@ -21,13 +21,13 @@ describe("sidebar glass tint", () => {
     document.documentElement.style.removeProperty("--sidebar-glass-tint");
   });
 
-  it("keeps the macOS material frosted behind a contrast-safe theme scrim", () => {
-    expect(sidebarGlassTintDefault("light")).toBe(98);
+  it("keeps the macOS material visibly frosted behind a contrast-safe theme scrim", () => {
+    expect(sidebarGlassTintDefault("light")).toBe(90);
     expect(sidebarGlassTintDefault("dark")).toBe(82);
-    expect(sidebarGlassTintMinimum("light")).toBe(98);
+    expect(sidebarGlassTintMinimum("light")).toBe(88);
     expect(sidebarGlassTintMinimum("dark")).toBe(80);
-    expect(sidebarGlassTintExpr(98)).toBe(
-      "color-mix(in oklab, var(--content-background) 98%, transparent)",
+    expect(sidebarGlassTintExpr(90)).toBe(
+      "color-mix(in oklab, var(--content-background) 90%, transparent)",
     );
   });
 
@@ -35,15 +35,17 @@ describe("sidebar glass tint", () => {
     platform.mac = false;
     platform.windows = true;
 
-    expect(sidebarGlassTintDefault("light")).toBe(98);
+    expect(sidebarGlassTintDefault("light")).toBe(94);
     expect(sidebarGlassTintDefault("dark")).toBe(88);
+    expect(sidebarGlassTintMinimum("light")).toBe(92);
+    expect(sidebarGlassTintMinimum("dark")).toBe(80);
   });
 
   it("applies an enabled native override and clears every fallback state", () => {
     const root = document.documentElement;
 
     applySidebarGlassTint(root, 82, true, "light");
-    expect(root.style.getPropertyValue("--sidebar-glass-tint")).toContain("98%");
+    expect(root.style.getPropertyValue("--sidebar-glass-tint")).toContain("88%");
 
     applySidebarGlassTint(root, null, true, "light");
     expect(root.style.getPropertyValue("--sidebar-glass-tint")).toBe("");

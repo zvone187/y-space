@@ -128,7 +128,7 @@ msgstr "{0, plural, other {#회 사용}}"
 #. placeholder {0}: state.actionCount
 #: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
 msgid "{0, plural, one {Browser verified · # action} other {Browser verified · # actions}}"
-msgstr ""
+msgstr "{0, plural, other {브라우저에서 검증 완료 · 작업 #개}}"
 
 #. placeholder {0}: candidates.length
 #: src/renderer/components/experiment/NewExperimentModal.tsx
@@ -952,7 +952,7 @@ msgstr "GitHub Actions를 사용하려면 프로젝트를 추가하세요."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Add a skill from your workspace or import one from another provider."
-msgstr ""
+msgstr "작업 공간에서 스킬을 추가하거나 다른 제공업체에서 가져오세요."
 
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "Add a skill to .agents/skills or .poracode/skills, or import one from another provider."
@@ -1977,6 +1977,7 @@ msgstr "Y Space의 격리된 내장 브라우저에서 웹사이트를 탐색하
 #: src/renderer/components/plugins/pluginCopy.ts
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
@@ -2010,7 +2011,7 @@ msgstr "브라우저 메뉴"
 
 #: src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
 msgid "Browser not verified"
-msgstr ""
+msgstr "브라우저에서 검증되지 않음"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -13892,7 +13893,7 @@ msgstr "공백 없이 문자, 숫자, 마침표, 대시 또는 밑줄을 사용�
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Use one global folder, or keep each project's worktrees with that project."
-msgstr ""
+msgstr "하나의 공용 폴더를 사용하거나 각 프로젝트의 워크트리를 해당 프로젝트와 함께 보관하세요."
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #~ msgid "Use one global folder, or nest worktrees inside each project at .poracode/worktrees."
@@ -14609,7 +14610,7 @@ msgstr "Y Space가 다시 시작되고 현재 데이터를 백업한 다음 이�
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Your focused workspace for agents, files, and the web."
-msgstr ""
+msgstr "에이전트, 파일, 웹에 집중할 수 있는 작업 공간입니다."
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/CommitSyncPanel.tsx
 msgid "Your local changes are stashed and will be re-applied when you commit or abort this merge."

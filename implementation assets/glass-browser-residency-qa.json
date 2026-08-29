@@ -1,0 +1,37 @@
+{
+  "testedAt": "2026-08-28T20:55:00-07:00",
+  "platform": "macOS Apple Silicon",
+  "build": "release/mac-arm64/Y Space.app",
+  "profile": "/tmp/y-space-glass-qa.FbbupN/base",
+  "method": "Computer Use opened seven disposable peer browser tabs from the packaged app, process state was sampled at the eight-tab peak, and Computer Use closed every disposable peer.",
+  "prePeak": {
+    "globalBrowserTabs": 1,
+    "rendererProcesses": 2,
+    "ordinaryBrowserGuests": 1,
+    "rendererRssKiB": 215472
+  },
+  "peak": {
+    "globalBrowserTabs": 8,
+    "rendererProcesses": 7,
+    "ordinaryBrowserGuests": 6,
+    "rendererRssKiB": 1360176
+  },
+  "cleanup": {
+    "globalBrowserTabs": 1,
+    "rendererProcesses": 2,
+    "ordinaryBrowserGuests": 1,
+    "rendererRssKiB": 259712
+  },
+  "result": "pass_residency_cleanup_memory_inconclusive",
+  "memoryAssessment": {
+    "status": "inconclusive_single_cycle",
+    "cleanupDeltaKiB": 44240,
+    "cleanupDeltaPercent": 20.5
+  },
+  "notes": [
+    "The resident ordinary-browser guest count stayed at the documented limit of six even with eight browser metadata tabs.",
+    "Closing the seven disposable tabs returned the packaged app to one browser guest and the two-renderer app baseline.",
+    "Cleanup renderer RSS remained 44,240 KiB (20.5%) above the pre-peak sample. A single cycle cannot distinguish normal Chromium caching from a persistent leak, so this artifact does not claim a memory trend.",
+    "No blur, filter, or persistent will-change is applied to browser hosts, content planes, individual tabs, or webviews."
+  ]
+}

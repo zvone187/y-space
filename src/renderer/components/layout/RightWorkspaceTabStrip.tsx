@@ -103,7 +103,7 @@ export function RightWorkspaceTabStrip({
   };
 
   return (
-    <div className="poracode-workspace-tab-strip flex h-9 min-w-0 shrink-0 items-end border-b px-1 pt-1">
+    <div className="poracode-workspace-tab-strip poracode-glass-chrome flex h-9 min-w-0 shrink-0 items-center px-1">
       <div
         role="tablist"
         aria-label={t`Tabs`}
@@ -119,7 +119,8 @@ export function RightWorkspaceTabStrip({
             <div
               key={tab.id}
               draggable={Boolean(onReorder)}
-              className={`group flex h-8 max-w-56 min-w-16 shrink-0 items-center rounded-none border-b-2 px-1 transition-colors ${
+              data-selected={selected}
+              className={`poracode-workspace-tab group flex h-7 max-w-56 min-w-16 shrink-0 items-center rounded-lg border-b-2 px-1 transition-colors ${
                 selected
                   ? "border-[var(--accent)] text-foreground"
                   : "border-transparent text-muted hover:text-foreground"

@@ -270,7 +270,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   const alignClass =
     paneAlign === "right" ? "ml-auto" : paneAlign === "left" ? "mr-auto" : "mx-auto";
   const paddingClass = "px-2";
-  const contentShellClass = `${alignClass} relative flex min-h-0 w-full max-w-[1040px] flex-1 flex-col ${paddingClass} px-3 pb-2`;
+  const contentShellClass = `${alignClass} poracode-thread-content-plane relative flex min-h-0 w-full max-w-[1040px] flex-1 flex-col ${paddingClass} px-3 pb-2`;
   const contentBodyClass = `${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col pt-2`;
 
   return (
@@ -314,7 +314,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
         <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div
-            className={`${dragHandleRef ? "poracode-content-over-drag-region" : "poracode-content-over-drag-region--drag"} @container ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
+            className={`${dragHandleRef ? "poracode-content-over-drag-region" : "poracode-content-over-drag-region--drag"} poracode-thread-header-glass @container ${alignClass} my-1 flex w-full max-w-[920px] items-center gap-2 px-2 py-1`}
           >
             <ThreadHeaderStatusButton
               threadId={thread.id}

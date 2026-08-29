@@ -414,6 +414,7 @@ export function ThreadComposer(props: {
     : "poracode-composer-toolbar relative flex items-end justify-between gap-3";
   const shellClassName = [
     "poracode-composer-shell",
+    "poracode-glass-chrome",
     variant === "draft" && "poracode-composer-shell--draft",
     variant !== "draft" &&
       preserveDisabledControlStyle &&

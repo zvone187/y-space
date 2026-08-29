@@ -569,7 +569,7 @@
        is the *wallpaper*, not the theme color, so higher alpha keeps the sidebar
        reading as the theme (less wallpaper/grey showing); lower alpha shows more
        wallpaper blur (more glassy, but tinted by whatever's on the desktop). */
-    --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 98%, transparent);
+    --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 90%, transparent);
     --content-background: var(--background);
     /* Floating chrome that hovers over the conversation — thread tool rail,
        changes bubble, scroll-to-bottom. One shared surface so the three read as
@@ -586,10 +586,25 @@
     --window-header-background: var(--sidebar-background);
     --window-overlay-background: rgba(0, 0, 0, 0);
     --composer-surface: var(--surface);
-    --glass-surface: color-mix(in oklab, var(--overlay) 86%, transparent);
+    --glass-surface: color-mix(in oklab, var(--overlay) 84%, transparent);
     --glass-border: color-mix(in oklab, var(--foreground) 7%, transparent);
-    --glass-backdrop: blur(18px) saturate(150%);
-    --glass-shadow: 0 14px 40px rgb(24 20 16 / 0.1), inset 0 1px 0 rgb(255 255 255 / 0.72);
+    --glass-backdrop: blur(22px) saturate(158%);
+    --glass-chrome-radius: 14px;
+    --glass-muted: var(--muted);
+    --glass-edge-highlight: rgb(255 255 255 / 0.62);
+    --glass-edge-highlight-strong: rgb(255 255 255 / 0.74);
+    --glass-edge-highlight-selected: rgb(255 255 255 / 0.58);
+    --glass-edge-highlight-sidebar: rgb(255 255 255 / 0.5);
+    --glass-elevation: rgb(24 20 16 / 0.09);
+    --glass-elevation-soft: rgb(24 20 16 / 0.055);
+    --glass-specular: linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.7) 0%,
+      rgb(255 255 255 / 0.16) 46%,
+      color-mix(in oklab, var(--accent) 5%, transparent) 100%
+    );
+    --glass-shadow:
+      0 12px 34px var(--glass-elevation), inset 0 1px 0 var(--glass-edge-highlight-strong);
     --interactive-cursor: default;
     --cursor-interactive: default;
 
@@ -659,7 +674,8 @@
     --content-background: #ffffff;
     --window-header-background: var(--sidebar-background);
     --composer-surface: #ffffff;
-    --glass-surface: color-mix(in oklab, #ffffff 82%, transparent);
+    --glass-surface: color-mix(in oklab, #ffffff 80%, transparent);
+    --glass-muted: #504f4c;
   }
 
   .dark,
@@ -725,7 +741,20 @@
     --composer-surface: #17171d;
     --glass-surface: color-mix(in oklab, var(--overlay) 78%, transparent);
     --glass-border: color-mix(in oklab, var(--foreground) 12%, transparent);
-    --glass-shadow: 0 16px 44px rgb(0 0 0 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.08);
+    --glass-edge-highlight: rgb(255 255 255 / 0.07);
+    --glass-edge-highlight-strong: rgb(255 255 255 / 0.09);
+    --glass-edge-highlight-selected: rgb(255 255 255 / 0.06);
+    --glass-edge-highlight-sidebar: rgb(255 255 255 / 0.06);
+    --glass-elevation: rgb(0 0 0 / 0.3);
+    --glass-elevation-soft: rgb(0 0 0 / 0.22);
+    --glass-specular: linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.1) 0%,
+      rgb(255 255 255 / 0.03) 48%,
+      color-mix(in oklab, var(--accent) 4%, transparent) 100%
+    );
+    --glass-shadow:
+      0 16px 44px var(--glass-elevation), inset 0 1px 0 var(--glass-edge-highlight-strong);
   }
 
   * {
@@ -1070,6 +1099,14 @@ html[data-sidebar-glass="on"][data-theme="dark"]
 html[data-native-material="on"] .poracode-sidebar-aside {
   background: var(--sidebar-glass-tint);
 }
+html[data-native-material="on"] .poracode-sidebar-aside:not(.poracode-sidebar-aside--overlay) {
+  box-shadow:
+    inset -1px 0 0 color-mix(in oklab, var(--foreground) 7%, transparent),
+    inset 0 1px 0 var(--glass-edge-highlight-sidebar);
+}
+html[data-native-material="on"]:is(.light, [data-theme="light"]) .poracode-sidebar-aside {
+  --muted: var(--glass-muted);
+}
 html[data-native-material="on"] .poracode-sidebar-aside .poracode-overlay-header {
   background: transparent;
 }
@@ -1095,7 +1132,7 @@ html[data-native-material="on"] .poracode-sidebar-spacer {
    macOS vibrancy composites its own adaptive material, so darwin is left
    untouched; these rules are unlayered so they win over the @layer base token. */
 html[data-platform="win32"][data-native-material="on"] {
-  --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 98%, transparent);
+  --sidebar-glass-tint: color-mix(in oklab, var(--content-background) 94%, transparent);
 }
 html[data-platform="win32"][data-native-material="on"].dark,
 html[data-platform="win32"][data-native-material="on"][data-theme="dark"] {
@@ -1166,28 +1203,80 @@ html[data-sidebar-glass="on"]:not([data-native-material="on"]) .poracode-sidebar
   background: var(--sidebar-background);
 }
 
-/* The global workspace strip, floating menus, and composer share one restrained
-   glass language. These are the only CSS-blurred desktop layers: keeping the
-   effect to stable chrome avoids multiplying compositor surfaces as browser or
-   document tabs are opened. */
-.poracode-workspace-tab-strip,
+/* Reusable real glass is intentionally limited to stable shell chrome. The
+   global tab strip and composer opt into this marker; individual tabs, browser
+   hosts, webviews, and content planes never do, so opening more pages cannot
+   multiply filtered compositor surfaces. */
+.poracode-glass-chrome {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-chrome-radius);
+  background: var(--glass-surface);
+  background-image: var(--glass-specular);
+  backdrop-filter: var(--glass-backdrop);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  box-shadow: var(--glass-shadow);
+  --muted: var(--glass-muted);
+}
+
+/* Portaled menus cannot reliably receive the shared marker, but remain bounded
+   stable chrome and use the same material without introducing per-content blur. */
 .popover,
-.dropdown__popover,
-.poracode-composer-shell {
+.dropdown__popover {
   background: var(--glass-surface);
   backdrop-filter: var(--glass-backdrop);
   -webkit-backdrop-filter: var(--glass-backdrop);
 }
 
 .poracode-workspace-tab-strip {
+  margin: 4px 6px 0;
   border-color: var(--glass-border);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.54);
+  box-shadow:
+    0 5px 18px var(--glass-elevation-soft),
+    inset 0 1px 0 var(--glass-edge-highlight);
+}
+
+.poracode-workspace-tab {
+  background: transparent;
+}
+
+.poracode-workspace-tab[data-selected="true"] {
+  background: color-mix(in oklab, var(--glass-surface) 68%, var(--surface-secondary));
+  box-shadow: inset 0 1px 0 var(--glass-edge-highlight-selected);
 }
 
 .popover,
 .dropdown__popover {
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
+}
+
+/* Thread and Browser toolbars only imitate glass. They are normal-flow chrome,
+   so a paint-only highlight has the same visual depth without an additional
+   GPU blur pass for every split pane or embedded browser. */
+.poracode-thread-header-glass,
+.poracode-browser-chrome {
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--glass-surface) 88%, var(--content-background));
+  background-image: var(--glass-specular);
+  box-shadow:
+    0 4px 16px var(--glass-elevation-soft),
+    inset 0 1px 0 var(--glass-edge-highlight);
+  --muted: var(--glass-muted);
+}
+
+.poracode-browser-omnibox {
+  box-shadow: inset 0 1px 2px rgb(24 20 16 / 0.045);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.poracode-browser-omnibox:focus {
+  box-shadow:
+    inset 0 1px 2px rgb(24 20 16 / 0.035),
+    0 0 0 2px color-mix(in oklab, var(--accent) 16%, transparent);
 }
 
 /* Overlays (settings, git review, file editor, …) reuse the same AppShell, so
@@ -1246,11 +1335,14 @@ html[data-native-material="on"]
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
-  .poracode-workspace-tab-strip,
+  .poracode-glass-chrome,
+  .poracode-glass-chrome.poracode-composer-shell,
   .popover,
   .dropdown__popover,
-  .poracode-composer-shell {
+  .poracode-thread-header-glass,
+  .poracode-browser-chrome {
     background: var(--overlay);
+    background-image: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -1889,14 +1981,15 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
 
 .poracode-composer-shell {
   position: relative;
-  border: 1px solid color-mix(in oklab, var(--foreground) 10%, transparent);
-  border-radius: 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
   background: var(--glass-surface);
+  background-image: var(--glass-specular);
   backdrop-filter: var(--glass-backdrop);
   -webkit-backdrop-filter: var(--glass-backdrop);
   box-shadow:
-    0 8px 28px rgb(24 20 16 / 0.08),
-    inset 0 1px 0 rgb(255 255 255 / 0.66);
+    0 12px 36px var(--glass-elevation),
+    inset 0 1px 0 var(--glass-edge-highlight-strong);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
@@ -1989,7 +2082,7 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
   border-color: var(--accent);
   outline: none !important;
   box-shadow:
-    0 2px 8px rgb(0 0 0 / 0.07),
+    0 12px 36px var(--glass-elevation),
     0 0 0 1px var(--accent) !important;
   --tw-ring-shadow: 0 0 #0000 !important;
   --tw-ring-offset-shadow: 0 0 #0000 !important;

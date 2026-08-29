@@ -336,7 +336,7 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
         onMenuPreviewChange={setMenuPreviewDataUrl}
       />
       <BrowserBookmarkBar />
-      <div className="relative flex-1 overflow-hidden bg-[var(--content-background)]">
+      <div className="poracode-browser-content-plane relative flex-1 overflow-hidden bg-[var(--content-background)]">
         {residentBrowserTabs.map((tab) => (
           <BrowserTabWebview
             key={tab.tabId}

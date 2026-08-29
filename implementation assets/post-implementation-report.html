@@ -3,22 +3,22 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space — Browser Default &amp; Compact Turns</title>
+    <title>Y Space — Modern Glass Polish</title>
     <style>
       :root {
-        --canvas: #fffaf4;
-        --ink: #1e1b18;
-        --muted: #716a63;
-        --border: #2f2a25;
+        --canvas: #fff8f1;
+        --ink: #211d19;
+        --muted: #716861;
+        --border: #302a25;
         --paper: #ffffff;
-        --orange: #ff6b22;
-        --orange-soft: #ffe3cf;
-        --green: #e4f6df;
+        --orange: #ff5a1f;
+        --orange-soft: #ffe2cf;
+        --green: #e2f6df;
         --blue: #e3f0ff;
-        --yellow: #fff2bd;
+        --yellow: #fff1b8;
         --pink: #ffe2e8;
-        --purple: #eee6ff;
-        --shadow: 7px 7px 0 rgba(47, 42, 37, 0.15);
+        --purple: #eee5ff;
+        --shadow: 7px 7px 0 rgb(48 42 37 / 0.15);
         font-family:
           Inter,
           ui-sans-serif,
@@ -32,24 +32,24 @@
         box-sizing: border-box;
       }
       body {
-        background:
-          linear-gradient(90deg, rgba(47, 42, 37, 0.06) 1px, transparent 1px),
-          linear-gradient(rgba(47, 42, 37, 0.06) 1px, transparent 1px), var(--canvas);
-        background-size: 28px 28px;
+        margin: 0;
         color: var(--ink);
         line-height: 1.45;
-        margin: 0;
+        background:
+          linear-gradient(90deg, rgb(48 42 37 / 0.06) 1px, transparent 1px),
+          linear-gradient(rgb(48 42 37 / 0.06) 1px, transparent 1px), var(--canvas);
+        background-size: 28px 28px;
       }
       main {
-        margin: 0 auto;
-        padding: 30px 22px 52px;
         width: min(1240px, 100%);
+        margin: 0 auto;
+        padding: 30px 22px 54px;
       }
       header {
         display: grid;
-        gap: 18px;
         grid-template-columns: 1.4fr 0.8fr;
-        margin-bottom: 22px;
+        gap: 18px;
+        margin-bottom: 24px;
       }
       h1,
       h2,
@@ -58,51 +58,57 @@
         margin: 0;
       }
       h1 {
-        font-size: clamp(2rem, 5vw, 4.2rem);
-        line-height: 0.98;
+        font-size: clamp(2.2rem, 5vw, 4.3rem);
+        line-height: 0.96;
       }
       h2 {
-        font-size: 1.05rem;
+        font-size: 1.06rem;
         text-transform: uppercase;
       }
       a {
-        color: #a83a00;
+        color: #a43800;
         font-weight: 780;
         text-decoration: none;
       }
       code {
-        background: rgba(255, 255, 255, 0.75);
-        border: 1px solid rgba(47, 42, 37, 0.23);
+        border: 1px solid rgb(48 42 37 / 0.24);
         border-radius: 6px;
+        background: rgb(255 255 255 / 0.76);
         padding: 2px 5px;
       }
       .hero,
       .card,
+      .sticky,
       details,
-      .sticky {
+      .table-card,
+      figure {
         border: 2px solid var(--border);
         box-shadow: var(--shadow);
       }
       .hero,
       .card,
-      details {
-        background: var(--paper);
+      details,
+      .table-card,
+      figure {
         border-radius: 16px;
+        background: var(--paper);
       }
       .hero {
         padding: 26px;
       }
       .hero p {
-        color: var(--muted);
-        margin-top: 12px;
         max-width: 760px;
+        margin-top: 12px;
+        color: var(--muted);
       }
       .meta-stack,
-      .grid {
+      .grid,
+      .evidence {
         display: grid;
         gap: 14px;
       }
-      .grid.two {
+      .grid.two,
+      .evidence {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .grid.three {
@@ -112,67 +118,67 @@
         padding: 16px;
       }
       .card small {
-        color: var(--muted);
         display: block;
+        color: var(--muted);
         font-size: 0.78rem;
         font-weight: 850;
         text-transform: uppercase;
       }
       .card strong {
         display: block;
-        font-size: 1.22rem;
-        line-height: 1.15;
         margin-top: 4px;
+        font-size: 1.2rem;
+        line-height: 1.15;
       }
       .tag,
       .pill {
+        display: inline-flex;
         border: 2px solid var(--border);
         border-radius: 999px;
-        display: inline-flex;
+        padding: 5px 9px;
         font-size: 0.76rem;
         font-weight: 900;
-        padding: 5px 9px;
         text-transform: uppercase;
       }
       .tag {
-        background: var(--orange-soft);
         margin-bottom: 12px;
+        background: var(--orange-soft);
       }
       .pill {
         margin: 0 6px 6px 0;
       }
       .board-section {
-        margin-top: 24px;
+        margin-top: 25px;
       }
       .section-title {
-        align-items: center;
         display: flex;
+        align-items: center;
         gap: 10px;
         margin-bottom: 12px;
       }
       .pin {
-        background: var(--orange);
+        width: 16px;
+        height: 16px;
         border: 2px solid var(--border);
         border-radius: 50%;
-        height: 16px;
-        width: 16px;
+        background: var(--orange);
       }
       .sticky {
+        min-height: 132px;
         border-radius: 3px;
-        min-height: 128px;
         padding: 16px;
-        transform: rotate(-0.55deg);
+        transform: rotate(-0.5deg);
       }
       .sticky:nth-child(even) {
-        transform: rotate(0.55deg);
+        transform: rotate(0.5deg);
       }
       .sticky h3 {
-        font-size: 1.08rem;
         margin-bottom: 8px;
+        font-size: 1.08rem;
       }
       .sticky p,
       .sticky li {
-        color: #453f39;
+        color: #493f38;
         font-size: 0.93rem;
       }
       .sticky ul {
@@ -197,71 +203,75 @@
       .bg-purple {
         background: var(--purple);
       }
+      .table-card {
+        overflow: hidden;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #ddd3ca;
+        padding: 9px 11px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--orange-soft);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      .pass {
+        color: #176225;
+        font-weight: 850;
+      }
       summary {
         cursor: pointer;
+        padding: 14px 16px;
         font-weight: 850;
         list-style: none;
-        padding: 14px 16px;
       }
-      summary::-webkit-details-marker {
-        display: none;
-      }
-      summary:before {
+      summary::before {
         content: "+";
         display: inline-block;
-        font-weight: 900;
-        margin-right: 10px;
         width: 14px;
+        margin-right: 10px;
+        font-weight: 900;
       }
-      details[open] summary:before {
+      details[open] summary::before {
         content: "−";
       }
       .detail-body {
         border-top: 2px solid var(--border);
-        color: #453f39;
         padding: 14px 16px 16px;
+        color: #493f38;
       }
       .detail-body ul {
         margin: 8px 0 0;
         padding-left: 18px;
       }
-      .evidence {
-        display: grid;
-        gap: 12px;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .evidence figure {
-        background: var(--paper);
-        border: 2px solid var(--border);
-        border-radius: 12px;
+      figure {
         margin: 0;
         overflow: hidden;
       }
-      .evidence img {
+      figure img {
         display: block;
-        height: auto;
         width: 100%;
+        height: auto;
       }
-      .evidence figcaption {
+      figcaption {
+        padding: 9px 11px;
         color: var(--muted);
         font-size: 0.83rem;
-        padding: 9px 11px;
       }
-      table {
-        border-collapse: collapse;
-        width: 100%;
-      }
-      th,
-      td {
-        border-bottom: 1px solid #d7d0c8;
-        padding: 8px;
-        text-align: left;
-        vertical-align: top;
-      }
-      th {
+      .footer-note {
+        margin-top: 24px;
         color: var(--muted);
-        font-size: 0.78rem;
-        text-transform: uppercase;
+        font-size: 0.86rem;
       }
       @media (max-width: 900px) {
         header,
@@ -277,23 +287,24 @@
     <main>
       <header>
         <section class="hero" aria-labelledby="title">
-          <span class="tag">Post-implementation handoff</span>
-          <h1 id="title">Y Space now uses its own Browser</h1>
+          <span class="tag">Post-implementation report</span>
+          <h1 id="title">Modern glass, without turning Y Space into glass soup.</h1>
           <p>
-            The final unsigned ARM64 package makes the visible embedded Browser the default and sole
-            browser route for agents, uses one global tab model, and collapses intermediate work
-            like Codex.
+            The final unsigned desktop package keeps content crisp and square while giving the
+            sidebar, one global tab rail, thread header, Browser controls, and composer a lighter,
+            warmer, Apple/Codex-style sense of material.
           </p>
         </section>
         <aside class="meta-stack" aria-label="Report metadata">
           <div class="card bg-green">
-            <small>Status</small><strong>Pass · external auth gates disclosed</strong>
+            <small>Status</small><strong>Pass — packaged and clicked</strong>
           </div>
-          <div class="card bg-blue">
-            <small>Branch</small><strong>y-space-browser-default-collapse</strong>
-          </div>
+          <div class="card bg-blue"><small>Branch</small><strong>y-space-glass-polish</strong></div>
           <div class="card bg-yellow">
-            <small>Date / platform</small><strong>2026-08-28 · macOS ARM64</strong>
+            <small>Base</small><strong>fork/y-space-browser-default-collapse · 9fdadda3</strong>
+          </div>
+          <div class="card bg-orange">
+            <small>Delivery</small><strong>Local commit; no new PR requested</strong>
           </div>
         </aside>
       </header>
@@ -301,30 +312,28 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Fast Answer</h2>
+          <h2>Fast answer</h2>
         </div>
         <div class="grid three">
           <div class="sticky bg-green">
-            <h3>Working now</h3>
+            <h3>What changed</h3>
             <p>
-              Codex GPT-5.6 Sol and OpenCode Big Pickle visibly drove the same embedded Browser,
-              changed localhost pages, managed global tabs, and returned authenticated Browser
-              proof.
+              One bounded glass capsule for global tabs, a softer 20px composer, calmer faux-glass
+              headers, and visibly lighter native sidebar frosting.
             </p>
           </div>
-          <div class="sticky bg-orange">
-            <h3>Conversation is calm</h3>
+          <div class="sticky bg-blue">
+            <h3>What stayed crisp</h3>
             <p>
-              Reasoning, commands, and tools live in one closed <strong>Working/Worked</strong> row.
-              The final response stays visible, and history expands only on request.
+              Transcript, Browser pages, webviews, document planes, pane boundaries, drag handles,
+              and individual tabs never receive a blur layer.
             </p>
           </div>
           <div class="sticky bg-yellow">
-            <h3>Only remaining gates</h3>
+            <h3>Verdict</h3>
             <p>
-              Claude live inference needs <code>claude auth login</code>. Persistent Pipedream
-              OAuth/account grants still require explicit user authorization. Neither was
-              fabricated.
+              The packaged ARM64 build passed light, dark, reduced-transparency, global-tab,
+              embedded-navigation, resize, close, and residency checks.
             </p>
           </div>
         </div>
@@ -333,30 +342,49 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>What Changed</h2>
+          <h2>Implementation</h2>
         </div>
         <div class="grid three">
-          <div class="sticky bg-blue">
-            <h3>Browser-exclusive agents</h3>
+          <div class="sticky bg-orange">
+            <h3>Stable real glass</h3>
             <p>
-              Codex, Claude Code, and OpenCode receive Y Space Browser by default. Competing web
-              search, Chrome, Playwright, gstack, browser MCP, skill, and command routes are removed
-              only from that launch.
+              <code>.poracode-glass-chrome</code> owns the shared border, surface, specular wash,
+              radius, blur, and shadow. Only the global strip and composer opt in.
             </p>
           </div>
           <div class="sticky bg-purple">
-            <h3>One global tab system</h3>
+            <h3>Faux glass where it matters</h3>
             <p>
-              Every browser page is a peer of Files, Git, Terminal, Notes, PDFs, and spreadsheets.
-              Agents can enumerate, find, activate, create, and close those exact visible tabs.
+              Thread and Browser toolbars use paint-only gradients, theme-aware edge tokens, and
+              shallow elevation. Browser content remains a normal opaque plane.
+            </p>
+          </div>
+          <div class="sticky bg-blue">
+            <h3>Platform-aware sidebar</h3>
+            <p>
+              macOS light defaults to 90% with an 88% floor; Windows uses 94% / 92%. Dark defaults
+              remain 82% / 88%, now selectable with a 1% slider step.
             </p>
           </div>
           <div class="sticky bg-green">
-            <h3>Bounded lifecycle</h3>
+            <h3>Accessibility first</h3>
             <p>
-              Live browser guests remain LRU-bounded, closed pages dispose their guests, tab
-              metadata is capped, provider process groups are reaped, and disposable tabs do not
-              restore.
+              Reduced transparency now has enough selector priority to beat the later composer rule.
+              Dark highlights use restrained theme tokens instead of light-mode white edges.
+            </p>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>One tab concept</h3>
+            <p>
+              Every Browser remains a peer global workspace tab. The strip is one glass surface;
+              tabs keep one orange selected indicator and do not create per-tab compositor layers.
+            </p>
+          </div>
+          <div class="sticky bg-pink">
+            <h3>Catalog cleanup</h3>
+            <p>
+              The renderer catalog was extracted and completed at 3,281 messages with zero missing
+              entries across all 12 translated locales.
             </p>
           </div>
         </div>
@@ -365,30 +393,118 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Checks And Evidence</h2>
+          <h2>Pass criteria</h2>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Result</th>
+                <th>Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>PC-68</td>
+                <td class="pass">Met</td>
+                <td>
+                  Final light package shows the white/orange Y Space shell with restrained material
+                  depth.
+                </td>
+              </tr>
+              <tr>
+                <td>PC-69</td>
+                <td class="pass">Met</td>
+                <td>
+                  One rounded global rail; eight-browser peak retained one strip and one selected
+                  peer.
+                </td>
+              </tr>
+              <tr>
+                <td>PC-70</td>
+                <td class="pass">Met</td>
+                <td>
+                  20px composer, specular wash, diffuse elevation, orange focus edge, unchanged
+                  controls.
+                </td>
+              </tr>
+              <tr>
+                <td>PC-71</td>
+                <td class="pass">Met</td>
+                <td>
+                  90% macOS light / 82% dark verified in the packaged Appearance screen; platform
+                  floors are tested.
+                </td>
+              </tr>
+              <tr>
+                <td>PC-72</td>
+                <td class="pass">Met</td>
+                <td>
+                  Faux-glass header and Browser toolbar markers; CSS test rejects filters on content
+                  planes and webviews.
+                </td>
+              </tr>
+              <tr>
+                <td>PC-73</td>
+                <td class="pass">Met</td>
+                <td>
+                  macOS Reduce transparency visibly produced opaque chrome; the original system
+                  setting was restored.
+                </td>
+              </tr>
+              <tr>
+                <td>PC-74</td>
+                <td class="pass">Met</td>
+                <td>
+                  Tab create/switch/close, omnibox navigation, Browser menu, and split resize were
+                  clicked in the package.
+                </td>
+              </tr>
+              <tr>
+                <td>PC-75</td>
+                <td class="pass">Met*</td>
+                <td>
+                  Unsigned ARM64 package, screenshots, dark/reduced regression, and six-guest
+                  residency ceiling passed; the one-cycle RSS trend is explicitly inconclusive.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Automated verification</h2>
         </div>
         <div class="grid two">
           <div class="sticky bg-green">
-            <h3>Automated · all green</h3>
+            <h3>Green checks</h3>
             <ul>
-              <li>912 test files passed, 5 skipped.</li>
-              <li>10,345 tests passed, 85 skipped.</li>
               <li>
-                Typecheck, regular/type-aware lint, format (3,031 files), and diff check passed.
+                Full Node 24 suite: 912 files passed, 5 skipped; 10,349 tests passed, 85 skipped.
               </li>
-              <li>ARM64 package and deep/strict ad-hoc signature verified.</li>
+              <li>
+                Focused glass pass: 10 files / 127 tests; review regression: 1 file / 11 tests.
+              </li>
+              <li>
+                Typecheck, lint, type-aware lint, formatting, diff check, and JSON validation
+                passed.
+              </li>
+              <li>Production renderer/main build and unsigned ARM64 packaging passed.</li>
+              <li>Deep/strict ad-hoc code-sign verification passed.</li>
             </ul>
           </div>
           <div class="sticky bg-blue">
-            <h3>Hands-on desktop QA</h3>
+            <h3>New regression coverage</h3>
             <ul>
-              <li>Codex: 15 Browser calls, 2 tabs, Alpha saved, Beta count 2, 1 tab retained.</li>
-              <li>OpenCode: existing Alpha found and saved through 6 Browser actions.</li>
-              <li>Both work histories expanded/collapsed manually.</li>
-              <li>Quit/relaunch removed helpers and did not restore closed Beta.</li>
-              <li>
-                Final rebuild migrated OpenCode's visible drop to <code>y-space-status</code>.
-              </li>
+              <li>Platform frosting defaults, floors, and exact 82% slider selection.</li>
+              <li>Shared glass marker, bounded radius, surface, blur, and theme-aware shadows.</li>
+              <li>Reduced-transparency cascade priority over the composer rule.</li>
+              <li>Browser/thread content-plane markers and no-blur selector boundaries.</li>
+              <li>One tablist, selected-state semantics, and global capsule geometry.</li>
             </ul>
           </div>
         </div>
@@ -397,46 +513,123 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Visual Proof</h2>
+          <h2>Packaged end-to-end QA</h2>
+        </div>
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Case</th>
+                <th>Status</th>
+                <th>What was clicked and observed</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>YS-GLASS-E2E-001</td>
+                <td class="pass">Pass</td>
+                <td>
+                  Light shell, 90% sidebar, focused composer, Browser toolbar, and complete Browser
+                  menu.
+                </td>
+              </tr>
+              <tr>
+                <td>YS-GLASS-E2E-002</td>
+                <td class="pass">Pass*</td>
+                <td>
+                  Created a peer Browser tab, navigated to example.org, switched with mouse and
+                  keyboard, resized, and closed only the disposable peer. Native drag synthesis is
+                  documented below.
+                </td>
+              </tr>
+              <tr>
+                <td>YS-GLASS-E2E-003</td>
+                <td class="pass">Pass*</td>
+                <td>
+                  Dark 82%, macOS reduced transparency, eight global Browser tabs, six resident
+                  guests, and cleanup to one guest. One-cycle RSS comparison is inconclusive.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Visual evidence</h2>
         </div>
         <div class="evidence">
           <figure>
-            <img
-              src="qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg"
-              alt="Codex working with two embedded Browser tabs while work stays collapsed"
-            />
+            <a href="qa-screenshots/glass-polish-light-final.jpeg"
+              ><img
+                src="qa-screenshots/glass-polish-light-final.jpeg"
+                alt="Final packaged Y Space light layout with embedded Example Domain Browser"
+            /></a>
             <figcaption>
-              Codex working: two global Browser peers are visible while the transcript stays
-              compact.
+              Final packaged light state: one calm shell, one global Browser peer, crisp content.
             </figcaption>
           </figure>
           <figure>
-            <img
-              src="qa-screenshots/browser-exclusive-codex-5-6-sol-settled-final.jpeg"
-              alt="Codex settled with a collapsed work row and verified final answer"
-            />
+            <a href="qa-screenshots/glass-polish-light-two-tabs.jpeg"
+              ><img
+                src="qa-screenshots/glass-polish-light-two-tabs.jpeg"
+                alt="Packaged Y Space with two global browser tabs"
+            /></a>
             <figcaption>
-              Codex settled: 38 work steps collapsed, final answer visible, 11-action Browser proof.
+              Two independent Browsers appear as peers in the sole global tab capsule.
             </figcaption>
           </figure>
           <figure>
-            <img
-              src="qa-screenshots/browser-exclusive-opencode-working-final.jpeg"
-              alt="OpenCode editing the embedded Alpha page while work stays collapsed"
-            />
+            <a href="qa-screenshots/glass-polish-browser-menu.jpeg"
+              ><img
+                src="qa-screenshots/glass-polish-browser-menu.jpeg"
+                alt="Packaged Y Space with the Browser menu open"
+            /></a>
             <figcaption>
-              OpenCode working: the visible Alpha form has already changed while operations remain
-              collapsed.
+              The open glass Browser menu remains readable and exposes every expected action.
             </figcaption>
           </figure>
           <figure>
-            <img
-              src="qa-screenshots/browser-exclusive-opencode-settled-final.jpeg"
-              alt="OpenCode settled with a collapsed work row and verified final answer"
-            />
+            <a href="qa-screenshots/glass-polish-dark-regression.jpeg"
+              ><img
+                src="qa-screenshots/glass-polish-dark-regression.jpeg"
+                alt="Packaged Y Space dark-mode glass regression"
+            /></a>
             <figcaption>
-              OpenCode settled: 24 work steps collapsed, exact tab data and six-action proof
-              visible.
+              Dark regression after theme-aware edge tokens; Appearance reported 82%.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/glass-polish-reduced-transparency.jpeg"
+              ><img
+                src="qa-screenshots/glass-polish-reduced-transparency.jpeg"
+                alt="Packaged Y Space with reduced transparency enabled"
+            /></a>
+            <figcaption>
+              Reduced transparency removes blur and leaves every boundary and orange state legible.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/glass-polish-narrow-layout.jpeg"
+              ><img
+                src="qa-screenshots/glass-polish-narrow-layout.jpeg"
+                alt="Packaged Y Space with resized Browser pane"
+            /></a>
+            <figcaption>
+              The square split boundary still resizes cleanly; rounded Browser controls remain
+              unclipped.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/glass-polish-eight-tabs.jpeg"
+              ><img
+                src="qa-screenshots/glass-polish-eight-tabs.jpeg"
+                alt="Packaged Y Space at the eight browser tab residency peak"
+            /></a>
+            <figcaption>
+              Eight Browser metadata tabs, one shared strip, and only six resident Browser guests.
             </figcaption>
           </figure>
         </div>
@@ -445,150 +638,78 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Open The Cards</h2>
+          <h2>Open the cards</h2>
         </div>
         <details open>
-          <summary>Implementation summary</summary>
+          <summary>Review findings and fixes</summary>
+          <div class="detail-body">
+            A fresh review found that the earlier reduced-transparency block could lose to the later
+            equal-specificity composer rule, and that several dark-mode inset highlights reused
+            light-mode opacities. The fallback now carries a composer-specific selector, highlights
+            and elevation are theme tokens, both findings have regressions, and corrected packaged
+            light/dark/reduced screenshots replaced the stale captures.
+          </div>
+        </details>
+        <details>
+          <summary>Decisions and assumptions</summary>
           <div class="detail-body">
             <ul>
               <li>
-                Launch-scoped private profiles preserve the user's normal Codex, Claude, and
-                OpenCode files while suppressing competing browser capabilities.
+                Real blur is reserved for small, stable shell chrome; faux glass is used on
+                normal-flow pane headers.
               </li>
               <li>
-                Codex keeps ordinary tools direct and runs managed Browser MCP calls through its
-                isolated Code Mode host. <code>CODEX_SQLITE_HOME</code> reuses the completed user
-                database without poisoning the private hook/config home.
+                Structural pane edges stay square so the desktop remains precise rather than
+                becoming a stack of floating cards.
               </li>
               <li>
-                Browser proof is app-owned, same-turn, request-local, privacy-bounded, and
-                correlated to observed tab/action evidence.
+                Explicit saved frosting values are preserved; only reset/default behavior adopts the
+                new platform values.
               </li>
               <li>
-                Compact turn projection preserves chronological provider text around tools, question
-                boundaries, hidden Find matches, and accessibility semantics.
-              </li>
-              <li>
-                Adapters without an exclusive embedded-browser route remain launchable without a
-                forced Browser; an explicit unsupported Browser request still fails closed.
+                No new pull request was created because this follow-up asked for a visual iteration,
+                not PR delivery.
               </li>
             </ul>
           </div>
         </details>
         <details>
-          <summary>Exact validation</summary>
-          <div class="detail-body">
-            <table>
-              <thead>
-                <tr>
-                  <th>Check</th>
-                  <th>Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>pnpm test</code></td>
-                  <td>912 passed files / 5 skipped; 10,345 passed tests / 85 skipped; 115.21 s</td>
-                </tr>
-                <tr>
-                  <td><code>pnpm typecheck</code></td>
-                  <td>Pass</td>
-                </tr>
-                <tr>
-                  <td><code>pnpm lint</code></td>
-                  <td>Pass, including type-aware lint with warnings denied</td>
-                </tr>
-                <tr>
-                  <td><code>pnpm fmt:check</code></td>
-                  <td>Pass, 3,031 files</td>
-                </tr>
-                <tr>
-                  <td><code>git diff --check</code></td>
-                  <td>Pass</td>
-                </tr>
-                <tr>
-                  <td>Package inspection</td>
-                  <td>
-                    Thin ARM64; deep/strict codesign pass; ad hoc hardened runtime; Y Space /
-                    Productivity identity
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </details>
-        <details>
-          <summary>Artifact integrity</summary>
+          <summary>Artifacts</summary>
           <div class="detail-body">
             <ul>
               <li>
-                DMG: <code>release/Y-Space-1.6.6-arm64.dmg</code> · 156,279,316 bytes · SHA-256
-                <code>c76b25b64cc0888fd8e6e70d109d4dc0ecf41204043a868531404dd61a3a5dc7</code>
+                <a href="../release/Y-Space-1.6.6-arm64.dmg">Unsigned Y Space 1.6.6 ARM64 DMG</a>
               </li>
+              <li><a href="qa-e2e-tests.json">QA source of truth and evidence</a></li>
               <li>
-                <code>app.asar</code> SHA-256:
-                <code>bb3158baeaa2e2a15e5c8c199b673eb7c0dc22a111715562d45687c41c59786c</code>
+                <a href="glass-browser-residency-qa.json">Packaged Browser residency sample</a>
               </li>
-              <li>
-                Executable SHA-256:
-                <code>899580987f5d52739cd1be8f3e214f1263348296d4608200f2db1c124005bff2</code>
-              </li>
-              <li>
-                The unsigned build was QA-launched with the explicit mock-keychain flag because
-                macOS can block unsigned binaries at Keychain access. Production code does not
-                auto-enable that flag.
-              </li>
-              <li>
-                The rebuilt package launched from an isolated data root, installed only the branded
-                OpenCode status drop, removed legacy generated drops, and exited without a surviving
-                helper. Existing Chrome PID 685 was unchanged. The visual screenshots above precede
-                only these non-visual post-audit fixes because the Mac had re-locked.
-              </li>
+              <li><a href="pass-criteria.md">Pass criteria PC-68 through PC-75</a></li>
             </ul>
           </div>
         </details>
         <details>
-          <summary>Authorization gates and deferred work</summary>
+          <summary>Caveats</summary>
           <div class="detail-body">
-            <ul>
-              <li>
-                Claude Code 2.1.210 is installed but logged out. The packaged app reports the login
-                requirement before inference; launch contracts pass.
-              </li>
-              <li>
-                No persistent Pipedream OAuth or account connection was created without the separate
-                authorization it requires. Read-only credential/catalog probes and boundary tests
-                passed without exposing values.
-              </li>
-              <li>
-                No Chrome or Brave extension was installed, matching the user's explicit direction.
-                Extension-free cookie-file import and automated cookie-security contracts remain
-                green.
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details>
-          <summary>Artifacts and handoff</summary>
-          <div class="detail-body">
-            <p>
-              <span class="pill bg-green">Ready for review</span
-              ><span class="pill bg-orange">Unsigned build</span
-              ><span class="pill bg-yellow">Do not merge automatically</span>
-            </p>
-            <ul>
-              <li><a href="qa-e2e-tests.json">Structured QA record</a></li>
-              <li><a href="pass-criteria.md">Pass criteria and final outcome</a></li>
-              <li><a href="browser-memory-soak.json">Browser memory soak</a></li>
-              <li><a href="../release/Y-Space-1.6.6-arm64.dmg">Unsigned ARM64 DMG</a></li>
-            </ul>
-            <p>
-              The branch is prepared for a fork PR; the final task response records the review link.
-              No merge or force-push is authorized.
-            </p>
+            The local package is intentionally unsigned for distribution: it uses an ad-hoc
+            hardened-runtime signature with no Team ID and is not notarized. Existing Vite
+            pseudo-highlight, sourcemap, and large-chunk warnings remain unchanged. Computer Use
+            could switch the global tabs with mouse and keyboard but its synthesized native HTML
+            drag did not reorder them; reorder state remains covered by the existing automated
+            reducer tests, and the established drag handlers were not changed by this visual pass.
+            The one-cycle residency sample returned to the renderer/guest baseline, but cleanup RSS
+            was 20.5% above pre-peak; that is recorded as inconclusive rather than a no-leak claim.
+            No confirmed product blocker or unresolved review finding remains.
           </div>
         </details>
       </section>
+
+      <p class="footer-note">
+        Branch <code>y-space-glass-polish</code> · base
+        <code>fork/y-space-browser-default-collapse@9fdadda3</code>
+        · implementation commit is the validated branch tip at handoff · package SHA-256
+        <code>a4cac2968027c07012e760fa3e800a25147b04beff227a38401cd3f26124db2f</code>.
+      </p>
     </main>
   </body>
 </html>
