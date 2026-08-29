@@ -1,5 +1,5 @@
 {
-  "version": 5,
+  "version": 6,
   "project": "Y Space",
   "branch": "y-space-browser-default-collapse",
   "platform": "macOS Apple Silicon desktop",
@@ -11,17 +11,18 @@
     "baseCommit": "5cff3e06",
     "baseline": "887 passed files, 5 skipped files, 9,926 passed tests, and 85 skipped tests under Node 24.13.0",
     "failFirst": "11 focused files failed as designed: 17 failed, 241 passed, and 1 skipped. Failures cover all three provider boundaries, OpenCode chronological mapping, compact projection, whole-turn disclosure, and live tool-group collapse.",
-    "implementationStatus": "complete"
+    "implementationStatus": "complete",
+    "postAuditHardening": "Adapters without an exclusive embedded-browser route remain launchable without Browser being forced on; an explicit unsupported Browser request still fails closed. OpenCode's visible status drop is now y-space-status, and launch migration removes legacy Poracode/Lightcode drops."
   },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
     "app": "release/mac-arm64/Y Space.app",
     "dmg": "release/Y-Space-1.6.6-arm64.dmg",
     "architecture": "arm64",
-    "sha256": "306a7143eb59a682aa8532b8835e7e83f239b7a4b73243b61136f2e188a32ffa",
-    "bytes": 156279617,
-    "appAsarSha256": "86537dbeb79f1df3cd1124f0729a8d0bd0ec8207c5005b1762b2a175ffd1cb16",
-    "executableSha256": "02a4c01b2c7adbdb277b7f8fe8bcc7c3fe67388a30d69a23c374c8f834508b8a",
+    "sha256": "c76b25b64cc0888fd8e6e70d109d4dc0ecf41204043a868531404dd61a3a5dc7",
+    "bytes": 156279316,
+    "appAsarSha256": "bb3158baeaa2e2a15e5c8c199b673eb7c0dc22a111715562d45687c41c59786c",
+    "executableSha256": "899580987f5d52739cd1be8f3e214f1263348296d4608200f2db1c124005bff2",
     "codesign": "codesign --verify --deep --strict passed; ad-hoc/runtime signature with no Team ID",
     "notarized": false
   },
@@ -30,9 +31,9 @@
       "status": "pass on the final source state under the repository's pinned Node.js runtime",
       "passedFiles": 912,
       "skippedFiles": 5,
-      "passedTests": 10343,
+      "passedTests": 10345,
       "skippedTests": 85,
-      "durationSeconds": 126.46
+      "durationSeconds": 115.21
     },
     "targetedBranding": {
       "status": "pass",
@@ -534,7 +535,8 @@
       "manualEvidence": [
         "The final packaged app visibly selected OpenCode Big Pickle, found Codex's existing Alpha global Browser tab, changed the form to QA-FINAL-OPENCODE-LATEST, clicked Save, and displayed the new saved status while Working stayed collapsed.",
         "The settled answer reported active tab tab-36536349-d6cd-4b71-a8d3-e73e59c7a65e, the exact localhost URL and title, one remaining tab, and Browser verified · 6 actions.",
-        "No external browser process appeared; the user's pre-existing Google Chrome PID 685 remained unchanged. The launch-scoped profile and command-gate suites passed without changing the normal OpenCode profile."
+        "No external browser process appeared; the user's pre-existing Google Chrome PID 685 remained unchanged. The launch-scoped profile and command-gate suites passed without changing the normal OpenCode profile.",
+        "The final rebuilt package launched from an isolated data root, installed only y-space-status.js plus y-space-status.plugin.json, removed legacy Poracode/Lightcode status drops, exited with no Y Space helper left behind, and again left Chrome PID 685 untouched."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/browser-exclusive-opencode-working-final.jpeg",

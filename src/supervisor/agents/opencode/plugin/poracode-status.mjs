@@ -24,13 +24,13 @@
  * not add additional named OR default exports beyond this single object.
  *
  * Filename note: deliberately `poracode-status.mjs` in the source tree.
- * The supervisor drops it as `poracode-status.js` into OpenCode's
+ * The supervisor drops it as `y-space-status.js` into OpenCode's
  * auto-discovery directory (`~/.config/opencode/plugins/`) — OpenCode's glob
  * is `{plugin,plugins}/*.{ts,js}` so `.mjs` would be silently ignored. Bun
  * (OpenCode's runtime) handles ESM syntax in `.js` natively. The displayed
  * plugin name in OpenCode's TUI status panel (`dialog-status.tsx`) is the
- * basename of the dropped file before the first dot, so naming the drop
- * `poracode-status.js` produces "poracode-status". The Windows panel
+ * basename of the dropped file before the first dot, so the branded drop
+ * produces "y-space-status". The Windows panel
  * display is buggy upstream — OpenCode `split("/")`s a native `\`-path —
  * and cannot be fixed plugin-side. `id` is still set because newer OpenCode
  * builds will read it.
@@ -47,8 +47,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 //   1. Deployed in OpenCode's plugins/ dir → sibling `<basename>.plugin.json`
 //      (the installer drops both files together so `import.meta.url` reaches
 //      the manifest at runtime). OpenCode auto-loads `.{ts,js}` only, so the
-//      deployed plugin file is `poracode-status.js` and its manifest is
-//      `poracode-status.plugin.json`.
+//      deployed plugin file is `y-space-status.js` and its manifest is
+//      `y-space-status.plugin.json`.
 //   2. Staged in our agent-plugins/ dir → sibling `plugin.json` (matches
 //      `installerBase`'s canonical filename, used by tests / dev paths). The
 //      staged file is `poracode-status.mjs`.
@@ -325,7 +325,7 @@ async function forwardIntent(eventType, intent, sessionId, extra) {
 }
 
 export default {
-  id: "poracode-status",
+  id: "y-space-status",
   server: async () => ({
     // Unified event dispatcher — see file header for why session/permission
     // lifecycle hooks must come through here, not as top-level keys.

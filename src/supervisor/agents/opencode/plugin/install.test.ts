@@ -49,7 +49,7 @@ describe("getOpenCodePluginPaths", () => {
     const paths = getOpenCodePluginPaths({ envKind: "posix", baseDir });
     expect(paths.pluginDir).toBe(join(baseDir, "agent-plugins", "opencode"));
     expect(paths.opencodePluginFile).toBe(
-      join(process.env.OPENCODE_CONFIG_DIR, "plugins", "poracode-status.js"),
+      join(process.env.OPENCODE_CONFIG_DIR, "plugins", "y-space-status.js"),
     );
   });
 
@@ -57,7 +57,7 @@ describe("getOpenCodePluginPaths", () => {
     const baseDir = makeBaseDir();
     delete process.env.OPENCODE_CONFIG_DIR;
     const paths = getOpenCodePluginPaths({ envKind: "posix", baseDir });
-    expect(paths.opencodePluginFile.endsWith(join("plugins", "poracode-status.js"))).toBe(true);
+    expect(paths.opencodePluginFile.endsWith(join("plugins", "y-space-status.js"))).toBe(true);
   });
 });
 
@@ -77,8 +77,8 @@ describe("installOpenCodePlugin", () => {
     expect(existsSync(join(result.paths.pluginDir, "poracode-status.mjs"))).toBe(true);
 
     // OpenCode-side drops: .js plugin file (auto-discovered) + sibling manifest
-    const droppedPlugin = join(opencodeDir, "plugins", "poracode-status.js");
-    const droppedManifest = join(opencodeDir, "plugins", "poracode-status.plugin.json");
+    const droppedPlugin = join(opencodeDir, "plugins", "y-space-status.js");
+    const droppedManifest = join(opencodeDir, "plugins", "y-space-status.plugin.json");
     expect(existsSync(droppedPlugin)).toBe(true);
     expect(existsSync(droppedManifest)).toBe(true);
 
@@ -256,19 +256,23 @@ describe("installOpenCodePlugin", () => {
     });
   });
 
-  it("removes a legacy poracode-status.mjs left behind by an older install", () => {
+  it("removes legacy Poracode drops left behind by older installs", () => {
     const baseDir = makeBaseDir();
     const opencodeDir = makeBaseDir();
     process.env.OPENCODE_CONFIG_DIR = opencodeDir;
 
-    const legacyPath = join(opencodeDir, "plugins", "poracode-status.mjs");
-    mkdirSync(dirname(legacyPath), { recursive: true });
-    writeFileSync(legacyPath, "// stale legacy plugin\n");
+    const legacyPaths = [
+      join(opencodeDir, "plugins", "poracode-status.js"),
+      join(opencodeDir, "plugins", "poracode-status.mjs"),
+      join(opencodeDir, "plugins", "poracode-status.plugin.json"),
+    ];
+    mkdirSync(dirname(legacyPaths[0]!), { recursive: true });
+    for (const legacyPath of legacyPaths) writeFileSync(legacyPath, "// stale legacy plugin\n");
 
     const result = installOpenCodePlugin({ envKind: "posix", baseDir });
     expect(result.ok).toBe(true);
 
-    expect(existsSync(legacyPath)).toBe(false);
+    for (const legacyPath of legacyPaths) expect(existsSync(legacyPath)).toBe(false);
   });
 
   it("removes a legacy lightcode-status.js left behind by the old brand", () => {
@@ -307,7 +311,7 @@ describe("installOpenCodePlugin", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    unlinkSync(join(opencodeDir, "plugins", "poracode-status.plugin.json"));
+    unlinkSync(join(opencodeDir, "plugins", "y-space-status.plugin.json"));
 
     expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toEqual({ installed: false });
   });
@@ -341,7 +345,7 @@ describe("uninstallOpenCodePlugin", () => {
     uninstallOpenCodePlugin({ envKind: "posix", baseDir });
 
     expect(existsSync(result.paths.opencodePluginFile)).toBe(false);
-    expect(existsSync(join(opencodeDir, "plugins", "poracode-status.plugin.json"))).toBe(false);
+    expect(existsSync(join(opencodeDir, "plugins", "y-space-status.plugin.json"))).toBe(false);
     expect(existsSync(result.paths.pluginDir)).toBe(false);
 
     const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;

@@ -142,13 +142,15 @@ export function effectiveLaunchConfig(
   config: ThreadConfig,
   disabledBuiltInMcpServerIds: readonly BuiltInMcpServerId[],
   pluginBuiltInMcpServerIds: readonly BuiltInMcpServerId[] = [],
+  forceBrowser = true,
 ): ThreadConfig {
-  const withDefaults = config.browserMcp === true ? config : { ...config, browserMcp: true };
+  const withDefaults =
+    !forceBrowser || config.browserMcp === true ? config : { ...config, browserMcp: true };
   if (disabledBuiltInMcpServerIds.length === 0 && pluginBuiltInMcpServerIds.length === 0) {
     return withDefaults;
   }
   const next = { ...withDefaults };
-  if (pluginBuiltInMcpServerIds.includes("browser")) next.browserMcp = true;
+  if (forceBrowser && pluginBuiltInMcpServerIds.includes("browser")) next.browserMcp = true;
   if (pluginBuiltInMcpServerIds.includes("crossagents")) next.crossagentMcp = true;
   if (pluginBuiltInMcpServerIds.includes("computer-use")) next.computerUse = true;
   if (disabledBuiltInMcpServerIds.includes("browser")) next.browserMcp = false;
@@ -165,13 +167,21 @@ export function effectiveLaunchConfig(
 export function workspaceLaunchConfig(
   location: ProjectLocation,
   config: ThreadConfig,
-  adapter: { capabilities: UnrestrictedPermissionCapabilities },
+  adapter: {
+    capabilities: UnrestrictedPermissionCapabilities;
+    browserRouting?: AgentAdapter["browserRouting"];
+  },
   disabledBuiltInMcpServerIds: readonly BuiltInMcpServerId[],
   pluginBuiltInMcpServerIds: readonly BuiltInMcpServerId[] = [],
 ): ThreadConfig {
   return applyHomeScopePermissions(
     location,
-    effectiveLaunchConfig(config, disabledBuiltInMcpServerIds, pluginBuiltInMcpServerIds),
+    effectiveLaunchConfig(
+      config,
+      disabledBuiltInMcpServerIds,
+      pluginBuiltInMcpServerIds,
+      Object.values(adapter.browserRouting ?? {}).includes("exclusive"),
+    ),
     adapter.capabilities,
   );
 }

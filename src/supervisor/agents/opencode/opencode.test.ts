@@ -436,7 +436,7 @@ describe("createOpenCodeAdapter", () => {
     const adapter = createOpenCodeAdapter();
     expect(adapter.kind).toBe("opencode");
     expect(adapter.label).toBe("OpenCode");
-    expect(adapter.pluginId).toBe("poracode-status@opencode");
+    expect(adapter.pluginId).toBe("y-space-status@opencode");
     expect(adapter.minProtocolVersion).toBe(1);
     expect(adapter.capabilities.crossagentMcpRouting).toBe("thread-token");
     expect(adapter.capabilities.agentSettingsDefaults?.browserMcp).toBe(true);

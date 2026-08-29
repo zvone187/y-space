@@ -372,7 +372,7 @@
             <h3>Automated · all green</h3>
             <ul>
               <li>912 test files passed, 5 skipped.</li>
-              <li>10,343 tests passed, 85 skipped.</li>
+              <li>10,345 tests passed, 85 skipped.</li>
               <li>
                 Typecheck, regular/type-aware lint, format (3,031 files), and diff check passed.
               </li>
@@ -386,6 +386,9 @@
               <li>OpenCode: existing Alpha found and saved through 6 Browser actions.</li>
               <li>Both work histories expanded/collapsed manually.</li>
               <li>Quit/relaunch removed helpers and did not restore closed Beta.</li>
+              <li>
+                Final rebuild migrated OpenCode's visible drop to <code>y-space-status</code>.
+              </li>
             </ul>
           </div>
         </div>
@@ -465,6 +468,10 @@
                 Compact turn projection preserves chronological provider text around tools, question
                 boundaries, hidden Find matches, and accessibility semantics.
               </li>
+              <li>
+                Adapters without an exclusive embedded-browser route remain launchable without a
+                forced Browser; an explicit unsupported Browser request still fails closed.
+              </li>
             </ul>
           </div>
         </details>
@@ -481,7 +488,7 @@
               <tbody>
                 <tr>
                   <td><code>pnpm test</code></td>
-                  <td>912 passed files / 5 skipped; 10,343 passed tests / 85 skipped; 126.46 s</td>
+                  <td>912 passed files / 5 skipped; 10,345 passed tests / 85 skipped; 115.21 s</td>
                 </tr>
                 <tr>
                   <td><code>pnpm typecheck</code></td>
@@ -515,21 +522,27 @@
           <div class="detail-body">
             <ul>
               <li>
-                DMG: <code>release/Y-Space-1.6.6-arm64.dmg</code> · 156,279,617 bytes · SHA-256
-                <code>306a7143eb59a682aa8532b8835e7e83f239b7a4b73243b61136f2e188a32ffa</code>
+                DMG: <code>release/Y-Space-1.6.6-arm64.dmg</code> · 156,279,316 bytes · SHA-256
+                <code>c76b25b64cc0888fd8e6e70d109d4dc0ecf41204043a868531404dd61a3a5dc7</code>
               </li>
               <li>
                 <code>app.asar</code> SHA-256:
-                <code>86537dbeb79f1df3cd1124f0729a8d0bd0ec8207c5005b1762b2a175ffd1cb16</code>
+                <code>bb3158baeaa2e2a15e5c8c199b673eb7c0dc22a111715562d45687c41c59786c</code>
               </li>
               <li>
                 Executable SHA-256:
-                <code>02a4c01b2c7adbdb277b7f8fe8bcc7c3fe67388a30d69a23c374c8f834508b8a</code>
+                <code>899580987f5d52739cd1be8f3e214f1263348296d4608200f2db1c124005bff2</code>
               </li>
               <li>
                 The unsigned build was QA-launched with the explicit mock-keychain flag because
                 macOS can block unsigned binaries at Keychain access. Production code does not
                 auto-enable that flag.
+              </li>
+              <li>
+                The rebuilt package launched from an isolated data root, installed only the branded
+                OpenCode status drop, removed legacy generated drops, and exited without a surviving
+                helper. Existing Chrome PID 685 was unchanged. The visual screenshots above precede
+                only these non-visual post-audit fixes because the Mac had re-locked.
               </li>
             </ul>
           </div>

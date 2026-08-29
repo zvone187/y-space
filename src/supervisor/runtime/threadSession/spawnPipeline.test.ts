@@ -116,6 +116,24 @@ describe("workspaceLaunchConfig — Home scope unrestricted for every agent", ()
     ).toEqual(config);
   });
 
+  it("does not force Browser on for an adapter without exclusive Browser routing", () => {
+    const config: ThreadConfig = { model: "cursor/model" };
+    expect(workspaceLaunchConfig({ kind: "windows", path: "C:\\repo" }, config, adapter, [])).toBe(
+      config,
+    );
+  });
+
+  it("forces Browser on for adapters that implement exclusive Browser routing", () => {
+    const config: ThreadConfig = { model: "codex/model", browserMcp: false };
+    const exclusiveAdapter = {
+      ...adapter,
+      browserRouting: { terminal: "exclusive", gui: "exclusive" },
+    } as const;
+    expect(
+      workspaceLaunchConfig({ kind: "windows", path: "C:\\repo" }, config, exclusiveAdapter, []),
+    ).toMatchObject({ browserMcp: true });
+  });
+
   it("forces each provider's unrestricted posture in Home", () => {
     const config = { ...baseConfig, approvalPolicy: "default", sandboxMode: "workspace-write" };
     expect(
@@ -806,7 +824,7 @@ describe("composeResolvedMcpServers", () => {
 });
 
 describe("launch-resource cleanup", () => {
-  it("rejects a non-exclusive root launch before creating a session or building a command", async () => {
+  it("rejects a provider-declared non-exclusive root mode before creating a session", async () => {
     const createStructuredSession = vi.fn<NonNullable<AgentAdapter["createStructuredSession"]>>(
       async () => undefined,
     );
@@ -821,6 +839,7 @@ describe("launch-resource cleanup", () => {
     const adapter = {
       kind: "cursor",
       label: "Cursor",
+      browserRouting: { gui: "exclusive" },
       capabilities: {
         presentationMode: "terminal",
         liveInputMode: "terminal",

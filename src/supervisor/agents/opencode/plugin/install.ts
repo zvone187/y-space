@@ -37,7 +37,7 @@ import {
  *      location used for version bookkeeping and the manifest the supervisor
  *      reads at boot).
  *   2. Copy the staged plugin into OpenCode's auto-discovery directory at
- *      `~/.config/opencode/plugins/poracode-status.js`. OpenCode globs
+ *      `~/.config/opencode/plugins/y-space-status.js`. OpenCode globs
  *      `{plugin,plugins}/*.{ts,js}` (no `.mjs`!) so the deployed file uses
  *      `.js`. Bun (OpenCode's runtime) treats ESM syntax in `.js` natively.
  *
@@ -47,8 +47,8 @@ import {
  * across Windows/WSL — auto-discovery from `plugins/` is the well-trodden
  * path every other ecosystem plugin (Warp, sample plugins) uses, and the
  * displayed name in OpenCode's TUI status panel comes from the basename of
- * the dropped file, so naming the drop `poracode-status.js` gives the right
- * label without further plumbing.
+ * the dropped file, so the branded `y-space-status.js` drop avoids exposing
+ * a legacy product name.
  *
  * Older poracode builds added a `file://` plugin entry to opencode.json that
  * would now be a dead reference; install removes it on every run so users
@@ -68,13 +68,13 @@ const OPENCODE_PLUGIN_ASSET_FILES = ["plugin.json", "poracode-status.mjs"] as co
  * (or `.ts`) extension — OpenCode's loader scans `{plugin,plugins}/*.{ts,js}`
  * and silently ignores any other extension.
  */
-const OPENCODE_PLUGIN_DROP_FILE_NAME = "poracode-status.js";
+const OPENCODE_PLUGIN_DROP_FILE_NAME = "y-space-status.js";
 
 /**
  * Filename of the manifest we drop next to the plugin file. Lets the plugin
  * read its version at runtime from `import.meta.url`'s directory.
  */
-const OPENCODE_PLUGIN_DROP_MANIFEST_NAME = "poracode-status.plugin.json";
+const OPENCODE_PLUGIN_DROP_MANIFEST_NAME = "y-space-status.plugin.json";
 
 /**
  * Older Poracode versions dropped a `.mjs` here, which OpenCode never loaded
@@ -82,7 +82,9 @@ const OPENCODE_PLUGIN_DROP_MANIFEST_NAME = "poracode-status.plugin.json";
  * so users upgrading don't end up with two stale siblings.
  */
 const OPENCODE_LEGACY_DROP_FILES = [
+  "poracode-status.js",
   "poracode-status.mjs",
+  "poracode-status.plugin.json",
   "lightcode-status.js",
   "lightcode-status.mjs",
   "lightcode-status.plugin.json",
@@ -230,7 +232,7 @@ export function installOpenCodePlugin(
   } catch (error) {
     return {
       ok: false,
-      reason: `failed to copy poracode-status plugin into ${opencodePluginsDir}: ${
+      reason: `failed to copy Y Space status plugin into ${opencodePluginsDir}: ${
         error instanceof Error ? error.message : String(error)
       }`,
     };
@@ -290,7 +292,7 @@ function installOpenCodePluginWsl(
     const detail = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
-      reason: `failed to copy poracode-status plugin into ${opencodeDir.linuxDir} (distro ${distro}): ${detail}`,
+      reason: `failed to copy Y Space status plugin into ${opencodeDir.linuxDir} (distro ${distro}): ${detail}`,
     };
   }
 

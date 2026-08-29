@@ -126,7 +126,7 @@ export function createOpenCodeAdapter(): AgentAdapter {
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },
 
     // ── CLI hook plugin support ──────────────────────────────────────────
-    pluginId: "poracode-status@opencode",
+    pluginId: "y-space-status@opencode",
     pluginVersion: OPENCODE_PLUGIN_VERSION,
     minProtocolVersion: 1,
     async isPluginSupported(ctx) {
