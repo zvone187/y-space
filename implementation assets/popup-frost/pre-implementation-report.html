@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Y Space Popup Frost — Implementation Readiness</title>
+    <style>
+      :root {
+        --canvas: #f6f2e8;
+        --ink: #172026;
+        --muted: #65727a;
+        --border: #2c3338;
+        --paper: #fff;
+        --blue: #d9ecff;
+        --green: #dff5df;
+        --yellow: #fff1b8;
+        --pink: #ffe2eb;
+        --shadow: 7px 7px 0 rgb(23 32 38 / 18%);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        color: var(--ink);
+        line-height: 1.45;
+        background:
+          linear-gradient(90deg, rgb(47 58 66 / 7%) 1px, transparent 1px),
+          linear-gradient(rgb(47 58 66 / 7%) 1px, transparent 1px), var(--canvas);
+        background-size: 28px 28px;
+      }
+      main {
+        width: min(1220px, 100%);
+        margin: 0 auto;
+        padding: 30px 22px 54px;
+      }
+      header,
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+      header {
+        grid-template-columns: 1.45fr 0.75fr;
+        margin-bottom: 20px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .hero,
+      .card,
+      details {
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+      .hero {
+        padding: 26px;
+      }
+      .card,
+      details {
+        padding: 16px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(2rem, 5vw, 4rem);
+        line-height: 0.98;
+      }
+      h2 {
+        margin: 24px 0 12px;
+        font-size: 1.05rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      h3 {
+        font-size: 1rem;
+      }
+      p + p {
+        margin-top: 9px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .meta {
+        display: grid;
+        gap: 10px;
+      }
+      .tag {
+        display: inline-block;
+        padding: 4px 9px;
+        border: 1.5px solid var(--border);
+        border-radius: 999px;
+        background: var(--yellow);
+        font-size: 0.76rem;
+        font-weight: 800;
+      }
+      .blue {
+        background: var(--blue);
+      }
+      .green {
+        background: var(--green);
+      }
+      .pink {
+        background: var(--pink);
+      }
+      ul,
+      ol {
+        margin: 10px 0 0;
+        padding-left: 20px;
+      }
+      li + li {
+        margin-top: 6px;
+      }
+      code {
+        padding: 2px 5px;
+        border-radius: 5px;
+        background: rgb(23 32 38 / 8%);
+      }
+      img {
+        width: 100%;
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 850;
+      }
+      @media (max-width: 760px) {
+        header,
+        .grid.two,
+        .grid.three {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <section class="hero">
+          <span class="tag pink">PRE-IMPLEMENTATION · 30 AUG 2026</span>
+          <h1>Real frost for Y Space popups</h1>
+          <p class="muted">
+            The live model picker is transparent, but the scene behind it remains sharp. This
+            revision moves the visual contract into the shared desktop menu primitive so every
+            responsive popup gets one bounded, visibly diffused glass surface.
+          </p>
+        </section>
+        <section class="meta">
+          <article class="card blue">
+            <h3>Readiness</h3>
+            <p><strong>YES</strong></p>
+            <p class="muted">
+              Clean worktree, green inherited baseline, live defect captured, fail-first contract
+              written.
+            </p>
+          </article>
+          <article class="card green">
+            <h3>Risk</h3>
+            <p><strong>Focused</strong></p>
+            <p class="muted">
+              Renderer CSS plus one shared class boundary. No Browser guest or agent runtime
+              changes.
+            </p>
+          </article>
+        </section>
+      </header>
+
+      <h2>Problem and evidence</h2>
+      <section class="grid two">
+        <article class="card">
+          <h3>Observed defect</h3>
+          <p>
+            The Select model surface passes light and color through, but words, icons, and edges
+            beneath the menu remain legible. The current generic <code>.popover</code> rule
+            therefore creates transparency without the visual diffusion in the supplied references.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Acceptance signal</h3>
+          <p>
+            Covered background detail must become an unreadable soft field while the model search,
+            provider headings, model rows, and favorites remain sharp. A warm three-bloom color
+            field, grain, lens, and rim should make the material visible even over Y Space’s
+            near-white canvas.
+          </p>
+        </article>
+      </section>
+      <p style="margin-top: 16px">
+        <img
+          src="qa-screenshots/model-picker-before.jpeg"
+          alt="Live baseline model picker showing sharp background content through a transparent popup"
+        />
+      </p>
+
+      <h2>Prepared implementation</h2>
+      <section class="grid three">
+        <article class="card yellow">
+          <h3>Worktree</h3>
+          <p><code>y-space-popup-frost</code></p>
+          <p class="muted">
+            Fresh branch and worktree from <code>c95bb658</code>; the repository checkout was not
+            switched.
+          </p>
+        </article>
+        <article class="card blue">
+          <h3>Baseline</h3>
+          <p><strong>11,126 passed</strong></p>
+          <p class="muted">
+            940 files passed, 6 skipped; 86 tests skipped. Native and Electron artifacts were
+            prepared serially first.
+          </p>
+        </article>
+        <article class="card green">
+          <h3>Environment</h3>
+          <p><strong>Ready</strong></p>
+          <p class="muted">
+            Frozen install complete, Husky installed, ignored Pipedream environment retained without
+            exposing values.
+          </p>
+        </article>
+      </section>
+
+      <h2>Technical boundary</h2>
+      <section class="grid two">
+        <article class="card">
+          <h3>Shared surface</h3>
+          <ul>
+            <li>
+              Add <code>poracode-frosted-popover</code> to every desktop
+              <code>ResponsiveMenuSurface</code>.
+            </li>
+            <li>
+              Use one portaled root filter per open popup: at least 48px blur and 185% saturation.
+            </li>
+            <li>Keep dialog content in a sharp foreground layer above non-interactive optics.</li>
+            <li>
+              Unmounting the menu removes the filtered surface, preventing accumulated compositor
+              work.
+            </li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>Material and accessibility</h3>
+          <ul>
+            <li>Lower-alpha adaptive tint plus three restrained orange/neutral blooms.</li>
+            <li>Static fine grain, refractive rim, optical lens, and restrained shadow.</li>
+            <li>
+              Reduce Transparency paints a solid overlay and removes filters and optical layers.
+            </li>
+            <li>
+              No filters on Browser guests, content planes, individual tabs, or repeated rows.
+            </li>
+          </ul>
+        </article>
+      </section>
+
+      <h2>Fail-first and QA plan</h2>
+      <section class="grid two">
+        <article class="card pink">
+          <h3>Automated contract</h3>
+          <ol>
+            <li>The shared responsive menu must own the dedicated marker.</li>
+            <li>The popup must own the strong blur and color field.</li>
+            <li>Rim/lens layers must not intercept interaction.</li>
+            <li>Dialog content must sit sharp above them.</li>
+            <li>Reduced Transparency must be complete.</li>
+          </ol>
+        </article>
+        <article class="card blue">
+          <h3>Hands-on cases</h3>
+          <ol>
+            <li>Before/after same-geometry model-picker diffusion.</li>
+            <li>Search, clear, scroll, favorite, select, reopen, Escape.</li>
+            <li>Two additional responsive menus use the same material.</li>
+            <li>Live Reduce Transparency off/on in one PID.</li>
+            <li>Embedded Browser pixels remain sharp.</li>
+          </ol>
+        </article>
+      </section>
+
+      <details style="margin-top: 18px">
+        <summary>Launch invariant</summary>
+        <p style="margin-top: 10px">
+          Every packaged QA action will use the exact revised app launched with the literal
+          <code>--use-mock-keychain</code> flag. One process will remain open between cases and for
+          the user’s follow-up testing. Normal release credential behavior is unchanged.
+        </p>
+      </details>
+    </main>
+  </body>
+</html>

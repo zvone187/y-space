@@ -1,19 +1,19 @@
 {
-  "version": 13,
+  "version": 14,
   "project": "Y Space",
-  "branch": "y-space-frosted-glass",
+  "branch": "y-space-popup-frost",
   "platform": "macOS Apple Silicon desktop",
   "testedOn": "2026-08-30",
-  "status": "frosted_glass_core_verified_evidence_caveats_recorded",
+  "status": "popup_frost_complete_and_verified",
   "currentPhase": {
-    "name": "Reference-matched Apple-style frosted material",
-    "baseBranch": "y-space-pipedream-live",
-    "baseCommit": "153af1429e150d11f6d53667a371a1c42673fef1",
+    "name": "True frosted popup surfaces",
+    "baseBranch": "y-space-frosted-glass",
+    "baseCommit": "c95bb6589305cfd2a42622c8f3d04ed9924d4bd5",
     "baseline": "940 passed files, 6 skipped files, 11,126 passed tests, and 86 skipped tests under Node 26.8.1",
-    "failFirst": "Native-material decisions, transparent-window construction, weak diffusion, absent optical edge layers, and unbounded filter placement were captured by focused failing tests before implementation.",
-    "implementationStatus": "complete_and_packaged",
-    "performanceBoundary": "One native macOS sidebar material and one bounded backdrop-filter per stable glass surface; no per-Browser-guest, content-plane, row, or individual-tab filters. The browser-extract auxiliary window explicitly opts out of native material.",
-    "reviewStatus": "The final unsigned ARM64 package passed deep/strict codesign verification and manual Computer Use inspection in light, dark, translucency-off, and macOS Reduce Transparency states. The same PID retained its UI state, restored the material live, opened the embedded Browser with sharp guest pixels, and remains open with the literal --use-mock-keychain argument."
+    "failFirst": "The source material contract was written before implementation, then a packaged-runtime failure exposed the production optimizer stripping Electron's usable backdrop-filter declaration. A second fail-first pipeline contract captured that packaging defect.",
+    "implementationStatus": "complete_and_verified",
+    "performanceBoundary": "One bounded backdrop-filter per open responsive popup root; no per-Browser-guest, content-plane, row, result, or individual-tab filters.",
+    "reviewStatus": "The final unsigned ARM64 package passed deep/strict codesign verification and hands-on model search, scrolling, favorite restoration, Escape dismissal, shared-menu, and live macOS Reduce Transparency checks. PID 15340 remains open with the literal --use-mock-keychain argument."
   },
   "frostedGlassRevision": {
     "name": "Apple-style frosted material revision",
@@ -26,27 +26,95 @@
     "materialBoundary": "Native sidebar blur plus bounded CSS blur on stable overlapping chrome only; no filters on Browser guests, content planes, individual tabs, rows, or per-page hosts.",
     "testLaunchInvariant": "Every packaged UI run will use one isolated process launched with the literal --use-mock-keychain argument, keep that process open between cases, and leave it open for user testing."
   },
+  "popupFrostRevision": {
+    "name": "True frosted popup surfaces",
+    "branch": "y-space-popup-frost",
+    "baseBranch": "y-space-frosted-glass",
+    "baseCommit": "c95bb6589305cfd2a42622c8f3d04ed9924d4bd5",
+    "worktree": "/Users/zvonimirsabljic/Development/y-space/y-space-popup-frost",
+    "baseline": "After serially preparing the native server and Electron worker artifacts, 940 files and 11,126 tests passed with 6 files and 86 tests skipped in 99.48 seconds under Node 26.8.1.",
+    "observedDefect": "The live Select model popup is translucent but not visibly frosted: composer labels and edges remain sharply readable behind the model list.",
+    "failFirst": "A dedicated popup-material contract requires the shared responsive-menu marker, at least 48px blur and 185% saturation, a three-bloom color field, non-interactive optical layers, sharp dialog content, and a complete reduced-transparency fallback.",
+    "implementationStatus": "complete_and_verified",
+    "productionRootCause": "Tailwind 4.3.2's Lightning CSS production optimizer removed the standard backdrop-filter declaration and left only -webkit-backdrop-filter. Electron 43 does not expose that alias, so the packaged popup computed to no blur even though the source stylesheet looked correct. Tailwind optimization is now disabled for this renderer build and Vite/esbuild preserves both declarations.",
+    "performanceBoundary": "One bounded compositor-backed backdrop filter is applied to each open responsive popup root, with no row, model result, embedded Browser guest, document surface, or nested-tab filters. Closing a menu unmounts and releases that surface.",
+    "testLaunchInvariant": "The revised packaged app must launch with the literal --use-mock-keychain argument, keep one PID open across every manual case, and remain open for user testing. Normal release credential behavior stays unchanged.",
+    "e2eCases": [
+      {
+        "id": "YS-POPUP-FROST-E2E-001",
+        "title": "Model picker visibly diffuses the scene behind it",
+        "status": "passed",
+        "setup": "Position the composer over visible labels and orange controls, then open Select model in the packaged app.",
+        "steps": [
+          "Capture the closed composer and open model picker at the same window geometry.",
+          "Compare labels and edges covered by the popup against uncovered equivalents.",
+          "Inspect the popup rim, color blooms, grain, shadow, and foreground text."
+        ],
+        "expected": "Covered background detail is strongly blurred and no longer readable while model names, icons, and the search field remain sharp.",
+        "evidence": [
+          "implementation assets/popup-frost/qa-screenshots/model-picker-before.jpeg",
+          "implementation assets/popup-frost/qa-screenshots/final-model-picker-frost.jpeg",
+          "The final packaged renderer computed backdrop-filter as blur(56px) saturate(1.95) contrast(1.03), with three bounded color-field gradients and sharp dialog content."
+        ]
+      },
+      {
+        "id": "YS-POPUP-FROST-E2E-002",
+        "title": "Frost survives complete model-search interaction",
+        "status": "passed",
+        "setup": "Keep the model picker open in the same --use-mock-keychain process.",
+        "steps": [
+          "Type into Search models and clear the query.",
+          "Scroll the result list and toggle one favorite.",
+          "Choose a model, reopen the picker, and dismiss it with Escape.",
+          "Open two other responsive menus and inspect their material."
+        ],
+        "expected": "All interactions remain correct, content stays crisp, and every responsive desktop menu uses the same bounded frosted material.",
+        "evidence": [
+          "implementation assets/popup-frost/qa-screenshots/final-model-search-filtered.jpeg",
+          "implementation assets/popup-frost/qa-screenshots/final-effort-popup-frost.jpeg",
+          "In the same packaged process, search was typed and cleared, the model list was scrolled, a favorite was toggled on and restored off, Escape dismissed the picker, and both effort and permission menus opened with the shared material."
+        ]
+      },
+      {
+        "id": "YS-POPUP-FROST-E2E-003",
+        "title": "Reduced Transparency swaps live frost for opaque material",
+        "status": "passed",
+        "setup": "Keep one packaged Y Space PID open with Select model visible.",
+        "steps": [
+          "Enable macOS Reduce Transparency and capture the picker.",
+          "Confirm the surface becomes opaque with no blur, grain, or optical lens.",
+          "Disable Reduce Transparency and capture the restored picker without relaunching."
+        ],
+        "expected": "The preference changes the material live in one process and restoration returns the same visible frost.",
+        "evidence": [
+          "implementation assets/popup-frost/qa-screenshots/final-reduced-transparency-popup.jpeg",
+          "implementation assets/popup-frost/qa-screenshots/final-restored-popup-frost.jpeg",
+          "PID 15340 switched live to an opaque rgb(255,255,255) surface with no filter, image, grain, or optical layers, then restored the 56px blur after the system preference was turned off."
+        ]
+      }
+    ]
+  },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
-    "app": "/tmp/y-space-frosted-glass-reviewed-20260830-1320/mac-arm64/Y Space.app",
+    "app": "/private/tmp/y-space-popup-frost-reviewed-20260830-1414/mac-arm64/Y Space.app",
     "architecture": "arm64",
-    "appDiskBytes": 456650752,
-    "appAsarSha256": "137ff0033d18c196579b1c15ccbd202f9be20a057f6d38b762389dfcdfc8046f",
-    "appAsarBytes": 164161598,
-    "executableSha256": "e34de8fca6a394fa0fe39fe6af3df69b76e5e05469719d3e5a64eef3554b8f66",
+    "appDiskBytes": 456663040,
+    "appAsarSha256": "c478ebadd2e2e3791d00f605fb8472555c566ecd85a6d4dcf4fe02f66c9fb958",
+    "appAsarBytes": 164175666,
+    "executableSha256": "9f9fb0e8c9c14f2cdedc9e464873eff4a794d80d5d50c0c1fc3438f98f2aa0c2",
     "executableBytes": 52752,
     "codesign": "codesign --verify --deep --strict passed; ad-hoc hardened-runtime signature with no Team ID",
-    "qaLaunch": "The exact reviewed packaged UI run launched with PORACODE_BASE_DIR=/tmp/y-space-frosted-glass-reviewed-profile-20260830-1320 and the literal --use-mock-keychain argument; PID 67151 remained open between every final frosted-material test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
+    "qaLaunch": "The exact reviewed packaged UI run launched with PORACODE_BASE_DIR=/tmp/y-space-popup-frost-reviewed-profile-20260830-1414 and the literal --use-mock-keychain argument; PID 15340 remained open between every popup-frost test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
       "status": "pass on the final reviewed source state under Node.js 26.8.1",
-      "passedFiles": 940,
+      "passedFiles": 941,
       "skippedFiles": 6,
-      "passedTests": 11126,
+      "passedTests": 11131,
       "skippedTests": 86,
-      "durationSeconds": 130.7,
+      "durationSeconds": 112.79,
       "focusedTimeoutStress": "Focused native-window, IPC, provider-lifecycle, sidebar-token, contrast, and CSS material-contract suites passed before this green full-suite run."
     },
     "targetedBranding": {

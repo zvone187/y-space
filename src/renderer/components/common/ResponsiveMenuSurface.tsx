@@ -81,6 +81,9 @@ export function ResponsiveMenuSurface(props: {
     typeof props.children === "function"
       ? props.children({ expanded: mobile ? expanded : false })
       : props.children;
+  const desktopContentClassName = ["poracode-frosted-popover", props.contentClassName]
+    .filter(Boolean)
+    .join(" ");
   const mobilePortalTarget = mobile
     ? (document.querySelector<HTMLElement>(".m-shell") ?? document.body)
     : null;
@@ -144,7 +147,7 @@ export function ResponsiveMenuSurface(props: {
         {presentedOpen ? (
           <Popover.Content
             placement={props.placement ?? "top start"}
-            {...(props.contentClassName ? { className: props.contentClassName } : {})}
+            className={desktopContentClassName}
           >
             <Popover.Dialog
               {...(props.dialogClassName ? { className: props.dialogClassName } : {})}

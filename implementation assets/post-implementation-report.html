@@ -3,22 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space — Frosted Glass Implementation Handoff</title>
+    <title>Y Space Popup Frost — Final Implementation Report</title>
     <style>
       :root {
-        --canvas: #fff8f1;
-        --ink: #211d19;
-        --muted: #716861;
-        --border: #302a25;
-        --paper: #ffffff;
-        --orange: #ff5a1f;
-        --orange-soft: #ffe2cf;
-        --green: #e2f6df;
-        --blue: #e3f0ff;
+        --canvas: #f6f2e8;
+        --ink: #172026;
+        --muted: #65727a;
+        --border: #2c3338;
+        --paper: #fff;
+        --blue: #d9ecff;
+        --green: #dff5df;
         --yellow: #fff1b8;
-        --pink: #ffe2e8;
-        --purple: #eee5ff;
-        --shadow: 7px 7px 0 rgb(48 42 37 / 0.15);
+        --pink: #ffe2eb;
+        --orange: #ffd8c2;
+        --shadow: 7px 7px 0 rgb(23 32 38 / 18%);
         font-family:
           Inter,
           ui-sans-serif,
@@ -36,8 +34,8 @@
         color: var(--ink);
         line-height: 1.45;
         background:
-          linear-gradient(90deg, rgb(48 42 37 / 0.06) 1px, transparent 1px),
-          linear-gradient(rgb(48 42 37 / 0.06) 1px, transparent 1px), var(--canvas);
+          linear-gradient(90deg, rgb(47 58 66 / 7%) 1px, transparent 1px),
+          linear-gradient(rgb(47 58 66 / 7%) 1px, transparent 1px), var(--canvas);
         background-size: 28px 28px;
       }
       main {
@@ -45,11 +43,35 @@
         margin: 0 auto;
         padding: 30px 22px 54px;
       }
-      header {
+      header,
+      .grid {
         display: grid;
-        grid-template-columns: 1.4fr 0.8fr;
-        gap: 18px;
-        margin-bottom: 24px;
+        gap: 16px;
+      }
+      header {
+        grid-template-columns: 1.45fr 0.75fr;
+        margin-bottom: 20px;
+      }
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .hero,
+      .card,
+      details {
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+      .hero {
+        padding: 26px;
+      }
+      .card,
+      details {
+        padding: 16px;
       }
       h1,
       h2,
@@ -58,234 +80,100 @@
         margin: 0;
       }
       h1 {
-        font-size: clamp(2.2rem, 5vw, 4.3rem);
-        line-height: 0.96;
+        margin-top: 8px;
+        font-size: clamp(2rem, 5vw, 4rem);
+        line-height: 0.98;
       }
       h2 {
-        font-size: 1.06rem;
+        margin: 24px 0 12px;
+        font-size: 1.05rem;
         text-transform: uppercase;
+        letter-spacing: 0.08em;
       }
-      a {
-        color: #a43800;
-        font-weight: 780;
-        text-decoration: none;
+      h3 {
+        font-size: 1rem;
       }
-      code {
-        border: 1px solid rgb(48 42 37 / 0.24);
-        border-radius: 6px;
-        background: rgb(255 255 255 / 0.76);
-        padding: 2px 5px;
+      p + p {
+        margin-top: 9px;
       }
-      .hero,
-      .card,
-      .sticky,
-      details,
-      .table-card,
-      figure {
-        border: 2px solid var(--border);
-        box-shadow: var(--shadow);
-      }
-      .hero,
-      .card,
-      details,
-      .table-card,
-      figure {
-        border-radius: 16px;
-        background: var(--paper);
-      }
-      .hero {
-        padding: 26px;
-      }
-      .hero p {
-        max-width: 760px;
-        margin-top: 12px;
+      .muted {
         color: var(--muted);
       }
-      .meta-stack,
-      .grid,
-      .evidence {
+      .meta {
         display: grid;
-        gap: 14px;
-      }
-      .grid.two,
-      .evidence {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .grid.three {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-      .card {
-        padding: 16px;
-      }
-      .card small {
-        display: block;
-        color: var(--muted);
-        font-size: 0.78rem;
-        font-weight: 850;
-        text-transform: uppercase;
-      }
-      .card strong {
-        display: block;
-        margin-top: 4px;
-        font-size: 1.2rem;
-        line-height: 1.15;
-      }
-      .tag,
-      .pill {
-        display: inline-flex;
-        border: 2px solid var(--border);
-        border-radius: 999px;
-        padding: 5px 9px;
-        font-size: 0.76rem;
-        font-weight: 900;
-        text-transform: uppercase;
+        gap: 10px;
       }
       .tag {
-        margin-bottom: 12px;
-        background: var(--orange-soft);
+        display: inline-block;
+        padding: 4px 9px;
+        border: 1.5px solid var(--border);
+        border-radius: 999px;
+        background: var(--yellow);
+        font-size: 0.76rem;
+        font-weight: 800;
       }
-      .pill {
-        margin: 0 6px 6px 0;
-      }
-      .board-section {
-        margin-top: 25px;
-      }
-      .section-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-      .pin {
-        width: 16px;
-        height: 16px;
-        border: 2px solid var(--border);
-        border-radius: 50%;
-        background: var(--orange);
-      }
-      .sticky {
-        min-height: 132px;
-        border-radius: 3px;
-        padding: 16px;
-        transform: rotate(-0.5deg);
-      }
-      .sticky:nth-child(even) {
-        transform: rotate(0.5deg);
-      }
-      .sticky h3 {
-        margin-bottom: 8px;
-        font-size: 1.08rem;
-      }
-      .sticky p,
-      .sticky li {
-        color: #493f38;
-        font-size: 0.93rem;
-      }
-      .sticky ul {
-        margin: 8px 0 0;
-        padding-left: 18px;
-      }
-      .bg-orange {
-        background: var(--orange-soft);
-      }
-      .bg-green {
-        background: var(--green);
-      }
-      .bg-blue {
+      .blue {
         background: var(--blue);
       }
-      .bg-yellow {
+      .green {
+        background: var(--green);
+      }
+      .yellow {
         background: var(--yellow);
       }
-      .bg-pink {
+      .pink {
         background: var(--pink);
       }
-      .bg-purple {
-        background: var(--purple);
+      .orange {
+        background: var(--orange);
       }
-      .table-card {
-        overflow: hidden;
+      ul,
+      ol {
+        margin: 10px 0 0;
+        padding-left: 20px;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
+      li + li {
+        margin-top: 6px;
       }
-      th,
-      td {
-        border-bottom: 1px solid #ddd3ca;
-        padding: 9px 11px;
-        text-align: left;
-        vertical-align: top;
-      }
-      th {
-        background: var(--orange-soft);
-        font-size: 0.78rem;
-        text-transform: uppercase;
-      }
-      tr:last-child td {
-        border-bottom: 0;
-      }
-      .pass {
-        color: #176225;
-        font-weight: 850;
-      }
-      .pending {
-        color: #8a4b00;
-        font-weight: 850;
-      }
-      .blocked {
-        color: #9b2435;
-        font-weight: 850;
-      }
-      summary {
-        cursor: pointer;
-        padding: 14px 16px;
-        font-weight: 850;
-        list-style: none;
-      }
-      summary::before {
-        content: "+";
-        display: inline-block;
-        width: 14px;
-        margin-right: 10px;
-        font-weight: 900;
-      }
-      details[open] summary::before {
-        content: "−";
-      }
-      .detail-body {
-        border-top: 2px solid var(--border);
-        padding: 14px 16px 16px;
-        color: #493f38;
-      }
-      .detail-body ul {
-        margin: 8px 0 0;
-        padding-left: 18px;
+      code {
+        padding: 2px 5px;
+        border-radius: 5px;
+        background: rgb(23 32 38 / 8%);
+        overflow-wrap: anywhere;
       }
       figure {
         margin: 0;
-        overflow: hidden;
       }
-      figure img {
-        display: block;
+      img {
         width: 100%;
-        height: auto;
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        background: #fff;
       }
       figcaption {
-        padding: 9px 11px;
+        margin-top: 7px;
         color: var(--muted);
         font-size: 0.83rem;
       }
-      .footer-note {
-        margin-top: 24px;
-        color: var(--muted);
-        font-size: 0.86rem;
+      .check {
+        display: inline-grid;
+        width: 1.3rem;
+        height: 1.3rem;
+        margin-right: 6px;
+        place-items: center;
+        border: 1.5px solid var(--border);
+        border-radius: 50%;
+        background: var(--green);
+        font-weight: 900;
       }
-      @media (max-width: 900px) {
+      summary {
+        cursor: pointer;
+        font-weight: 850;
+      }
+      @media (max-width: 760px) {
         header,
         .grid.two,
-        .grid.three,
-        .evidence {
+        .grid.three {
           grid-template-columns: 1fr;
         }
       }
@@ -294,792 +182,237 @@
   <body>
     <main>
       <header>
-        <section class="hero" aria-labelledby="title">
-          <span class="tag">Post-implementation handoff · frosted material revision</span>
-          <h1 id="title">Y Space now has real frosted material.</h1>
-          <p>
-            The white/orange Y Space shell now combines native macOS vibrancy with bounded 40px
-            renderer diffusion, grain, warm color fields, and optical edge concentration. The final
-            unsigned ARM64 package passed automated verification and live light, dark,
-            translucency-off, reduced-transparency, composer, and embedded-Browser inspection. The
-            earlier global-tab, agent-Browser, cursor, compact-conversation, and Pipedream work is
-            preserved; live Gmail OAuth and Claude authentication remain external acceptance gates.
+        <section class="hero">
+          <span class="tag green">IMPLEMENTED + PACKAGED + HANDS-ON VERIFIED · 30 AUG 2026</span>
+          <h1>Y Space popups now render real frost</h1>
+          <p class="muted">
+            The model picker and shared desktop menus no longer stop at transparency. The shipped
+            renderer preserves a native Electron-compatible 56px backdrop blur, richer light
+            diffusion, an optical rim and lens, and a complete opaque accessibility fallback.
           </p>
         </section>
-        <aside class="meta-stack" aria-label="Report metadata">
-          <div class="card bg-yellow">
-            <small>Status</small
-            ><strong>Core frost passed · evidence caveats logged · package open</strong>
-          </div>
-          <div class="card bg-blue">
-            <small>Branch</small><strong>y-space-frosted-glass</strong>
-          </div>
-          <div class="card bg-purple">
-            <small>Base</small><strong>153af142 · y-space-pipedream-live</strong>
-          </div>
-          <div class="card bg-green">
-            <small>Delivery</small><strong>Local branch · no PR requested</strong>
-          </div>
-          <div class="card bg-orange">
-            <small>Report date</small><strong>August 30, 2026</strong>
-          </div>
-        </aside>
+        <section class="meta">
+          <article class="card green">
+            <h3>Outcome</h3>
+            <p><strong>PASS</strong></p>
+            <p class="muted">
+              All three popup-frost E2E cases and the full automated suite passed.
+            </p>
+          </article>
+          <article class="card orange">
+            <h3>Reviewed app</h3>
+            <p><strong>Still open</strong></p>
+            <p class="muted">
+              PID 15340, launched with the literal <code>--use-mock-keychain</code> flag.
+            </p>
+          </article>
+        </section>
       </header>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Fast answer</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-green">
-            <h3>What changed now</h3>
-            <p>
-              A true frosted stack: native macOS sidebar material, warm ambient color fields, 40px
-              diffusion, restrained saturation, fine static grain, and bright rim/lens layers on
-              only the stable chrome that needs them.
-            </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>What the final package proved</h3>
-            <p>
-              PID 67151 stayed open with the literal <code>--use-mock-keychain</code> argument while
-              Computer Use toggled the material off/on, switched light/dark, exercised macOS Reduce
-              Transparency, opened the composer, and displayed a sharp embedded Browser guest.
-            </p>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>What remains honest</h3>
-            <p>
-              The bounded-filter and six-guest residency contracts pass, but one earlier
-              post-cleanup RSS sample was inconclusive. This handoff does not turn that into a “no
-              memory leaks” claim. Live Gmail OAuth and Claude still require the user gates
-              documented below.
-            </p>
-          </div>
-        </div>
+      <h2>What was actually broken</h2>
+      <section class="grid two">
+        <article class="card pink">
+          <h3>Symptom</h3>
+          <p>
+            The source stylesheet declared blur, but the packaged model search displayed a
+            transparent sheet whose covered labels and edges stayed sharp.
+          </p>
+        </article>
+        <article class="card blue">
+          <h3>Production root cause</h3>
+          <p>
+            Tailwind 4.3.2’s Lightning CSS optimizer removed the standard
+            <code>backdrop-filter</code> and retained only <code>-webkit-backdrop-filter</code>.
+            Electron 43 does not expose that alias, so the computed packaged style became
+            <code>none</code>.
+          </p>
+        </article>
       </section>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Frosted material pass criteria</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-green">
-            <h3>Met · real diffusion</h3>
-            <p>
-              Light mode visibly diffuses peach/orange fields through milky grain; dark mode becomes
-              smoky amber glass. Translucency off removes the treatment live, proving the material
-              is more than a static transparent tint.
-            </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Met · accessible fallback</h3>
-            <p>
-              macOS Reduce Transparency disables native vibrancy, backdrop filters, grain, specular
-              bloom, and optical layers without changing the in-app preference or requiring a
-              restart. Restoring the OS setting restores the material in the same PID.
-            </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Met · bounded composition</h3>
-            <p>
-              Browser guests, webviews, documents, content planes, rows, and individual tabs remain
-              unfiltered. The auxiliary Browser extract window opts out of native material; the
-              embedded DuckDuckGo page stayed sharp beside the frosted shell.
-            </p>
-          </div>
-        </div>
+      <h2>Final implementation</h2>
+      <section class="grid three">
+        <article class="card yellow">
+          <h3>Shared surface</h3>
+          <p>
+            Every desktop <code>ResponsiveMenuSurface</code> receives one
+            <code>poracode-frosted-popover</code> root, covering model, effort, permission, project,
+            branch, and related menus.
+          </p>
+        </article>
+        <article class="card green">
+          <h3>Material</h3>
+          <p>
+            <code>blur(56px) saturate(195%) contrast(1.03)</code>, a valid three-bloom color field,
+            fine grain, a specular pass, optical rim, lens, and sharp dialog content.
+          </p>
+        </article>
+        <article class="card blue">
+          <h3>Build integrity</h3>
+          <p>
+            Tailwind’s faulty optimizer is disabled for this renderer and Vite/esbuild performs CSS
+            minification while preserving both standard and prefixed declarations.
+          </p>
+        </article>
       </section>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Delivered product</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-orange">
-            <h3>Modern Y Space</h3>
-            <p>
-              Light warm-neutral surfaces, restrained orange accents, native system typography,
-              softer chrome, bounded glass, reduced-transparency fallback, and no developer-heavy
-              task-row clutter.
-            </p>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>One global tab system</h3>
-            <p>
-              Browser pages, Files, Git, Terminal, Notes, Usage, source, Markdown, PDF, XLS, and
-              XLSX all open as peers in the sole top strip. No nested Browser tabs remain.
-            </p>
-          </div>
-          <div class="sticky bg-purple">
-            <h3>Browser as the agent route</h3>
-            <p>
-              Codex and OpenCode launch contracts route browser work to the visible embedded Y Space
-              Browser, with global tab discovery, focus, create, inspect, interact, screenshot, and
-              close operations.
-            </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Trusted visible cursor</h3>
-            <p>
-              The orange-and-white overlay glides to retained targets while Chromium receives
-              trusted native pointer, key, text, wheel, toggle, and select input. Click, hover,
-              text, and scroll feedback stay distinct and bounded.
-            </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>Codex-style conversation</h3>
-            <p>
-              Intermediate reasoning and tool work render inside one collapsed disclosure. On
-              completion it closes automatically, leaving the final assistant answer visible.
-            </p>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>Pipedream Connections</h3>
-            <p>
-              Composer and Settings open the same glass popup with live catalog search/pagination.
-              Credentials stay main/supervisor-owned; agents receive only launch-scoped loopback
-              relay access, and each account must be granted explicitly.
-            </p>
-          </div>
-        </div>
+      <h2>Before and after</h2>
+      <section class="grid two">
+        <figure class="card">
+          <img
+            src="popup-frost/qa-screenshots/model-picker-before.jpeg"
+            alt="Baseline transparent model picker with sharply legible background content"
+          />
+          <figcaption>
+            Baseline: transparency without effective packaged backdrop diffusion.
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img
+            src="popup-frost/qa-screenshots/final-model-picker-frost.jpeg"
+            alt="Final model picker with strong soft background diffusion and sharp foreground rows"
+          />
+          <figcaption>
+            Final package: diffuse scene behind the menu, warm color transmission, and crisp model
+            content.
+          </figcaption>
+        </figure>
       </section>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Acceptance matrix</h2>
-        </div>
-        <div class="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>Capability</th>
-                <th>Status</th>
-                <th>Evidence and remaining boundary</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Reference-matched frosted UI + global tabs</td>
-                <td class="pass">Passed</td>
-                <td>
-                  The final package covers native-backed light/dark material, a live off/on switch,
-                  macOS reduced-transparency fallback and restoration, a frosted composer, and a
-                  sharp Browser guest. Existing packaged QA covers mixed peer tabs, documents,
-                  tools, keyboard navigation, and Browser residency.
-                </td>
-              </tr>
-              <tr>
-                <td>Codex/OpenCode embedded Browser</td>
-                <td class="pass">Passed across packaged builds</td>
-                <td>
-                  Earlier packaged runs proved Codex GPT-5.6 Sol and OpenCode shared a first-class Y
-                  Space Browser tab. The definitive GLM-5.3-Flash replay then used only the embedded
-                  route for hover, click, one fill-with-submit, and final inspection.
-                </td>
-              </tr>
-              <tr>
-                <td>Visible trusted cursor</td>
-                <td class="pass">Passed on final package</td>
-                <td>
-                  Packaged Codex/OpenCode fixtures recorded trusted native pointer sequences. The
-                  definitive replay visibly parked the orange-and-white cursor on the DuckDuckGo
-                  search field for hover and native click/focus, then finished with verified Browser
-                  evidence.
-                </td>
-              </tr>
-              <tr>
-                <td>Collapsed work + final-only answer</td>
-                <td class="pass">Passed</td>
-                <td>
-                  Codex and OpenCode settled to one closed Worked row with the final answer and
-                  Browser proof visible; projection and accessibility regressions cover retention.
-                </td>
-              </tr>
-              <tr>
-                <td>Pipedream popup + catalog + backend</td>
-                <td class="pass">Implemented, hardened, packaged</td>
-                <td>
-                  Both UI entry points, live Gmail search, pagination, zero-result state, relay
-                  isolation, exact launch cleanup, privileged configure acknowledgement, live MCP
-                  reload status, scoped disconnect, OAuth credential epochs, Personal URL aliases,
-                  bounded sign-out, single-flight refresh, and secret boundaries are covered.
-                </td>
-              </tr>
-              <tr>
-                <td>Gmail OAuth + read-only use + disconnect</td>
-                <td class="blocked">External authorization gate</td>
-                <td>
-                  No OAuth grant, connected Gmail account, mailbox read, or disconnect has been
-                  performed. Acceptance is prepared in a main-owned sensitive Y Space Browser tab;
-                  no external Browser will be used or claimed. If Google rejects the embedded user
-                  agent, that provider response will be reported rather than bypassed.
-                </td>
-              </tr>
-              <tr>
-                <td>Claude Code live Browser inference</td>
-                <td class="blocked">Authentication gate</td>
-                <td>
-                  The launch contract is covered, but the installed Claude CLI is logged out. The
-                  user must run <code>claude auth login</code> before live provider acceptance.
-                </td>
-              </tr>
-              <tr>
-                <td>Earlier packaged Quit + relaunch</td>
-                <td class="pass">Earlier package + lifecycle regressions passed</td>
-                <td>
-                  Earlier packaged QA completed native quit and relaunch. Current orderly-shutdown,
-                  renderer-loss, guest cleanup, process-group, and persisted Browser verification
-                  regressions pass. The definitive thin ARM64 package is ad-hoc signed and PID 67151
-                  is intentionally still open for user testing.
-                </td>
-              </tr>
-              <tr>
-                <td>Persistent test credential isolation</td>
-                <td class="pass">Passed on final package</td>
-                <td>
-                  Definitive manual QA used one continuously open package process, PID 67151,
-                  launched from the exact rebuilt bundle with
-                  <code
-                    >PORACODE_BASE_DIR=/tmp/y-space-frosted-glass-reviewed-profile-20260830-1320</code
-                  >
-                  and the literal <code>--use-mock-keychain</code> argument. It remained open
-                  between every frosted-material test case and is intentionally still running. The
-                  flag is launch-scoped to testing; ordinary releases continue to use the normal
-                  operating-system credential store.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <h2>Hands-on interaction evidence</h2>
+      <section class="grid two">
+        <figure class="card">
+          <img
+            src="popup-frost/qa-screenshots/final-model-search-filtered.jpeg"
+            alt="Filtered model search in the final frosted popup"
+          />
+          <figcaption>
+            Search typed and cleared; the list was scrolled and a favorite was toggled on and
+            restored off in the same process.
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img
+            src="popup-frost/qa-screenshots/final-effort-popup-frost.jpeg"
+            alt="Effort menu using the same frosted popup surface"
+          />
+          <figcaption>
+            A second responsive menu proves the material is shared rather than model-picker-only.
+            The permission menu was inspected in the same run.
+          </figcaption>
+        </figure>
       </section>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Automated verification</h2>
-        </div>
-        <div class="grid two">
-          <div class="sticky bg-green">
-            <h3>Passing targeted evidence</h3>
-            <ul>
-              <li>
-                New native-window, IPC, provider-lifecycle, sidebar-token, contrast, and CSS
-                material-contract regressions cover macOS/Windows decisions, stale replies,
-                reduced-transparency behavior, optical layers, and forbidden filter placement.
-              </li>
-              <li>
-                Final combined high-risk Browser/Pipedream run: 15 files / 437 tests passed, with
-                one intentional skip.
-              </li>
-              <li>
-                Independent hardening review lanes passed 289 / 289 and 217 / 217 tests with no
-                remaining concrete P1/P2 finding.
-              </li>
-              <li>
-                The final security re-audit passed 305 / 305 high-risk tests and 104 / 104
-                accepted-turn/start-close tests with no remaining concrete P1/P2 finding.
-              </li>
-              <li>
-                OAuth epochs reject stale code exchange, refresh, dynamic registration, storage, and
-                bearer returns after clear or cancellation.
-              </li>
-              <li>
-                Pending root/child launches are revoked before attach, active descendants are
-                cancelled, and hung provider cleanup is bounded without restoring authority.
-              </li>
-              <li>
-                Disconnect quarantine defeats concurrent refresh/enable races, while sensitive OAuth
-                tab ownership remains exclusive until exact cleanup is confirmed.
-              </li>
-            </ul>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>Final checks recorded</h3>
-            <ul>
-              <li>
-                The complete Node 26.8.1 suite passed 940 files and 11,126 tests in 130.70 seconds,
-                with 6 files / 86 tests skipped.
-              </li>
-              <li>
-                Typecheck, standard/type-aware lint, formatting, production build, JSON parsing, and
-                diff integrity passed.
-              </li>
-              <li>The final unsigned ARM64 app passed deep/strict ad-hoc codesign verification.</li>
-              <li>
-                Computer Use captured earlier packaged Codex evidence plus definitive OpenCode
-                hover, click, single-fill, visible-cursor, and verified-answer evidence.
-              </li>
-              <li>
-                Exact configured Pipedream credential values had zero matches across tracked source
-                and all 288 regular files in the definitive app bundle; no <code>.env</code> file is
-                packaged. The generic non-secret environment label is excluded from the secret
-                claim.
-              </li>
-              <li>
-                Definitive unsigned app: 456,650,752 on-disk bytes (435 MiB); packaged
-                <code>app.asar</code> SHA-256
-                <code>137ff0033d18c196579b1c15ccbd202f9be20a057f6d38b762389dfcdfc8046f</code>;
-                executable SHA-256
-                <code>e34de8fca6a394fa0fe39fe6af3df69b76e5e05469719d3e5a64eef3554b8f66</code>.
-              </li>
-            </ul>
-          </div>
-        </div>
+      <h2>Accessibility fallback</h2>
+      <section class="grid two">
+        <figure class="card">
+          <img
+            src="popup-frost/qa-screenshots/final-reduced-transparency-popup.jpeg"
+            alt="Opaque popup while macOS Reduce Transparency is enabled"
+          />
+          <figcaption>
+            With Reduce Transparency enabled, the same PID changed live to an opaque surface with no
+            blur, background image, grain, rim, or lens.
+          </figcaption>
+        </figure>
+        <figure class="card">
+          <img
+            src="popup-frost/qa-screenshots/final-restored-popup-frost.jpeg"
+            alt="Frosted popup restored after disabling Reduce Transparency"
+          />
+          <figcaption>
+            The system setting was restored to off and the 56px frost returned without relaunching.
+          </figcaption>
+        </figure>
       </section>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Visual evidence</h2>
-        </div>
-        <div class="evidence">
-          <figure>
-            <a href="frosted-glass/qa-screenshots/final-package-light-composer.jpeg"
-              ><img
-                src="frosted-glass/qa-screenshots/final-package-light-composer.jpeg"
-                alt="Final Y Space light composer with warm frosted sidebar and orange optical rim"
-            /></a>
-            <figcaption>
-              Final light package: milky warm diffusion and fine grain remain in the sidebar while
-              the bounded composer concentrates a bright orange edge around sharp controls.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="frosted-glass/qa-screenshots/final-package-dark-appearance.jpeg"
-              ><img
-                src="frosted-glass/qa-screenshots/final-package-dark-appearance.jpeg"
-                alt="Final Y Space dark Appearance screen with smoky amber frosted sidebar"
-            /></a>
-            <figcaption>
-              Final dark package: smoky amber glass keeps the requested depth, color diffusion,
-              grain, and bright boundary without washing the content plane.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="frosted-glass/qa-screenshots/final-package-reduced-transparency.jpeg"
-              ><img
-                src="frosted-glass/qa-screenshots/final-package-reduced-transparency.jpeg"
-                alt="Final Y Space opaque fallback while macOS Reduce Transparency is enabled"
-            /></a>
-            <figcaption>
-              Accessibility proof: macOS Reduce Transparency removes diffusion and optical effects
-              live while the Y Space translucency preference remains enabled.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="frosted-glass/qa-screenshots/final-package-final-restored-browser.jpeg"
-              ><img
-                src="frosted-glass/qa-screenshots/final-package-final-restored-browser.jpeg"
-                alt="Final restored Y Space embedded DuckDuckGo Browser beside frosted global chrome"
-            /></a>
-            <figcaption>
-              Final restoration proof: after the second Reduce Transparency cycle, the embedded
-              Browser stays crisp while shell, rail, toolbar, and composer return to stable frost.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="frosted-glass/qa-screenshots/final-package-translucency-off.jpeg"
-              ><img
-                src="frosted-glass/qa-screenshots/final-package-translucency-off.jpeg"
-                alt="Exact final Y Space package with its translucent sidebar preference off"
-            /></a>
-            <figcaption>
-              Matched light fallback: disabling the app preference removes the color field, grain,
-              blur, and frosting control without relaunching.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="frosted-glass/qa-screenshots/final-package-reduced-connections.jpeg"
-              ><img
-                src="frosted-glass/qa-screenshots/final-package-reduced-connections.jpeg"
-                alt="Exact final Y Space Connections settings with Reduce Transparency enabled"
-            /></a>
-            <figcaption>
-              Secondary-surface fallback: Connections cards, settings navigation, and content remain
-              solid and legible while macOS Reduce Transparency is enabled.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg"
-              ><img
-                src="qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg"
-                alt="Codex operating the visible embedded Y Space Browser"
-            /></a>
-            <figcaption>
-              Earlier packaged Codex proof: visible embedded-browser work with the transcript kept
-              compact.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg"
-              ><img
-                src="qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg"
-                alt="Earlier packaged Codex trusted click result beside the embedded Browser"
-            /></a>
-            <figcaption>
-              Earlier packaged Codex proof: one embedded-tab click produced trusted pointermove,
-              pointerdown, pointerup, and click events.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg"
-              ><img
-                src="qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg"
-                alt="Earlier OpenCode answer beside the visible Y Space cursor on the click target"
-            /></a>
-            <figcaption>
-              Earlier OpenCode fixture proof: the orange-and-white cursor is visibly parked on the
-              real target and the second trusted event sequence raised the ledger from 16 to 23.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/final-opencode-visible-agent-cursor-hover.jpeg"
-              ><img
-                src="qa-screenshots/final-opencode-visible-agent-cursor-hover.jpeg"
-                alt="Definitive Y Space OpenCode run with orange agent cursor hovering the DuckDuckGo search field"
-            /></a>
-            <figcaption>
-              Definitive hover proof: OpenCode GLM-5.3-Flash moved the orange Y Space agent cursor
-              onto the active embedded DuckDuckGo search field while work stayed collapsed.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/final-opencode-visible-agent-cursor-click.jpeg"
-              ><img
-                src="qa-screenshots/final-opencode-visible-agent-cursor-click.jpeg"
-                alt="Definitive Y Space OpenCode native click and focus on the embedded DuckDuckGo search field"
-            /></a>
-            <figcaption>
-              Definitive click proof: the same orange cursor is on the real focused field during a
-              native Browser click; no external browser or synthetic transcript-only claim is used.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/final-opencode-browser-verified.jpeg"
-              ><img
-                src="qa-screenshots/final-opencode-browser-verified.jpeg"
-                alt="Definitive OpenCode final answer with Browser verified badge beside DuckDuckGo results"
-            /></a>
-            <figcaption>
-              Definitive answer proof: exact tab id, title, and URL are visible beside the embedded
-              results page, with <code>Worked · 19 steps</code> collapsed and
-              <code>Browser verified · 5 actions</code> shown.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg"
-              ><img
-                src="qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg"
-                alt="Y Space Connections popup searching the Pipedream catalog for Gmail"
-            /></a>
-            <figcaption>
-              Shared Connections popup from Settings with live Gmail catalog results; Connect was
-              not authorized or clicked through OAuth.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg"
-              ><img
-                src="qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg"
-                alt="Fresh hardened Y Space Connections popup over the embedded Browser"
-            /></a>
-            <figcaption>
-              Earlier hardened bundle: the active composer opened the same light glass Connections
-              surface while its <code>--use-mock-keychain</code> process remained live.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/pipedream-hardening-fresh-package-global-browser-tabs.jpeg"
-              ><img
-                src="qa-screenshots/pipedream-hardening-fresh-package-global-browser-tabs.jpeg"
-                alt="Fresh hardened Y Space package with DuckDuckGo and Example Domain global Browser peers"
-            /></a>
-            <figcaption>
-              Earlier hardened bundle: DuckDuckGo and Example Domain are independent Browser peers
-              in the one global tab strip; switching and cleanup were manually verified.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg"
-              ><img
-                src="qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg"
-                alt="Fresh Y Space package showing Codex browser verification beside the navigated IANA page"
-            /></a>
-            <figcaption>
-              Earlier packaged agent proof: Codex 5.6 Sol reused the existing embedded tab, clicked
-              its visible link, reached the IANA page, and settled to one collapsed Worked row with
-              <code>Browser verified · 4 actions</code>.
-            </figcaption>
-          </figure>
-        </div>
+      <h2>Verification</h2>
+      <section class="grid three">
+        <article class="card green">
+          <h3><span class="check">✓</span>Full suite</h3>
+          <p><strong>941 files · 11,131 tests</strong></p>
+          <p class="muted">6 files and 86 tests skipped; 112.79 seconds on Node 26.8.1.</p>
+        </article>
+        <article class="card green">
+          <h3><span class="check">✓</span>Focused contract</h3>
+          <p><strong>2 files · 9 tests</strong></p>
+          <p class="muted">
+            Covers material strength, valid color field, optics, fallback, and production CSS
+            preservation.
+          </p>
+        </article>
+        <article class="card green">
+          <h3><span class="check">✓</span>Quality gates</h3>
+          <p><strong>All green</strong></p>
+          <p class="muted">
+            Typecheck, standard and type-aware lint, formatting, renderer production build, and diff
+            integrity.
+          </p>
+        </article>
       </section>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Open the cards</h2>
-        </div>
-        <details open>
-          <summary>Frosted material implementation</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                The macOS main window uses Electron vibrancy with follow-window visual state and no
-                fragile transparent-window construction. The renderer provider reconciles native
-                material through typed IPC, handles reduced transparency, and rejects stale async
-                replies.
-              </li>
-              <li>
-                Stable glass surfaces use a shared 40px / 180% backdrop token, theme-aware milky
-                tint, SVG fractal-noise grain, orange ambient/specular fields, and masked rim/lens
-                layers. Pointer events remain disabled on decorative layers.
-              </li>
-              <li>
-                Opaque content planes and embedded Browser pixels are deliberately excluded. The
-                Browser-extract auxiliary window requests
-                <code>nativeMaterialCapability=disabled</code>
-                so it never allocates an invisible native material.
-              </li>
-              <li>
-                Light and dark retain separate 64% / 70% defaults. User translucency and macOS
-                Reduce Transparency both update live; the system preference was restored to off
-                after QA.
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details>
-          <summary>FG-01 through FG-14 status</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                <strong>Passed:</strong> FG-01 native frost, FG-02 bounded renderer frost, FG-03
-                honest pane chrome, FG-04 rim/lens language, and FG-05 crisp content.
-              </li>
-              <li>
-                <strong>Passed:</strong> FG-06 reliable macOS window, FG-07 live platform decision,
-                FG-08 reduced-transparency fallback, FG-09 contrast, and FG-10 interaction safety.
-              </li>
-              <li>
-                <strong>Passed:</strong> FG-11 bounded filters, FG-13 existing regression/build
-                behavior, and FG-14 persistent isolated <code>--use-mock-keychain</code> QA launch.
-              </li>
-              <li>
-                <strong>Evidence boundary:</strong> the exact reviewed package has matched light and
-                dark translucency on/off captures plus reduced-transparency composer and Connections
-                captures. The planned checkerboard/pixel-detail ledger was not run, so the report
-                makes a visual state-matrix claim rather than a numerical blur-strength claim.
-              </li>
-              <li>
-                <strong>Inconclusive:</strong> FG-12 long-horizon memory trend. The earlier
-                eight-tab cycle returned six Browser guests to one, but one post-cleanup RSS sample
-                was 20.5% above warm baseline. No no-leak claim is made.
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details open>
-          <summary>YS-FROST end-to-end matrix</summary>
-          <div class="detail-body">
-            <table>
-              <thead>
-                <tr>
-                  <th>Case</th>
-                  <th>Status</th>
-                  <th>Evidence boundary</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>YS-FROST-E2E-001 · visible diffusion</td>
-                  <td class="blocked">Partial</td>
-                  <td>
-                    The exact package has matched light/dark translucency on/off, composer, and
-                    sharp Browser captures. The planned checkerboard pixel ledger was not run, so no
-                    quantitative blur-strength claim is made.
-                  </td>
-                </tr>
-                <tr>
-                  <td>YS-FROST-E2E-002 · accessible fallback</td>
-                  <td class="pass">Passed</td>
-                  <td>
-                    Reduce Transparency changed Appearance, composer, Connections, and menu states
-                    live and restored in PID 67151. The
-                    <a href="frosted-glass/manual-material-transition-ledger.json"
-                      >transition ledger</a
-                    >
-                    records package identity, screenshots, process continuity, and the native-state
-                    evidence boundary.
-                  </td>
-                </tr>
-                <tr>
-                  <td>YS-FROST-E2E-003 · long-session stability</td>
-                  <td class="blocked">Partial</td>
-                  <td>
-                    Filter/guest bounds and cleanup pass, but the historical single-cycle RSS delta
-                    remains inconclusive. This report does not claim that memory cannot leak.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </details>
-        <details>
-          <summary>Required decisions and external gates</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                The acceptance path is the main-owned sensitive Y Space Browser tab. Keep external
-                browsers out of the workflow; if Google refuses the embedded user agent, record the
-                provider limitation instead of weakening or bypassing it.
-              </li>
-              <li>
-                Immediately before the Gmail grant, obtain explicit user confirmation because it
-                creates persistent third-party account access.
-              </li>
-              <li>
-                After authorization, explicitly enable the exact intended account row, then test
-                restart reconciliation, a privacy-minimized read-only Gmail call, and scoped
-                disconnect. None is currently marked passed.
-              </li>
-              <li>
-                Authenticate Claude with <code>claude auth login</code>, then repeat the same
-                visible embedded-Browser scenario. No credential should be entered on the user's
-                behalf.
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details>
-          <summary>Browser trust and memory boundaries</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                Actions target the exact captured guest and retained backend node; document, loader,
-                viewport drift, occlusion, removal, and authorization guards fail closed.
-              </li>
-              <li>
-                A single bounded correction handles page-scroll drift without silently following a
-                genuinely moving element. Native key-down partial delivery is reported as
-                retry-ambiguous.
-              </li>
-              <li>
-                Ordinary Browser residency remains capped at six live guests, sensitive pages at
-                four, and tab metadata at thirty. Cursor nodes are reusable, aria-hidden, and
-                pointer-events none.
-              </li>
-              <li>
-                Browser verification comes from canonical tool evidence, not assistant prose.
-                Browser MCP screenshots intentionally omit the presentation cursor.
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details>
-          <summary>Pipedream privacy and lifecycle boundaries</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                Environment values, upstream tokens, OAuth URLs, cookies, account secrets, and
-                routing headers are never rendered in this report or exposed to agents.
-              </li>
-              <li>
-                Sensitive navigation requires the exact main-owned private Electron session.
-                Renderer state receives only redacted account summaries.
-              </li>
-              <li>
-                Provider access is launch-scoped through loopback relays; spoofed routing is
-                overwritten, consequential calls are not retried, and exact launch exit revokes its
-                bindings without affecting siblings.
-              </li>
-              <li>
-                Personal Pipedream upstream bearers never enter Codex, Claude, or OpenCode
-                configuration. Agents receive only a local launch capability; revocation aborts
-                in-flight work and credential refresh is single-flight per server and epoch.
-              </li>
-              <li>
-                Clearing Personal Pipedream is main-owned and atomic. Deferred OAuth work, pending
-                or child agents, concurrent refresh/enable, hung disposal, and failed sensitive-tab
-                closure all fail closed under deterministic regressions.
-              </li>
-              <li>
-                The live catalog and credential bootstrap are verified. A connected Gmail account
-                has not been created, read, persisted, or disconnected.
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details>
-          <summary>Artifacts</summary>
-          <div class="detail-body">
-            <ul>
-              <li><a href="qa-e2e-tests.json">QA source of truth and detailed evidence</a></li>
-              <li>
-                <a href="frosted-glass/pass-criteria.md">Frosted-material pass criteria</a>
-              </li>
-              <li>
-                <a href="frosted-glass/manual-material-transition-ledger.json"
-                  >Exact-package material transition ledger</a
-                >
-              </li>
-              <li>
-                <a href="frosted-glass/frost-fixture.svg">Prepared deterministic frost fixture</a>
-                — retained for a future quantitative pixel ledger; it was not used to claim a
-                measured blur result in this revision.
-              </li>
-              <li>
-                <a href="frosted-glass/qa-screenshots/final-package-light-composer.jpeg"
-                  >Final frosted-package screenshot set</a
-                >
-              </li>
-              <li>
-                <a href="definitive-opencode-browser-qa.json"
-                  >Definitive OpenCode, cursor, package, and launch ledger</a
-                >
-              </li>
-              <li><a href="pass-criteria.md">Combined pass criteria</a></li>
-              <li>
-                <a href="browser-memory-soak.json">Historical Browser memory and residency soak</a>
-                — source commit recorded; package no longer retained and no package hash was
-                captured.
-              </li>
-              <li>
-                <a href="glass-browser-residency-qa.json"
-                  >Historical glass Browser residency sample</a
-                >
-                — source commit recorded; package no longer retained and no package hash was
-                captured.
-              </li>
-              <li>
-                Definitive local unsigned app:
-                <code>/tmp/y-space-frosted-glass-reviewed-20260830-1320/mac-arm64/Y Space.app</code>
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details>
-          <summary>Remaining live acceptance</summary>
-          <div class="detail-body">
-            Gmail OAuth/read/disconnect remains gated until the user confirms importing the local
-            Pipedream setup and creating the persistent grant at action time. The sensitive flow is
-            prepared inside Y Space and will not use an external browser. Claude inference remains
-            gated until the local Claude CLI is authenticated. Neither is overstated as passed.
-          </div>
-        </details>
+      <h2>Package and process</h2>
+      <section class="grid two">
+        <article class="card blue">
+          <h3>Exact reviewed artifact</h3>
+          <p>
+            <code
+              >/private/tmp/y-space-popup-frost-reviewed-20260830-1414/mac-arm64/Y Space.app</code
+            >
+          </p>
+          <p class="muted">
+            Unsigned ad-hoc ARM64 build; <code>codesign --verify --deep --strict</code> passed.
+          </p>
+        </article>
+        <article class="card yellow">
+          <h3>Launch invariant</h3>
+          <p>
+            PID 15340 remained open across search, scroll, favorite, dismissal, other-menu, and
+            Reduce Transparency cases with <code>--use-mock-keychain</code>.
+          </p>
+          <p class="muted">
+            Normal release credential behavior was not weakened; the flag belongs only to the
+            persistent QA launch.
+          </p>
+        </article>
       </section>
 
-      <p class="footer-note">
-        Worktree <code>y-space-frosted-glass</code> · base <code>153af142</code> · no PR requested ·
-        definitive unsigned ARM64 app <code>app.asar</code> SHA-256
-        <code>137ff0033d18c196579b1c15ccbd202f9be20a057f6d38b762389dfcdfc8046f</code> · executable
-        SHA-256 <code>e34de8fca6a394fa0fe39fe6af3df69b76e5e05469719d3e5a64eef3554b8f66</code> ·
-        implementation commit follows this report revision. No secret values are included.
-      </p>
+      <h2>Performance and scope boundaries</h2>
+      <section class="grid two">
+        <article class="card">
+          <h3>Bounded composition</h3>
+          <p>
+            One backdrop filter exists on each open popup root. Closing the menu unmounts that
+            compositor surface. There are no filters on individual rows, model results, global tabs,
+            Browser guests, document content, or page hosts.
+          </p>
+        </article>
+        <article class="card">
+          <h3>Change scope</h3>
+          <p>
+            Renderer styling, the shared desktop menu class boundary, the production CSS pipeline,
+            focused tests, durable repository guidance, and QA evidence only. No agent runtime,
+            Browser-control, or Pipedream authority path changed in this revision.
+          </p>
+        </article>
+      </section>
+
+      <h2>Source handoff</h2>
+      <details open>
+        <summary>Branch, base, review state, and delivery</summary>
+        <ul>
+          <li>Branch: <code>y-space-popup-frost</code> (HEAD contains this report).</li>
+          <li>
+            Base: <code>fork/y-space-frosted-glass</code> at
+            <code>c95bb6589305cfd2a42622c8f3d04ed9924d4bd5</code>.
+          </li>
+          <li>No PR was requested or created.</li>
+          <li>No blocked or failed final check remains.</li>
+          <li>
+            Machine-readable E2E evidence:
+            <code>implementation assets/qa-e2e-tests.json</code>.
+          </li>
+        </ul>
+      </details>
     </main>
   </body>
 </html>

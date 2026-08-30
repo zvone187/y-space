@@ -334,7 +334,11 @@ function materialIconAssets(): Plugin[] {
 
 export default defineConfig(({ mode }) => ({
   plugins: [
-    tailwindcss(),
+    // Tailwind's production optimizer uses Lightning CSS before Vite sees the
+    // stylesheet. It currently drops the standard backdrop-filter declaration
+    // and keeps only an alias Electron 43 does not expose. Leave optimization
+    // to Vite/esbuild so both standard and prefixed glass properties survive.
+    tailwindcss({ optimize: false }),
     resizeObserverLoopErrorFilter(),
     mobileSshRuntime(),
     rendererBootstrapTiming(),
@@ -392,6 +396,12 @@ export default defineConfig(({ mode }) => ({
     emptyOutDir: true,
     reportCompressedSize: false,
     sourcemap: mobileOnly ? false : "hidden",
+    // Lightning CSS currently collapses the standard + prefixed
+    // backdrop-filter declarations to only -webkit-backdrop-filter. Electron
+    // 43 exposes the standard property but not that alias, which silently turns
+    // every packaged frosted surface into plain transparency. Esbuild retains
+    // both declarations while still minifying the production stylesheets.
+    cssMinify: "esbuild",
     // Filter modulePreload so the heaviest async chunks (shiki grammars,
     // @git-diff-view, xterm) are not parsed by V8 at startup. They load on
     // demand when the code path that needs them runs (first code block,
