@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useLingui } from "@lingui/react/macro";
 import { ChevronsDownUp, ChevronsUpDown, Plus, Ungroup, X } from "lucide-react";
 import { readBridge } from "@/renderer/bridge";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import type { BrowserTabGroupColor, BrowserTabGroupInfo } from "@/shared/ipc";
 import { GROUP_COLOR_ORDER, groupColor } from "./groupColors";
 
@@ -23,6 +24,7 @@ export function BrowserTabGroupMenu(props: {
   const ref = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [title, setTitle] = useState(group.title);
+  const overlayReady = useSensitiveNativeViewOverlayGate(true);
 
   const commitTitle = () => {
     const next = title.trim();
@@ -64,6 +66,8 @@ export function BrowserTabGroupMenu(props: {
 
   const item =
     "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[12px] text-foreground hover:bg-[var(--surface-secondary)]";
+
+  if (!overlayReady) return null;
 
   return createPortal(
     <div

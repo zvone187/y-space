@@ -208,6 +208,17 @@ describe("SupervisorClient lifecycle", () => {
     expect(forkMock).toHaveBeenCalledOnce();
   });
 
+  it("does not run a crash restart that was scheduled before disposal", async () => {
+    vi.useFakeTimers();
+    const { client, child } = makeClient();
+
+    child.emit("exit", 1);
+    client.dispose();
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(forkMock).toHaveBeenCalledOnce();
+  });
+
   it("sends Pipedream credentials only in the privileged bootstrap message, never child env", () => {
     const { child } = makeClient({
       resolvePipedreamPrivilegedBootstrap: () => ({
@@ -235,7 +246,9 @@ describe("SupervisorClient lifecycle", () => {
 
   it("reloads Pipedream credentials over privileged IPC without adding them to provider env", async () => {
     const { client, child } = makeClient();
-    child.send.mockImplementation((_message, callback) => {
+    let sentMessage: { id: string } | undefined;
+    child.send.mockImplementation((message, callback) => {
+      sentMessage = message as { id: string };
       callback?.();
       return true;
     });
@@ -253,13 +266,52 @@ describe("SupervisorClient lifecycle", () => {
       externalUserId: "y-space:runtime-install",
     };
 
-    await client.configurePipedream(payload);
+    const configuration = client.configurePipedream(payload);
+    let settled = false;
+    void configuration.finally(() => {
+      settled = true;
+    });
+    await vi.waitFor(() => expect(sentMessage).toBeDefined());
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
+    child.emit("message", {
+      kind: "pipedream-privileged-reply",
+      replyTo: sentMessage!.id,
+      ok: true,
+      data: {
+        personalMcp: { enabled: false, authenticated: false, serverName: "pd" },
+        connect: { state: "absent" },
+        agentReload: { state: "restart-required" },
+      },
+    });
+    await expect(configuration).resolves.toMatchObject({
+      agentReload: { state: "restart-required" },
+    });
 
     expect(child.send).toHaveBeenCalledExactlyOnceWith(
-      { kind: "pipedream-privileged-bootstrap", payload },
+      { kind: "pipedream-privileged-bootstrap", id: expect.any(String), payload },
       expect.any(Function),
     );
     const forkOptions = forkMock.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv };
     expect(JSON.stringify(forkOptions.env)).not.toContain("runtime-client-secret");
+  });
+
+  it("rejects an invalid privileged Connect redirect capability before child IPC", async () => {
+    vi.useFakeTimers();
+    const { client, child } = makeClient();
+    const outcome = client
+      .createPipedreamConnectLink("gmail", {
+        successRedirectUrl: "https://attacker.invalid/success/private",
+        errorRedirectUrl: `http://127.0.0.1:43127/error/${"b".repeat(64)}`,
+      })
+      .catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(child.send).not.toHaveBeenCalled();
+    await expect(outcome).resolves.toEqual(
+      expect.objectContaining({ message: expect.stringMatching(/invalid/i) }),
+    );
   });
 });

@@ -7,6 +7,7 @@ import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { useCommandPaletteStore } from "./commandPaletteStore";
 import { useKeybindingStore } from "./keybindingStore";
 import { bindingForPlatform, formatKeybinding } from "./keybindingMatcher";
@@ -22,6 +23,8 @@ const MAX_VISIBLE_COMMANDS = 80;
 export function CommandPalette() {
   const { t } = useLingui();
   const isOpen = useCommandPaletteStore((state) => state.isOpen);
+  const overlayReady = useSensitiveNativeViewOverlayGate(isOpen);
+  const presentedOpen = isOpen && overlayReady;
   const close = useCommandPaletteStore((state) => state.close);
   const keybindings = useKeybindingStore((state) => state.keybindings);
   const [query, setQuery] = useState("");
@@ -46,14 +49,14 @@ export function CommandPalette() {
   const activeCommand = filteredCommands[activeIndex];
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!presentedOpen) {
       setQuery("");
       setActiveIndex(0);
       return;
     }
     const id = requestAnimationFrame(() => inputRef.current?.focus());
     return () => cancelAnimationFrame(id);
-  }, [isOpen]);
+  }, [presentedOpen]);
 
   useEffect(() => {
     if (activeIndex >= filteredCommands.length) {
@@ -69,7 +72,7 @@ export function CommandPalette() {
 
   return (
     <Modal.Backdrop
-      isOpen={isOpen}
+      isOpen={presentedOpen}
       variant="blur"
       onOpenChange={(open) => {
         if (!open) close();

@@ -27,6 +27,7 @@ export {
   type PoracodeBridge,
   type PoracodeInvokeBridge,
   type MainLocalIpcHandlerMap,
+  type MainLocalIpcCallContext,
   type SupervisorIpcHandlerMap,
 } from "./bridge";
 export type { RemoteAccessTailscaleStatus, StartTailscaleResult } from "./procedures/app";
@@ -58,10 +59,17 @@ export {
   type UpdateStatus,
 } from "./events";
 export {
+  browserAcknowledgeAutomationPresentationPayloadSchema,
+  browserAutomationPresentationInvalidationReasonSchema,
+  browserAutomationPresentationSurfaceSchema,
+  browserInvalidateAutomationPresentationPayloadSchema,
   browserPickResultSchema,
   browserStateSchema,
   browserTabGroupSchema,
   browserTabSchema,
+  type BrowserAcknowledgeAutomationPresentationPayload,
+  type BrowserAutomationPresentationSurface,
+  type BrowserInvalidateAutomationPresentationPayload,
   type BrowserBookmarkInfo,
   type BrowserHistoryEntryInfo,
   type BrowserPickResult,

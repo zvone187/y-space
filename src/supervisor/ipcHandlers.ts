@@ -1,3 +1,12 @@
+import {
+  isPipedreamPersonalMcpUrl,
+  PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+  PIPEDREAM_PERSONAL_MCP_SERVER_NAME,
+  PIPEDREAM_PERSONAL_MCP_URL,
+  type McpServer,
+  type PipedreamAgentReloadOutcome,
+  type PipedreamSnapshot,
+} from "@/shared/contracts";
 import { defineSupervisorIpcHandlers, type SupervisorIpcHandlerMap } from "@/shared/ipc";
 import type { SupervisorRuntime } from "./supervisorRuntime";
 
@@ -21,10 +30,53 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
   const lsp = runtime.lspManager;
   const mcpProbe = runtime.mcpProbeService;
   const mcpOAuth = runtime.mcpOAuthService;
+  const personalPipedreamMcpServer: McpServer = {
+    id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+    name: PIPEDREAM_PERSONAL_MCP_SERVER_NAME,
+    description: "Personal Pipedream tools",
+    enabled: true,
+    timeoutMs: 30_000,
+    transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+  };
   const externalMcpDiscovery = runtime.externalMcpDiscoveryService;
   const skills = runtime.skillsService;
   const pluginRegistry = runtime.pluginRegistry;
   const pipedream = runtime.pipedreamService;
+  const reloadLivePipedreamMcpServers = async (options?: {
+    revokePersonalOauth?: boolean;
+  }): Promise<PipedreamAgentReloadOutcome> => {
+    try {
+      return await threads.reloadPipedreamMcpServers(options);
+    } catch {
+      console.warn("[supervisor] failed to refresh live Pipedream MCP servers.");
+      return { state: "failed-pending" };
+    }
+  };
+  const withLivePipedreamMcpReload = async (
+    mutation: () => PipedreamSnapshot | Promise<PipedreamSnapshot>,
+  ): Promise<PipedreamSnapshot> => {
+    const before = relayGrantSignature(pipedream.getSnapshot());
+    try {
+      const result = await mutation();
+      if (relayGrantSignature(result) !== before) {
+        const agentReload = await reloadLivePipedreamMcpServers();
+        return { ...result, agentReload };
+      }
+      return result;
+    } catch (error) {
+      // Disconnect revokes local authorization before its remote request. A
+      // failed upstream DELETE must still remove the live MCP route, while a
+      // no-op refresh must not churn every running provider on each OAuth poll.
+      let changed = true;
+      try {
+        changed = relayGrantSignature(pipedream.getSnapshot()) !== before;
+      } catch {
+        // Fail closed when the safe snapshot cannot be read after a mutation.
+      }
+      if (changed) await reloadLivePipedreamMcpServers();
+      throw error;
+    }
+  };
   const listPlugins = () => ({
     plugins: pluginRegistry.listPlugins(),
     userPluginsDir: pluginRegistry.ensureUserPluginsDir(),
@@ -327,9 +379,26 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     lspSendMessage: (payload) => lsp.sendMessage(payload),
     discoverExternalMcpServers: (payload) => externalMcpDiscovery.discover(payload),
     probeMcpServer: (payload) => mcpProbe.probe(payload),
-    beginMcpServerOauth: (payload) => mcpOAuth.begin(payload),
+    beginMcpServerOauth: (payload) => {
+      const transport = payload.server.transport;
+      if (
+        (transport.type === "http" || transport.type === "sse") &&
+        isPipedreamPersonalMcpUrl(transport.url)
+      ) {
+        return {
+          status: "error" as const,
+          message: "Personal Pipedream sign-in must be started from Connections.",
+        };
+      }
+      return mcpOAuth.begin(payload);
+    },
     waitMcpServerOauth: (payload) => mcpOAuth.wait(payload),
-    clearMcpServerOauth: (payload) => mcpOAuth.clear(payload),
+    clearMcpServerOauth: async (payload) => {
+      if (isPipedreamPersonalMcpUrl(payload.url)) {
+        throw new Error("Personal Pipedream sign-out must be managed from Connections.");
+      }
+      mcpOAuth.clear(payload);
+    },
     getMcpOauthStatus: () => mcpOAuth.status(),
     scanSkills: (payload) => skills.scan(payload),
     setSkillEnabled: (payload) => skills.setEnabled(payload),
@@ -344,8 +413,43 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     },
     pipedreamGetSnapshot: () => pipedream.getSnapshot(),
     pipedreamListApps: (payload) => pipedream.listApps(payload),
-    pipedreamRefreshAccounts: () => pipedream.refreshAccounts(),
-    pipedreamDisconnectAccount: (payload) => pipedream.disconnectAccount(payload),
-    pipedreamSetAccountAgentAccess: (payload) => pipedream.setAccountAgentAccess(payload),
+    pipedreamRefreshAccounts: () => withLivePipedreamMcpReload(() => pipedream.refreshAccounts()),
+    pipedreamDisconnectAccount: (payload) =>
+      withLivePipedreamMcpReload(() => pipedream.disconnectAccount(payload)),
+    pipedreamSetAccountAgentAccess: (payload) =>
+      withLivePipedreamMcpReload(() => pipedream.setAccountAgentAccess(payload)),
+    pipedreamInternalBeginPersonalMcpOauth: async () => {
+      const result = await mcpOAuth.begin({ server: personalPipedreamMcpServer });
+      if (result.status === "authorized") await reloadLivePipedreamMcpServers();
+      return result;
+    },
+    pipedreamInternalWaitPersonalMcpOauth: async (payload) => {
+      const result = await mcpOAuth.wait(payload);
+      if (result.status === "authorized") await reloadLivePipedreamMcpServers();
+      return result;
+    },
+    pipedreamInternalCancelPersonalMcpOauth: (payload) => mcpOAuth.cancel(payload),
+    pipedreamInternalClearPersonalMcpOauth: async () => {
+      let persistenceError: Error | undefined;
+      try {
+        mcpOAuth.clear({ url: PIPEDREAM_PERSONAL_MCP_URL }, { strictPersistence: true });
+      } catch (error) {
+        persistenceError =
+          error instanceof Error
+            ? error
+            : new Error("Could not persist the OAuth credential change.");
+      }
+      await reloadLivePipedreamMcpServers({ revokePersonalOauth: true });
+      if (persistenceError) throw persistenceError;
+    },
   });
+}
+
+function relayGrantSignature(snapshot: PipedreamSnapshot): string {
+  if (snapshot.connect.state !== "ready") return `state:${snapshot.connect.state}`;
+  return snapshot.connect.accounts
+    .filter((account) => account.healthy && account.agentAccess)
+    .map((account) => `${account.id}\0${account.app.slug}`)
+    .sort()
+    .join("\n");
 }

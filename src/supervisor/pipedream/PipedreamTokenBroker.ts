@@ -1,5 +1,6 @@
 export const PIPEDREAM_OAUTH_TOKEN_URL = "https://api.pipedream.com/v1/oauth/token";
 export const PIPEDREAM_DEVELOPER_SCOPE = "connect:*";
+export const PIPEDREAM_OAUTH_TOKEN_TIMEOUT_MS = 30_000;
 
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 
@@ -66,53 +67,64 @@ export class PipedreamTokenBroker {
   }
 
   async #exchangeAccessToken(): Promise<ExchangedAccessToken> {
-    let response: Response;
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(new Error("Pipedream authentication failed."));
+      }, PIPEDREAM_OAUTH_TOKEN_TIMEOUT_MS);
+      timeout.unref?.();
+    });
+    const beforeDeadline = <T>(operation: Promise<T>): Promise<T> =>
+      Promise.race([operation, timedOut]);
+
     try {
-      response = await this.#fetch(PIPEDREAM_OAUTH_TOKEN_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          grant_type: "client_credentials",
-          client_id: this.#clientId,
-          client_secret: this.#clientSecret,
-          scope: PIPEDREAM_DEVELOPER_SCOPE,
+      const response = await beforeDeadline(
+        this.#fetch(PIPEDREAM_OAUTH_TOKEN_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            grant_type: "client_credentials",
+            client_id: this.#clientId,
+            client_secret: this.#clientSecret,
+            scope: PIPEDREAM_DEVELOPER_SCOPE,
+          }),
+          signal: controller.signal,
         }),
-      });
+      );
+
+      if (!response.ok) {
+        await beforeDeadline(response.body?.cancel() ?? Promise.resolve()).catch(() => undefined);
+        throw new Error("Pipedream authentication failed.");
+      }
+
+      const payload = await beforeDeadline(response.json());
+      if (!isRecord(payload)) throw new Error("Pipedream authentication failed.");
+
+      const accessToken =
+        typeof payload.access_token === "string" ? payload.access_token.trim() : undefined;
+      const tokenType = typeof payload.token_type === "string" ? payload.token_type : undefined;
+      const expiresIn = typeof payload.expires_in === "number" ? payload.expires_in : undefined;
+      if (
+        !accessToken ||
+        tokenType?.toLowerCase() !== "bearer" ||
+        !expiresIn ||
+        !Number.isFinite(expiresIn) ||
+        expiresIn <= 0
+      ) {
+        throw new Error("Pipedream authentication failed.");
+      }
+
+      return {
+        value: accessToken,
+        expiresAtMs: this.#now() + expiresIn * 1_000,
+      };
     } catch {
       throw new Error("Pipedream authentication failed.");
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
-
-    if (!response.ok) {
-      await response.body?.cancel().catch(() => undefined);
-      throw new Error("Pipedream authentication failed.");
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new Error("Pipedream authentication failed.");
-    }
-    if (!isRecord(payload)) throw new Error("Pipedream authentication failed.");
-
-    const accessToken =
-      typeof payload.access_token === "string" ? payload.access_token.trim() : undefined;
-    const tokenType = typeof payload.token_type === "string" ? payload.token_type : undefined;
-    const expiresIn = typeof payload.expires_in === "number" ? payload.expires_in : undefined;
-    if (
-      !accessToken ||
-      tokenType?.toLowerCase() !== "bearer" ||
-      !expiresIn ||
-      !Number.isFinite(expiresIn) ||
-      expiresIn <= 0
-    ) {
-      throw new Error("Pipedream authentication failed.");
-    }
-
-    return {
-      value: accessToken,
-      expiresAtMs: this.#now() + expiresIn * 1_000,
-    };
   }
 }
 

@@ -6,6 +6,7 @@ import { readBridge } from "@/renderer/bridge";
 import { ChangelogView } from "@/renderer/components/changelog/ChangelogView";
 import { openChangelogSettings } from "@/renderer/actions/panelActions";
 import { useChangelogStore, useUnseenReleases } from "@/renderer/state/changelogStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { productNameFor } from "@/shared/channel";
 
 /**
@@ -16,6 +17,8 @@ import { productNameFor } from "@/shared/channel";
  */
 export function WhatsNewOverlay() {
   const open = useChangelogStore((s) => s.whatsNewOpen);
+  const overlayReady = useSensitiveNativeViewOverlayGate(open);
+  const presentedOpen = open && overlayReady;
   const bootstrapSeenState = useChangelogStore((s) => s.bootstrapSeenState);
   const loadChangelog = useChangelogStore((s) => s.loadChangelog);
 
@@ -28,13 +31,15 @@ export function WhatsNewOverlay() {
 
   return (
     <Modal.Backdrop
-      isOpen={open}
+      isOpen={presentedOpen}
       onOpenChange={(next) => {
         if (!next) useChangelogStore.getState().dismissWhatsNew();
       }}
     >
       <Modal.Container>
-        <Modal.Dialog className="sm:max-w-[560px]">{open ? <WhatsNewBody /> : null}</Modal.Dialog>
+        <Modal.Dialog className="sm:max-w-[560px]">
+          {presentedOpen ? <WhatsNewBody /> : null}
+        </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>
   );

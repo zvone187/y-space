@@ -13,9 +13,13 @@ Use Y Space's `browser` MCP when the task depends on a rendered page, visible in
 2. Inventory tabs with `browser.list_tabs`, search their titles and URLs, and activate a relevant match. Only create another tab when no existing tab fits. Open the exact URL the user supplied or the known local target; do not guess a remote site or substitute web search when authentication blocks the requested page.
 3. Establish the baseline with the current URL plus `browser.snapshot` or `browser.find`. Prefer accessible roles, names, and returned element refs over brittle selectors or coordinates.
 4. Perform the smallest meaningful action. Use `fill` when replacing a field and `type` only when appending is intended.
-5. After every navigation or state-changing action, wait for the expected URL, text, or element and inspect the resulting state. For web-app verification, also check relevant console errors and failed network requests.
-6. Capture a screenshot when visual layout or appearance is part of the requirement.
-7. Call `browser.disable` before asking the user for input, waiting on an external event, or finishing.
+5. Interactive tools automatically present the exact global browser tab and move Y Space's visible
+   orange cursor to the real target before the action. Use one meaningful tool call per intended
+   action; do not add ornamental hovers or clicks just to manufacture cursor motion. Passive tab
+   inventory and inspection stay in the background until an interaction is required.
+6. After every navigation or state-changing action, wait for the expected URL, text, or element and inspect the resulting state. For web-app verification, also check relevant console errors and failed network requests.
+7. Capture a screenshot when visual layout or appearance is part of the requirement.
+8. Call `browser.disable` before asking the user for input, waiting on an external event, or finishing.
 
 ## Boundaries
 

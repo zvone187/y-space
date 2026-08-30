@@ -11,6 +11,7 @@ import {
   useWelcomeGateStore,
   WELCOME_SEEN_STORAGE_KEY,
 } from "@/renderer/state/welcomeGateStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { writeStoredBoolean } from "@/renderer/utils/localStorage";
 import { BrandWordmark } from "@/renderer/components/common/BrandWordmark";
 import { CreateProjectMenu } from "@/renderer/views/MainView/parts/CreateProject/CreateProjectMenu";
@@ -32,6 +33,7 @@ export function WelcomeOverlay() {
   const [welcomeSeen, setWelcomeSeen] = useState(isWelcomeSeen);
   const open = !welcomeSeen;
   const [mounted, setMounted] = useState(open);
+  const overlayReady = useSensitiveNativeViewOverlayGate(mounted);
   // Initialize `visible` to `open` so the overlay is fully opaque on first paint.
   const [visible, setVisible] = useState(open);
 
@@ -89,7 +91,7 @@ export function WelcomeOverlay() {
       });
   }
 
-  if (!mounted) return null;
+  if (!mounted || !overlayReady) return null;
 
   return (
     <div

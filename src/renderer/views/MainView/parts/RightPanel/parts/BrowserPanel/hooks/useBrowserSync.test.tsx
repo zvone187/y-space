@@ -1,17 +1,33 @@
 // @vitest-environment jsdom
 import { act, render, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BrowserEvent, BrowserState, BrowserTabInfo } from "@/shared/ipc";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  BrowserAcknowledgeAutomationPresentationPayload,
+  BrowserEvent,
+  BrowserInvalidateAutomationPresentationPayload,
+  BrowserState,
+  BrowserTabInfo,
+} from "@/shared/ipc";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import {
+  notifyBrowserAutomationPresentationObstructed,
+  useSensitiveNativeViewOverlayGate,
+} from "@/renderer/state/sensitiveNativeViewObstruction";
 import { WORKSPACE_TAB_CYCLE_EVENT } from "@/renderer/commands/workspaceTabCycle";
 import { useBrowserSync } from "./useBrowserSync";
+
+const documentHasFocus = vi.spyOn(document, "hasFocus");
 
 const bridge = vi.hoisted(() => ({
   handlers: [] as Array<(event: BrowserEvent) => void>,
   browserGetState: vi.fn<() => Promise<BrowserState>>(),
+  browserAcknowledgeAutomationPresentation:
+    vi.fn<(payload: BrowserAcknowledgeAutomationPresentationPayload) => Promise<void>>(),
+  browserInvalidateAutomationPresentation:
+    vi.fn<(payload: BrowserInvalidateAutomationPresentationPayload) => Promise<void>>(),
   windowKind: "main" as "main" | "browserExtract",
 }));
 
@@ -26,12 +42,19 @@ vi.mock("@/renderer/bridge", () => ({
       };
     },
     browserGetState: bridge.browserGetState,
+    browserAcknowledgeAutomationPresentation: bridge.browserAcknowledgeAutomationPresentation,
+    browserInvalidateAutomationPresentation: bridge.browserInvalidateAutomationPresentation,
   }),
 }));
 
 function Harness() {
   useBrowserSync();
   return null;
+}
+
+function GatedOverlay(props: { open: boolean }) {
+  const ready = useSensitiveNativeViewOverlayGate(props.open);
+  return ready ? <div data-testid="ordinary-obstruction-overlay" /> : null;
 }
 
 function browserTab(tabId: string, title: string, url: string): BrowserTabInfo {
@@ -45,11 +68,46 @@ function browserTab(tabId: string, title: string, url: string): BrowserTabInfo {
   };
 }
 
+function mountPresentedWebview(tabId: string, surface: "main" | "extracted"): HTMLElement {
+  const container = document.createElement("div");
+  if (surface === "main") {
+    container.setAttribute("data-y-space-browser-host", "");
+    container.setAttribute("aria-hidden", "false");
+  }
+  const browser = document.createElement("div");
+  browser.setAttribute("data-poracode-browser", "");
+  const webview = document.createElement("webview");
+  webview.dataset.tabId = tabId;
+  webview.setAttribute("aria-hidden", "false");
+  webview.style.display = "flex";
+  webview.style.opacity = "1";
+  webview.style.pointerEvents = "auto";
+  webview.getBoundingClientRect = () =>
+    ({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 800,
+      bottom: 600,
+      left: 0,
+      width: 800,
+      height: 600,
+      toJSON: () => ({}),
+    }) as DOMRect;
+  browser.append(webview);
+  container.append(browser);
+  document.body.append(container);
+  return container;
+}
+
 describe("useBrowserSync global Browser routing", () => {
   beforeEach(() => {
+    documentHasFocus.mockReturnValue(true);
     bridge.handlers.length = 0;
     bridge.windowKind = "main";
     bridge.browserGetState.mockReset().mockResolvedValue({ tabs: [], activeTabId: null });
+    bridge.browserAcknowledgeAutomationPresentation.mockReset().mockResolvedValue(undefined);
+    bridge.browserInvalidateAutomationPresentation.mockReset().mockResolvedValue(undefined);
     useRightWorkspaceTabsStore.getState().reset();
     useBrowserPanelStore.setState({
       tabs: [],
@@ -71,6 +129,10 @@ describe("useBrowserSync global Browser routing", () => {
       browserOverlayOpen: false,
       browserOverlayMaximized: false,
     });
+  });
+
+  afterAll(() => {
+    documentHasFocus.mockRestore();
   });
 
   it("projects browser pages into global tabs without stealing focus from another workspace tab", async () => {
@@ -240,7 +302,7 @@ describe("useBrowserSync global Browser routing", () => {
     });
   });
 
-  it("presents an agent-requested browser page without stealing global workspace focus", async () => {
+  it("keeps residency headless until an interactive action presents the exact browser page", async () => {
     const pages = Array.from({ length: 7 }, (_, index) =>
       browserTab(`page-${index + 1}`, `Page ${index + 1}`, `https://example.com/${index + 1}`),
     );
@@ -265,6 +327,321 @@ describe("useBrowserSync global Browser routing", () => {
     expect(
       useRightWorkspaceTabsStore.getState().tabs.find((tab) => tab.id === "browser:page-6"),
     ).toMatchObject({ resident: false });
+
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "state",
+        state: { tabs: pages, activeTabId: "page-7" },
+      }),
+    );
+    expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("tool:git");
+
+    act(() => bridge.handlers[0]?.({ type: "open-panel", mode: "panel" }));
+
+    expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("browser:page-7");
+    expect(usePanelStore.getState()).toMatchObject({
+      rightPanelTab: "browser",
+      browserPanelOpen: true,
+      browserOverlayOpen: false,
+    });
+    expect(
+      useRightWorkspaceTabsStore.getState().tabs.find((tab) => tab.id === "browser:page-6"),
+    ).toMatchObject({ resident: false });
+  });
+
+  it("acknowledges an exact main-window browser page only after its webview paints", async () => {
+    const first = browserTab("page-1", "First", "https://example.com/first");
+    const target = browserTab("page-2", "Target", "https://example.com/target");
+    bridge.browserGetState.mockResolvedValue({ tabs: [first, target], activeTabId: first.tabId });
+    useRightWorkspaceTabsStore.getState().openTool("git");
+    const presented = mountPresentedWebview(target.tabId, "main");
+
+    const view = render(<Harness />);
+    await waitFor(() => expect(bridge.handlers).toHaveLength(1));
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "1b74121a-44ed-4ec0-aa75-68a5f4fb03ed",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "1b74121a-44ed-4ec0-aa75-68a5f4fb03ed",
+        tabId: target.tabId,
+        surface: "main",
+        presented: true,
+      }),
+    );
+    expect(useRightWorkspaceTabsStore.getState().activeTabId).toBe("browser:page-2");
+    expect(usePanelStore.getState()).toMatchObject({
+      browserPanelOpen: true,
+      rightPanelTab: "browser",
+    });
+    view.unmount();
+    presented.remove();
+  });
+
+  it("keeps presentation valid when focus moves into the selected embedded guest", async () => {
+    const target = browserTab("page-2", "Target", "https://example.com/target");
+    bridge.browserGetState.mockResolvedValue({ tabs: [target], activeTabId: target.tabId });
+    documentHasFocus.mockReturnValue(false);
+    const presented = mountPresentedWebview(target.tabId, "main");
+
+    const view = render(<Harness />);
+    await waitFor(() => expect(bridge.handlers).toHaveLength(1));
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "7fb0c76e-89f8-4d71-958f-e2a16d47f58e",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "7fb0c76e-89f8-4d71-958f-e2a16d47f58e",
+        tabId: target.tabId,
+        surface: "main",
+        presented: true,
+      }),
+    );
+    window.dispatchEvent(new Event("blur"));
+    await act(async () => Promise.resolve());
+    expect(bridge.browserInvalidateAutomationPresentation).not.toHaveBeenCalled();
+    view.unmount();
+    presented.remove();
+  });
+
+  it("revokes an acknowledged presentation when an async menu preview becomes ready", async () => {
+    const target = browserTab("page-2", "Target", "https://example.com/target");
+    bridge.browserGetState.mockResolvedValue({ tabs: [target], activeTabId: target.tabId });
+    const presented = mountPresentedWebview(target.tabId, "main");
+    let resolvePreview!: () => void;
+    const previewReady = new Promise<void>((resolve) => {
+      resolvePreview = resolve;
+    });
+    const previewObstructed = previewReady.then(() =>
+      notifyBrowserAutomationPresentationObstructed(),
+    );
+
+    const view = render(<Harness />);
+    await waitFor(() => expect(bridge.handlers).toHaveLength(1));
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "6360917c-2dc5-45f2-9ca4-6523ff733f45",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: "6360917c-2dc5-45f2-9ca4-6523ff733f45",
+          presented: true,
+        }),
+      ),
+    );
+
+    await act(async () => {
+      resolvePreview();
+      await previewObstructed;
+    });
+
+    expect(bridge.browserInvalidateAutomationPresentation).toHaveBeenCalledWith({
+      requestId: "6360917c-2dc5-45f2-9ca4-6523ff733f45",
+      tabId: target.tabId,
+      surface: "main",
+      reason: "obstructed",
+    });
+    view.unmount();
+    presented.remove();
+  });
+
+  it("blocks overlay paint on ordinary-tab invalidation and rejects presentation while obstructed", async () => {
+    const target = browserTab("page-2", "Target", "https://example.com/target");
+    bridge.browserGetState.mockResolvedValue({ tabs: [target], activeTabId: target.tabId });
+    const presented = mountPresentedWebview(target.tabId, "main");
+    let finishInvalidation!: () => void;
+    const invalidationCompleted = new Promise<void>((resolve) => {
+      finishInvalidation = resolve;
+    });
+
+    const view = render(
+      <>
+        <Harness />
+        <GatedOverlay open={false} />
+      </>,
+    );
+    await waitFor(() => expect(bridge.handlers).toHaveLength(1));
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "410df163-722b-48b7-a989-e8cf518ca43b",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: "410df163-722b-48b7-a989-e8cf518ca43b",
+          presented: true,
+        }),
+      ),
+    );
+
+    bridge.browserInvalidateAutomationPresentation.mockImplementationOnce(
+      () => invalidationCompleted,
+    );
+    view.rerender(
+      <>
+        <Harness />
+        <GatedOverlay open />
+      </>,
+    );
+
+    await waitFor(() =>
+      expect(bridge.browserInvalidateAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "410df163-722b-48b7-a989-e8cf518ca43b",
+        tabId: target.tabId,
+        surface: "main",
+        reason: "obstructed",
+      }),
+    );
+    expect(view.queryByTestId("ordinary-obstruction-overlay")).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishInvalidation();
+      await invalidationCompleted;
+      await Promise.resolve();
+    });
+    expect(view.getByTestId("ordinary-obstruction-overlay")).toBeInTheDocument();
+
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "14557b4c-01c6-40e0-8d8b-72c5c0f5a39c",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "14557b4c-01c6-40e0-8d8b-72c5c0f5a39c",
+        tabId: target.tabId,
+        surface: "main",
+        presented: false,
+      }),
+    );
+
+    view.unmount();
+    presented.remove();
+  });
+
+  it("revokes the presentation capability when the user switches to another global tab", async () => {
+    const target = browserTab("page-2", "Target", "https://example.com/target");
+    bridge.browserGetState.mockResolvedValue({ tabs: [target], activeTabId: target.tabId });
+    useRightWorkspaceTabsStore.getState().openTool("git");
+    const presented = mountPresentedWebview(target.tabId, "main");
+
+    const view = render(<Harness />);
+    await waitFor(() => expect(bridge.handlers).toHaveLength(1));
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "28415d6c-84ca-48a4-9247-ab5207f465d5",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestId: "28415d6c-84ca-48a4-9247-ab5207f465d5",
+          presented: true,
+        }),
+      ),
+    );
+
+    act(() => useRightWorkspaceTabsStore.getState().openTool("git"));
+
+    await waitFor(() =>
+      expect(bridge.browserInvalidateAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "28415d6c-84ca-48a4-9247-ab5207f465d5",
+        tabId: target.tabId,
+        surface: "main",
+        reason: "workspace-tab-changed",
+      }),
+    );
+    view.unmount();
+    presented.remove();
+  });
+
+  it("fails a presentation acknowledgement when the exact webview did not paint", async () => {
+    const target = browserTab("page-1", "Target", "https://example.com/target");
+    bridge.browserGetState.mockResolvedValue({ tabs: [target], activeTabId: target.tabId });
+
+    const view = render(<Harness />);
+    await waitFor(() => expect(bridge.handlers).toHaveLength(1));
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "64e7a4e0-d9ee-4a72-8818-672038641635",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "64e7a4e0-d9ee-4a72-8818-672038641635",
+        tabId: target.tabId,
+        surface: "main",
+        presented: false,
+      }),
+    );
+    view.unmount();
+  });
+
+  it("acknowledges the exact active page from the extracted browser renderer", async () => {
+    const first = browserTab("page-1", "First", "https://example.com/first");
+    const target = browserTab("page-2", "Target", "https://example.com/target");
+    bridge.windowKind = "browserExtract";
+    bridge.browserGetState.mockResolvedValue({
+      tabs: [first, target],
+      activeTabId: first.tabId,
+      extracted: true,
+    });
+    const presented = mountPresentedWebview(target.tabId, "extracted");
+
+    const view = render(<Harness />);
+    await waitFor(() => expect(bridge.handlers).toHaveLength(1));
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "ea67c301-12a3-4e03-bf59-19af93e11840",
+        tabId: target.tabId,
+        surface: "extracted",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "ea67c301-12a3-4e03-bf59-19af93e11840",
+        tabId: target.tabId,
+        surface: "extracted",
+        presented: true,
+      }),
+    );
+    expect(useBrowserPanelStore.getState().activeTabId).toBe(target.tabId);
+    expect(useRightWorkspaceTabsStore.getState().tabs).toEqual([]);
+    view.unmount();
+    presented.remove();
   });
 
   it("does not let a stale initial snapshot resurrect a page closed by live state", async () => {

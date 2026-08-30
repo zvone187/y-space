@@ -32,11 +32,13 @@ import { deleteWorktreeGroup } from "@/renderer/actions/worktreeActions";
 import { readBridge } from "@/renderer/bridge";
 import { Button } from "@/renderer/components/common/Button";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import type { UsageLoginConfirmationAction } from "@/shared/contracts";
 import { WelcomeOverlay } from "@/renderer/views/WelcomeOverlay";
 import { WhatsNewOverlay } from "@/renderer/views/WhatsNewOverlay";
 import { useLoginTerminalStore } from "@/renderer/state/loginTerminalStore";
 import { findExperimentByWorktree } from "@/renderer/state/experimentStore";
+import { ConnectionsDialogHost } from "@/renderer/components/connections/ConnectionsDialog";
 
 function useEverEnabled(active: boolean): boolean {
   const [enabled, setEnabled] = useState(active);
@@ -100,6 +102,7 @@ export function AppOverlays() {
     <>
       <WelcomeOverlay />
       <WhatsNewOverlay />
+      <ConnectionsDialogHost />
       <OverlayShell open={settingsOpen} onExited={() => usePanelStore.getState().closeSettings()}>
         <Suspense fallback={<OverlayLoader />}>
           <DeferredSettingsOverlay onClose={() => usePanelStore.getState().closeSettings()} />
@@ -308,8 +311,9 @@ function DeferredCloneProjectModal() {
 
 function UsageLoginConfirmationDialog() {
   const request = useBrowserPanelStore((s) => s.usageLoginConfirmation);
+  const overlayReady = useSensitiveNativeViewOverlayGate(request !== null);
 
-  if (!request) return null;
+  if (!request || !overlayReady) return null;
   const activeRequest = request;
 
   function respond(action: UsageLoginConfirmationAction) {

@@ -66,11 +66,18 @@ export function resolveBrowserVerificationBadge(
   }
 
   const evidence: AppOwnedBrowserEvidence[] = [];
+  let hasSubstantiveFailure = false;
   for (let index = turnStart; index < turnEnd; index += 1) {
     const item = items[itemIds[index]!];
     if (!item || item.parentItemId) continue;
     const action = appOwnedBrowserEvidence(item);
     if (action) evidence.push(action);
+    if (isAppOwnedBrowserFailureItem(item)) hasSubstantiveFailure = true;
+  }
+  // One later failed or ambiguous action invalidates an otherwise-successful
+  // turn. This prevents a prior success row from certifying a mixed outcome.
+  if (hasSubstantiveFailure && (evidence.length > 0 || claimRequirement)) {
+    return { kind: "unverified" };
   }
   if (evidence.length === 0) return claimRequirement ? { kind: "unverified" } : null;
   if (claimRequirement) {
@@ -106,14 +113,25 @@ function browserClaimRequirement(text: string): BrowserClaimRequirement | null {
   const textWithoutReferences = removeBrowserClaimReferences(text);
   const mentionsReferencedAction = (action: string) =>
     hasReferences && new RegExp(`\\b(?:${action})\\b`, "iu").test(textWithoutReferences);
-  const interaction = "(?:click(?:s|ed|ing)?|fill(?:s|ed|ing)?|submit(?:s|ted|ting)?)";
+  const interaction =
+    "(?:double(?:-|\\s)?click(?:s|ed|ing)?|click(?:s|ed|ing)?|focus(?:es|ed|ing)?|typ(?:e|es|ed|ing)|fill(?:s|ed|ing)?|submit(?:s|ted|ting)?|select(?:s|ed|ing)?|press(?:es|ed|ing)?|hover(?:s|ed|ing)?|scroll(?:s|ed|ing)?|toggl(?:e|es|ed|ing)|accept(?:s|ed|ing)?|dismiss(?:es|ed|ing)?|evaluat(?:e|es|ed|ing)|(?:add(?:s|ed|ing)?|inject(?:s|ed|ing)?)[\\s\\S]{0,24}(?:script|style))";
+  // "Checked the website" means inspection, while checking a form control is
+  // native interaction. Require a nearby control noun to keep that distinction.
+  const controlToggle =
+    "(?:(?:un)?check(?:s|ed|ing)?\\b[\\s\\S]{0,40}\\b(?:checkbox|radio|switch|toggle|option|control)|(?:checkbox|radio|switch|toggle|option|control)\\b[\\s\\S]{0,40}\\b(?:un)?check(?:s|ed|ing)?)";
   const inspection =
     "(?:verif(?:y|ies|ied|ying|ication(?:s)?)|test(?:s|ed|ing)?|check(?:s|ed|ing)?|confirm(?:s|ed|ing|ation(?:s)?)|inspect(?:s|ed|ing|ion(?:s)?))";
   const navigation =
     "(?:open(?:s|ed|ing)?|navigat(?:e|es|ed|ing|ion(?:s)?)|visit(?:s|ed|ing)?|load(?:s|ed|ing)?)";
   let actionKind: BrowserEvidenceActionKind | null = null;
-  if (matches(interaction) || mentionsReferencedAction(interaction)) actionKind = "interaction";
-  else if (matches(inspection) || mentionsReferencedAction(inspection)) actionKind = "inspection";
+  if (
+    matches(interaction) ||
+    mentionsReferencedAction(interaction) ||
+    matches(controlToggle) ||
+    mentionsReferencedAction(controlToggle)
+  ) {
+    actionKind = "interaction";
+  } else if (matches(inspection) || mentionsReferencedAction(inspection)) actionKind = "inspection";
   // A concise provider final can refer back to Browser work simply as
   // "Verification succeeded." Treat that success assertion as an inspection
   // claim so it cannot evade the unverified badge by using a noun form.
@@ -139,13 +157,29 @@ function browserClaimRequirement(text: string): BrowserClaimRequirement | null {
 }
 
 export function isAppOwnedBrowserEvidenceItem(item: RuntimeChatItem | undefined): boolean {
+  if (!isAppOwnedBrowserOutcomeItem(item)) return false;
+  return item.payload.status === "success";
+}
+
+/** Any canonical Browser result, including a negative result reported after a
+ * provider final. Both outcomes are logical turn metadata rather than later
+ * provider work, but only successful outcomes can satisfy verification. */
+export function isAppOwnedBrowserOutcomeItem(
+  item: RuntimeChatItem | undefined,
+): item is RuntimeChatItem & { payload: ToolCallPayload } {
   if (item?.type !== "mcp_tool_call" || item.state !== "completed") return false;
   const payload = item.payload as ToolCallPayload | undefined;
   return (
     payload?.serverId === "browser" &&
-    payload.status === "success" &&
+    (payload.status === "success" || payload.status === "error") &&
     payload.browserEvidence?.source === Y_SPACE_BROWSER_EVIDENCE_SOURCE
   );
+}
+
+function isAppOwnedBrowserFailureItem(item: RuntimeChatItem | undefined): boolean {
+  if (!isAppOwnedBrowserOutcomeItem(item)) return false;
+  const payload = item.payload;
+  return payload.status === "error" && browserEvidenceActionKind(payload.name) !== null;
 }
 
 function appOwnedBrowserEvidence(item: RuntimeChatItem): AppOwnedBrowserEvidence | null {
@@ -214,7 +248,27 @@ function extractClaimedBrowserTabIds(text: string): string[] {
   // Exclude URL bodies first: a path such as `/tabs/tab-history` names a route,
   // not an app Browser tab identity.
   const withoutUrls = text.replace(/\bhttps?:\/\/[^\s<>"'`]+/giu, (url) => " ".repeat(url.length));
-  return [...new Set(withoutUrls.match(/\btab-[a-z0-9](?:[a-z0-9_-]{0,253}[a-z0-9])?\b/giu) ?? [])];
+  const candidates = [
+    ...withoutUrls.matchAll(/\btab-[a-z0-9](?:[a-z0-9_-]{0,253}[a-z0-9])?\b/giu),
+  ].map((match) => {
+    const tabId = match[0];
+    const suffix = withoutUrls.slice((match.index ?? 0) + tabId.length);
+    return { tabId, truncated: /^[-_]?(?:\.{3}|…)/u.test(suffix) };
+  });
+  const tabIds = new Set(
+    candidates.filter(({ truncated }) => !truncated).map(({ tabId }) => tabId),
+  );
+  for (const { tabId, truncated } of candidates) {
+    if (!truncated) continue;
+    // Providers sometimes repeat an authenticated ID in shortened form such
+    // as `tab-acf68c7a-...`. Ignore that occurrence only when another exact
+    // claimed ID proves what it abbreviates; never authenticate by prefix.
+    const repeatsExactId = [...tabIds].some(
+      (exactTabId) => exactTabId.startsWith(`${tabId}-`) || exactTabId.startsWith(`${tabId}_`),
+    );
+    if (!repeatsExactId) tabIds.add(`${tabId}-…`);
+  }
+  return [...tabIds];
 }
 
 function removeBrowserClaimReferences(text: string): string {

@@ -50,6 +50,10 @@ describe("sharedSettingsStore", () => {
   it("switches theme mode", () => {
     useSharedSettings.getState().setThemeMode("light");
     expect(useSharedSettings.getState().themeMode).toBe("light");
+    expect(JSON.parse(localStorage.getItem("poracode-shared-settings") ?? "null")).toMatchObject({
+      themeMode: "light",
+      themeDefaultVersion: 1,
+    });
   });
 
   it("updates the Windows shell path and arguments", () => {

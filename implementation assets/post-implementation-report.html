@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space — Modern Glass Polish</title>
+    <title>Y Space — Combined Implementation Handoff</title>
     <style>
       :root {
         --canvas: #fff8f1;
@@ -229,6 +229,14 @@
         color: #176225;
         font-weight: 850;
       }
+      .pending {
+        color: #8a4b00;
+        font-weight: 850;
+      }
+      .blocked {
+        color: #9b2435;
+        font-weight: 850;
+      }
       summary {
         cursor: pointer;
         padding: 14px 16px;
@@ -287,24 +295,27 @@
     <main>
       <header>
         <section class="hero" aria-labelledby="title">
-          <span class="tag">Post-implementation report</span>
-          <h1 id="title">Modern glass, without turning Y Space into glass soup.</h1>
+          <span class="tag">Combined post-implementation handoff</span>
+          <h1 id="title">Y Space is built. Two external acceptance gates remain.</h1>
           <p>
-            The final unsigned desktop package keeps content crisp and square while giving the
-            sidebar, one global tab rail, thread header, Browser controls, and composer a lighter,
-            warmer, Apple/Codex-style sense of material.
+            The modern light shell, one global tab system, embedded agent Browser, visible trusted
+            cursor, compact conversations, and Pipedream connection architecture are implemented and
+            packaged. Final Codex and OpenCode cursor QA passed; Gmail OAuth still needs a compliant
+            user-authorized handoff, and Claude still needs local authentication.
           </p>
         </section>
         <aside class="meta-stack" aria-label="Report metadata">
-          <div class="card bg-green">
-            <small>Status</small><strong>Pass — packaged and clicked</strong>
-          </div>
-          <div class="card bg-blue"><small>Branch</small><strong>y-space-glass-polish</strong></div>
           <div class="card bg-yellow">
-            <small>Base</small><strong>fork/y-space-browser-default-collapse · 9fdadda3</strong>
+            <small>Status</small><strong>Implementation ready · acceptance gated</strong>
+          </div>
+          <div class="card bg-blue">
+            <small>Branch</small><strong>y-space-pipedream-live</strong>
+          </div>
+          <div class="card bg-purple">
+            <small>Base</small><strong>y-space-glass-polish · 361aab63</strong>
           </div>
           <div class="card bg-orange">
-            <small>Delivery</small><strong>Local commit; no new PR requested</strong>
+            <small>Report date</small><strong>August 30, 2026</strong>
           </div>
         </aside>
       </header>
@@ -316,75 +327,27 @@
         </div>
         <div class="grid three">
           <div class="sticky bg-green">
-            <h3>What changed</h3>
+            <h3>What is built</h3>
             <p>
-              One bounded glass capsule for global tabs, a softer 20px composer, calmer faux-glass
-              headers, and visibly lighter native sidebar frosting.
-            </p>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>What stayed crisp</h3>
-            <p>
-              Transcript, Browser pages, webviews, document planes, pane boundaries, drag handles,
-              and individual tabs never receive a blur layer.
+              A white/orange glass shell, peer global tabs for Browsers/files/tools, agent-owned
+              Browser control, a visible native-input cursor, collapsed work, and one shared
+              Connections popup backed by a hardened Pipedream relay.
             </p>
           </div>
           <div class="sticky bg-yellow">
-            <h3>Verdict</h3>
+            <h3>What the final package proved</h3>
             <p>
-              The packaged ARM64 build passed light, dark, reduced-transparency, global-tab,
-              embedded-navigation, resize, close, and residency checks.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Implementation</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-orange">
-            <h3>Stable real glass</h3>
-            <p>
-              <code>.poracode-glass-chrome</code> owns the shared border, surface, specular wash,
-              radius, blur, and shadow. Only the global strip and composer opt in.
-            </p>
-          </div>
-          <div class="sticky bg-purple">
-            <h3>Faux glass where it matters</h3>
-            <p>
-              Thread and Browser toolbars use paint-only gradients, theme-aware edge tokens, and
-              shallow elevation. Browser content remains a normal opaque plane.
-            </p>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>Platform-aware sidebar</h3>
-            <p>
-              macOS light defaults to 90% with an 88% floor; Windows uses 94% / 92%. Dark defaults
-              remain 82% / 88%, now selectable with a 1% slider step.
-            </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>Accessibility first</h3>
-            <p>
-              Reduced transparency now has enough selector priority to beat the later composer rule.
-              Dark highlights use restrained theme tokens instead of light-mode white edges.
-            </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>One tab concept</h3>
-            <p>
-              Every Browser remains a peer global workspace tab. The strip is one glass surface;
-              tabs keep one orange selected indicator and do not create per-tab compositor layers.
+              Codex and OpenCode each reused the same visible Browser tab, moved the Y Space cursor
+              to the real target, and generated trusted native pointermove, pointerdown, pointerup,
+              and click events.
             </p>
           </div>
           <div class="sticky bg-pink">
-            <h3>Catalog cleanup</h3>
+            <h3>What needs the user</h3>
             <p>
-              The renderer catalog was extracted and completed at 3,281 messages with zero missing
-              entries across all 12 translated locales.
+              Google/Gmail OAuth needs a compliant one-time authorization handoff followed by an
+              explicit grant on the exact visible account row. Claude also needs
+              <code>claude auth login</code> before live inference can be accepted.
             </p>
           </div>
         </div>
@@ -393,80 +356,150 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Pass criteria</h2>
+          <h2>Delivered product</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-orange">
+            <h3>Modern Y Space</h3>
+            <p>
+              Light warm-neutral surfaces, restrained orange accents, native system typography,
+              softer chrome, bounded glass, reduced-transparency fallback, and no developer-heavy
+              task-row clutter.
+            </p>
+          </div>
+          <div class="sticky bg-blue">
+            <h3>One global tab system</h3>
+            <p>
+              Browser pages, Files, Git, Terminal, Notes, Usage, source, Markdown, PDF, XLS, and
+              XLSX all open as peers in the sole top strip. No nested Browser tabs remain.
+            </p>
+          </div>
+          <div class="sticky bg-purple">
+            <h3>Browser as the agent route</h3>
+            <p>
+              Codex and OpenCode launch contracts route browser work to the visible embedded Y Space
+              Browser, with global tab discovery, focus, create, inspect, interact, screenshot, and
+              close operations.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Trusted visible cursor</h3>
+            <p>
+              The orange-and-white overlay glides to retained targets while Chromium receives
+              trusted native pointer, key, text, wheel, toggle, and select input. Click, hover,
+              text, and scroll feedback stay distinct and bounded.
+            </p>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Codex-style conversation</h3>
+            <p>
+              Intermediate reasoning and tool work render inside one collapsed disclosure. On
+              completion it closes automatically, leaving the final assistant answer visible.
+            </p>
+          </div>
+          <div class="sticky bg-pink">
+            <h3>Pipedream Connections</h3>
+            <p>
+              Composer and Settings open the same glass popup with live catalog search/pagination.
+              Credentials stay main/supervisor-owned; agents receive only launch-scoped loopback
+              relay access, and each account must be granted explicitly.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Acceptance matrix</h2>
         </div>
         <div class="table-card">
           <table>
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Result</th>
-                <th>Evidence</th>
+                <th>Capability</th>
+                <th>Status</th>
+                <th>Evidence and remaining boundary</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>PC-68</td>
-                <td class="pass">Met</td>
+                <td>Light glass UI + global tabs</td>
+                <td class="pass">Passed</td>
                 <td>
-                  Final light package shows the white/orange Y Space shell with restrained material
-                  depth.
+                  Existing packaged QA covers light/dark/reduced-transparency, mixed peer tabs,
+                  browser residency, documents, tools, keyboard navigation, and bounded glass.
                 </td>
               </tr>
               <tr>
-                <td>PC-69</td>
-                <td class="pass">Met</td>
+                <td>Codex/OpenCode embedded Browser</td>
+                <td class="pass">Passed on final package</td>
                 <td>
-                  One rounded global rail; eight-browser peak retained one strip and one selected
-                  peer.
+                  Codex GPT-5.6 Sol and OpenCode Big Pickle visibly controlled the same first-class
+                  Y Space Browser tab through the packaged launch-scoped Browser route.
                 </td>
               </tr>
               <tr>
-                <td>PC-70</td>
-                <td class="pass">Met</td>
+                <td>Visible trusted cursor</td>
+                <td class="pass">Passed on final package</td>
                 <td>
-                  20px composer, specular wash, diffuse elevation, orange focus edge, unchanged
-                  controls.
+                  The final Codex run recorded 16 trusted native events. OpenCode added a second
+                  seven-event sequence, and its screenshot shows the orange-and-white cursor on the
+                  actual Single-click target.
                 </td>
               </tr>
               <tr>
-                <td>PC-71</td>
-                <td class="pass">Met</td>
+                <td>Collapsed work + final-only answer</td>
+                <td class="pass">Passed</td>
                 <td>
-                  90% macOS light / 82% dark verified in the packaged Appearance screen; platform
-                  floors are tested.
+                  Codex and OpenCode settled to one closed Worked row with the final answer and
+                  Browser proof visible; projection and accessibility regressions cover retention.
                 </td>
               </tr>
               <tr>
-                <td>PC-72</td>
-                <td class="pass">Met</td>
+                <td>Pipedream popup + catalog + backend</td>
+                <td class="pass">Implemented and targeted-pass</td>
                 <td>
-                  Faux-glass header and Browser toolbar markers; CSS test rejects filters on content
-                  planes and webviews.
+                  Both UI entry points, live Gmail search, pagination, zero-result state, relay
+                  isolation, exact launch cleanup, privileged configure acknowledgement, live MCP
+                  reload status, scoped disconnect, OAuth credential epochs, and secret boundaries
+                  are covered.
                 </td>
               </tr>
               <tr>
-                <td>PC-73</td>
-                <td class="pass">Met</td>
+                <td>Gmail OAuth + read-only use + disconnect</td>
+                <td class="blocked">External authorization gate</td>
                 <td>
-                  macOS Reduce transparency visibly produced opaque chrome; the original system
-                  setting was restored.
+                  No OAuth grant, connected Gmail account, mailbox read, or disconnect has been
+                  performed. Google authentication must use a compliant system browser/auth session;
+                  embedded-webview-only OAuth cannot be claimed as supported.
                 </td>
               </tr>
               <tr>
-                <td>PC-74</td>
-                <td class="pass">Met</td>
+                <td>Claude Code live Browser inference</td>
+                <td class="blocked">Authentication gate</td>
                 <td>
-                  Tab create/switch/close, omnibox navigation, Browser menu, and split resize were
-                  clicked in the package.
+                  The launch contract is covered, but the installed Claude CLI is logged out. The
+                  user must run <code>claude auth login</code> before live provider acceptance.
                 </td>
               </tr>
               <tr>
-                <td>PC-75</td>
-                <td class="pass">Met*</td>
+                <td>Final native Quit + relaunch</td>
+                <td class="pass">Lifecycle regressions passed</td>
                 <td>
-                  Unsigned ARM64 package, screenshots, dark/reduced regression, and six-guest
-                  residency ceiling passed; the one-cycle RSS trend is explicitly inconclusive.
+                  Orderly-shutdown, renderer-loss, guest cleanup, process-group, and persisted
+                  Browser verification paths pass. The final package is ad-hoc signed and launches
+                  as a thin ARM64 app.
+                </td>
+              </tr>
+              <tr>
+                <td>Persistent test credential isolation</td>
+                <td class="pass">Passed on final package</td>
+                <td>
+                  Manual QA used one continuously open package process launched with
+                  <code>--use-mock-keychain</code>. The flag is launch-scoped to testing; an
+                  ordinary release launch continues to use the normal operating-system credential
+                  store.
                 </td>
               </tr>
             </tbody>
@@ -481,77 +514,54 @@
         </div>
         <div class="grid two">
           <div class="sticky bg-green">
-            <h3>Green checks</h3>
+            <h3>Passing targeted evidence</h3>
             <ul>
+              <li>Cursor, Browser ingress, and Browser evidence: 7 files / 213 tests passed.</li>
+              <li>Dynamic target drift/removal/occlusion hardening: 77 tests passed.</li>
               <li>
-                Full Node 24 suite: 912 files passed, 5 skipped; 10,349 tests passed, 85 skipped.
+                Combined high-risk Browser/Pipedream security run: 32 files / 649 tests passed.
               </li>
               <li>
-                Focused glass pass: 10 files / 127 tests; review regression: 1 file / 11 tests.
+                OAuth epochs reject stale code exchange, refresh, dynamic registration, storage, and
+                bearer returns after clear or cancellation.
               </li>
               <li>
-                Typecheck, lint, type-aware lint, formatting, diff check, and JSON validation
-                passed.
+                Pending root/child launches are revoked before attach, active descendants are
+                cancelled, and hung provider cleanup is bounded without restoring authority.
               </li>
-              <li>Production renderer/main build and unsigned ARM64 packaging passed.</li>
-              <li>Deep/strict ad-hoc code-sign verification passed.</li>
+              <li>
+                Disconnect quarantine defeats concurrent refresh/enable races, while sensitive OAuth
+                tab ownership remains exclusive until exact cleanup is confirmed.
+              </li>
             </ul>
           </div>
-          <div class="sticky bg-blue">
-            <h3>New regression coverage</h3>
+          <div class="sticky bg-yellow">
+            <h3>Final checks recorded</h3>
             <ul>
-              <li>Platform frosting defaults, floors, and exact 82% slider selection.</li>
-              <li>Shared glass marker, bounded radius, surface, blur, and theme-aware shadows.</li>
-              <li>Reduced-transparency cascade priority over the composer rule.</li>
-              <li>Browser/thread content-plane markers and no-blur selector boundaries.</li>
-              <li>One tablist, selected-state semantics, and global capsule geometry.</li>
+              <li>
+                The complete Node 24 suite passed 924 files and 10,794 tests in 115.31 seconds, with
+                5 files / 85 tests skipped.
+              </li>
+              <li>
+                Typecheck, standard/type-aware lint, formatting, 3,343-message localization with
+                zero missing translations, fixture, JSON, and diff integrity passed.
+              </li>
+              <li>The final unsigned ARM64 app passed deep/strict ad-hoc codesign verification.</li>
+              <li>
+                Computer Use captured final packaged Codex and OpenCode trusted-input results.
+              </li>
+              <li>
+                Exact configured Pipedream credential values had zero matches across 3,135 tracked
+                readable source files and 549 regular files in the final app bundle.
+              </li>
+              <li>
+                Final DMG: 156,367,170 bytes,
+                <code>6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0</code>;
+                packaged <code>app.asar</code>:
+                <code>153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08</code>.
+              </li>
             </ul>
           </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Packaged end-to-end QA</h2>
-        </div>
-        <div class="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>Case</th>
-                <th>Status</th>
-                <th>What was clicked and observed</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>YS-GLASS-E2E-001</td>
-                <td class="pass">Pass</td>
-                <td>
-                  Light shell, 90% sidebar, focused composer, Browser toolbar, and complete Browser
-                  menu.
-                </td>
-              </tr>
-              <tr>
-                <td>YS-GLASS-E2E-002</td>
-                <td class="pass">Pass*</td>
-                <td>
-                  Created a peer Browser tab, navigated to example.org, switched with mouse and
-                  keyboard, resized, and closed only the disposable peer. Native drag synthesis is
-                  documented below.
-                </td>
-              </tr>
-              <tr>
-                <td>YS-GLASS-E2E-003</td>
-                <td class="pass">Pass*</td>
-                <td>
-                  Dark 82%, macOS reduced transparency, eight global Browser tabs, six resident
-                  guests, and cleanup to one guest. One-cycle RSS comparison is inconclusive.
-                </td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </section>
 
@@ -565,71 +575,65 @@
             <a href="qa-screenshots/glass-polish-light-final.jpeg"
               ><img
                 src="qa-screenshots/glass-polish-light-final.jpeg"
-                alt="Final packaged Y Space light layout with embedded Example Domain Browser"
+                alt="Packaged Y Space light glass layout with an embedded Browser"
             /></a>
             <figcaption>
-              Final packaged light state: one calm shell, one global Browser peer, crisp content.
+              Verified light/glass shell: bright Y Space chrome, orange accents, and crisp Browser
+              content.
             </figcaption>
           </figure>
           <figure>
-            <a href="qa-screenshots/glass-polish-light-two-tabs.jpeg"
+            <a href="qa-screenshots/branding-mixed-global-tabs-final.jpg"
               ><img
-                src="qa-screenshots/glass-polish-light-two-tabs.jpeg"
-                alt="Packaged Y Space with two global browser tabs"
+                src="qa-screenshots/branding-mixed-global-tabs-final.jpg"
+                alt="Y Space with mixed browser, document, and tool tabs in one global strip"
             /></a>
             <figcaption>
-              Two independent Browsers appear as peers in the sole global tab capsule.
+              Browser, document, and tool surfaces remain peers in the sole global tab strip.
             </figcaption>
           </figure>
           <figure>
-            <a href="qa-screenshots/glass-polish-browser-menu.jpeg"
+            <a href="qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg"
               ><img
-                src="qa-screenshots/glass-polish-browser-menu.jpeg"
-                alt="Packaged Y Space with the Browser menu open"
+                src="qa-screenshots/browser-exclusive-codex-5-6-sol-working-final.jpeg"
+                alt="Codex operating the visible embedded Y Space Browser"
             /></a>
             <figcaption>
-              The open glass Browser menu remains readable and exposes every expected action.
+              Earlier packaged Codex proof: visible embedded-browser work with the transcript kept
+              compact.
             </figcaption>
           </figure>
           <figure>
-            <a href="qa-screenshots/glass-polish-dark-regression.jpeg"
+            <a href="qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg"
               ><img
-                src="qa-screenshots/glass-polish-dark-regression.jpeg"
-                alt="Packaged Y Space dark-mode glass regression"
+                src="qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg"
+                alt="Final packaged Codex trusted click result beside the embedded Browser"
             /></a>
             <figcaption>
-              Dark regression after theme-aware edge tokens; Appearance reported 82%.
+              Final Codex proof: one embedded-tab click produced trusted pointermove, pointerdown,
+              pointerup, and click events.
             </figcaption>
           </figure>
           <figure>
-            <a href="qa-screenshots/glass-polish-reduced-transparency.jpeg"
+            <a href="qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg"
               ><img
-                src="qa-screenshots/glass-polish-reduced-transparency.jpeg"
-                alt="Packaged Y Space with reduced transparency enabled"
+                src="qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg"
+                alt="OpenCode final answer beside the visible Y Space cursor on the click target"
             /></a>
             <figcaption>
-              Reduced transparency removes blur and leaves every boundary and orange state legible.
+              Final OpenCode proof: the orange-and-white cursor is visibly parked on the real target
+              and the second trusted event sequence raised the ledger from 16 to 23.
             </figcaption>
           </figure>
           <figure>
-            <a href="qa-screenshots/glass-polish-narrow-layout.jpeg"
+            <a href="qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg"
               ><img
-                src="qa-screenshots/glass-polish-narrow-layout.jpeg"
-                alt="Packaged Y Space with resized Browser pane"
+                src="qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg"
+                alt="Y Space Connections popup searching the Pipedream catalog for Gmail"
             /></a>
             <figcaption>
-              The square split boundary still resizes cleanly; rounded Browser controls remain
-              unclipped.
-            </figcaption>
-          </figure>
-          <figure>
-            <a href="qa-screenshots/glass-polish-eight-tabs.jpeg"
-              ><img
-                src="qa-screenshots/glass-polish-eight-tabs.jpeg"
-                alt="Packaged Y Space at the eight browser tab residency peak"
-            /></a>
-            <figcaption>
-              Eight Browser metadata tabs, one shared strip, and only six resident Browser guests.
+              Shared Connections popup from Settings with live Gmail catalog results; Connect was
+              not authorized or clicked through OAuth.
             </figcaption>
           </figure>
         </div>
@@ -641,34 +645,81 @@
           <h2>Open the cards</h2>
         </div>
         <details open>
-          <summary>Review findings and fixes</summary>
-          <div class="detail-body">
-            A fresh review found that the earlier reduced-transparency block could lose to the later
-            equal-specificity composer rule, and that several dark-mode inset highlights reused
-            light-mode opacities. The fallback now carries a composer-specific selector, highlights
-            and elevation are theme tokens, both findings have regressions, and corrected packaged
-            light/dark/reduced screenshots replaced the stale captures.
-          </div>
-        </details>
-        <details>
-          <summary>Decisions and assumptions</summary>
+          <summary>Required decisions and external gates</summary>
           <div class="detail-body">
             <ul>
               <li>
-                Real blur is reserved for small, stable shell chrome; faux glass is used on
-                normal-flow pane headers.
+                Choose a compliant Google OAuth path. Recommended: allow the system browser only for
+                the one-time authorization handoff; all ordinary browsing and agent control remain
+                inside Y Space.
               </li>
               <li>
-                Structural pane edges stay square so the desktop remains precise rather than
-                becoming a stack of floating cards.
+                Immediately before the Gmail grant, obtain explicit user confirmation because it
+                creates persistent third-party account access.
               </li>
               <li>
-                Explicit saved frosting values are preserved; only reset/default behavior adopts the
-                new platform values.
+                After authorization, explicitly enable the exact intended account row, then test
+                restart reconciliation, a privacy-minimized read-only Gmail call, and scoped
+                disconnect. None is currently marked passed.
               </li>
               <li>
-                No new pull request was created because this follow-up asked for a visual iteration,
-                not PR delivery.
+                Authenticate Claude with <code>claude auth login</code>, then repeat the same
+                visible embedded-Browser scenario. No credential should be entered on the user's
+                behalf.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Browser trust and memory boundaries</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                Actions target the exact captured guest and retained backend node; document, loader,
+                viewport drift, occlusion, removal, and authorization guards fail closed.
+              </li>
+              <li>
+                A single bounded correction handles page-scroll drift without silently following a
+                genuinely moving element. Native key-down partial delivery is reported as
+                retry-ambiguous.
+              </li>
+              <li>
+                Ordinary Browser residency remains capped at six live guests, sensitive pages at
+                four, and tab metadata at thirty. Cursor nodes are reusable, aria-hidden, and
+                pointer-events none.
+              </li>
+              <li>
+                Browser verification comes from canonical tool evidence, not assistant prose.
+                Browser MCP screenshots intentionally omit the presentation cursor.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Pipedream privacy and lifecycle boundaries</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                Environment values, upstream tokens, OAuth URLs, cookies, account secrets, and
+                routing headers are never rendered in this report or exposed to agents.
+              </li>
+              <li>
+                Sensitive navigation requires the exact main-owned private Electron session.
+                Renderer state receives only redacted account summaries.
+              </li>
+              <li>
+                Provider access is launch-scoped through loopback relays; spoofed routing is
+                overwritten, consequential calls are not retried, and exact launch exit revokes its
+                bindings without affecting siblings.
+              </li>
+              <li>
+                Clearing Personal Pipedream is main-owned and atomic. Deferred OAuth work, pending
+                or child agents, concurrent refresh/enable, hung disposal, and failed sensitive-tab
+                closure all fail closed under deterministic regressions.
+              </li>
+              <li>
+                The live catalog and credential bootstrap are verified. A connected Gmail account
+                has not been created, read, persisted, or disconnected.
               </li>
             </ul>
           </div>
@@ -677,38 +728,33 @@
           <summary>Artifacts</summary>
           <div class="detail-body">
             <ul>
+              <li><a href="qa-e2e-tests.json">QA source of truth and detailed evidence</a></li>
+              <li><a href="pass-criteria.md">Combined pass criteria</a></li>
+              <li><a href="browser-memory-soak.json">Browser memory and residency soak</a></li>
               <li>
-                <a href="../release/Y-Space-1.6.6-arm64.dmg">Unsigned Y Space 1.6.6 ARM64 DMG</a>
+                <a href="glass-browser-residency-qa.json">Glass Browser residency sample</a>
               </li>
-              <li><a href="qa-e2e-tests.json">QA source of truth and evidence</a></li>
               <li>
-                <a href="glass-browser-residency-qa.json">Packaged Browser residency sample</a>
+                <a href="../release/Y-Space-1.6.6-arm64.dmg">Final unsigned ARM64 DMG</a>
               </li>
-              <li><a href="pass-criteria.md">Pass criteria PC-68 through PC-75</a></li>
             </ul>
           </div>
         </details>
         <details>
-          <summary>Caveats</summary>
+          <summary>Remaining live acceptance</summary>
           <div class="detail-body">
-            The local package is intentionally unsigned for distribution: it uses an ad-hoc
-            hardened-runtime signature with no Team ID and is not notarized. Existing Vite
-            pseudo-highlight, sourcemap, and large-chunk warnings remain unchanged. Computer Use
-            could switch the global tabs with mouse and keyboard but its synthesized native HTML
-            drag did not reorder them; reorder state remains covered by the existing automated
-            reducer tests, and the established drag handlers were not changed by this visual pass.
-            The one-cycle residency sample returned to the renderer/guest baseline, but cleanup RSS
-            was 20.5% above pre-peak; that is recorded as inconclusive rather than a no-leak claim.
-            No confirmed product blocker or unresolved review finding remains.
+            Gmail OAuth/read/disconnect remains gated until the user chooses a compliant OAuth
+            handoff and confirms the persistent grant at action time. Claude inference remains gated
+            until the local Claude CLI is authenticated. Neither is overstated as passed.
           </div>
         </details>
       </section>
 
       <p class="footer-note">
-        Branch <code>y-space-glass-polish</code> · base
-        <code>fork/y-space-browser-default-collapse@9fdadda3</code>
-        · implementation commit is the validated branch tip at handoff · package SHA-256
-        <code>a4cac2968027c07012e760fa3e800a25147b04beff227a38401cd3f26124db2f</code>.
+        Worktree <code>y-space-pipedream-live</code> · base
+        <code>y-space-glass-polish@361aab63</code> · final unsigned DMG SHA-256
+        <code>6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0</code> ·
+        implementation commit follows this report revision. No secret values are included.
       </p>
     </main>
   </body>

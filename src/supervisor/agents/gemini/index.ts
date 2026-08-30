@@ -21,12 +21,10 @@ import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/i
 import { buildGeminiArgs } from "./argv";
 import { defaultGeminiCapabilities, geminiDetectionSpec } from "./detection";
 import {
-  createGeminiThreadSettingsFile,
-  ensureGeminiLaunchSettingsFile,
+  createGeminiLaunchSettingsFile,
   installGeminiPlugin,
   isGeminiPluginInstalled,
   readBundledGeminiPluginVersion,
-  syncGeminiLaunchMcpSettings,
   uninstallGeminiPlugin,
 } from "./plugin/install";
 import { detectGeminiInvalidSessionRef } from "./session";
@@ -63,19 +61,12 @@ function prepareGeminiLaunchMcpSettings(
   location: ProjectLocation,
   launchOptions: AgentLaunchOptions | undefined,
 ): { env: Record<string, string>; cleanup: () => void } | undefined {
-  const ctx: AgentEnvContext = {
-    ...geminiEnvContextForLocation(location),
-    mcpServers: launchOptions?.mcpServers ?? [],
-  };
-  const createIfMissing = (launchOptions?.mcpServers?.length ?? 0) > 0;
-  if (!ensureGeminiLaunchSettingsFile(ctx, createIfMissing)) return undefined;
-
-  syncGeminiLaunchMcpSettings(ctx, launchOptions?.mcpServers ?? []);
-  const threadSettings = createGeminiThreadSettingsFile(ctx);
-  if (!threadSettings) return undefined;
+  const ctx = geminiEnvContextForLocation(location);
+  const launchSettings = createGeminiLaunchSettingsFile(ctx, launchOptions?.mcpServers ?? []);
+  if (!launchSettings) return undefined;
   return {
-    env: { GEMINI_CLI_SYSTEM_SETTINGS_PATH: threadSettings.settingsPath },
-    cleanup: threadSettings.cleanup,
+    env: { GEMINI_CLI_SYSTEM_SETTINGS_PATH: launchSettings.settingsPath },
+    cleanup: launchSettings.cleanup,
   };
 }
 

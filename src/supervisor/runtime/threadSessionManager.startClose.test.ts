@@ -2,9 +2,17 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentKind, McpServer, ProjectLocation, ResolvedMcpServer } from "@/shared/contracts";
+import {
+  PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+  PIPEDREAM_PERSONAL_MCP_URL,
+  type AgentKind,
+  type McpServer,
+  type ProjectLocation,
+  type ResolvedMcpServer,
+} from "@/shared/contracts";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import type { SupervisorEvent } from "@/shared/ipc";
+import { MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN } from "@/shared/browserMcpEvidence";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { WindowsShellPreference } from "../shellPreference";
 import type { SessionRuntime } from "./sessionTypes";
@@ -76,6 +84,17 @@ function deferred<T = void>(): {
   return { promise, resolve, reject };
 }
 
+function inertCrossagentMcp(cancelAll: (threadId: string) => void | Promise<void>) {
+  return {
+    register: () => undefined,
+    registerProviderSession: () => undefined,
+    unregister: vi.fn<(threadId: string) => void>(),
+    cancelForeground: vi.fn<(threadId: string) => void>(),
+    cancelAll,
+    resolveChildRequest: () => false,
+  };
+}
+
 function createManager(
   agentKind: AgentKind,
   adapter: AgentAdapter,
@@ -85,6 +104,7 @@ function createManager(
     kind: "powershell" as const,
     args: ["-NoLogo"],
   }),
+  releasePipedreamMcpBindings?: (threadId: string) => void,
 ): ThreadSessionManager {
   const tempDir = mkdtempSync(join(tmpdir(), "poracode-start-close-"));
   tempDirs.push(tempDir);
@@ -96,6 +116,7 @@ function createManager(
     readDisableCliHookPlugin: () => false,
     adapters: new Map([[agentKind, adapter]]),
     resolveWindowsShell,
+    ...(releasePipedreamMcpBindings ? { releasePipedreamMcpBindings } : {}),
     resolvePluginEnvForSpawn: async (input) =>
       input.agentKind === "codex"
         ? {
@@ -249,6 +270,61 @@ beforeEach(() => {
   process.env[BROWSER_MCP_TOKEN_ENV] = "thread-session-manager-test-browser-token";
 });
 
+it("releases only the exact exited MCP launch and every child binding it authorized", () => {
+  const structuredSession = createStructuredSession(Promise.resolve());
+  const adapter = createAdapter("codex", structuredSession);
+  const releasePipedreamMcpBindings = vi.fn<(threadId: string) => void>();
+  const manager = createManager(
+    "codex",
+    adapter,
+    undefined,
+    undefined,
+    releasePipedreamMcpBindings,
+  );
+  const current = createInactiveRuntime("codex", adapter, structuredSession);
+  current.status = "idle";
+  const currentIdentity = attachAuthorizedRuntime(manager, current);
+  releasePipedreamMcpBindings.mockClear();
+
+  const childThreadId = "thread-codex-child";
+  const internals = manager as unknown as {
+    releaseExitedMcpLaunch(session: SessionRuntime): void;
+    rootMcpLaunchAuthorities: Map<string, unknown>;
+    subagentMcpLaunchAuthorities: Map<string, unknown>;
+  };
+  internals.subagentMcpLaunchAuthorities.set(childThreadId, {
+    parentThreadId: current.threadId,
+    parentSessionInstanceId: current.instanceId,
+    authorization: {
+      identity: { threadId: childThreadId, launchId: "child-launch" },
+      adapter,
+      config: current.config,
+      launchConfig: current.config,
+      mcpLaunchSnapshot: current.mcpLaunchSnapshot,
+    },
+  });
+  const stale = {
+    ...current,
+    instanceId: "stale-instance",
+    mcpIdentity: { ...currentIdentity, launchId: "stale-launch" },
+  } as SessionRuntime;
+
+  internals.releaseExitedMcpLaunch(stale);
+
+  expect(releasePipedreamMcpBindings).not.toHaveBeenCalled();
+  expect(internals.rootMcpLaunchAuthorities.has(current.threadId)).toBe(true);
+  expect(internals.subagentMcpLaunchAuthorities.has(childThreadId)).toBe(true);
+
+  internals.releaseExitedMcpLaunch(current);
+
+  expect(releasePipedreamMcpBindings.mock.calls.map(([threadId]) => threadId)).toEqual([
+    current.threadId,
+    childThreadId,
+  ]);
+  expect(internals.rootMcpLaunchAuthorities.has(current.threadId)).toBe(false);
+  expect(internals.subagentMcpLaunchAuthorities.has(childThreadId)).toBe(false);
+});
+
 afterEach(async () => {
   for (const manager of managersToDispose.splice(0)) {
     await manager.dispose();
@@ -263,7 +339,7 @@ afterEach(async () => {
 });
 
 describe("ThreadSessionManager provider-session routing", () => {
-  it("records only successful Browser proof for the exact current launch and user turn", async () => {
+  it("records authenticated Browser outcomes for the exact current launch and user turn", async () => {
     const structuredSession = createStructuredSession(Promise.resolve());
     const adapter = createAdapter("codex", structuredSession);
     const events: SupervisorEvent[] = [];
@@ -312,7 +388,34 @@ describe("ThreadSessionManager provider-session routing", () => {
       expect.objectContaining({ type: "item.completed", threadId: runtime.threadId }),
     ]);
 
-    expect(manager.recordBrowserMcpToolCall({ ...report, success: false })).toBe(false);
+    const eventCountBeforeFailure = collectRuntimeEvents(events).length;
+    expect(
+      manager.recordBrowserMcpToolCall({
+        ...report,
+        toolName: "select",
+        success: false,
+        tabId: "tab-must-not-leak",
+        url: "https://secret.example/private?token=must-not-leak",
+        title: "Must not leak",
+      }),
+    ).toBe(true);
+    expect(collectRuntimeEvents(events).slice(eventCountBeforeFailure)).toEqual([
+      expect.objectContaining({
+        type: "item.started",
+        threadId: runtime.threadId,
+        itemType: "mcp_tool_call",
+        payload: {
+          name: "select",
+          serverId: "browser",
+          status: "error",
+          browserEvidence: {
+            source: "y-space-browser-mcp",
+            occurredAt: 1_778_000_000_000,
+          },
+        },
+      }),
+      expect.objectContaining({ type: "item.completed", threadId: runtime.threadId }),
+    ]);
     expect(manager.recordBrowserMcpToolCall({ ...report, launchId: "stale-launch" })).toBe(false);
 
     const internal = manager as unknown as {
@@ -325,6 +428,46 @@ describe("ThreadSessionManager provider-session routing", () => {
 
     await manager.closeThread({ threadId: runtime.threadId });
     expect(manager.recordBrowserMcpToolCall({ ...report, turnId: nextTurnId })).toBe(false);
+  });
+
+  it("retains one negative Browser outcome after the successful evidence cap is full", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const events: SupervisorEvent[] = [];
+    const manager = createManager("codex", adapter, (event) => events.push(event));
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "browser-evidence-cap-failure";
+    runtime.status = "idle";
+    runtime.config = { model: "codex/model", browserMcp: true };
+    runtime.launchConfig = { ...runtime.config };
+    const identity = attachAuthorizedRuntime(manager, runtime);
+    const report = {
+      threadId: runtime.threadId,
+      launchId: identity.launchId,
+      turnId: identity.browserEvidenceTurnId!,
+      toolName: "click",
+      success: true,
+      occurredAt: 1_778_000_000_000,
+    } as const;
+
+    for (let index = 0; index < MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN; index += 1) {
+      expect(
+        manager.recordBrowserMcpToolCall({ ...report, occurredAt: report.occurredAt + index }),
+      ).toBe(true);
+    }
+    expect(manager.recordBrowserMcpToolCall(report)).toBe(false);
+    const eventCountBeforeFailure = collectRuntimeEvents(events).length;
+
+    expect(
+      manager.recordBrowserMcpToolCall({ ...report, toolName: "select", success: false }),
+    ).toBe(true);
+    expect(collectRuntimeEvents(events).slice(eventCountBeforeFailure)).toEqual([
+      expect.objectContaining({
+        type: "item.started",
+        payload: expect.objectContaining({ name: "select", status: "error" }),
+      }),
+      expect.objectContaining({ type: "item.completed" }),
+    ]);
   });
 
   it("rotates Browser proof authority across an accepted restart prompt", async () => {
@@ -484,6 +627,57 @@ describe("ThreadSessionManager provider-session routing", () => {
         occurredAt: Date.now(),
       }),
     ).toBe(true);
+  });
+
+  it("drops a child MCP resolution that crossed a Personal credential revocation", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const parent = createInactiveRuntime("codex", adapter, structuredSession);
+    parent.threadId = "personal-oauth-pending-child-parent";
+    parent.status = "idle";
+    attachAuthorizedRuntime(manager, parent);
+
+    const resolution = deferred<ResolvedMcpServer[]>();
+    const spawnPipeline = (
+      manager as unknown as {
+        spawnPipeline: {
+          resolveMcpServersForLaunch(): Promise<ResolvedMcpServer[]>;
+        };
+      }
+    ).spawnPipeline;
+    const resolveMcpServers = vi
+      .spyOn(spawnPipeline, "resolveMcpServersForLaunch")
+      .mockReturnValue(resolution.promise);
+    const childAccess = manager.resolveSubagentParentMcpAccess(
+      parent.threadId,
+      { threadId: "personal-oauth-pending-child", title: "pending child" },
+      "codex",
+      parent.config,
+    );
+    await vi.waitFor(() => expect(resolveMcpServers).toHaveBeenCalledOnce());
+
+    const revocation = manager.reloadPipedreamMcpServers({ revokePersonalOauth: true });
+    resolution.resolve([
+      {
+        id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+        name: "pd",
+        timeoutMs: 30_000,
+        transport: {
+          type: "http",
+          url: PIPEDREAM_PERSONAL_MCP_URL,
+          headers: { Authorization: "Bearer child-stale-token" },
+        },
+      },
+    ]);
+
+    await expect(childAccess).resolves.toEqual({});
+    await expect(revocation).resolves.toEqual({ state: "applied" });
+    expect(
+      (
+        manager as unknown as { subagentMcpLaunchAuthorities: Map<string, unknown> }
+      ).subagentMcpLaunchAuthorities.has("personal-oauth-pending-child"),
+    ).toBe(false);
   });
 
   it("keeps interrupt-backed steer proof on the old turn until the replacement starts", async () => {
@@ -1484,6 +1678,1119 @@ describe("ThreadSessionManager start guards", () => {
     ).toEqual(
       expect.objectContaining({ launchConfig: expect.objectContaining({ crossagentMcp: true }) }),
     );
+  });
+
+  it("reports Pipedream grants as applied when there are no live sessions to reload", async () => {
+    const adapter = createAdapter("opencode", createStructuredSession(Promise.resolve()));
+    const manager = createManager("opencode", adapter);
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({ state: "applied" });
+  });
+
+  it("re-resolves Pipedream grants and revocations for an already-running supported session", async () => {
+    const updateMcpServers = vi.fn<NonNullable<StructuredSessionHandle["updateMcpServers"]>>(
+      async () => undefined,
+    );
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = updateMcpServers;
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    adapter.capabilities.crossagentMcpRouting = "provider-session";
+    const manager = createManager("opencode", adapter);
+    const gmailRelay: ResolvedMcpServer = {
+      id: "pipedream:local-gmail",
+      name: "pipedream-gmail-local",
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: "http://127.0.0.1:43123/mcp",
+        headers: { Authorization: "Bearer local-test" },
+      },
+    };
+    const resolvePipedreamMcpServers = vi
+      .fn<
+        (input: {
+          threadId: string;
+          providerBindingId?: string;
+          projectLocation: ProjectLocation;
+        }) => Promise<ResolvedMcpServer[]>
+      >()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([gmailRelay])
+      .mockResolvedValueOnce([]);
+    (
+      manager as unknown as {
+        options: { resolvePipedreamMcpServers: typeof resolvePipedreamMcpServers };
+      }
+    ).options.resolvePipedreamMcpServers = resolvePipedreamMcpServers;
+
+    await manager.startThread({
+      threadId: "thread-live-pipedream-reload",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const originalIdentity = manager.sessions.get("thread-live-pipedream-reload")?.mcpIdentity;
+    expect(originalIdentity).toBeDefined();
+    updateMcpServers.mockClear();
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        resolveMcpServersForLaunch(input: {
+          identity?: McpThreadIdentity;
+        }): Promise<ResolvedMcpServer[]>;
+      };
+    };
+    const resolveLaunch = vi.spyOn(internal.spawnPipeline, "resolveMcpServersForLaunch");
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({ state: "applied" });
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "applied",
+    });
+
+    expect(resolveLaunch).toHaveBeenCalledTimes(2);
+    for (const [input] of resolveLaunch.mock.calls) {
+      expect(input.identity).toMatchObject({
+        threadId: originalIdentity?.threadId,
+        launchId: originalIdentity?.launchId,
+      });
+    }
+    expect(resolvePipedreamMcpServers).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        threadId: "thread-live-pipedream-reload",
+        projectLocation: { kind: "windows", path: "C:\\repo" },
+      }),
+    );
+    expect(resolvePipedreamMcpServers).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        threadId: "thread-live-pipedream-reload",
+        projectLocation: { kind: "windows", path: "C:\\repo" },
+      }),
+    );
+    expect(updateMcpServers).toHaveBeenNthCalledWith(1, [gmailRelay]);
+    expect(updateMcpServers).toHaveBeenNthCalledWith(2, []);
+  });
+
+  it("re-resolves current Personal OAuth for a live update and removes a stale launch token on sign-out", async () => {
+    const updateMcpServers = vi.fn<NonNullable<StructuredSessionHandle["updateMcpServers"]>>(
+      async () => undefined,
+    );
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = updateMcpServers;
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    adapter.capabilities.crossagentMcpRouting = "provider-session";
+    const manager = createManager("opencode", adapter);
+    const stalePersonalServer: McpServer = {
+      id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: PIPEDREAM_PERSONAL_MCP_URL,
+        headers: { Authorization: "Bearer stale-launch-token" },
+      },
+    };
+
+    await manager.startThread({
+      threadId: "thread-personal-oauth-live-refresh",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [stalePersonalServer],
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        mcpServers: [
+          {
+            ...stalePersonalServer,
+            transport: { ...stalePersonalServer.transport, headers: {} },
+          },
+        ],
+      }),
+      "utf8",
+    );
+    let currentToken: string | undefined = "fresh-current-token";
+    const applyMcpServerAuthorization = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) =>
+        servers.map((server) => {
+          if (
+            (server.transport.type !== "http" && server.transport.type !== "sse") ||
+            server.transport.url !== PIPEDREAM_PERSONAL_MCP_URL
+          ) {
+            return server;
+          }
+          const headers = { ...server.transport.headers };
+          delete headers.Authorization;
+          return {
+            ...server,
+            transport: {
+              ...server.transport,
+              headers: currentToken
+                ? { ...headers, Authorization: `Bearer ${currentToken}` }
+                : headers,
+            },
+          };
+        }),
+    );
+    (
+      manager as unknown as {
+        options: { applyMcpServerAuthorization: typeof applyMcpServerAuthorization };
+      }
+    ).options.applyMcpServerAuthorization = applyMcpServerAuthorization;
+    updateMcpServers.mockClear();
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({ state: "applied" });
+    expect(JSON.stringify(updateMcpServers.mock.calls.at(-1)?.[0])).toContain(
+      "Bearer fresh-current-token",
+    );
+    expect(JSON.stringify(updateMcpServers.mock.calls.at(-1)?.[0])).not.toContain(
+      "stale-launch-token",
+    );
+
+    currentToken = undefined;
+    updateMcpServers.mockClear();
+    const cancelAllChildren = vi.fn<(threadId: string) => Promise<void>>(async () => undefined);
+    (
+      manager as unknown as {
+        options: { crossagentMcp: ReturnType<typeof inertCrossagentMcp> };
+      }
+    ).options.crossagentMcp = inertCrossagentMcp(cancelAllChildren);
+    await expect(manager.reloadPipedreamMcpServers({ revokePersonalOauth: true })).resolves.toEqual(
+      { state: "applied" },
+    );
+
+    const appliedAfterSignOut = JSON.stringify(updateMcpServers.mock.calls.at(-1)?.[0]);
+    const storedAfterSignOut = JSON.stringify(
+      manager.sessions.get("thread-personal-oauth-live-refresh")?.mcpLaunchSnapshot,
+    );
+    const activeAuthorityAfterSignOut = (
+      manager as unknown as {
+        rootMcpLaunchAuthorities: Map<string, { authorization: { mcpLaunchSnapshot: unknown } }>;
+      }
+    ).rootMcpLaunchAuthorities.get("thread-personal-oauth-live-refresh")?.authorization
+      .mcpLaunchSnapshot;
+    expect(appliedAfterSignOut).not.toMatch(
+      /authorization|stale-launch-token|fresh-current-token/i,
+    );
+    expect(storedAfterSignOut).not.toMatch(/authorization|stale-launch-token|fresh-current-token/i);
+    expect(JSON.stringify(activeAuthorityAfterSignOut)).not.toMatch(
+      /authorization|stale-launch-token|fresh-current-token/i,
+    );
+    expect(structuredSession.dispose).not.toHaveBeenCalled();
+    expect(cancelAllChildren).toHaveBeenCalledExactlyOnceWith("thread-personal-oauth-live-refresh");
+  });
+
+  it("cancels a pending root launch so its stale Personal bearer can never attach", async () => {
+    const activation = deferred();
+    const structuredSession = createStructuredSession(activation.promise);
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const stalePersonalServer: McpServer = {
+      id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: PIPEDREAM_PERSONAL_MCP_URL,
+        headers: { Authorization: "Bearer pending-root-stale-token" },
+      },
+    };
+
+    const launch = manager.startThread({
+      threadId: "thread-personal-oauth-pending-root",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [stalePersonalServer],
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    await vi.waitFor(() => expect(structuredSession.activate).toHaveBeenCalledOnce());
+
+    await expect(manager.reloadPipedreamMcpServers({ revokePersonalOauth: true })).resolves.toEqual(
+      { state: "applied" },
+    );
+    activation.resolve();
+    await launch;
+
+    expect(manager.sessions.has("thread-personal-oauth-pending-root")).toBe(false);
+    expect(structuredSession.dispose).toHaveBeenCalledOnce();
+    expect(
+      (
+        manager as unknown as {
+          rootMcpLaunchAuthorities: Map<string, unknown>;
+        }
+      ).rootMcpLaunchAuthorities.has("thread-personal-oauth-pending-root"),
+    ).toBe(false);
+  });
+
+  it("terminates and restarts a live-update session when Personal OAuth revocation cannot apply", async () => {
+    const revocationOrder: string[] = [];
+    const updateMcpServers = vi.fn<NonNullable<StructuredSessionHandle["updateMcpServers"]>>(
+      async () => {
+        revocationOrder.push("live-update-failed");
+        throw new Error("simulated live update rejection");
+      },
+    );
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = updateMcpServers;
+    vi.mocked(structuredSession.dispose).mockImplementation(async () => {
+      revocationOrder.push("dispose-old-process");
+    });
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    adapter.capabilities.crossagentMcpRouting = "provider-session";
+    const manager = createManager("opencode", adapter);
+    const stalePersonalServer: McpServer = {
+      id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: PIPEDREAM_PERSONAL_MCP_URL,
+        headers: { Authorization: "Bearer rejected-update-token" },
+      },
+    };
+
+    await manager.startThread({
+      threadId: "thread-personal-oauth-live-update-fallback",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [stalePersonalServer],
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-personal-oauth-live-update-fallback")!;
+    session.status = "working";
+    session.sessionRef = {
+      providerSessionId: "ses_personal_oauth_live_update_fallback",
+      discoveredAt: "2026-08-29T07:00:00.000Z",
+    };
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        mcpServers: [
+          {
+            ...stalePersonalServer,
+            transport: { ...stalePersonalServer.transport, headers: {} },
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const applyMcpServerAuthorization = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) => {
+        revocationOrder.push("resolve-current-authorization");
+        return servers;
+      },
+    );
+    (
+      manager as unknown as {
+        options: { applyMcpServerAuthorization: typeof applyMcpServerAuthorization };
+      }
+    ).options.applyMcpServerAuthorization = applyMcpServerAuthorization;
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockImplementation(async (runtime) => {
+        revocationOrder.push("restart");
+        expect(JSON.stringify(runtime.mcpLaunchSnapshot)).not.toMatch(
+          /authorization|rejected-update-token/i,
+        );
+      });
+
+    await expect(manager.reloadPipedreamMcpServers({ revokePersonalOauth: true })).resolves.toEqual(
+      { state: "applied" },
+    );
+
+    expect(restartThread).toHaveBeenCalledExactlyOnceWith(session, {
+      prompt: "",
+      config: session.config,
+    });
+    expect(revocationOrder).toEqual([
+      "resolve-current-authorization",
+      "live-update-failed",
+      "dispose-old-process",
+      "resolve-current-authorization",
+      "restart",
+    ]);
+    expect(session.pendingPipedreamMcpReload).toBeUndefined();
+  });
+
+  it("serializes concurrent provider-settings and Pipedream MCP mutations", async () => {
+    const updateMcpServers = vi.fn<NonNullable<StructuredSessionHandle["updateMcpServers"]>>(
+      async () => undefined,
+    );
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = updateMcpServers;
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    const manager = createManager("opencode", adapter);
+    const oldServer: McpServer = {
+      id: "old-concurrent-server",
+      name: "old-concurrent-server",
+      description: "",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: "https://old.concurrent.test/mcp", headers: {} },
+    };
+    const newServer: McpServer = {
+      id: "new-concurrent-server",
+      name: "new-concurrent-server",
+      description: "",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: "https://new.concurrent.test/mcp", headers: {} },
+    };
+    const oldResolved: ResolvedMcpServer = {
+      id: oldServer.id,
+      name: oldServer.name,
+      timeoutMs: oldServer.timeoutMs,
+      transport: oldServer.transport,
+    };
+    const newResolved: ResolvedMcpServer = {
+      id: newServer.id,
+      name: newServer.name,
+      timeoutMs: newServer.timeoutMs,
+      transport: newServer.transport,
+    };
+
+    await manager.startThread({
+      threadId: "thread-concurrent-mcp-mutations",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [oldServer],
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    updateMcpServers.mockClear();
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(settingsPath, JSON.stringify({ mcpServers: [newServer] }), "utf8");
+    const currentSettingsResolution = deferred<ResolvedMcpServer[]>();
+    const stalePipedreamResolution = deferred<ResolvedMcpServer[]>();
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        resolveMcpServersForLaunch(input: {
+          mcpLaunchSnapshot: { mcpServers: McpServer[] };
+        }): Promise<ResolvedMcpServer[]>;
+      };
+    };
+    const resolveLaunch = vi
+      .spyOn(internal.spawnPipeline, "resolveMcpServersForLaunch")
+      .mockImplementation((input) =>
+        input.mcpLaunchSnapshot.mcpServers.some((server) => server.id === newServer.id)
+          ? currentSettingsResolution.promise
+          : stalePipedreamResolution.promise,
+      );
+
+    const settingsReload = manager.reloadAgentMcpServers({ agentKind: "opencode" });
+    const pipedreamReload = manager.reloadPipedreamMcpServers();
+    await vi.waitFor(() => expect(resolveLaunch).toHaveBeenCalled());
+    await Promise.resolve();
+    const resolutionsBeforeSettingsApply = resolveLaunch.mock.calls.length;
+
+    currentSettingsResolution.resolve([newResolved]);
+    await vi.waitFor(() => expect(updateMcpServers).toHaveBeenCalled());
+    stalePipedreamResolution.resolve([oldResolved]);
+    await Promise.all([settingsReload, pipedreamReload]);
+
+    expect(resolutionsBeforeSettingsApply).toBe(1);
+    expect(updateMcpServers).toHaveBeenLastCalledWith([newResolved]);
+    expect(
+      manager.sessions
+        .get("thread-concurrent-mcp-mutations")
+        ?.mcpLaunchSnapshot.mcpServers.map((server) => server.id),
+    ).toContain(newServer.id);
+  });
+
+  it("reloads Pipedream MCPs by live-session capability instead of provider kind", async () => {
+    const updateMcpServers = vi.fn<NonNullable<StructuredSessionHandle["updateMcpServers"]>>(
+      async () => undefined,
+    );
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = updateMcpServers;
+    const adapter = createAdapter("claude", structuredSession);
+    const manager = createManager("claude", adapter);
+
+    await manager.startThread({
+      threadId: "thread-provider-neutral-pipedream-reload",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "claude",
+      config: { model: "claude/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    updateMcpServers.mockClear();
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "applied",
+    });
+
+    expect(updateMcpServers).toHaveBeenCalledOnce();
+  });
+
+  it("retries a failed live Pipedream MCP reload before the next user turn", async () => {
+    const updateMcpServers = vi
+      .fn<NonNullable<StructuredSessionHandle["updateMcpServers"]>>()
+      .mockRejectedValueOnce(new Error("simulated live update failure"))
+      .mockResolvedValue(undefined);
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = updateMcpServers;
+    const adapter = createAdapter("opencode", structuredSession);
+    const manager = createManager("opencode", adapter);
+
+    await manager.startThread({
+      threadId: "thread-opencode-pipedream-retry",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-opencode-pipedream-retry")!;
+    const internal = manager as unknown as {
+      structuredTurnQueue: {
+        start(session: SessionRuntime, turn: { prompt: string; config: object }): void;
+      };
+      startStructuredTurn(session: SessionRuntime, turn: { prompt: string; config: object }): void;
+    };
+    const start = vi.spyOn(internal.structuredTurnQueue, "start");
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "failed-pending",
+    });
+
+    expect(session.pendingPipedreamMcpReload).toBe(true);
+    const turn = { prompt: "Count my unread Gmail messages", config: session.config };
+    internal.startStructuredTurn(session, turn);
+
+    await vi.waitFor(() => expect(updateMcpServers).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(start).toHaveBeenCalledExactlyOnceWith(session, turn));
+    expect(session.pendingPipedreamMcpReload).toBeUndefined();
+  });
+
+  it("transparently resumes an idle Codex GUI session when Pipedream grants change", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+
+    await manager.startThread({
+      threadId: "thread-codex-pipedream-resume",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-codex-pipedream-resume")!;
+    const stalePersonalServer: McpServer = {
+      id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: PIPEDREAM_PERSONAL_MCP_URL,
+        headers: { Authorization: "Bearer stale-restart-token" },
+      },
+    };
+    session.mcpLaunchSnapshot = {
+      ...session.mcpLaunchSnapshot,
+      mcpServers: [stalePersonalServer],
+    };
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        mcpServers: [
+          {
+            ...stalePersonalServer,
+            transport: { ...stalePersonalServer.transport, headers: {} },
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const applyMcpServerAuthorization = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) => servers,
+    );
+    (
+      manager as unknown as {
+        options: { applyMcpServerAuthorization: typeof applyMcpServerAuthorization };
+      }
+    ).options.applyMcpServerAuthorization = applyMcpServerAuthorization;
+    session.status = "idle";
+    session.sessionRef = {
+      providerSessionId: "ses_codex_existing",
+      discoveredAt: "2026-08-29T07:00:00.000Z",
+    };
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockImplementation(async (runtime) => {
+        expect(JSON.stringify(runtime.mcpLaunchSnapshot)).not.toMatch(
+          /authorization|stale-restart-token/i,
+        );
+      });
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "applied",
+    });
+
+    expect(restartThread).toHaveBeenCalledExactlyOnceWith(session, {
+      prompt: "",
+      config: session.config,
+    });
+    expect(session.pendingPipedreamMcpReload).toBeUndefined();
+  });
+
+  it("defers a Claude GUI Pipedream reload while working and resumes before its next turn", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("claude", structuredSession);
+    const manager = createManager("claude", adapter);
+
+    await manager.startThread({
+      threadId: "thread-claude-pipedream-deferred",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "claude",
+      config: { model: "claude/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-claude-pipedream-deferred")!;
+    session.status = "working";
+    session.sessionRef = {
+      providerSessionId: "ses_claude_existing",
+      discoveredAt: "2026-08-29T07:00:00.000Z",
+    };
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+      startStructuredTurn(session: SessionRuntime, turn: { prompt: string; config: object }): void;
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockResolvedValue(undefined);
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "restart-required",
+    });
+
+    expect(restartThread).not.toHaveBeenCalled();
+    expect(session.pendingPipedreamMcpReload).toBe(true);
+
+    session.status = "idle";
+    const turn = { prompt: "Read my latest Gmail message", config: session.config };
+    internal.startStructuredTurn(session, turn);
+    await vi.waitFor(() => expect(restartThread).toHaveBeenCalledExactlyOnceWith(session, turn));
+    expect(session.pendingPipedreamMcpReload).toBeUndefined();
+  });
+
+  it("immediately restarts a working launch-bound GUI session when Personal OAuth is revoked", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("claude", structuredSession);
+    const manager = createManager("claude", adapter);
+    const stalePersonalServer: McpServer = {
+      id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: PIPEDREAM_PERSONAL_MCP_URL,
+        headers: { Authorization: "Bearer revoked-working-token" },
+      },
+    };
+
+    await manager.startThread({
+      threadId: "thread-claude-personal-oauth-revoked",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "claude",
+      config: { model: "claude/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-claude-personal-oauth-revoked")!;
+    session.mcpLaunchSnapshot = {
+      ...session.mcpLaunchSnapshot,
+      mcpServers: [stalePersonalServer],
+    };
+    const settingsPath = (manager as unknown as { options: { settingsPath: string } }).options
+      .settingsPath;
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        mcpServers: [
+          {
+            ...stalePersonalServer,
+            transport: { ...stalePersonalServer.transport, headers: {} },
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const revocationOrder: string[] = [];
+    vi.mocked(structuredSession.dispose).mockImplementation(async () => {
+      revocationOrder.push("dispose-old-process");
+    });
+    const applyMcpServerAuthorization = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) => {
+        revocationOrder.push("resolve-current-authorization");
+        return servers;
+      },
+    );
+    (
+      manager as unknown as {
+        options: { applyMcpServerAuthorization: typeof applyMcpServerAuthorization };
+      }
+    ).options.applyMcpServerAuthorization = applyMcpServerAuthorization;
+    session.status = "working";
+    session.sessionRef = {
+      providerSessionId: "ses_claude_personal_oauth_revoked",
+      discoveredAt: "2026-08-29T07:00:00.000Z",
+    };
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockImplementation(async (runtime) => {
+        revocationOrder.push("restart");
+        expect(JSON.stringify(runtime.mcpLaunchSnapshot)).not.toMatch(
+          /authorization|revoked-working-token/i,
+        );
+      });
+
+    await expect(manager.reloadPipedreamMcpServers({ revokePersonalOauth: true })).resolves.toEqual(
+      { state: "applied" },
+    );
+
+    expect(restartThread).toHaveBeenCalledExactlyOnceWith(session, {
+      prompt: "",
+      config: session.config,
+    });
+    expect(revocationOrder).toEqual([
+      "dispose-old-process",
+      "resolve-current-authorization",
+      "restart",
+    ]);
+    expect(session.pendingPipedreamMcpReload).toBeUndefined();
+  });
+
+  it("revokes authority and kills the root process without waiting forever for provider or child disposal", async () => {
+    vi.useFakeTimers();
+    try {
+      const hungDispose = deferred();
+      const hungChildDisposal = deferred();
+      const structuredSession = createStructuredSession(Promise.resolve());
+      const terminationOrder: string[] = [];
+      vi.mocked(structuredSession.dispose).mockImplementation(() => {
+        terminationOrder.push("dispose-root");
+        return hungDispose.promise;
+      });
+      const adapter = createAdapter("claude", structuredSession);
+      const manager = createManager("claude", adapter);
+      const session = createInactiveRuntime("claude", adapter, structuredSession);
+      session.threadId = "thread-personal-oauth-hung-dispose";
+      session.status = "working";
+      session.mcpLaunchSnapshot = {
+        ...session.mcpLaunchSnapshot,
+        mcpServers: [
+          {
+            id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+            name: "pd",
+            description: "Personal Pipedream tools",
+            enabled: true,
+            timeoutMs: 30_000,
+            transport: {
+              type: "http",
+              url: PIPEDREAM_PERSONAL_MCP_URL,
+              headers: { Authorization: "Bearer hung-dispose-stale-token" },
+            },
+          },
+        ],
+      };
+      attachAuthorizedRuntime(manager, session);
+      const cancelAllChildren = vi.fn<(threadId: string) => Promise<void>>(() => {
+        terminationOrder.push("cancel-children");
+        return hungChildDisposal.promise;
+      });
+      const internals = manager as unknown as {
+        options: { crossagentMcp: ReturnType<typeof inertCrossagentMcp> };
+        ptyLifecycle: { kill(runtime: SessionRuntime): void };
+        rootMcpLaunchAuthorities: Map<string, unknown>;
+        spawnPipeline: {
+          restartThread(
+            runtime: SessionRuntime,
+            turn: { prompt: string; config: object },
+          ): Promise<void>;
+        };
+      };
+      internals.options.crossagentMcp = inertCrossagentMcp(cancelAllChildren);
+      const kill = vi.spyOn(internals.ptyLifecycle, "kill").mockImplementation(() => {
+        terminationOrder.push("kill-root");
+      });
+      vi.spyOn(internals.spawnPipeline, "restartThread").mockResolvedValue(undefined);
+
+      let settled = false;
+      const reload = manager
+        .reloadPipedreamMcpServers({ revokePersonalOauth: true })
+        .then((outcome) => {
+          settled = true;
+          return outcome;
+        });
+      await vi.advanceTimersByTimeAsync(0);
+      const authorityRevokedWhileDisposalHung = !internals.rootMcpLaunchAuthorities.has(
+        session.threadId,
+      );
+      const killedWhileDisposalHung = kill.mock.calls.length > 0;
+      const childrenCancelledWhileDisposalHung = cancelAllChildren.mock.calls.length > 0;
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      const settledWithinBound = settled;
+      hungDispose.resolve();
+      hungChildDisposal.resolve();
+      await reload;
+
+      expect(authorityRevokedWhileDisposalHung).toBe(true);
+      expect(killedWhileDisposalHung).toBe(true);
+      expect(childrenCancelledWhileDisposalHung).toBe(true);
+      expect(settledWithinBound).toBe(true);
+      expect(terminationOrder.indexOf("kill-root")).toBeLessThanOrEqual(
+        terminationOrder.indexOf("dispose-root"),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps an unresumable GUI reload pending until a provider session id exists", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+
+    await manager.startThread({
+      threadId: "thread-codex-pipedream-await-ref",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-codex-pipedream-await-ref")!;
+    session.status = "idle";
+    delete session.sessionRef;
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockResolvedValue(undefined);
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "restart-required",
+    });
+
+    expect(restartThread).not.toHaveBeenCalled();
+    expect(session.pendingPipedreamMcpReload).toBe(true);
+  });
+
+  it("marks a mid-launch GUI session pending when its structured handle is not ready", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+
+    await manager.startThread({
+      threadId: "thread-codex-pipedream-mid-launch",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-codex-pipedream-mid-launch")!;
+    session.structuredSession = undefined;
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "restart-required",
+    });
+
+    expect(session.pendingPipedreamMcpReload).toBe(true);
+  });
+
+  it("gates a concurrent GUI submit behind an in-flight Pipedream restart", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const startTurn = vi.fn<NonNullable<StructuredSessionHandle["startTurn"]>>(
+      async () => undefined,
+    );
+    structuredSession.startTurn = startTurn;
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+
+    await manager.startThread({
+      threadId: "thread-submit-during-pipedream-restart",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-submit-during-pipedream-restart")!;
+    session.status = "idle";
+    session.sessionRef = {
+      providerSessionId: "ses_submit_during_restart",
+      discoveredAt: "2026-08-29T08:00:00.000Z",
+    };
+    const restart = deferred<void>();
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockReturnValue(restart.promise);
+
+    const reload = manager.reloadPipedreamMcpServers();
+    await vi.waitFor(() => expect(restartThread).toHaveBeenCalledOnce());
+    await manager.sendThreadInput({
+      threadId: session.threadId,
+      prompt: "Use my new Gmail connection",
+      config: session.config,
+    });
+    const submittedThroughStaleHandle = startTurn.mock.calls.length > 0;
+    const pendingDuringRestart = session.pendingPipedreamMcpReload;
+
+    restart.resolve();
+    await reload;
+    await vi.waitFor(() => expect(structuredSession.startTurn).toHaveBeenCalledOnce());
+
+    expect(submittedThroughStaleHandle).toBe(false);
+    expect(pendingDuringRestart).toBe(true);
+    expect(restartThread).toHaveBeenCalledOnce();
+    expect(structuredSession.startTurn).toHaveBeenCalledWith(
+      "Use my new Gmail connection",
+      session.config,
+      undefined,
+      expect.any(Object),
+    );
+  });
+
+  it("retains a failed GUI Pipedream restart and retries it with the next submit", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.startTurn = vi.fn<NonNullable<StructuredSessionHandle["startTurn"]>>(
+      async () => undefined,
+    );
+    const adapter = createAdapter("claude", structuredSession);
+    const manager = createManager("claude", adapter);
+
+    await manager.startThread({
+      threadId: "thread-retry-failed-pipedream-restart",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "claude",
+      config: { model: "claude/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-retry-failed-pipedream-restart")!;
+    session.status = "idle";
+    session.sessionRef = {
+      providerSessionId: "ses_retry_failed_restart",
+      discoveredAt: "2026-08-29T08:00:00.000Z",
+    };
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockRejectedValueOnce(new Error("simulated Pipedream restart failure"))
+      .mockResolvedValueOnce(undefined);
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "failed-pending",
+    });
+    const pendingAfterFailure = session.pendingPipedreamMcpReload;
+    await manager.sendThreadInput({
+      threadId: session.threadId,
+      prompt: "Retry with current Gmail access",
+      config: session.config,
+    });
+    await vi.waitFor(() => expect(restartThread).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(session.pendingPipedreamMcpReload).toBeUndefined());
+
+    expect(pendingAfterFailure).toBe(true);
+    expect(restartThread).toHaveBeenNthCalledWith(
+      2,
+      session,
+      expect.objectContaining({ prompt: "Retry with current Gmail access" }),
+    );
+    expect(structuredSession.startTurn).not.toHaveBeenCalled();
+  });
+
+  it("never submits through a stale GUI handle while a pending reload lacks a session ref", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.startTurn = vi.fn<NonNullable<StructuredSessionHandle["startTurn"]>>(
+      async () => undefined,
+    );
+    const adapter = createAdapter("codex", structuredSession);
+    const events: SupervisorEvent[] = [];
+    const manager = createManager("codex", adapter, (event) => events.push(event));
+
+    await manager.startThread({
+      threadId: "thread-submit-pipedream-without-session-ref",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-submit-pipedream-without-session-ref")!;
+    session.status = "idle";
+    delete session.sessionRef;
+
+    await manager.reloadPipedreamMcpServers();
+    await manager.sendThreadInput({
+      threadId: session.threadId,
+      prompt: "Do not use the stale connection",
+      config: session.config,
+    });
+
+    expect(structuredSession.startTurn).not.toHaveBeenCalled();
+    expect(session.pendingPipedreamMcpReload).toBe(true);
+    expect(session.status).toBe("error");
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        status: "error",
+        errorMessage: expect.stringContaining("integration access before starting"),
+      }),
+    );
+  });
+
+  it("reports launch-bound terminal sessions as restart-required without restarting them", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+
+    await manager.startThread({
+      threadId: "thread-terminal-pipedream-next-launch",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "terminal",
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    const session = manager.sessions.get("thread-terminal-pipedream-next-launch")!;
+    const internal = manager as unknown as {
+      spawnPipeline: {
+        restartThread(
+          session: SessionRuntime,
+          turn: { prompt: string; config: object },
+        ): Promise<void>;
+      };
+    };
+    const restartThread = vi
+      .spyOn(internal.spawnPipeline, "restartThread")
+      .mockResolvedValue(undefined);
+
+    await expect(manager.reloadPipedreamMcpServers()).resolves.toEqual({
+      state: "restart-required",
+    });
+
+    expect(restartThread).not.toHaveBeenCalled();
+    expect(session.pendingPipedreamMcpReload).toBeUndefined();
   });
 
   it("does not emit a stale launch state after an MCP reload's session closes", async () => {

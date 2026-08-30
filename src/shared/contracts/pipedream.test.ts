@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   pipedreamBeginConnectPayloadSchema,
+  pipedreamBeginConnectResultSchema,
+  pipedreamConnectFlowPayloadSchema,
+  pipedreamConnectFlowStatusSchema,
   pipedreamDisconnectAccountPayloadSchema,
   pipedreamListAppsPayloadSchema,
   pipedreamSetAccountAgentAccessPayloadSchema,
@@ -45,6 +48,30 @@ describe("Pipedream public contracts", () => {
     expect(JSON.stringify(parsed)).not.toMatch(
       /"(?:clientSecret|accessToken|connectToken|externalUserId|credentials)":/i,
     );
+  });
+
+  it.each(["applied", "restart-required", "failed-pending"] as const)(
+    "accepts the strict renderer-safe %s agent reload outcome",
+    (state) => {
+      const snapshot = { ...SAFE_SNAPSHOT, agentReload: { state } };
+
+      expect(pipedreamSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+      expect(
+        pipedreamSnapshotSchema.safeParse({
+          ...snapshot,
+          agentReload: { state, error: "private provider restart detail" },
+        }).success,
+      ).toBe(false);
+    },
+  );
+
+  it("rejects unknown agent reload states", () => {
+    expect(
+      pipedreamSnapshotSchema.safeParse({
+        ...SAFE_SNAPSHOT,
+        agentReload: { state: "silently-ignored" },
+      }).success,
+    ).toBe(false);
   });
 
   it.each([
@@ -93,6 +120,53 @@ describe("Pipedream public contracts", () => {
         pipedreamBeginConnectPayloadSchema.safeParse({ appSlug: "slack", ...forbidden }).success,
       ).toBe(false);
     }
+  });
+
+  it("exposes only an opaque flow id and coarse terminal state for Connect lifecycle IPC", () => {
+    const flowId = "4d73cb38-1566-4e07-bf92-ce6edf1c82e8";
+
+    expect(
+      pipedreamBeginConnectResultSchema.parse({
+        opened: true,
+        expiresAt: "2026-08-27T12:10:00.000Z",
+        flowId,
+      }),
+    ).toEqual({
+      opened: true,
+      expiresAt: "2026-08-27T12:10:00.000Z",
+      flowId,
+    });
+    expect(pipedreamConnectFlowPayloadSchema.parse({ flowId })).toEqual({ flowId });
+    expect(pipedreamConnectFlowStatusSchema.parse({ state: "open" })).toEqual({ state: "open" });
+    expect(pipedreamConnectFlowStatusSchema.parse({ state: "closed" })).toEqual({
+      state: "closed",
+    });
+    expect(pipedreamConnectFlowStatusSchema.parse({ state: "succeeded" })).toEqual({
+      state: "succeeded",
+    });
+    expect(pipedreamConnectFlowStatusSchema.parse({ state: "failed" })).toEqual({
+      state: "failed",
+    });
+
+    for (const forbidden of [
+      { flowId, tabId: "sensitive-tab-private" },
+      { flowId, url: "https://pipedream.com/connect?token=private" },
+      { flowId, state: "open" },
+    ]) {
+      expect(pipedreamConnectFlowPayloadSchema.safeParse(forbidden).success).toBe(false);
+    }
+    expect(
+      pipedreamConnectFlowStatusSchema.safeParse({
+        state: "open",
+        tabId: "sensitive-tab-private",
+      }).success,
+    ).toBe(false);
+    expect(
+      pipedreamConnectFlowStatusSchema.safeParse({
+        state: "succeeded",
+        accountId: "apn_UncorrelatedRendererGuess",
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects route-shaped identifiers instead of accepting arbitrary upstream paths", () => {

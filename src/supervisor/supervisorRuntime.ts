@@ -17,12 +17,14 @@ import type {
   GitSyncResult,
   JudgeExperimentSnapshotPayload,
   JudgeExperimentSnapshotResult,
+  PipedreamSnapshot,
   ProjectLocation,
   RemoveExperimentWorktreesPayload,
   RemoveExperimentWorktreesResult,
   RelocateProjectPayload,
   RelocateProjectResult,
 } from "@/shared/contracts";
+import { PIPEDREAM_PERSONAL_MCP_URL } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { crossagentRankingPreferences } from "@/shared/crossagentRanking";
 import type { CrossagentRoutingState } from "@/shared/crossagentRanking";
@@ -94,10 +96,7 @@ import { dropSkillSegmentsOnPolicyFailure } from "./skills/pluginSkillPolicy";
 import { PluginRegistry, resolvePluginMcpServers } from "./plugins";
 import { captureExperimentResponseSnapshot } from "./experimentResponseSnapshot";
 import type { PipedreamPrivilegedBootstrapPayload } from "@/shared/pipedreamPrivilegedIpc";
-import {
-  PIPEDREAM_PERSONAL_MCP_URL,
-  PipedreamSupervisorService,
-} from "./pipedream/PipedreamSupervisorService";
+import { PipedreamSupervisorService } from "./pipedream/PipedreamSupervisorService";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
 
@@ -663,8 +662,20 @@ export class SupervisorRuntime {
     this.routingOverridePersistence.confirm(payload);
   }
 
-  configurePipedream(payload: PipedreamPrivilegedBootstrapPayload): void {
+  async configurePipedream(
+    payload: PipedreamPrivilegedBootstrapPayload,
+  ): Promise<PipedreamSnapshot> {
     this.pipedreamService.configure(payload);
+    let agentReload: PipedreamSnapshot["agentReload"];
+    try {
+      agentReload = await this.threadSessionManager.reloadPipedreamMcpServers();
+    } catch {
+      console.warn(
+        "[supervisor] failed to refresh live Pipedream MCP servers after configuration.",
+      );
+      agentReload = { state: "failed-pending" };
+    }
+    return { ...this.pipedreamService.getSnapshot(), agentReload };
   }
 
   private readPipedreamPersonalMcpStatus(): { enabled: boolean; authenticated: boolean } {

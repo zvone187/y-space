@@ -115,8 +115,21 @@ export function parseIpcProcedureArgs<Name extends IpcProcedureName>(
 export type MainLocalIpcHandlerMap = {
   [Name in MainLocalProcedureName]: (
     payload: IpcProcedurePayload<Name>,
+    context?: MainLocalIpcCallContext,
   ) => Promise<IpcProcedureResult<Name>> | IpcProcedureResult<Name>;
 };
+
+/** Main-derived call metadata. It is never accepted from renderer arguments. */
+export interface MainLocalIpcCallContext {
+  readonly senderWebContentsId: number;
+  /** Main-derived Chromium frame identity observed by ipcMain for this invoke.
+   * Privileged handlers pair it with the sender WebContents to reject
+   * subframes and stale renderer documents without renderer-supplied epochs. */
+  readonly senderFrame: {
+    readonly processId: number;
+    readonly routingId: number;
+  } | null;
+}
 
 export type SupervisorIpcHandlerMap = {
   [Name in SupervisorProcedureName]: (

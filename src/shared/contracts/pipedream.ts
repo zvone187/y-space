@@ -1,5 +1,25 @@
 import { z } from "zod";
 
+export const PIPEDREAM_PERSONAL_MCP_SERVER_ID = "pipedream-personal-mcp";
+export const PIPEDREAM_PERSONAL_MCP_SERVER_NAME = "pd";
+export const PIPEDREAM_PERSONAL_MCP_URL = "https://mcp.pipedream.net/v2";
+
+export function isPipedreamPersonalMcpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.replace(/\.+$/, "");
+    const pathname = decodeURIComponent(url.pathname);
+    return (
+      url.protocol === "https:" &&
+      hostname === "mcp.pipedream.net" &&
+      url.port === "" &&
+      (pathname === "/v2" || pathname === "/v2/")
+    );
+  } catch {
+    return false;
+  }
+}
+
 const pipedreamAppSlugSchema = z
   .string()
   .min(1)
@@ -84,11 +104,18 @@ export const pipedreamConnectSnapshotSchema = z.discriminatedUnion("state", [
     .strict(),
 ]);
 
+/** Renderer-safe aggregate result of applying changed integration access to live agents. */
+export const pipedreamAgentReloadOutcomeSchema = z
+  .object({ state: z.enum(["applied", "restart-required", "failed-pending"]) })
+  .strict();
+export type PipedreamAgentReloadOutcome = z.infer<typeof pipedreamAgentReloadOutcomeSchema>;
+
 /** Public snapshot safe to send over IPC and persist in renderer state. */
 export const pipedreamSnapshotSchema = z
   .object({
     personalMcp: pipedreamPersonalMcpSnapshotSchema,
     connect: pipedreamConnectSnapshotSchema,
+    agentReload: pipedreamAgentReloadOutcomeSchema.optional(),
   })
   .strict();
 export type PipedreamSnapshot = z.infer<typeof pipedreamSnapshotSchema>;
@@ -128,6 +155,52 @@ export const pipedreamBeginConnectPayloadSchema = z
   .strict();
 export type PipedreamBeginConnectPayload = z.infer<typeof pipedreamBeginConnectPayloadSchema>;
 
+const pipedreamConnectFlowIdSchema = z.string().uuid();
+
+/** Opaque main-owned Connect flow handle; never a browser tab identifier. */
+export const pipedreamConnectFlowPayloadSchema = z
+  .object({ flowId: pipedreamConnectFlowIdSchema })
+  .strict();
+export type PipedreamConnectFlowPayload = z.infer<typeof pipedreamConnectFlowPayloadSchema>;
+
+/**
+ * Coarse renderer-safe state correlated to one opaque main-owned flow.
+ * Pipedream's current Connect redirect supplies no account identity, so a
+ * succeeded state must never be used to infer or auto-grant a refreshed account.
+ */
+export const pipedreamConnectFlowStatusSchema = z
+  .object({ state: z.enum(["open", "closed", "succeeded", "failed"]) })
+  .strict();
+export type PipedreamConnectFlowStatus = z.infer<typeof pipedreamConnectFlowStatusSchema>;
+
+const pipedreamPersonalMcpOauthFlowIdSchema = z.string().uuid();
+
+/** Opaque renderer handle for a main-owned Personal Pipedream OAuth flow. */
+export const pipedreamPersonalMcpOauthFlowPayloadSchema = z
+  .object({ flowId: pipedreamPersonalMcpOauthFlowIdSchema })
+  .strict();
+export type PipedreamPersonalMcpOauthFlowPayload = z.infer<
+  typeof pipedreamPersonalMcpOauthFlowPayloadSchema
+>;
+
+/** URL-free begin result; authorization URL, PKCE state, and tab identity stay in main. */
+export const pipedreamPersonalMcpOauthBeginResultSchema = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("authorized") }).strict(),
+  z.object({ state: z.literal("open"), flowId: pipedreamPersonalMcpOauthFlowIdSchema }).strict(),
+  z.object({ state: z.literal("error") }).strict(),
+]);
+export type PipedreamPersonalMcpOauthBeginResult = z.infer<
+  typeof pipedreamPersonalMcpOauthBeginResultSchema
+>;
+
+/** Coarse terminal state; upstream errors and sensitive browser details remain privileged. */
+export const pipedreamPersonalMcpOauthFlowStatusSchema = z
+  .object({ state: z.enum(["open", "authorized", "error", "closed"]) })
+  .strict();
+export type PipedreamPersonalMcpOauthFlowStatus = z.infer<
+  typeof pipedreamPersonalMcpOauthFlowStatusSchema
+>;
+
 export const pipedreamDisconnectAccountPayloadSchema = z
   .object({ accountId: pipedreamAccountIdSchema })
   .strict();
@@ -157,8 +230,9 @@ export type PipedreamListAppsResult = z.infer<typeof pipedreamListAppsResultSche
 /** Safe acknowledgement from main after it opens the one-use Connect Link. */
 export const pipedreamBeginConnectResultSchema = z
   .object({
-    opened: z.boolean(),
+    opened: z.literal(true),
     expiresAt: z.iso.datetime(),
+    flowId: pipedreamConnectFlowIdSchema,
   })
   .strict();
 export type PipedreamBeginConnectResult = z.infer<typeof pipedreamBeginConnectResultSchema>;

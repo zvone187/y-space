@@ -152,6 +152,33 @@ describe("selectCompactThreadTimelineEntries", () => {
     ]);
   });
 
+  it("keeps the settled final visible when app-owned Browser failure evidence arrives after it", () => {
+    const threadId = "late-browser-failure-after-final";
+    const state = makeState(threadId, [
+      makeItem("user-1", "user_message"),
+      makeItem("reasoning-1", "reasoning", { reasoning_text: "Checking the web page." }),
+      makeItem("assistant-final", "assistant_message", {
+        assistant_text: "The embedded browser flow works.",
+      }),
+      makeBrowserEvidence("browser-late-failure", "snapshot", "error"),
+    ]);
+
+    expect(selectCompactThreadTimelineEntries(state, threadId, undefined, false)).toEqual([
+      { kind: "item", id: "user-1" },
+      {
+        kind: "turn_activity_group",
+        id: "turn-activity-group:reasoning-1",
+        itemIds: ["reasoning-1", "browser-late-failure"],
+        entries: [
+          { kind: "item", id: "reasoning-1" },
+          { kind: "item", id: "browser-late-failure" },
+        ],
+        isCurrentTurn: false,
+      },
+      { kind: "item", id: "assistant-final" },
+    ]);
+  });
+
   it("still treats a provider-authored tool row after an assistant message as later work", () => {
     const threadId = "provider-tool-after-assistant";
     const state = makeState(threadId, [
@@ -353,7 +380,11 @@ function makeTool(
   };
 }
 
-function makeBrowserEvidence(id: string, name: string): RuntimeChatItem {
+function makeBrowserEvidence(
+  id: string,
+  name: string,
+  status: "success" | "error" = "success",
+): RuntimeChatItem {
   return makeItem(
     id,
     "mcp_tool_call",
@@ -361,7 +392,7 @@ function makeBrowserEvidence(id: string, name: string): RuntimeChatItem {
     {
       name,
       serverId: "browser",
-      status: "success",
+      status,
       browserEvidence: { source: "y-space-browser-mcp", occurredAt: 1 },
     },
   );

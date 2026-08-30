@@ -51,6 +51,7 @@ import {
   installCookieImportExtension,
 } from "./browser/cookieImport";
 import { buildBrowserUserAgent } from "./browser/userAgent";
+import { cleanupSensitiveSessionPartition } from "./browser/cleanupSensitiveSessionPartition";
 import { startUsageLoginCookieMirror } from "./usageLogin/UsageLoginCookieMirror";
 import {
   ComputerUseDesktopOverlay,
@@ -130,6 +131,8 @@ import {
   capturePipedreamBootstrapEnvFile,
 } from "@/shared/pipedreamBootstrap";
 import { PipedreamMainService } from "./pipedream/PipedreamMainService";
+import { createOrderlyPipedreamShutdown } from "./pipedream/orderlyPipedreamShutdown";
+import { createProcessRuntimeShutdown } from "./processRuntimeShutdown";
 import {
   applyPersistedPipedreamEnvFile,
   clearPipedreamEnvFilePath,
@@ -268,6 +271,7 @@ let browserExtractWindow: BrowserWindow | null = null;
 let tray: TrayHandle | null = null;
 let quickComposerShortcutManager: QuickComposerShortcutManager | null = null;
 let isQuitting = false;
+let finalizeProcessRuntime: (() => void) | null = null;
 
 function captureRendererProcessGone(
   details: RenderProcessGoneDetails,
@@ -849,6 +853,9 @@ if (!hasSingleInstanceLock) {
           captureMainException(error, tags);
         },
         onEvent: (event) => {
+          // RPC replies are handled inside SupervisorClient before this callback.
+          // Ignore only unsolicited events once dependent services begin teardown.
+          if (isQuitting) return;
           if (event.type === "crossagent-selection-used") {
             try {
               recordCrossagentSelectionPreference(event);
@@ -889,28 +896,73 @@ if (!hasSingleInstanceLock) {
         },
         onReset: () => {
           workingThreads.clear();
-          updatePowerSaveBlocker();
+          // The final supervisor reset runs during will-quit, after the sleep
+          // inhibitor has been disposed. Never reactivate it during teardown.
+          if (!isQuitting) updatePowerSaveBlocker();
+        },
+      });
+      // Keep the supervisor available while the first, cancelable before-quit
+      // pass closes sensitive Browser/Pipedream state. Renderer windows are
+      // gone by will-quit, so only then can snapshot IPC be torn down without
+      // racing hydration or view-reconciliation requests still in flight.
+      finalizeProcessRuntime = createProcessRuntimeShutdown({
+        disposeSupervisor: () => supervisorClient.dispose(),
+        disposeJobObject: () => {
+          const manager = windowsJobObjectManager;
+          windowsJobObjectManager = null;
+          manager?.dispose();
+        },
+        closeDatabase,
+        reportError: (_error, phase) => {
+          captureMainException(new Error(`Final ${phase} shutdown cleanup failed.`), {
+            "poracode.feature_area": "main-shutdown",
+          });
         },
       });
       const pipedreamMainService = new PipedreamMainService({
-        createConnectLink: (appSlug) => supervisorClient.createPipedreamConnectLink(appSlug),
+        createConnectLink: (appSlug, redirects) =>
+          supervisorClient.createPipedreamConnectLink(appSlug, redirects),
+        beginPersonalMcpOauth: () =>
+          supervisorClient.call("pipedreamInternalBeginPersonalMcpOauth", {}),
+        waitPersonalMcpOauth: (flowId) =>
+          supervisorClient.call("pipedreamInternalWaitPersonalMcpOauth", { flowId }),
+        cancelPersonalMcpOauth: (flowId) =>
+          supervisorClient.call("pipedreamInternalCancelPersonalMcpOauth", { flowId }),
+        clearPersonalMcpOauth: () =>
+          supervisorClient.call("pipedreamInternalClearPersonalMcpOauth", {}),
         persistEnvFilePath: (filePath) => writePipedreamEnvFilePath(paths.baseDir, filePath),
         clearEnvFilePath: () => clearPipedreamEnvFilePath(paths.baseDir),
         fallbackBootstrap: () => launchPipedreamBootstrap,
         configureBootstrap: async (bootstrap) => {
-          pipedreamBootstrap = bootstrap;
-          await supervisorClient.configurePipedream({
+          const snapshot = await supervisorClient.configurePipedream({
             bootstrap,
             externalUserId: pipedreamExternalUserId,
           });
-          return supervisorClient.call("pipedreamGetSnapshot", {});
+          pipedreamBootstrap = bootstrap;
+          return snapshot;
         },
-        openConnectUrl: async (url) => {
+        openConnectUrl: async (url, ownership) => {
           const manager = browserPanelManager;
           if (!manager) throw new Error("Embedded browser is not initialized.");
-          await manager.createSensitiveIntegrationTab({ url, activate: true, reveal: true });
+          const tab = await manager.createSensitiveIntegrationTab(
+            {
+              url,
+              activate: true,
+              reveal: true,
+            },
+            {},
+            ownership,
+          );
           showAndFocusWindow(ensureMainWindow());
+          return { tabId: tab.tabId };
         },
+        closeConnectTab: async (tabId) => {
+          const manager = browserPanelManager;
+          if (!manager?.hasSensitiveIntegrationTab(tabId)) return;
+          await manager.closeTab(tabId);
+        },
+        isConnectTabOpen: async (tabId) =>
+          browserPanelManager?.hasSensitiveIntegrationTab(tabId) ?? false,
       });
       const resolveLaunchContextIdentity =
         (serverId: "browser" | "computer-use" | "app-controls") =>
@@ -1102,6 +1154,7 @@ if (!hasSingleInstanceLock) {
       browserPanelManager = new BrowserPanelManager(paths, browserUserAgent, {
         isExtracted: () => browserExtractWindow !== null && !browserExtractWindow.isDestroyed(),
         focusExtractedWindow: focusBrowserExtractWindow,
+        cleanupSensitiveSessionPartition,
       });
       browserMcpIngress = new BrowserMcpIngress({
         resolveLaunchContextIdentity: resolveLaunchContextIdentity("browser"),
@@ -1210,6 +1263,7 @@ if (!hasSingleInstanceLock) {
         localHandlers: createLocalIpcHandlers({
           getMainWindow: () => mainWindow,
           getBrowserPanelManager: () => browserPanelManager,
+          isQuitting: () => isQuitting,
           getRemoteAccessServer: controller.getServer,
           setRemoteAccessEnabled: controller.setEnabled,
           getRemoteAccessTailscaleStatus: controller.getTailscaleStatus,
@@ -1282,6 +1336,56 @@ if (!hasSingleInstanceLock) {
         if (window) requestTrackedRendererReload(window);
       });
 
+      // Register before exposing a renderer window or awaiting startup gates.
+      // A native Quit during slow startup must take the same secret-cleanup path
+      // as a quit after the app is fully ready.
+      app.on(
+        "before-quit",
+        createOrderlyPipedreamShutdown({
+          beginShutdown: () => {
+            isQuitting = true;
+            quickComposerShortcutManager?.dispose();
+            quickComposerShortcutManager = null;
+            if (quickComposerDismissTimer) clearTimeout(quickComposerDismissTimer);
+            quickComposerDismissTimer = null;
+            pendingQuickComposerSubmissions.length = 0;
+            scheduleService.dispose();
+            prWatchService.dispose();
+            gitStateService.dispose();
+            autoUpdaterController.dispose();
+            browserMcpIngress?.dispose();
+            browserMcpIngress = null;
+            computerUseMcpIngress?.dispose();
+            computerUseMcpIngress = null;
+            appControlsMcpIngress?.dispose();
+            appControlsMcpIngress = null;
+            computerUseDesktopOverlay?.dispose();
+            computerUseDesktopOverlay = null;
+            cookieImportBridge.dispose();
+            void controller.dispose();
+            void sshConnectionManager.dispose();
+            browserExtractWindow?.close();
+            browserExtractWindow = null;
+            quickComposerWindow?.close();
+            quickComposerWindow = null;
+            sleepInhibitor.dispose();
+            tray?.destroy();
+            tray = null;
+          },
+          disposePipedream: () => pipedreamMainService.dispose(),
+          disposeBrowserManager: () => {
+            browserPanelManager?.dispose();
+            browserPanelManager = null;
+          },
+          reportPipedreamDisposeError: () => {
+            captureMainException(new Error("Pipedream shutdown cleanup failed."), {
+              "poracode.feature_area": "pipedream-shutdown",
+            });
+          },
+          requestFinalQuit: () => app.quit(),
+        }),
+      );
+
       const initialMainWindow = ensureMainWindow(showMainWindowOnReady);
 
       tray = createTray({
@@ -1301,6 +1405,7 @@ if (!hasSingleInstanceLock) {
       onProjectThreadDataChanged(() => tray?.refreshMenu());
 
       await jobObjectReady;
+      if (isQuitting) return;
 
       const hookDebugOn =
         Boolean(process.env.PORACODE_HOOK_DEBUG) && process.env.PORACODE_HOOK_DEBUG !== "0";
@@ -1316,6 +1421,7 @@ if (!hasSingleInstanceLock) {
         computerUseMcpInfoReady,
         appControlsMcpReady,
       ]);
+      if (isQuitting) return;
       supervisorClient.start(paths.baseDir);
       scheduleService.start();
       prWatchService.start();
@@ -1347,6 +1453,7 @@ if (!hasSingleInstanceLock) {
             clearTimeout(debounce);
           }
           debounce = setTimeout(() => {
+            if (isQuitting) return;
             console.log("[poracode] supervisor changed, restarting…");
             supervisorClient.start(requirePoracodePaths().baseDir);
           }, 200);
@@ -1360,41 +1467,6 @@ if (!hasSingleInstanceLock) {
         }
         ensureMainWindow();
       });
-
-      app.on("before-quit", () => {
-        isQuitting = true;
-        quickComposerShortcutManager?.dispose();
-        quickComposerShortcutManager = null;
-        if (quickComposerDismissTimer) clearTimeout(quickComposerDismissTimer);
-        quickComposerDismissTimer = null;
-        pendingQuickComposerSubmissions.length = 0;
-        scheduleService.dispose();
-        prWatchService.dispose();
-        gitStateService.dispose();
-        supervisorClient.dispose();
-        windowsJobObjectManager?.dispose();
-        windowsJobObjectManager = null;
-        browserMcpIngress?.dispose();
-        browserMcpIngress = null;
-        computerUseMcpIngress?.dispose();
-        computerUseMcpIngress = null;
-        appControlsMcpIngress?.dispose();
-        appControlsMcpIngress = null;
-        computerUseDesktopOverlay?.dispose();
-        computerUseDesktopOverlay = null;
-        cookieImportBridge.dispose();
-        void controller.dispose();
-        void sshConnectionManager.dispose();
-        browserExtractWindow?.close();
-        browserExtractWindow = null;
-        quickComposerWindow?.close();
-        quickComposerWindow = null;
-        browserPanelManager?.dispose();
-        browserPanelManager = null;
-        sleepInhibitor.dispose();
-        tray?.destroy();
-        tray = null;
-      });
     })
     .catch((error: unknown) => {
       console.error("[poracode] failed to initialize:", error);
@@ -1404,7 +1476,8 @@ if (!hasSingleInstanceLock) {
 }
 
 app.on("will-quit", () => {
-  closeDatabase();
+  if (finalizeProcessRuntime) finalizeProcessRuntime();
+  else closeDatabase();
 });
 
 app.on("window-all-closed", () => {

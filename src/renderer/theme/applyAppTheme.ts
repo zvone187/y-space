@@ -6,7 +6,11 @@
  * than by re-setting equivalent values.
  */
 
-import { resolveThemeMode } from "@/shared/themeMode";
+import {
+  migrateLegacyThemeDefault,
+  resolveThemeMode,
+  THEME_DEFAULT_VERSION,
+} from "@/shared/themeMode";
 import type { ThemeMode } from "@/shared/contracts";
 import { DEFAULT_THEME_ID, getThemePreset } from "./themePresets";
 import { MANAGED_THEME_VARS } from "./themeTokens";
@@ -45,7 +49,14 @@ export function persistThemeBoot(appearance: Appearance, themeId: string): void 
   try {
     const preset = getThemePreset(themeId);
     const background = (appearance === "dark" ? preset.dark : preset.light)["--background"];
-    localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify({ appearance, bg: background }));
+    localStorage.setItem(
+      BOOT_CACHE_KEY,
+      JSON.stringify({
+        appearance,
+        bg: background,
+        themeDefaultVersion: THEME_DEFAULT_VERSION,
+      }),
+    );
   } catch {
     // Non-fatal; the bootstrap falls back to themeMode + system preference.
   }
@@ -69,10 +80,15 @@ export function bootstrapAppThemeFromCache(): void {
   try {
     const raw = localStorage.getItem(SHARED_SETTINGS_CACHE_KEY);
     if (!raw) return;
-    const cached = JSON.parse(raw) as { themeMode?: unknown; themePreset?: unknown };
-    const mode: ThemeMode =
+    const cached = JSON.parse(raw) as {
+      themeMode?: unknown;
+      themePreset?: unknown;
+      themeDefaultVersion?: unknown;
+    };
+    const cachedMode: ThemeMode =
       cached.themeMode === "dark" || cached.themeMode === "system" ? cached.themeMode : "light";
     const themeId = typeof cached.themePreset === "string" ? cached.themePreset : DEFAULT_THEME_ID;
+    const mode = migrateLegacyThemeDefault(cachedMode, themeId, cached.themeDefaultVersion);
     const appearance = resolveThemeMode(mode, systemPrefersDark());
 
     const root = document.documentElement;

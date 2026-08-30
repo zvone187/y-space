@@ -56,7 +56,7 @@ export interface ThreadSessionManagerOptions {
     ): CrossagentMcpHttpConfig | undefined;
     unregister(threadId: string): void;
     cancelForeground(threadId: string): void;
-    cancelAll(threadId: string): void;
+    cancelAll(threadId: string): void | Promise<void>;
     /**
      * Try to route a server-request resolution to a subagent child run. Returns
      * `true` when the id belonged to a subagent (namespaced under a run) and was

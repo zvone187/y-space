@@ -390,7 +390,7 @@ describe("McpServersManager", () => {
   it("keeps MCP OAuth authorization inside the embedded Y Space browser", async () => {
     const remoteServer: McpServer = {
       ...server,
-      transport: { type: "http", url: "https://mcp.pipedream.net/v2", headers: {} },
+      transport: { type: "http", url: "https://mcp.example.test", headers: {} },
     };
     bridge.probeMcpServer.mockResolvedValue({
       status: "auth-required",

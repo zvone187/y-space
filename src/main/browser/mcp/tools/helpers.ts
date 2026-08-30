@@ -20,6 +20,13 @@ export function agentTabOpts(ctx: ToolContext): {
   };
 }
 
+/** Presence ownership is per authenticated agent launch when that identity is
+ * available. Legacy/test callers without a launch nonce retain their existing
+ * per-thread behavior. Tab grouping itself intentionally remains per thread. */
+export function automationSessionId(ctx: ToolContext): string {
+  return ctx.launchId ? `launch:${ctx.launchId}` : (ctx.threadId ?? "unscoped");
+}
+
 export async function resolveTabId(
   ctx: ToolContext,
   payload: Record<string, unknown>,
@@ -28,7 +35,7 @@ export async function resolveTabId(
     ctx.resolvedTabIdForToolCall = tabId;
     return tabId;
   };
-  const sessionId = ctx.threadId ?? "unscoped";
+  const sessionId = automationSessionId(ctx);
   const requested = typeof payload.tabId === "string" ? payload.tabId : null;
   if (requested) {
     if (!ctx.manager.getTab(requested)) throw new Error(`unknown tab ${requested}`);

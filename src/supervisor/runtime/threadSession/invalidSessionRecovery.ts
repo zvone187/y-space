@@ -28,6 +28,7 @@ export interface InvalidSessionRecoveryContext {
   failStructuredSession(session: SessionRuntime, error: unknown): void;
   beginMcpLaunchAuthorization(authorization: McpLaunchAuthorization): void;
   revokeMcpLaunchAuthorization(identity: McpLaunchIdentity): void;
+  getPersonalMcpCredentialEpoch?(): number;
   settleAfterStructuredDispose(): Promise<void>;
   primeProjectShellEnv(cwd: string): Promise<unknown>;
   resolveLaunchSpec(location: ProjectLocation, argv: AgentArgvSpec): CommandSpec;
@@ -65,6 +66,7 @@ export class InvalidSessionRecoveryCoordinator {
     if (!context.isCurrentSession(session)) {
       return;
     }
+    const personalMcpCredentialEpoch = context.getPersonalMcpCredentialEpoch?.() ?? 0;
     const mcpLaunchSnapshot = session.mcpLaunchSnapshot;
     const mcpIdentity: McpLaunchIdentity = {
       ...session.mcpIdentity,
@@ -90,6 +92,7 @@ export class InvalidSessionRecoveryCoordinator {
       config: session.config,
       launchConfig,
       mcpLaunchSnapshot,
+      personalMcpCredentialEpoch,
     });
 
     try {
@@ -132,45 +135,63 @@ export class InvalidSessionRecoveryCoordinator {
         undefined,
         context.spawnPipeline.composeLaunchOptions(session.adapter, undefined, resolvedMcpServers),
       );
-      if (cliHookExtras.extraArgs.length > 0) {
-        argv.args = mergeCliHookExtraArgs(
+      const cleanupArgv = onceRecoveryLaunchCleanup(argv.cleanup);
+      if (cleanupArgv) argv.cleanup = cleanupArgv;
+      let argvTransferred = false;
+      try {
+        if (cliHookExtras.extraArgs.length > 0) {
+          argv.args = mergeCliHookExtraArgs(
+            session.adapter,
+            argv.args,
+            cliHookExtras.extraArgs,
+            session.launchPrompt,
+          );
+        }
+        argv.args = await applyLaunchArgsConfigRewrite(
           session.adapter,
           argv.args,
-          cliHookExtras.extraArgs,
-          session.launchPrompt,
+          session.config,
+          session.projectLocation,
         );
-      }
-      argv.args = await applyLaunchArgsConfigRewrite(
-        session.adapter,
-        argv.args,
-        session.config,
-        session.projectLocation,
-      );
-      if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
-        await context.primeProjectShellEnv(session.projectLocation.path);
-      }
-      if (!context.isCurrentSession(session)) {
-        return;
-      }
-      const command = context.resolveLaunchSpec(session.projectLocation, argv);
+        if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
+          await context.primeProjectShellEnv(session.projectLocation.path);
+        }
+        if (!context.isCurrentSession(session)) {
+          return;
+        }
+        const command = context.resolveLaunchSpec(session.projectLocation, argv);
 
-      context.spawnPipeline.spawnThread({
-        threadId: session.threadId,
-        agentKind: session.agentKind,
-        adapter: session.adapter,
-        projectLocation: session.projectLocation,
-        config: session.config,
-        initialSize: session.terminalSize,
-        launchPrompt: session.launchPrompt,
-        command,
-        mcpLaunchSnapshot,
-        launchConfig,
-        mcpIdentity,
-        ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
-        ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
-      });
+        context.spawnPipeline.spawnThread({
+          threadId: session.threadId,
+          agentKind: session.agentKind,
+          adapter: session.adapter,
+          projectLocation: session.projectLocation,
+          config: session.config,
+          initialSize: session.terminalSize,
+          launchPrompt: session.launchPrompt,
+          command,
+          mcpLaunchSnapshot,
+          launchConfig,
+          mcpIdentity,
+          ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
+          ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
+        });
+        argvTransferred = true;
+      } finally {
+        if (!argvTransferred) cleanupArgv?.();
+      }
     } finally {
       context.revokeMcpLaunchAuthorization(mcpIdentity);
     }
   }
+}
+
+function onceRecoveryLaunchCleanup(cleanup: (() => void) | undefined): (() => void) | undefined {
+  if (!cleanup) return undefined;
+  let called = false;
+  return () => {
+    if (called) return;
+    called = true;
+    cleanup();
+  };
 }

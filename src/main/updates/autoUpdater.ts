@@ -27,6 +27,7 @@ const TRANSIENT_REPORT_COOLDOWN_MS = 6 * 60 * 60 * 1_000;
 
 export interface AutoUpdaterController {
   initialize(): void;
+  dispose(): void;
   getStatus(): UpdateStatus | null;
   checkForUpdate(): Promise<void>;
   startUpdateDownload(): Promise<void>;
@@ -54,6 +55,7 @@ export function createAutoUpdaterController(
   // trigger a redundant re-download.
   let downloadedVersion: string | null = null;
   let availableVersion: string | null = null;
+  let initialTimer: ReturnType<typeof setTimeout> | null = null;
   let periodicTimer: ReturnType<typeof setInterval> | null = null;
   let checkPromise: Promise<void> | null = null;
   let downloadPromise: Promise<void> | null = null;
@@ -200,6 +202,17 @@ export function createAutoUpdaterController(
     void beginCheck();
   }
 
+  function clearScheduledChecks(): void {
+    if (initialTimer) {
+      clearTimeout(initialTimer);
+      initialTimer = null;
+    }
+    if (periodicTimer) {
+      clearInterval(periodicTimer);
+      periodicTimer = null;
+    }
+  }
+
   function initialize(): void {
     if (initialized) {
       return;
@@ -290,7 +303,13 @@ export function createAutoUpdaterController(
     // First check ~30s after launch, then keep checking hourly so an app that
     // is never restarted still surfaces new releases (the sidebar install
     // affordance reacts to the resulting status).
-    setTimeout(runScheduledCheck, INITIAL_CHECK_DELAY_MS);
+    initialTimer = setTimeout(() => {
+      initialTimer = null;
+      runScheduledCheck();
+    }, INITIAL_CHECK_DELAY_MS);
+    // A user quitting before the first background check must not leave the
+    // packaged process alive solely to service an optional update timer.
+    initialTimer.unref?.();
     periodicTimer = setInterval(runScheduledCheck, PERIODIC_CHECK_INTERVAL_MS);
     // Don't let the recurring timer keep the process alive on its own.
     periodicTimer.unref?.();
@@ -314,17 +333,19 @@ export function createAutoUpdaterController(
   }
 
   function installUpdate(): void {
-    // Stop the recurring check so it can't race quitAndInstall.
-    if (periodicTimer) {
-      clearInterval(periodicTimer);
-      periodicTimer = null;
-    }
+    // Stop scheduled checks so they cannot race quitAndInstall.
+    clearScheduledChecks();
     beforeInstall();
     autoUpdater.quitAndInstall(process.platform === "win32", true);
   }
 
+  function dispose(): void {
+    clearScheduledChecks();
+  }
+
   return {
     initialize,
+    dispose,
     getStatus: () => lastStatus,
     checkForUpdate,
     startUpdateDownload,

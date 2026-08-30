@@ -42,6 +42,7 @@ describe("PipedreamMcpRelay security", () => {
     expect(headers.get("x-pd-external-user-id")).toBe("y-space-install-private-id");
     expect(headers.get("x-pd-app-slug")).toBe("slack");
     expect(headers.get("x-pd-account-id")).toBe("apn_Account123");
+    expect(headers.get("x-pd-registry")).toBe("all");
 
     expect(headers.get("accept")).toBe("application/json, text/event-stream");
     expect(headers.get("content-type")).toBe("application/json");
@@ -49,7 +50,7 @@ describe("PipedreamMcpRelay security", () => {
     expect(headers.get("mcp-session-id")).toBe("session-a");
     expect(headers.get("last-event-id")).toBe("event-3");
 
-    for (const stripped of ["cookie", "origin", "host", "x-forwarded-for", "x-pd-registry"]) {
+    for (const stripped of ["cookie", "origin", "host", "x-forwarded-for"]) {
       expect(headers.has(stripped)).toBe(false);
     }
   });
@@ -66,6 +67,46 @@ describe("PipedreamMcpRelay security", () => {
 
     sessions.clearBinding("binding-a");
     expect(sessions.owns({ bindingId: "binding-a", sessionId: "session-a" })).toBe(false);
+  });
+
+  it("bounds retained upstream session ids per binding and across the relay", () => {
+    const sessions = new PipedreamMcpSessionRegistry({
+      maxSessionsPerBinding: 2,
+      maxSessionsTotal: 3,
+    });
+
+    sessions.bind({ bindingId: "binding-a", sessionId: "session-a1" });
+    sessions.bind({ bindingId: "binding-a", sessionId: "session-a2" });
+    expect(() => sessions.bind({ bindingId: "binding-a", sessionId: "session-a3" })).toThrow(
+      /session limit/i,
+    );
+
+    sessions.bind({ bindingId: "binding-b", sessionId: "session-b1" });
+    expect(() => sessions.bind({ bindingId: "binding-b", sessionId: "session-b2" })).toThrow(
+      /session limit/i,
+    );
+
+    sessions.clearBinding("binding-a");
+    sessions.bind({ bindingId: "binding-b", sessionId: "session-b2" });
+    expect(sessions.owns({ bindingId: "binding-b", sessionId: "session-b2" })).toBe(true);
+  });
+
+  it("clears exactly one owned session and frees both session limits", () => {
+    const sessions = new PipedreamMcpSessionRegistry({
+      maxSessionsPerBinding: 1,
+      maxSessionsTotal: 1,
+    });
+
+    sessions.bind({ bindingId: "binding-a", sessionId: "session-a" });
+    expect(sessions.clearSession({ bindingId: "binding-b", sessionId: "session-a" })).toBe(false);
+    expect(sessions.owns({ bindingId: "binding-a", sessionId: "session-a" })).toBe(true);
+
+    expect(sessions.clearSession({ bindingId: "binding-a", sessionId: "session-a" })).toBe(true);
+    expect(sessions.clearSession({ bindingId: "binding-a", sessionId: "session-a" })).toBe(false);
+    expect(sessions.owns({ bindingId: "binding-a", sessionId: "session-a" })).toBe(false);
+
+    sessions.bind({ bindingId: "binding-b", sessionId: "session-b" });
+    expect(sessions.owns({ bindingId: "binding-b", sessionId: "session-b" })).toBe(true);
   });
 
   it("retries a 401 only for handshake and read RPCs, never for tools/call", () => {

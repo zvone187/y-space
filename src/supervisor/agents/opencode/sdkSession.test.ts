@@ -474,6 +474,61 @@ describe("OpencodeSdkSession", () => {
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 
+  it("retries a missing acquisition after an MCP connection-loss recovery fails", async () => {
+    const firstDispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const recoveredDispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const firstUpdate = vi.fn<() => Promise<void>>().mockRejectedValue(new Error("fetch failed"));
+    mocks.acquireOpenCodeServer
+      .mockResolvedValueOnce({
+        eventClient: emptyEventClient(),
+        client: {},
+        baseUrl: "http://127.0.0.1:1",
+        handle: {},
+        updateMcpServers: firstUpdate,
+        dispose: firstDispose,
+      })
+      .mockRejectedValueOnce(new Error("replacement unavailable"))
+      .mockResolvedValueOnce({
+        eventClient: emptyEventClient(),
+        client: {},
+        baseUrl: "http://127.0.0.1:3",
+        handle: {},
+        updateMcpServers: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        dispose: recoveredDispose,
+      });
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-retry-missing-acquisition",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+      mcpServers: [],
+    });
+    await session.activate();
+    const nextMcpServers = [
+      {
+        id: "pipedream:gmail",
+        name: "pipedream-gmail-local",
+        timeoutMs: 30_000,
+        transport: { type: "http" as const, url: "http://127.0.0.1:9502/mcp", headers: {} },
+      },
+    ];
+
+    await expect(session.updateMcpServers(nextMcpServers)).rejects.toThrow(
+      "replacement unavailable",
+    );
+    expect(mocks.acquireOpenCodeServer).toHaveBeenCalledTimes(2);
+
+    await expect(session.updateMcpServers(nextMcpServers)).resolves.toBeUndefined();
+
+    expect(mocks.acquireOpenCodeServer).toHaveBeenCalledTimes(3);
+    expect(mocks.acquireOpenCodeServer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mcpServers: nextMcpServers }),
+    );
+    await session.dispose();
+    expect(firstDispose).toHaveBeenCalledOnce();
+    expect(recoveredDispose).toHaveBeenCalledOnce();
+  });
+
   it.each([
     {
       label: "added",

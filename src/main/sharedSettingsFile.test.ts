@@ -81,6 +81,7 @@ describe("sharedSettingsFile", () => {
     const settingsPath = join(makeTempDir(), "settings.json");
     writeSharedSettingsFile(settingsPath, {
       themeMode: "dark",
+      themeDefaultVersion: 1,
       themePreset: "default",
       locale: "system",
       gitTextLanguage: "en",
@@ -216,6 +217,7 @@ describe("sharedSettingsFile", () => {
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
       themeMode: "dark",
+      themeDefaultVersion: 1,
       themePreset: "default",
       locale: "system",
       gitTextLanguage: "en",
@@ -447,6 +449,7 @@ describe("sharedSettingsFile", () => {
       settingsPath,
       JSON.stringify({
         themeMode: "dark",
+        themeDefaultVersion: 1,
         terminalPosition: "right",
         autoShowTerminalPanel: false,
         providerConfigs: {

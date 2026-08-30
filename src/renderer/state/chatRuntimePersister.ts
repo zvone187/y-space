@@ -1,4 +1,5 @@
 import type { ToolCallPayload } from "@/shared/contracts";
+import { Y_SPACE_BROWSER_EVIDENCE_SOURCE } from "@/shared/browserMcpEvidence";
 import type { PersistedRuntimeItem } from "@/shared/ipc";
 import { isDelegatedAgentTool } from "@/shared/toolCallClassification";
 import { captureRendererException } from "../diagnostics/sentry";
@@ -406,6 +407,10 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
   ) {
     return false;
   }
+  // These canonical rows are the durable trust boundary for final Browser
+  // verification. Folding them into a generic tool summary would discard the
+  // app-owned marker, target identity, and success/failure outcome on reopen.
+  if (isAppOwnedBrowserEvidenceItem(item)) return false;
   // Tool rows that render as a standalone inline image (ImageView) must NOT be
   // folded into a "N tools" summary: `summarizeToolCallRun` keeps only a name +
   // status, which would strip the image off the payload and lose it on reload.
@@ -427,6 +432,15 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
     item.type === "command_execution" ||
     item.type === "file_change" ||
     item.type === "web_search"
+  );
+}
+
+function isAppOwnedBrowserEvidenceItem(item: RuntimeChatItem): boolean {
+  if (item.type !== "mcp_tool_call") return false;
+  const payload = item.payload as Partial<ToolCallPayload> | undefined;
+  return (
+    payload?.serverId === "browser" &&
+    payload.browserEvidence?.source === Y_SPACE_BROWSER_EVIDENCE_SOURCE
   );
 }
 

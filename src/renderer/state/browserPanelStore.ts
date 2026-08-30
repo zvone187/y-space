@@ -90,10 +90,9 @@ export const useBrowserPanelStore = create<BrowserPanelState>((set) => ({
       if (idx < 0) {
         return { tabs: [...s.tabs, tab] };
       }
-      const nextTab = { ...s.tabs[idx]!, ...tab };
-      if (tabInfoEqual(s.tabs[idx]!, nextTab)) return {};
+      if (tabInfoEqual(s.tabs[idx]!, tab)) return {};
       const next = s.tabs.slice();
-      next[idx] = nextTab;
+      next[idx] = tab;
       return { tabs: next };
     }),
   setActive: (tabId) => set((state) => (state.activeTabId === tabId ? {} : { activeTabId: tabId })),
@@ -158,6 +157,7 @@ function tabInfoEqual(a: BrowserTabInfo, b: BrowserTabInfo): boolean {
     a.canGoForward === b.canGoForward &&
     a.devToolsOpen === b.devToolsOpen &&
     a.groupId === b.groupId &&
-    a.sensitiveIntegration === b.sensitiveIntegration
+    a.sensitiveIntegration === b.sensitiveIntegration &&
+    a.sensitiveViewGeneration === b.sensitiveViewGeneration
   );
 }

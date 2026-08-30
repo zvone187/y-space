@@ -598,7 +598,7 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
     }
   });
 
-  it("uses a stable same-directory Pipedream binding for OpenCode GUI reloads", async () => {
+  it("isolates OpenCode GUI Pipedream bindings by task and launch in the same directory", async () => {
     const resolvePipedreamMcpServers = vi.fn<
       (input: {
         threadId: string;
@@ -633,20 +633,27 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
 
     await pipeline.resolveMcpServersForLaunch({
       ...input,
-      identity: { threadId: "thread-a" },
+      identity: { threadId: "thread-a", launchId: "launch-a" },
     });
     await pipeline.resolveMcpServersForLaunch({
       ...input,
       crossagentThreadId: "thread-b",
-      identity: { threadId: "thread-b" },
+      identity: { threadId: "thread-b", launchId: "launch-b" },
+    });
+    await pipeline.resolveMcpServersForLaunch({
+      ...input,
+      identity: { threadId: "thread-a", launchId: "launch-a-restarted" },
     });
 
     const first = resolvePipedreamMcpServers.mock.calls[0]?.[0];
     const second = resolvePipedreamMcpServers.mock.calls[1]?.[0];
+    const restarted = resolvePipedreamMcpServers.mock.calls[2]?.[0];
     expect(first).toMatchObject({ threadId: "thread-a", projectLocation: location });
     expect(second).toMatchObject({ threadId: "thread-b", projectLocation: location });
-    expect(first?.providerBindingId).toMatch(/^opencode-gui:/u);
-    expect(second?.providerBindingId).toBe(first?.providerBindingId);
+    expect(restarted).toMatchObject({ threadId: "thread-a", projectLocation: location });
+    expect(first?.providerBindingId).toBe("thread:thread-a:launch:launch-a");
+    expect(second?.providerBindingId).toBe("thread:thread-b:launch:launch-b");
+    expect(restarted?.providerBindingId).toBe("thread:thread-a:launch:launch-a-restarted");
   });
 });
 
@@ -824,6 +831,50 @@ describe("composeResolvedMcpServers", () => {
 });
 
 describe("launch-resource cleanup", () => {
+  it("cleans argv-owned resources when hook-extra resolution rejects before spawn", async () => {
+    const cleanup = vi.fn<() => void>();
+    const hookError = new Error("hook extras failed");
+    const adapter = {
+      kind: "gemini",
+      label: "Gemini",
+      capabilities: { presentationMode: "terminal", liveInputMode: "terminal" },
+      buildLaunchArgv: () => ({ binary: "gemini", args: [], cleanup }),
+      buildResumeArgv: () => ({ binary: "gemini", args: [], cleanup }),
+    } as unknown as AgentAdapter;
+    const pipeline = new SpawnPipeline({
+      options: { adapters: new Map([["gemini", adapter]]) },
+      sessions: new Map(),
+      pendingStartInterrupts: new Set(),
+      pendingStartAborts: new Set(),
+      closeThread: vi.fn<() => Promise<void>>(async () => {}),
+      resolveAgentSettings: () => ({}),
+      beginMcpLaunchAuthorization: vi.fn<() => void>(),
+      activateMcpLaunchAuthorization: vi.fn<() => void>(),
+      revokeMcpLaunchAuthorization: vi.fn<() => void>(),
+      emitOptimisticUserMessage: vi.fn<() => string>(() => "unused"),
+      cliHookPlugin: {
+        resolveCliHookPluginExtras: vi.fn<() => Promise<never>>(async () => {
+          throw hookError;
+        }),
+      },
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+
+    await expect(
+      pipeline.startThreadInner({
+        threadId: "thread-hook-cleanup",
+        agentKind: "gemini",
+        projectLocation: { kind: "posix", path: "/work/project" },
+        config: { model: "gemini-2.5-pro" },
+        prompt: "",
+        initialSize: { cols: 120, rows: 30 },
+        presentationMode: "terminal",
+        disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+      }),
+    ).rejects.toBe(hookError);
+
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects a provider-declared non-exclusive root mode before creating a session", async () => {
     const createStructuredSession = vi.fn<NonNullable<AgentAdapter["createStructuredSession"]>>(
       async () => undefined,

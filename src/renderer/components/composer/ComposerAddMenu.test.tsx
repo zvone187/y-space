@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { ComposerAddMenu } from "./ComposerAddMenu";
@@ -35,6 +35,63 @@ describe("ComposerAddMenu", () => {
     );
 
     expect(container.querySelector("button button")).not.toBeInTheDocument();
+  });
+
+  it("opens Integrations from the desktop add menu", () => {
+    const onOpenIntegrations = vi.fn<() => void>();
+    render(
+      <ComposerAddMenu
+        mcpServers={[]}
+        onPickFiles={vi.fn<() => void>()}
+        onOpenIntegrations={onOpenIntegrations}
+      />,
+    );
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Integrations" }));
+
+    expect(onOpenIntegrations).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Integrations available as the only mobile add action", () => {
+    bridgeMock.isRemoteSession.mockReturnValue(true);
+    const onOpenIntegrations = vi.fn<() => void>();
+    render(
+      <ComposerAddMenu
+        mcpServers={[]}
+        showFileOption={false}
+        onPickFiles={vi.fn<() => void>()}
+        onOpenIntegrations={onOpenIntegrations}
+      />,
+    );
+
+    openMenu();
+    const sheet = screen.getByRole("dialog", { name: "Add to composer" });
+    const actions = within(sheet).getAllByRole("button");
+    const integrationAction = actions[0]!;
+    expect(actions).toHaveLength(1);
+    expect(integrationAction).toHaveAccessibleName("Integrations");
+    fireEvent.click(integrationAction);
+
+    expect(onOpenIntegrations).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Integrations actionable when active-session MCP bindings are read-only", () => {
+    const onOpenIntegrations = vi.fn<() => void>();
+    render(
+      <ComposerAddMenu
+        readOnly
+        mcpServers={[]}
+        showFileOption={false}
+        onPickFiles={vi.fn<() => void>()}
+        onOpenIntegrations={onOpenIntegrations}
+      />,
+    );
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Integrations" }));
+
+    expect(onOpenIntegrations).toHaveBeenCalledOnce();
   });
 
   it("hides the file picker action when file attachments are unavailable", () => {

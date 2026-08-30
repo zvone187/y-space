@@ -151,6 +151,40 @@ describe("createMainWindow", () => {
     expect(event.preventDefault).toHaveBeenCalledOnce();
   });
 
+  it("rejects renderer webviews that request a main-owned sensitive session", async () => {
+    const { createMainWindow } = await import("./createMainWindow");
+    createMainWindow({
+      title: "Y Space",
+      isDev: false,
+      channel: "stable",
+      preloadPath: "/tmp/preload.cjs",
+      rendererHtmlPath: "/tmp/index.html",
+      appVersion: "1.2.1",
+      posthogEnableDev: false,
+      posthogEnabled: false,
+      posthogHost: "",
+      posthogKey: "",
+      sentryEnabled: false,
+      windowChromeHeight: 32,
+      browserUserAgent: "Y Space",
+      appearance: "light",
+      sidebarTranslucency: false,
+      onClosed: vi.fn<() => void>(),
+    });
+    const event = { preventDefault: vi.fn<() => void>() };
+
+    webContentsHandlers["will-attach-webview"]?.(
+      event as never,
+      {} as never,
+      {
+        src: "about:blank",
+        partition: "pipedream-oauth-11111111111111111111111111111111",
+      } as never,
+    );
+
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+  });
+
   it("supplies window-close intent only when the app does not prevent the close", async () => {
     const { createMainWindow } = await import("./createMainWindow");
     let preventClose = true;

@@ -13,6 +13,7 @@ import { withCursorOverlayHidden } from "./cursorOverlay";
 import { truncateUtf8, utf8ByteLength } from "./boundedText";
 import {
   installNavigationGuards,
+  installSensitiveSessionPermissions,
   installSessionPermissions,
   isNavigationUrlAllowed,
 } from "./permissions";
@@ -33,6 +34,7 @@ export interface BrowserTabOptions {
   initialUrl?: string;
   initialTitle?: string;
   userAgent: string;
+  permissionProfile?: "ordinary" | "sensitive";
   onUpdate(snapshot: BrowserTabSnapshot): void;
   onAttention(tabId: string): void;
   onPopup(tabId: string, url: string): void;
@@ -53,6 +55,7 @@ const CONSOLE_BUFFER_SIZE = 200;
 export const BROWSER_TAB_ATTACH_TIMEOUT_MS = 8_000;
 export const MAX_BROWSER_URL_BYTES = 64 * 1024;
 export const MAX_BROWSER_TITLE_BYTES = 8 * 1024;
+export const BROWSER_TAB_TARGET_INITIALIZATION_TIMEOUT_MS = 1_000;
 const MAX_BROWSER_FAVICON_URL_BYTES = 64 * 1024;
 const MAX_BROWSER_CONSOLE_TEXT_BYTES = 64 * 1024;
 const MAX_BROWSER_CONSOLE_SOURCE_BYTES = 16 * 1024;
@@ -81,6 +84,53 @@ interface AttachmentWaiter {
   timeout: ReturnType<typeof setTimeout> | null;
 }
 
+type BoundedInitializationResult<T> =
+  | { status: "fulfilled"; value: T }
+  | { status: "rejected" }
+  | { status: "timed-out" }
+  | { status: "aborted" };
+
+function settleInitializationBefore<T>(
+  promise: Promise<T>,
+  deadline: number,
+  signal: AbortSignal,
+): Promise<BoundedInitializationResult<T>> {
+  return new Promise<BoundedInitializationResult<T>>((resolve) => {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    let settled = false;
+    const finish = (result: BoundedInitializationResult<T>) => {
+      if (settled) return;
+      settled = true;
+      if (timeout) clearTimeout(timeout);
+      timeout = null;
+      signal.removeEventListener("abort", onAbort);
+      resolve(result);
+    };
+    const onAbort = () => finish({ status: "aborted" });
+
+    // Observe the operation even when its budget is already exhausted. The
+    // caller creates the promise before this helper can inspect the deadline,
+    // so returning immediately without a rejection handler would leak a late
+    // failure as an unhandled rejection.
+    void promise.then(
+      (value) => finish({ status: "fulfilled", value }),
+      () => finish({ status: "rejected" }),
+    );
+
+    if (signal.aborted) {
+      finish({ status: "aborted" });
+      return;
+    }
+    const remainingMs = Math.max(0, deadline - Date.now());
+    if (remainingMs === 0) {
+      finish({ status: "timed-out" });
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    timeout = setTimeout(() => finish({ status: "timed-out" }), remainingMs);
+  });
+}
+
 export class BrowserTab {
   readonly tabId: string;
   readonly network: NetworkCapture;
@@ -104,6 +154,7 @@ export class BrowserTab {
   private clearInitialHistoryOnLoad = false;
   private initialHistoryUrl: string | null = null;
   private clearInitialHistoryTimer: ReturnType<typeof setTimeout> | null = null;
+  private targetInitializationAbortController: AbortController | null = null;
   private devToolsVisible = false;
   private wcCleanups: Array<() => void> = [];
 
@@ -188,10 +239,20 @@ export class BrowserTab {
     const cdp = new CdpClient(webContents);
     this._cdp = cdp;
     const targetGeneration = ++this.attachedTargetGeneration;
-    installSessionPermissions(webContents.session);
-    const removeNavGuards = installNavigationGuards(webContents, (popupUrl) => {
-      this.opts.onPopup(this.tabId, popupUrl);
-    });
+    const initializationAbortController = new AbortController();
+    this.targetInitializationAbortController = initializationAbortController;
+    if (this.opts.permissionProfile === "sensitive") {
+      installSensitiveSessionPermissions(webContents.session);
+    } else {
+      installSessionPermissions(webContents.session);
+    }
+    const removeNavGuards = installNavigationGuards(
+      webContents,
+      (popupUrl) => {
+        this.opts.onPopup(this.tabId, popupUrl);
+      },
+      this.opts.permissionProfile ?? "ordinary",
+    );
     this.wcCleanups.push(removeNavGuards);
     this.wireEvents(webContents);
     this.currentUrl = truncateUtf8(webContents.getURL() || this.currentUrl, MAX_BROWSER_URL_BYTES);
@@ -207,24 +268,44 @@ export class BrowserTab {
     ) {
       this.finishInitialHistoryCleanup(webContents);
     }
-    void this.initializeAttachedTarget(cdp, targetGeneration);
+    void this.initializeAttachedTarget(cdp, targetGeneration, initializationAbortController);
     this.emit();
     return true;
   }
 
-  private async initializeAttachedTarget(cdp: CdpClient, targetGeneration: number): Promise<void> {
+  private async initializeAttachedTarget(
+    cdp: CdpClient,
+    targetGeneration: number,
+    abortController: AbortController,
+  ): Promise<void> {
+    const deadline = Date.now() + BROWSER_TAB_TARGET_INITIALIZATION_TIMEOUT_MS;
     try {
       await cdp.attach();
       if (!this.isCurrentTarget(cdp, targetGeneration)) return;
-      await this.reinstallRetainedInitScripts(cdp, targetGeneration);
+      await this.reinstallRetainedInitScripts(
+        cdp,
+        targetGeneration,
+        deadline,
+        abortController.signal,
+      );
       if (!this.isCurrentTarget(cdp, targetGeneration)) return;
       try {
-        await this.dialogs.enable(cdp);
+        const remainingMs = Math.max(0, deadline - Date.now());
+        if (remainingMs > 0) {
+          await settleInitializationBefore(
+            this.dialogs.enable(cdp, remainingMs),
+            deadline,
+            abortController.signal,
+          );
+        }
       } catch {}
     } catch {
       // Preserve the existing attachment contract: target setup is best effort,
       // and individual tools surface a CDP failure when they next use it.
     } finally {
+      if (this.targetInitializationAbortController === abortController) {
+        this.targetInitializationAbortController = null;
+      }
       if (this.isCurrentTarget(cdp, targetGeneration)) {
         this.readyTargetGeneration = targetGeneration;
         this.resolveAttachmentWaiters(targetGeneration);
@@ -265,24 +346,42 @@ export class BrowserTab {
   private async reinstallRetainedInitScripts(
     cdp: CdpClient,
     targetGeneration: number,
+    deadline: number,
+    signal: AbortSignal,
   ): Promise<void> {
     for (const [identifier, retained] of this.retainedInitScripts) {
-      if (!this.isCurrentTarget(cdp, targetGeneration)) return;
-      const installed = await this.installRetainedInitScript(cdp, retained.kind, retained.source);
+      if (!this.isCurrentTarget(cdp, targetGeneration) || signal.aborted) return;
+      const installPromise = this.installRetainedInitScript(cdp, retained.kind, retained.source);
+      const installed = await settleInitializationBefore(installPromise, deadline, signal);
+      if (installed.status !== "fulfilled") {
+        if (installed.status === "timed-out" || installed.status === "aborted") {
+          // A response can arrive after the readiness deadline. Remove any late,
+          // untracked registration without retaining this BrowserTab instance.
+          void installPromise.then(
+            (late) => {
+              if (!cdp.isAttached()) return;
+              void uninstallInitScript(cdp, late.identifier).catch(() => undefined);
+            },
+            () => undefined,
+          );
+        }
+        return;
+      }
       if (!this.isCurrentTarget(cdp, targetGeneration)) return;
       const current = this.retainedInitScripts.get(identifier);
       if (current !== retained) continue;
-      current.targetIdentifier = installed.identifier;
+      current.targetIdentifier = installed.value.identifier;
 
       // A replacement guest is identified at `dom-ready`, after its first
       // document exists. Reapply once there as well as registering for every
       // subsequent navigation on the new target.
       try {
-        if (retained.kind === "style") {
-          await evaluateOneShotStyle(cdp, retained.source);
-        } else {
-          await evalJs(cdp, retained.source);
-        }
+        const applied =
+          retained.kind === "style"
+            ? evaluateOneShotStyle(cdp, retained.source)
+            : evalJs(cdp, retained.source);
+        const result = await settleInitializationBefore(applied, deadline, signal);
+        if (result.status === "timed-out" || result.status === "aborted") return;
       } catch {
         // Registration succeeded. Code that is not valid against the already
         // loaded document must still remain active for future documents.
@@ -464,6 +563,8 @@ export class BrowserTab {
     // guest WebContents/CDP target. Release controller bindings now so neither
     // controller retains the destroyed guest or incorrectly reports itself as
     // enabled when the replacement attaches.
+    this.targetInitializationAbortController?.abort();
+    this.targetInitializationAbortController = null;
     this.network.suspend();
     this.dialogs.suspend();
     for (const retained of this.retainedInitScripts.values()) {

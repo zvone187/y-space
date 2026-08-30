@@ -3,7 +3,11 @@ import type { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
 import type { PoracodeDiagnosticTags } from "@/shared/diagnostics/sentryPrivacy";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import type { StartThreadPayload } from "@/shared/contracts";
+import {
+  pipedreamSnapshotSchema,
+  type PipedreamSnapshot,
+  type StartThreadPayload,
+} from "@/shared/contracts";
 import type {
   IpcProcedurePayload,
   IpcProcedureResult,
@@ -18,7 +22,10 @@ import type {
   PipedreamPrivilegedConnectLinkResult,
   PipedreamPrivilegedReply,
 } from "@/shared/pipedreamPrivilegedIpc";
-import { isPipedreamPrivilegedBootstrapMessage } from "@/shared/pipedreamPrivilegedIpc";
+import {
+  isPipedreamPrivilegedBootstrapMessage,
+  isPipedreamPrivilegedConnectLinkRequest,
+} from "@/shared/pipedreamPrivilegedIpc";
 
 function isSupervisorReply(
   message: unknown,
@@ -139,6 +146,7 @@ export class SupervisorClient {
   }
 
   start(baseDir: string): void {
+    if (this.disposed) return;
     this.baseDir = baseDir;
     this.resolveStartedGate();
     this.stop(new Error("Supervisor restarting"));
@@ -202,17 +210,9 @@ export class SupervisorClient {
 
     const privilegedBootstrap = this.options.resolvePipedreamPrivilegedBootstrap?.();
     if (privilegedBootstrap) {
-      try {
-        child.send(
-          { kind: "pipedream-privileged-bootstrap", payload: privilegedBootstrap },
-          (error) => {
-            if (error)
-              console.error("[poracode] failed to initialize Pipedream supervisor service");
-          },
-        );
-      } catch {
+      void this.requestPipedreamConfiguration(child, privilegedBootstrap).catch(() => {
         console.error("[poracode] failed to initialize Pipedream supervisor service");
-      }
+      });
     }
 
     this.options.onStarted?.();
@@ -228,7 +228,7 @@ export class SupervisorClient {
         console.error(`[poracode] ${error.message}, restarting…`);
         this.options.reportError?.(error, { "poracode.feature_area": "supervisor" });
         setTimeout(() => {
-          if (!this.child && this.baseDir) {
+          if (!this.disposed && !this.child && this.baseDir) {
             this.start(this.baseDir);
           }
         }, 1000);
@@ -319,11 +319,27 @@ export class SupervisorClient {
   }
 
   /** Internal-only RPC whose one-use Connect URL must never enter the public procedure map. */
-  async createPipedreamConnectLink(appSlug: string): Promise<PipedreamPrivilegedConnectLinkResult> {
+  async createPipedreamConnectLink(
+    appSlug: string,
+    redirects: { readonly successRedirectUrl: string; readonly errorRedirectUrl: string },
+  ): Promise<PipedreamPrivilegedConnectLinkResult> {
     await this.startedGate;
     const child = this.child;
     if (!child || !child.connected) throw new Error("Supervisor is not running.");
     const id = randomUUID();
+    const message = {
+      kind: "pipedream-privileged-request" as const,
+      id,
+      request: {
+        type: "create-connect-link" as const,
+        appSlug,
+        successRedirectUrl: redirects.successRedirectUrl,
+        errorRedirectUrl: redirects.errorRedirectUrl,
+      },
+    };
+    if (!isPipedreamPrivilegedConnectLinkRequest(message)) {
+      throw new Error("Pipedream Connect request is invalid.");
+    }
     return new Promise<PipedreamPrivilegedConnectLinkResult>((resolve, reject) => {
       const timeout = setTimeout(() => {
         if (this.pendingRequests.delete(id)) reject(new Error("Pipedream request timed out."));
@@ -346,16 +362,9 @@ export class SupervisorClient {
         pending.reject(error);
       };
       try {
-        child.send(
-          {
-            kind: "pipedream-privileged-request",
-            id,
-            request: { type: "create-connect-link", appSlug },
-          },
-          (error) => {
-            if (error) fail(error);
-          },
-        );
+        child.send(message, (error) => {
+          if (error) fail(error);
+        });
       } catch (error) {
         fail(error);
       }
@@ -363,23 +372,57 @@ export class SupervisorClient {
   }
 
   /** Reconfigure the live supervisor without routing credentials through public procedure IPC. */
-  async configurePipedream(payload: PipedreamPrivilegedBootstrapPayload): Promise<void> {
+  async configurePipedream(
+    payload: PipedreamPrivilegedBootstrapPayload,
+  ): Promise<PipedreamSnapshot> {
     await this.startedGate;
     const child = this.child;
     if (!child || !child.connected) throw new Error("Supervisor is not running.");
-    const message = { kind: "pipedream-privileged-bootstrap" as const, payload };
+    return this.requestPipedreamConfiguration(child, payload);
+  }
+
+  private requestPipedreamConfiguration(
+    child: ChildProcess,
+    payload: PipedreamPrivilegedBootstrapPayload,
+  ): Promise<PipedreamSnapshot> {
+    if (!child.connected) return Promise.reject(new Error("Supervisor is not running."));
+    const id = randomUUID();
+    const message = { kind: "pipedream-privileged-bootstrap" as const, id, payload };
     if (!isPipedreamPrivilegedBootstrapMessage(message)) {
-      throw new Error("Pipedream configuration is invalid.");
+      return Promise.reject(new Error("Pipedream configuration is invalid."));
     }
-    await new Promise<void>((resolve, reject) => {
+    return new Promise<unknown>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (this.pendingRequests.delete(id)) {
+          reject(new Error("Pipedream configuration timed out."));
+        }
+      }, REQUEST_TIMEOUT_MS);
+      timeout.unref?.();
+
+      this.pendingRequests.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (reason) => {
+          clearTimeout(timeout);
+          reject(reason);
+        },
+      });
+
+      const fail = (error: unknown): void => {
+        const pending = this.pendingRequests.get(id);
+        if (!pending) return;
+        this.pendingRequests.delete(id);
+        pending.reject(error);
+      };
       try {
         child.send(message, (error) => {
-          if (error) reject(new Error("Unable to configure Pipedream."));
-          else resolve();
+          if (error) fail(error);
         });
-      } catch {
-        reject(new Error("Unable to configure Pipedream."));
+      } catch (error) {
+        fail(error);
       }
-    });
+    }).then((value) => pipedreamSnapshotSchema.parse(value));
   }
 }

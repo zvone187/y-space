@@ -7,7 +7,14 @@ import { BROWSER_HOME_URL } from "@/shared/browserDefaults";
 import type { BrowserTabInfo } from "@/shared/ipc";
 import { isMac, readBridge } from "@/renderer/bridge";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import {
+  isSensitiveNativeViewObstructed,
+  notifyBrowserAutomationPresentationObstructed,
+  registerSensitiveNativeViewPresenter,
+  useSensitiveNativeViewOverlayGate,
+} from "@/renderer/state/sensitiveNativeViewObstruction";
 import {
   RIGHT_WORKSPACE_BROWSER_PAGE_RESIDENT_LIMIT,
   type RightWorkspaceBrowserPageTab,
@@ -105,9 +112,36 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
   const browserOverlayMaximized = usePanelStore((s) => s.browserOverlayMaximized);
   const setBrowserOverlayOpen = usePanelStore((s) => s.setBrowserOverlayOpen);
   const setBrowserOverlayMaximized = usePanelStore((s) => s.setBrowserOverlayMaximized);
+  const obstructedByPanelOverlay = usePanelStore(
+    (s) =>
+      s.settingsOpen ||
+      s.projectSettingsId !== null ||
+      s.gitOverlayOpen ||
+      s.prReviewContext !== null ||
+      s.githubActionsContext !== null ||
+      s.threadSearchOpen,
+  );
+  const obstructedByFileOverlay = useFileEditorStore((s) => s.overlayMode !== null);
   const isWindowSurface = props.surface === "window";
   const visible = props.visible || browserOverlayOpen || isWindowSurface;
   const [menuPreviewDataUrl, setMenuPreviewDataUrl] = useState<string | null>(null);
+  const menuPreviewRevisionRef = useRef(0);
+  const handleMenuPreviewChange = useCallback((dataUrl: string | null) => {
+    const revision = ++menuPreviewRevisionRef.current;
+    if (!dataUrl) {
+      setMenuPreviewDataUrl(null);
+      return;
+    }
+    void notifyBrowserAutomationPresentationObstructed().then(
+      () => {
+        if (menuPreviewRevisionRef.current === revision) setMenuPreviewDataUrl(dataUrl);
+      },
+      () => {
+        // Fail closed: keep the live browser visible if its automation
+        // presentation could not be revoked before the preview replaces it.
+      },
+    );
+  }, []);
   const {
     pickerActive,
     startPicker,
@@ -333,18 +367,32 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
         }
         onChoosePickTarget={chooseTargetForPendingPick}
         onCancelPendingPick={cancelPendingPick}
-        onMenuPreviewChange={setMenuPreviewDataUrl}
+        onMenuPreviewChange={handleMenuPreviewChange}
       />
       <BrowserBookmarkBar />
       <div className="poracode-browser-content-plane relative flex-1 overflow-hidden bg-[var(--content-background)]">
-        {residentBrowserTabs.map((tab) => (
-          <BrowserTabWebview
-            key={tab.tabId}
-            tabId={tab.tabId}
-            initialSrc={tab.url}
-            visible={visible && !menuPreviewDataUrl && tab.tabId === presentedBrowserTabId}
-          />
-        ))}
+        {residentBrowserTabs.map((tab) => {
+          const tabVisible = visible && !menuPreviewDataUrl && tab.tabId === presentedBrowserTabId;
+          return tab.sensitiveIntegration ? (
+            <SensitiveIntegrationViewHost
+              key={tab.tabId}
+              tabId={tab.tabId}
+              generation={tab.sensitiveViewGeneration}
+              visible={
+                tabVisible &&
+                (browserOverlayOpen || (!obstructedByPanelOverlay && !obstructedByFileOverlay))
+              }
+            />
+          ) : (
+            <BrowserTabWebview
+              key={tab.tabId}
+              tabId={tab.tabId}
+              initialSrc={tab.url}
+              sessionPartition={BROWSER_SESSION_PARTITION}
+              visible={tabVisible}
+            />
+          );
+        })}
         {menuPreviewDataUrl ? (
           <img
             src={menuPreviewDataUrl}
@@ -363,11 +411,92 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
   );
 }
 
+function SensitiveIntegrationViewHost(props: {
+  tabId: string;
+  generation: number;
+  visible: boolean;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const bridge = readBridge();
+    let frame: number | null = null;
+    let cancelled = false;
+    let lastBounds = "";
+    let pendingPresentation: Promise<void> | null = null;
+    const publish = (visible: boolean): Promise<void> => {
+      const rect = element.getBoundingClientRect();
+      const bounds = {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      };
+      const serialized = `${bounds.x}:${bounds.y}:${bounds.width}:${bounds.height}:${visible}`;
+      if (serialized === lastBounds) return pendingPresentation ?? Promise.resolve();
+      lastBounds = serialized;
+      const present = () =>
+        bridge.browserPresentSensitiveView({
+          tabId: props.tabId,
+          generation: props.generation,
+          bounds,
+          visible,
+        });
+      pendingPresentation = pendingPresentation
+        ? pendingPresentation.catch(() => undefined).then(present)
+        : present();
+      return pendingPresentation;
+    };
+    const presentCurrentState = (obstructed = isSensitiveNativeViewObstructed()) => {
+      const browserHost = element.closest<HTMLElement>("[data-y-space-browser-host]");
+      const hostPresented =
+        !browserHost ||
+        (browserHost.getAttribute("aria-hidden") !== "true" && !browserHost.hasAttribute("inert"));
+      return publish(
+        props.visible &&
+          !obstructed &&
+          element.isConnected &&
+          document.visibilityState === "visible" &&
+          hostPresented,
+      );
+    };
+    const unregisterPresenter = registerSensitiveNativeViewPresenter((obstructed) =>
+      presentCurrentState(obstructed),
+    );
+    const tick = () => {
+      if (cancelled) return;
+      void presentCurrentState().catch(() => {});
+      if (props.visible) frame = window.requestAnimationFrame(tick);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      const hideAcknowledged = publish(false);
+      unregisterPresenter(hideAcknowledged);
+      void hideAcknowledged.catch(() => {});
+    };
+  }, [props.generation, props.tabId, props.visible]);
+
+  return (
+    <div
+      ref={ref}
+      data-sensitive-integration-view={props.tabId}
+      aria-hidden={!props.visible}
+      className="absolute inset-0 bg-[var(--content-background)]"
+      style={{ display: props.visible ? "block" : "none" }}
+    />
+  );
+}
+
 function BrowserDeviceCodeButton() {
   const { t } = useLingui();
   const deviceCode = useBrowserPanelStore((s) => s.usageLoginDeviceCode);
   const [copied, setCopied] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState(false);
+  const tooltipOverlayReady = useSensitiveNativeViewOverlayGate(tooltipOpen);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -404,7 +533,7 @@ function BrowserDeviceCodeButton() {
   }
 
   return (
-    <Tooltip delay={0} isOpen={tooltipOpen} onOpenChange={setTooltipOpen}>
+    <Tooltip delay={0} isOpen={tooltipOpen && tooltipOverlayReady} onOpenChange={setTooltipOpen}>
       <Tooltip.Trigger>
         <button
           type="button"
@@ -437,7 +566,12 @@ function BrowserDeviceCodeButton() {
   );
 }
 
-function BrowserTabWebview(props: { tabId: string; initialSrc: string; visible: boolean }) {
+function BrowserTabWebview(props: {
+  tabId: string;
+  initialSrc: string;
+  sessionPartition: string;
+  visible: boolean;
+}) {
   const ref = useRef<HTMLWebViewElement | null>(null);
   const initialSrcRef = useRef(props.initialSrc);
 
@@ -445,45 +579,62 @@ function BrowserTabWebview(props: { tabId: string; initialSrc: string; visible: 
     const el = ref.current;
     if (!el) return;
     let cancelled = false;
-    const onDomReady = () => {
-      if (cancelled) return;
+    let attachCycle = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const retryDelaysMs = [25, 100, 400, 1_500, 4_000] as const;
+    const scheduleRetry = (cycle: number, retryIndex: number) => {
+      if (cancelled || cycle !== attachCycle) return;
+      const delay = retryDelaysMs[retryIndex];
+      if (delay === undefined) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        void attemptAttach(cycle, retryIndex + 1);
+      }, delay);
+    };
+    const attemptAttach = async (cycle: number, retryIndex: number): Promise<void> => {
+      if (cancelled || cycle !== attachCycle) return;
       let webContentsId: number;
       try {
         webContentsId = el.getWebContentsId();
       } catch {
+        // The upgraded <webview> custom element can become readable just after
+        // React commits. Its one-shot dom-ready event may already be over, so
+        // keep the same bounded retry contract used for main-process rejects.
+        scheduleRetry(cycle, retryIndex);
         return;
       }
-      readBridge()
-        .browserAttachWebContents({ tabId: props.tabId, webContentsId })
-        .catch(() => {});
+      let attached = false;
+      try {
+        attached = await readBridge().browserAttachWebContents({
+          tabId: props.tabId,
+          webContentsId,
+        });
+      } catch {}
+      if (cancelled || cycle !== attachCycle || attached) return;
+      scheduleRetry(cycle, retryIndex);
     };
-    el.addEventListener("dom-ready", onDomReady);
+    const requestAttach = () => {
+      if (cancelled) return;
+      attachCycle += 1;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      retryTimer = null;
+      void attemptAttach(attachCycle, 0);
+    };
+    el.addEventListener("dom-ready", requestAttach);
+    if (props.visible) requestAttach();
     return () => {
       cancelled = true;
-      el.removeEventListener("dom-ready", onDomReady);
+      attachCycle += 1;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      el.removeEventListener("dom-ready", requestAttach);
     };
-  }, [props.tabId]);
-
-  useEffect(() => {
-    if (!props.visible) return;
-    const el = ref.current;
-    if (!el) return;
-    let webContentsId: number;
-    try {
-      webContentsId = el.getWebContentsId();
-    } catch {
-      return;
-    }
-    readBridge()
-      .browserAttachWebContents({ tabId: props.tabId, webContentsId })
-      .catch(() => {});
   }, [props.tabId, props.visible]);
 
   return (
     <webview
       ref={ref}
       data-tab-id={props.tabId}
-      partition={BROWSER_SESSION_PARTITION}
+      partition={props.sessionPartition}
       src={initialSrcRef.current || "about:blank"}
       // Electron's React type says boolean, but React warns unless this custom
       // element attribute is serialized as a string.

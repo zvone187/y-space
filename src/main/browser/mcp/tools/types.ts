@@ -11,6 +11,10 @@ export interface ToolContext {
    * instead of rereading the thread's mutable active tab after an await.
    */
   resolvedTabIdForToolCall?: string;
+  /** Opaque supervisor-issued launch nonce. Cursor presence leases use this
+   * instead of the stable thread id so overlapping/restarted agent launches
+   * cannot release or retain each other's visible browser state. */
+  launchId?: string;
   /** Calling thread + its task title (from the MCP URL) — agent tabs join a
    *  per-thread group named after the task. */
   threadId?: string;

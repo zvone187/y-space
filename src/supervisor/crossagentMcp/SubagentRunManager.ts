@@ -322,13 +322,16 @@ export class SubagentRunManager {
    * Cancel every live child of a parent and evict all of its run records.
    * Called on parent thread interrupt and close.
    */
-  cancelAllForThread(parentThreadId: string): void {
+  cancelAllForThread(parentThreadId: string): Promise<void> {
+    const teardowns: Promise<void>[] = [];
     for (const record of [...this.runs.values()]) {
       if (record.parentThreadId !== parentThreadId) continue;
       record.cancelRequested = true;
-      this.settle(record, "cancelled");
+      this.settle(record, "cancelled", undefined, { teardown: false });
+      teardowns.push(this.attemptRunner.teardown(record));
       this.runs.delete(record.runId);
     }
+    return Promise.allSettled(teardowns).then(() => undefined);
   }
 
   /** Cancel turn-scoped runs while leaving explicitly detached background work alive. */

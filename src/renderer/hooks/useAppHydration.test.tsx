@@ -23,11 +23,15 @@ const mocks = vi.hoisted(() => ({
     >(),
   },
   hydrateThreadRuntimeItems: vi.fn<(threadId: string) => Promise<void>>(),
+  loadPlugins: vi.fn<() => Promise<void>>(),
 }));
 
 vi.mock("@/renderer/bridge", () => ({ readBridge: () => mocks.bridge }));
 vi.mock("@/renderer/state/chatRuntimePersister", () => ({
   hydrateThreadRuntimeItems: mocks.hydrateThreadRuntimeItems,
+}));
+vi.mock("@/renderer/state/pluginsStore", () => ({
+  usePlugins: { getState: () => ({ load: mocks.loadPlugins }) },
 }));
 vi.mock("@/renderer/deferredFeatures", () => ({
   startDeferredFeaturePrewarm: () => () => undefined,
@@ -132,6 +136,7 @@ describe("useAppHydration experiments", () => {
           : "experiment-1:candidate-2",
     }));
     mocks.hydrateThreadRuntimeItems.mockResolvedValue(undefined);
+    mocks.loadPlugins.mockResolvedValue(undefined);
   });
 
   it("retains every running candidate even when the board is not the active view", async () => {
@@ -167,6 +172,47 @@ describe("useAppHydration experiments", () => {
         "working",
       );
     });
+  });
+
+  it("attaches a snapshot rejection handler before transcript hydration can delay reconciliation", async () => {
+    let resolveSnapshots!: (snapshots: ThreadRuntimeSnapshot[]) => void;
+    let resolveTranscriptHydration!: () => void;
+    const snapshots = new Promise<ThreadRuntimeSnapshot[]>((resolve) => {
+      resolveSnapshots = resolve;
+    });
+    const catchSpy = vi.spyOn(snapshots, "catch");
+    mocks.bridge.getThreadSnapshots.mockReturnValueOnce(snapshots);
+    mocks.hydrateThreadRuntimeItems.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveTranscriptHydration = resolve;
+      }),
+    );
+
+    const { unmount } = renderHook(() => useAppHydration());
+
+    await waitFor(() => expect(mocks.bridge.getThreadSnapshots).toHaveBeenCalled());
+    expect(catchSpy).toHaveBeenCalledOnce();
+
+    resolveSnapshots([]);
+    resolveTranscriptHydration();
+    unmount();
+  });
+
+  it("observes deferred plugin loading failures immediately", async () => {
+    let resolvePluginLoad!: () => void;
+    const pluginLoad = new Promise<void>((resolve) => {
+      resolvePluginLoad = resolve;
+    });
+    const catchSpy = vi.spyOn(pluginLoad, "catch");
+    mocks.loadPlugins.mockReturnValueOnce(pluginLoad);
+
+    const { unmount } = renderHook(() => useAppHydration());
+
+    await waitFor(() => expect(mocks.loadPlugins).toHaveBeenCalledOnce());
+    expect(catchSpy).toHaveBeenCalledOnce();
+
+    resolvePluginLoad();
+    unmount();
   });
 
   it("recovers candidate worktree paths from their durable branches before showing the UI", async () => {

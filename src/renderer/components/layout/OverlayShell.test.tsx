@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { registerSensitiveNativeViewPresenter } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { OverlayShell } from "./OverlayShell";
 
 function surface(container: HTMLElement) {
@@ -15,13 +16,46 @@ async function flushFadeIn() {
 }
 
 describe("OverlayShell", () => {
-  it("retains the open content until the exit transition finishes", () => {
+  it("does not paint Settings until a sensitive native view confirms it is hidden", async () => {
+    let finishHide!: () => void;
+    const hidden = new Promise<void>((resolve) => {
+      finishHide = resolve;
+    });
+    const presenter = vi.fn<(obstructed: boolean) => Promise<void>>((obstructed) =>
+      obstructed ? hidden : Promise.resolve(),
+    );
+    const unregister = registerSensitiveNativeViewPresenter(presenter);
+
+    try {
+      render(
+        <OverlayShell open instantEnter>
+          <div>Settings</div>
+        </OverlayShell>,
+      );
+
+      expect(presenter).toHaveBeenCalledWith(true);
+      expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+
+      await act(async () => {
+        finishHide();
+        await hidden;
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText("Settings")).toBeInTheDocument();
+    } finally {
+      unregister(Promise.resolve());
+    }
+  });
+
+  it("retains the open content until the exit transition finishes", async () => {
     const onExited = vi.fn<() => void>();
     const { container, rerender } = render(
       <OverlayShell open onExited={onExited}>
         <div>GitHub Actions</div>
       </OverlayShell>,
     );
+    await act(async () => Promise.resolve());
 
     // The GitHub Actions overlay clears its own context on close, so `open` and
     // `children` drop in the same render — the content must survive the fade.
@@ -43,6 +77,7 @@ describe("OverlayShell", () => {
         <div>GitHub Actions reopened</div>
       </OverlayShell>,
     );
+    await act(async () => Promise.resolve());
 
     expect(screen.getByText("GitHub Actions reopened")).toBeInTheDocument();
   });
@@ -55,6 +90,7 @@ describe("OverlayShell", () => {
       </OverlayShell>,
     );
 
+    await act(async () => Promise.resolve());
     await flushFadeIn();
     rerender(
       <OverlayShell open={false} onExited={onExited}>
@@ -79,6 +115,7 @@ describe("OverlayShell", () => {
         <div>Settings</div>
       </OverlayShell>,
     );
+    await act(async () => Promise.resolve());
 
     expect(surface(container).className).toContain("opacity-0");
 
@@ -87,13 +124,14 @@ describe("OverlayShell", () => {
     expect(surface(container).className).toContain("opacity-100");
   });
 
-  it("appears fully opaque with instantEnter, and still fades out", () => {
+  it("appears fully opaque with instantEnter, and still fades out", async () => {
     const onExited = vi.fn<() => void>();
     const { container, rerender } = render(
       <OverlayShell open instantEnter onExited={onExited}>
         <div>GitHub Actions</div>
       </OverlayShell>,
     );
+    await act(async () => Promise.resolve());
 
     // Opaque on the first painted frame — no opacity-0 pass, so no frame
     // composites the overlay against bare desktop material.

@@ -2,6 +2,7 @@ import React, { type MouseEventHandler, type ReactNode, useEffect, useRef, useSt
 import { createPortal } from "react-dom";
 import { Button, Description, Dropdown, Label, Separator } from "@heroui/react";
 import { useDraggable } from "@dnd-kit/react";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 
 // Context menus can stack (e.g. the flat-list filter stacks a project menu
 // over its own), so dismissal tracks a stack of closers: a new surface pushes
@@ -275,6 +276,7 @@ export function ContextMenuSurface(props: {
   withBackdrop?: boolean;
 }) {
   const { position, items, onAction, onClose } = props;
+  const overlayReady = useSensitiveNativeViewOverlayGate(position !== null);
   // A row being dragged out of the menu: the menu hides but stays mounted —
   // unmounting the dragged element cancels the dnd-kit operation — and closes
   // once the drag ends. dnd-kit promotes its drag feedback into the top layer,
@@ -329,7 +331,7 @@ export function ContextMenuSurface(props: {
     };
   }, [position, onClose]);
 
-  return position
+  return position && overlayReady
     ? createPortal(
         <>
           {props.withBackdrop ? (

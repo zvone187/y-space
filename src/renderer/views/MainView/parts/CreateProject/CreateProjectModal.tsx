@@ -17,6 +17,7 @@ import { readBridge } from "@/renderer/bridge";
 import { loadHomeScopeLocation } from "@/renderer/actions/projectActions";
 import { commitCreateProject } from "@/renderer/actions/createProjectActions";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 /**
@@ -27,17 +28,19 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
  */
 export function CreateProjectModal() {
   const open = usePanelStore((s) => s.createProjectModalOpen);
+  const overlayReady = useSensitiveNativeViewOverlayGate(open);
+  const presentedOpen = open && overlayReady;
 
   return (
     <Modal.Backdrop
-      isOpen={open}
+      isOpen={presentedOpen}
       onOpenChange={(next) => {
         if (!next) usePanelStore.getState().closeCreateProjectModal();
       }}
     >
       <Modal.Container>
         <Modal.Dialog className="sm:max-w-[540px]">
-          {open ? <CreateProjectForm /> : null}
+          {presentedOpen ? <CreateProjectForm /> : null}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

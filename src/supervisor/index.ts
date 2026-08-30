@@ -65,12 +65,36 @@ async function handleRequest(request: SupervisorRequest): Promise<unknown> {
 
 process.on("message", (message: unknown) => {
   if (isPipedreamPrivilegedBootstrapMessage(message)) {
-    runtime.configurePipedream(message.payload);
+    void runtime
+      .configurePipedream(message.payload)
+      .then(
+        (data): PipedreamPrivilegedReply => ({
+          kind: "pipedream-privileged-reply",
+          replyTo: message.id,
+          ok: true,
+          data,
+        }),
+      )
+      .catch(
+        (): PipedreamPrivilegedReply => ({
+          kind: "pipedream-privileged-reply",
+          replyTo: message.id,
+          ok: false,
+          error: "Pipedream configuration failed.",
+        }),
+      )
+      .then((reply) => process.send?.(reply));
     return;
   }
   if (isPipedreamPrivilegedConnectLinkRequest(message)) {
     void runtime.pipedreamService
-      .createConnectLink({ appSlug: message.request.appSlug })
+      .createConnectLink(
+        { appSlug: message.request.appSlug },
+        {
+          successRedirectUrl: message.request.successRedirectUrl,
+          errorRedirectUrl: message.request.errorRedirectUrl,
+        },
+      )
       .then(
         (data): PipedreamPrivilegedReply => ({
           kind: "pipedream-privileged-reply",

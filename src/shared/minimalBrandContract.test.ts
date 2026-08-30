@@ -94,6 +94,8 @@ describe("Y Space minimal brand contract", () => {
     expect(index).toContain(
       'mode === "system"\n                    ? prefersDark\n                      ? "dark"\n                      : "light"\n                    : "light"',
     );
+    expect(index).toContain("themeDefaultVersion");
+    expect(index).toContain("bootIsCurrent");
   });
 
   it("ships orange-on-white stable brand sources without the legacy indigo", () => {

@@ -1,6 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
-import { resolve as resolvePosixPath } from "node:path/posix";
-import { resolve as resolveWindowsPath } from "node:path/win32";
+import { randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 import { spawn } from "node-pty";
 import {
@@ -129,6 +127,12 @@ export interface McpLaunchAuthorization {
   config: ThreadConfig;
   launchConfig: ThreadConfig;
   mcpLaunchSnapshot: McpLaunchSnapshot;
+  /**
+   * Supervisor-owned generation for credentials copied into this launch.
+   * Personal OAuth clear advances the generation so an already-resolving
+   * launch cannot publish a process containing the cleared bearer.
+   */
+  personalMcpCredentialEpoch?: number;
 }
 
 /**
@@ -299,6 +303,10 @@ export interface SpawnPipelineContext {
   resolveAgentSettings(adapter: AgentAdapter): Record<string, boolean | string>;
   beginMcpLaunchAuthorization(authorization: McpLaunchAuthorization): void;
   activateMcpLaunchAuthorization(session: SessionRuntime): void;
+  /** Fail closed immediately before process creation/runtime publication. */
+  assertMcpLaunchAuthorizationCurrent?(identity: McpLaunchIdentity): void;
+  /** Capture the credential generation before any asynchronous launch work. */
+  getPersonalMcpCredentialEpoch?(): number;
   revokeMcpLaunchAuthorization(identity: McpLaunchIdentity): void;
   emitOptimisticUserMessage(
     threadId: string,
@@ -321,6 +329,7 @@ export class SpawnPipeline {
     payload: StartThreadPayload & { threadId: string },
   ): Promise<StartThreadResult> {
     const ctx = this.ctx;
+    const personalMcpCredentialEpoch = ctx.getPersonalMcpCredentialEpoch?.() ?? 0;
     await ctx.closeThread({ threadId: payload.threadId });
     if (ctx.pendingStartAborts.delete(payload.threadId)) {
       ctx.pendingStartInterrupts.delete(payload.threadId);
@@ -498,6 +507,7 @@ export class SpawnPipeline {
         config: payload.config,
         launchConfig,
         mcpLaunchSnapshot,
+        personalMcpCredentialEpoch,
       },
       async () => {
         const resolvedMcpServers = await this.resolveMcpServersForLaunch({
@@ -672,101 +682,109 @@ export class SpawnPipeline {
               payload.sessionRef,
               launchOptionsWithMcp,
             );
-
-        // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
-        // (`PORACODE_HOOK_URL`, `PORACODE_HOOK_SECRET`, `PORACODE_THREAD_ID`,
-        // `PORACODE_AGENT_KIND`, `PORACODE_HOOK_PROTOCOL_VERSION`) flow through
-        // `spawnThread` → `agentEnv` so they end up in the PTY env on every
-        // platform (WSL, win32, posix). Failure to resolve plugin extras normally
-        // degrades to L2. A Codex terminal connected to the canonical Browser is
-        // the exception: it requires the app-owned PreToolUse command gate and
-        // fails closed before spawn when that gate cannot be staged.
-        const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
-          payload.threadId,
-          payload.agentKind,
-          payload.projectLocation,
-          resolvedMcpServers,
-        );
-        if (cliHookExtras.extraArgs.length > 0) {
-          argv.args = mergeCliHookExtraArgs(
+        const cleanupArgv = onceLaunchCleanup(argv.cleanup);
+        if (cleanupArgv) argv.cleanup = cleanupArgv;
+        let argvTransferred = false;
+        try {
+          // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
+          // (`PORACODE_HOOK_URL`, `PORACODE_HOOK_SECRET`, `PORACODE_THREAD_ID`,
+          // `PORACODE_AGENT_KIND`, `PORACODE_HOOK_PROTOCOL_VERSION`) flow through
+          // `spawnThread` → `agentEnv` so they end up in the PTY env on every
+          // platform (WSL, win32, posix). Failure to resolve plugin extras normally
+          // degrades to L2. A Codex terminal connected to the canonical Browser is
+          // the exception: it requires the app-owned PreToolUse command gate and
+          // fails closed before spawn when that gate cannot be staged.
+          const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
+            payload.threadId,
+            payload.agentKind,
+            payload.projectLocation,
+            resolvedMcpServers,
+          );
+          if (cliHookExtras.extraArgs.length > 0) {
+            argv.args = mergeCliHookExtraArgs(
+              adapter,
+              argv.args,
+              cliHookExtras.extraArgs,
+              launchPrompt,
+              payload.sessionRef,
+            );
+          }
+          argv.args = await applyLaunchArgsConfigRewrite(
             adapter,
             argv.args,
-            cliHookExtras.extraArgs,
-            launchPrompt,
-            payload.sessionRef,
+            payload.config,
+            payload.projectLocation,
           );
-        }
-        argv.args = await applyLaunchArgsConfigRewrite(
-          adapter,
-          argv.args,
-          payload.config,
-          payload.projectLocation,
-        );
-        if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
-          await primeProjectShellEnv(payload.projectLocation.path);
-        }
-        const keepStructuredSession = structuredSession && useStructuredFlow;
-        if (structuredSession && !keepStructuredSession) {
-          try {
-            await structuredSession.dispose();
-          } catch (error) {
-            argv.cleanup?.();
-            throw error;
+          if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
+            await primeProjectShellEnv(payload.projectLocation.path);
           }
-        }
-        if (ctx.pendingStartAborts.delete(payload.threadId)) {
-          ctx.pendingStartInterrupts.delete(payload.threadId);
-          try {
-            if (structuredSession && keepStructuredSession) {
+          const keepStructuredSession = structuredSession && useStructuredFlow;
+          if (structuredSession && !keepStructuredSession) {
+            try {
               await structuredSession.dispose();
+            } catch (error) {
+              argv.cleanup?.();
+              throw error;
             }
-          } finally {
-            argv.cleanup?.();
           }
+          if (ctx.pendingStartAborts.delete(payload.threadId)) {
+            ctx.pendingStartInterrupts.delete(payload.threadId);
+            try {
+              if (structuredSession && keepStructuredSession) {
+                await structuredSession.dispose();
+              }
+            } finally {
+              argv.cleanup?.();
+            }
+            return { threadId: payload.threadId };
+          }
+
+          // Materialize WSL launch files only after every awaited pre-launch
+          // operation has settled, keeping the credential-file lifetime minimal.
+          const command = resolveLaunchSpec(payload.projectLocation, argv);
+          const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
+          this.spawnThread({
+            threadId: payload.threadId,
+            adapter,
+            agentKind: payload.agentKind,
+            projectLocation: payload.projectLocation,
+            config: payload.config,
+            initialSize: payload.initialSize,
+            launchPrompt,
+            command,
+            ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
+            ...(keepStructuredSession ? { structuredSession } : {}),
+            ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
+            mcpLaunchSnapshot,
+            launchConfig,
+            mcpIdentity,
+            nativePlugins,
+            ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
+            presentationMode: requestedPresentation,
+            ...(deferToTerminal && !useStructuredFlow
+              ? (() => {
+                  const preInputs = adapter.buildTerminalPreInputs?.(payload.config);
+                  return {
+                    ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
+                    pendingTerminalPrompt: initialPrompt,
+                    ...(effectiveSegments ? { pendingTerminalSegments: effectiveSegments } : {}),
+                  };
+                })()
+              : {}),
+          });
+          argvTransferred = true;
+
           return { threadId: payload.threadId };
+        } finally {
+          if (!argvTransferred) cleanupArgv?.();
         }
-
-        // Materialize WSL launch files only after every awaited pre-launch
-        // operation has settled, keeping the credential-file lifetime minimal.
-        const command = resolveLaunchSpec(payload.projectLocation, argv);
-        const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
-        this.spawnThread({
-          threadId: payload.threadId,
-          adapter,
-          agentKind: payload.agentKind,
-          projectLocation: payload.projectLocation,
-          config: payload.config,
-          initialSize: payload.initialSize,
-          launchPrompt,
-          command,
-          ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
-          ...(keepStructuredSession ? { structuredSession } : {}),
-          ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
-          mcpLaunchSnapshot,
-          launchConfig,
-          mcpIdentity,
-          nativePlugins,
-          ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
-          presentationMode: requestedPresentation,
-          ...(deferToTerminal && !useStructuredFlow
-            ? (() => {
-                const preInputs = adapter.buildTerminalPreInputs?.(payload.config);
-                return {
-                  ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
-                  pendingTerminalPrompt: initialPrompt,
-                  ...(effectiveSegments ? { pendingTerminalSegments: effectiveSegments } : {}),
-                };
-              })()
-            : {}),
-        });
-
-        return { threadId: payload.threadId };
       },
     );
   }
 
   async restartThread(session: SessionRuntime, turn: QueuedStructuredTurn): Promise<void> {
     const ctx = this.ctx;
+    const personalMcpCredentialEpoch = ctx.getPersonalMcpCredentialEpoch?.() ?? 0;
     const { prompt, config } = turn;
     if (!session.sessionRef) {
       throw new Error("Session cannot be restarted without a known session reference.");
@@ -801,6 +819,7 @@ export class SpawnPipeline {
         config,
         launchConfig,
         mcpLaunchSnapshot,
+        personalMcpCredentialEpoch,
       },
       async () => {
         const isServerControlled = session.adapter.capabilities.liveInputMode === "server";
@@ -954,76 +973,92 @@ export class SpawnPipeline {
             resolvedMcpServers,
           ),
         );
-        if (cliHookExtras.extraArgs.length > 0) {
-          argv.args = mergeCliHookExtraArgs(
+        const cleanupArgv = onceLaunchCleanup(argv.cleanup);
+        if (cleanupArgv) argv.cleanup = cleanupArgv;
+        let argvTransferred = false;
+        try {
+          if (cliHookExtras.extraArgs.length > 0) {
+            argv.args = mergeCliHookExtraArgs(
+              session.adapter,
+              argv.args,
+              cliHookExtras.extraArgs,
+              launchPrompt,
+              sessionRef,
+            );
+          }
+          argv.args = await applyLaunchArgsConfigRewrite(
             session.adapter,
             argv.args,
-            cliHookExtras.extraArgs,
-            launchPrompt,
-            sessionRef,
+            config,
+            session.projectLocation,
           );
-        }
-        argv.args = await applyLaunchArgsConfigRewrite(
-          session.adapter,
-          argv.args,
-          config,
-          session.projectLocation,
-        );
-        if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
-          await primeProjectShellEnv(session.projectLocation.path);
-        }
-        if (!ctx.isCurrentSession(session)) {
-          await structuredSession?.dispose();
-          argv.cleanup?.();
-          return;
-        }
-        const keepStructuredSession = structuredSession && useStructuredFlow;
-        if (structuredSession && !keepStructuredSession) {
-          try {
-            await structuredSession.dispose();
-          } catch (error) {
-            argv.cleanup?.();
-            throw error;
+          if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
+            await primeProjectShellEnv(session.projectLocation.path);
           }
-        }
-        if (!ctx.isCurrentSession(session)) {
-          try {
-            if (structuredSession && keepStructuredSession) {
+          if (!ctx.isCurrentSession(session)) {
+            await structuredSession?.dispose();
+            argv.cleanup?.();
+            return;
+          }
+          const keepStructuredSession = structuredSession && useStructuredFlow;
+          if (structuredSession && !keepStructuredSession) {
+            try {
               await structuredSession.dispose();
+            } catch (error) {
+              argv.cleanup?.();
+              throw error;
             }
-          } finally {
-            argv.cleanup?.();
           }
-          return;
-        }
+          if (!ctx.isCurrentSession(session)) {
+            try {
+              if (structuredSession && keepStructuredSession) {
+                await structuredSession.dispose();
+              }
+            } finally {
+              argv.cleanup?.();
+            }
+            return;
+          }
 
-        // Avoid creating WSL launch files until no asynchronous pre-launch
-        // disposal can strand them.
-        const command = resolveLaunchSpec(session.projectLocation, argv);
-        this.spawnThread({
-          threadId: session.threadId,
-          agentKind: session.agentKind,
-          adapter: session.adapter,
-          projectLocation: session.projectLocation,
-          config,
-          initialSize: session.terminalSize,
-          launchPrompt,
-          command,
-          ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
-          ...(keepStructuredSession ? { structuredSession } : {}),
-          sessionRef,
-          mcpLaunchSnapshot,
-          launchConfig,
-          mcpIdentity,
-          ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
-          ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
-        });
+          // Avoid creating WSL launch files until no asynchronous pre-launch
+          // disposal can strand them.
+          const command = resolveLaunchSpec(session.projectLocation, argv);
+          this.spawnThread({
+            threadId: session.threadId,
+            agentKind: session.agentKind,
+            adapter: session.adapter,
+            projectLocation: session.projectLocation,
+            config,
+            initialSize: session.terminalSize,
+            launchPrompt,
+            command,
+            ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
+            ...(keepStructuredSession ? { structuredSession } : {}),
+            sessionRef,
+            mcpLaunchSnapshot,
+            launchConfig,
+            mcpIdentity,
+            ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
+            ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
+          });
+          argvTransferred = true;
+        } finally {
+          if (!argvTransferred) cleanupArgv?.();
+        }
       },
     );
   }
 
   spawnThread(input: SpawnThreadInput): SessionRuntime {
     const ctx = this.ctx;
+    if (input.mcpIdentity?.launchId) {
+      try {
+        ctx.assertMcpLaunchAuthorizationCurrent?.(input.mcpIdentity as McpLaunchIdentity);
+      } catch (error) {
+        disposeRejectedSpawnInput(input);
+        throw error;
+      }
+    }
     const mcpLaunchSnapshot =
       input.mcpLaunchSnapshot ?? ({ mcpServers: [], disabledBuiltInMcpServerIds: [] } as const);
     // `thread-reset` is only consumed by the terminal panel (renderer scrollback
@@ -1146,8 +1181,18 @@ export class SpawnPipeline {
       ...(input.structuredSession ? { structuredSession: input.structuredSession } : {}),
     };
 
+    try {
+      ctx.activateMcpLaunchAuthorization(session);
+    } catch (error) {
+      try {
+        pty?.kill();
+      } catch {
+        // The authorization error remains the actionable launch failure.
+      }
+      disposeRejectedSpawnInput(input);
+      throw error;
+    }
     ctx.sessionRuntimeLifecycle.attach(session);
-    ctx.activateMcpLaunchAuthorization(session);
 
     return session;
   }
@@ -1196,9 +1241,9 @@ export class SpawnPipeline {
     adapter?: AgentAdapter;
     presentationMode?: ThreadPresentationMode;
   }): Promise<ResolvedMcpServer[]> {
-    // Pipedream leases always bind to the concrete app thread. A separate,
-    // stable directory key may pool only the relay transport for providers
-    // that reload their MCP configuration at the project-server boundary.
+    // Pipedream front-door bearers bind to one concrete app launch. Provider
+    // runtimes may pool their own credential-free transport internally, but a
+    // stale process must never retain a sibling task's relay authorization.
     const pipedreamIdentity = identity;
     const providerSessionCrossagents = usesProviderSessionCrossagentRouting(
       adapter,
@@ -1260,10 +1305,8 @@ export class SpawnPipeline {
       ? await this.ctx.options.resolvePipedreamMcpServers?.({
           threadId: pipedreamIdentity.threadId,
           providerBindingId: resolvePipedreamProviderBindingId(
-            adapter,
-            presentationMode,
-            location,
             pipedreamIdentity.threadId,
+            pipedreamIdentity.launchId,
           ),
           projectLocation: location,
         })
@@ -1513,24 +1556,31 @@ export class SpawnPipeline {
   }
 }
 
-function resolvePipedreamProviderBindingId(
-  adapter: AgentAdapter | undefined,
-  presentationMode: ThreadPresentationMode | undefined,
-  location: ProjectLocation,
-  threadId: string,
-): string {
-  const usesDirectoryScopedOpenCodeMcp =
-    adapter?.kind === "opencode" &&
-    adapter.capabilities.mcpConfigSource === "agentSettings" &&
-    (presentationMode ?? adapter.capabilities.presentationMode) !== "terminal";
-  if (!usesDirectoryScopedOpenCodeMcp) return `thread:${threadId}`;
+function disposeRejectedSpawnInput(input: SpawnThreadInput): void {
+  try {
+    input.command?.cleanup?.();
+  } catch {
+    // Best-effort launch artifact cleanup must not hide revocation.
+  }
+  try {
+    const disposal = input.structuredSession?.dispose();
+    if (disposal) void disposal.catch(() => {});
+  } catch {
+    // Revocation must stay synchronous even if provider disposal throws.
+  }
+}
 
-  const directory =
-    location.kind === "windows"
-      ? resolveWindowsPath(location.path).toLowerCase()
-      : resolvePosixPath(location.kind === "wsl" ? location.linuxPath : location.path);
-  const runtime = location.kind === "wsl" ? `wsl:${location.distro.toLowerCase()}` : location.kind;
-  const canonical = `${runtime}:${location.remoteServerId ?? "local"}:${directory}`;
-  const digest = createHash("sha256").update(canonical).digest("hex").slice(0, 32);
-  return `opencode-gui:${digest}`;
+function resolvePipedreamProviderBindingId(threadId: string, launchId: string | undefined): string {
+  const threadBindingId = `thread:${threadId}`;
+  return launchId ? `${threadBindingId}:launch:${launchId}` : threadBindingId;
+}
+
+function onceLaunchCleanup(cleanup: (() => void) | undefined): (() => void) | undefined {
+  if (!cleanup) return undefined;
+  let called = false;
+  return () => {
+    if (called) return;
+    called = true;
+    cleanup();
+  };
 }

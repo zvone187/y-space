@@ -15,7 +15,7 @@
 }
 
 :root {
-  --poracode-modal-radius: 0.7rem;
+  --poracode-modal-radius: 1rem;
 }
 
 .modal__dialog:not(.modal__dialog--cover):not(.modal__dialog--full),
@@ -545,8 +545,8 @@
 @layer base {
   :root {
     /* Intentional overrides from HeroUI defaults */
-    --radius: 0.5rem;
-    --field-radius: 0.625rem;
+    --radius: 0.625rem;
+    --field-radius: 0.75rem;
     --field-border-width: 1px;
     --link: var(--accent-text);
     --focus: var(--foreground);
@@ -588,23 +588,24 @@
     --composer-surface: var(--surface);
     --glass-surface: color-mix(in oklab, var(--overlay) 84%, transparent);
     --glass-border: color-mix(in oklab, var(--foreground) 7%, transparent);
-    --glass-backdrop: blur(22px) saturate(158%);
-    --glass-chrome-radius: 14px;
+    --glass-backdrop: blur(24px) saturate(152%);
+    --glass-chrome-radius: 16px;
     --glass-muted: var(--muted);
     --glass-edge-highlight: rgb(255 255 255 / 0.62);
     --glass-edge-highlight-strong: rgb(255 255 255 / 0.74);
     --glass-edge-highlight-selected: rgb(255 255 255 / 0.58);
     --glass-edge-highlight-sidebar: rgb(255 255 255 / 0.5);
-    --glass-elevation: rgb(24 20 16 / 0.09);
-    --glass-elevation-soft: rgb(24 20 16 / 0.055);
+    --glass-elevation: rgb(24 20 16 / 0.075);
+    --glass-elevation-soft: rgb(24 20 16 / 0.04);
     --glass-specular: linear-gradient(
       135deg,
-      rgb(255 255 255 / 0.7) 0%,
-      rgb(255 255 255 / 0.16) 46%,
-      color-mix(in oklab, var(--accent) 5%, transparent) 100%
+      rgb(255 255 255 / 0.78) 0%,
+      rgb(255 255 255 / 0.12) 46%,
+      color-mix(in oklab, var(--accent) 6%, transparent) 100%
     );
     --glass-shadow:
-      0 12px 34px var(--glass-elevation), inset 0 1px 0 var(--glass-edge-highlight-strong);
+      0 18px 50px -28px var(--glass-elevation), 0 5px 18px -12px var(--glass-elevation-soft),
+      inset 0 1px 0 var(--glass-edge-highlight-strong);
     --interactive-cursor: default;
     --cursor-interactive: default;
 
@@ -674,7 +675,7 @@
     --content-background: #ffffff;
     --window-header-background: var(--sidebar-background);
     --composer-surface: #ffffff;
-    --glass-surface: color-mix(in oklab, #ffffff 80%, transparent);
+    --glass-surface: color-mix(in oklab, #ffffff 74%, transparent);
     --glass-muted: #504f4c;
   }
 
@@ -1218,6 +1219,18 @@ html[data-sidebar-glass="on"]:not([data-native-material="on"]) .poracode-sidebar
   --muted: var(--glass-muted);
 }
 
+/* One modeless integration surface stays above app chrome while its secure
+   embedded OAuth tab remains clickable around it. A slightly denser tint keeps
+   catalog text legible over both the light thread canvas and browser content. */
+.poracode-connections-dialog {
+  border-radius: 24px;
+  background: color-mix(in oklab, var(--glass-surface) 93%, var(--overlay));
+  background-image: var(--glass-specular);
+  box-shadow:
+    0 24px 70px color-mix(in oklab, var(--foreground) 16%, transparent),
+    inset 0 1px 0 var(--glass-edge-highlight);
+}
+
 /* Portaled menus cannot reliably receive the shared marker, but remain bounded
    stable chrome and use the same material without introducing per-content blur. */
 .popover,
@@ -1228,20 +1241,48 @@ html[data-sidebar-glass="on"]:not([data-native-material="on"]) .poracode-sidebar
 }
 
 .poracode-workspace-tab-strip {
-  margin: 4px 6px 0;
+  margin: 6px 8px 0;
   border-color: var(--glass-border);
   box-shadow:
-    0 5px 18px var(--glass-elevation-soft),
+    0 14px 32px -24px var(--glass-elevation),
+    0 4px 14px -10px var(--glass-elevation-soft),
     inset 0 1px 0 var(--glass-edge-highlight);
 }
 
 .poracode-workspace-tab {
   background: transparent;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    box-shadow 0.16s ease,
+    color 0.16s ease;
+}
+
+@media (hover: hover) {
+  .poracode-workspace-tab[data-selected="false"]:hover {
+    background: color-mix(in oklab, var(--foreground) 4%, transparent);
+  }
 }
 
 .poracode-workspace-tab[data-selected="true"] {
-  background: color-mix(in oklab, var(--glass-surface) 68%, var(--surface-secondary));
-  box-shadow: inset 0 1px 0 var(--glass-edge-highlight-selected);
+  border-color: var(--glass-border);
+  background: color-mix(in oklab, var(--glass-surface) 74%, var(--overlay));
+  box-shadow:
+    0 5px 14px -10px var(--glass-elevation),
+    inset 0 1px 0 var(--glass-edge-highlight-selected);
+}
+
+.poracode-workspace-tab__accent {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 9px color-mix(in oklab, var(--accent) 28%, transparent);
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .popover,
@@ -1256,17 +1297,22 @@ html[data-sidebar-glass="on"]:not([data-native-material="on"]) .poracode-sidebar
 .poracode-thread-header-glass,
 .poracode-browser-chrome {
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  background: color-mix(in oklab, var(--glass-surface) 88%, var(--content-background));
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--glass-surface) 82%, var(--content-background));
   background-image: var(--glass-specular);
   box-shadow:
-    0 4px 16px var(--glass-elevation-soft),
+    0 14px 30px -24px var(--glass-elevation),
+    0 4px 14px -10px var(--glass-elevation-soft),
     inset 0 1px 0 var(--glass-edge-highlight);
   --muted: var(--glass-muted);
 }
 
 .poracode-browser-omnibox {
-  box-shadow: inset 0 1px 2px rgb(24 20 16 / 0.045);
+  border-color: color-mix(in oklab, var(--foreground) 10%, transparent);
+  background: color-mix(in oklab, var(--field-background) 88%, transparent);
+  box-shadow:
+    inset 0 1px 2px rgb(24 20 16 / 0.035),
+    inset 0 1px 0 var(--glass-edge-highlight);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease,
@@ -1274,9 +1320,10 @@ html[data-sidebar-glass="on"]:not([data-native-material="on"]) .poracode-sidebar
 }
 
 .poracode-browser-omnibox:focus {
+  border-color: color-mix(in oklab, var(--accent) 58%, var(--glass-border));
   box-shadow:
-    inset 0 1px 2px rgb(24 20 16 / 0.035),
-    0 0 0 2px color-mix(in oklab, var(--accent) 16%, transparent);
+    inset 0 1px 2px rgb(24 20 16 / 0.025),
+    0 0 0 3px color-mix(in oklab, var(--accent) 11%, transparent);
 }
 
 /* Overlays (settings, git review, file editor, …) reuse the same AppShell, so
@@ -1337,6 +1384,7 @@ html[data-native-material="on"]
   }
   .poracode-glass-chrome,
   .poracode-glass-chrome.poracode-composer-shell,
+  .poracode-connections-dialog,
   .popover,
   .dropdown__popover,
   .poracode-thread-header-glass,
@@ -1982,13 +2030,14 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
 .poracode-composer-shell {
   position: relative;
   border: 1px solid var(--glass-border);
-  border-radius: 20px;
-  background: var(--glass-surface);
+  border-radius: 24px;
+  background: color-mix(in oklab, var(--glass-surface) 90%, var(--composer-surface));
   background-image: var(--glass-specular);
   backdrop-filter: var(--glass-backdrop);
   -webkit-backdrop-filter: var(--glass-backdrop);
   box-shadow:
-    0 12px 36px var(--glass-elevation),
+    0 22px 52px -30px var(--glass-elevation),
+    0 5px 18px -11px var(--glass-elevation-soft),
     inset 0 1px 0 var(--glass-edge-highlight-strong);
   transition:
     border-color 0.15s ease,
@@ -2079,11 +2128,12 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
 }
 
 .poracode-composer-shell:focus-within {
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--accent) 62%, var(--glass-border));
   outline: none !important;
   box-shadow:
-    0 12px 36px var(--glass-elevation),
-    0 0 0 1px var(--accent) !important;
+    0 22px 52px -30px var(--glass-elevation),
+    0 5px 18px -11px var(--glass-elevation-soft),
+    0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent) !important;
   --tw-ring-shadow: 0 0 #0000 !important;
   --tw-ring-offset-shadow: 0 0 #0000 !important;
 }

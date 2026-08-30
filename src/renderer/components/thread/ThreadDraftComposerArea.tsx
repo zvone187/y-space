@@ -53,6 +53,7 @@ import type { VoiceInputHandle } from "@/renderer/components/composer/VoiceInput
 import { getComputerUseScope } from "@/renderer/components/composer/computerUseScope";
 import { useBrowserAttachInbox } from "@/renderer/state/browserAttachInbox";
 import { useComposerInputInbox } from "@/renderer/state/composerInputInbox";
+import { useConnectionsDialogStore } from "@/renderer/state/connectionsDialogStore";
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import {
   BranchSelector,
@@ -261,6 +262,7 @@ function DraftComposerAfterControls(props: {
             }
           : {})}
         showFileOption
+        onOpenIntegrations={() => useConnectionsDialogStore.getState().openDialog("composer")}
         onPickFiles={props.onPickFiles}
         computerUse={props.computerUse}
         {...(props.experiment ? { experiment: props.experiment } : {})}

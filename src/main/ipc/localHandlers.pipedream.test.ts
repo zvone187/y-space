@@ -32,6 +32,16 @@ import { createLocalIpcHandlers } from "./localHandlers";
 function makeHandlers(
   importEnvironmentFile: (filePath: string) => Promise<unknown>,
   clearEnvironmentFile: () => Promise<unknown> = async () => ({}),
+  connectLifecycle: {
+    beginConnect?: (payload: { appSlug: string }) => Promise<unknown>;
+    getConnectFlowStatus?: (payload: { flowId: string }) => Promise<unknown>;
+    finishConnect?: (payload: { flowId: string }) => Promise<void>;
+    cancelConnect?: (payload: { flowId: string }) => Promise<void>;
+    beginPersonalMcpOauth?: () => Promise<unknown>;
+    getPersonalMcpOauthFlowStatus?: (payload: { flowId: string }) => Promise<unknown>;
+    cancelPersonalMcpOauth?: (payload: { flowId: string }) => Promise<void>;
+    clearPersonalMcpOauth?: () => Promise<void>;
+  } = {},
 ) {
   return createLocalIpcHandlers({
     getMainWindow: () => ({}) as never,
@@ -51,7 +61,29 @@ function makeHandlers(
     requestRelaunch: vi.fn<() => void>(),
     scheduleService: {} as never,
     prWatchService: {} as never,
-    pipedreamMainService: { importEnvironmentFile, clearEnvironmentFile } as never,
+    pipedreamMainService: {
+      importEnvironmentFile,
+      clearEnvironmentFile,
+      beginConnect:
+        connectLifecycle.beginConnect ??
+        vi.fn<(payload: { appSlug: string }) => Promise<unknown>>(),
+      getConnectFlowStatus:
+        connectLifecycle.getConnectFlowStatus ??
+        vi.fn<(payload: { flowId: string }) => Promise<unknown>>(),
+      finishConnect:
+        connectLifecycle.finishConnect ?? vi.fn<(payload: { flowId: string }) => Promise<void>>(),
+      cancelConnect:
+        connectLifecycle.cancelConnect ?? vi.fn<(payload: { flowId: string }) => Promise<void>>(),
+      beginPersonalMcpOauth:
+        connectLifecycle.beginPersonalMcpOauth ?? vi.fn<() => Promise<unknown>>(),
+      getPersonalMcpOauthFlowStatus:
+        connectLifecycle.getPersonalMcpOauthFlowStatus ??
+        vi.fn<(payload: { flowId: string }) => Promise<unknown>>(),
+      cancelPersonalMcpOauth:
+        connectLifecycle.cancelPersonalMcpOauth ??
+        vi.fn<(payload: { flowId: string }) => Promise<void>>(),
+      clearPersonalMcpOauth: connectLifecycle.clearPersonalMcpOauth ?? vi.fn<() => Promise<void>>(),
+    } as never,
     browserCookieImportService: {} as never,
     cookieImportBridge: {} as never,
     browserCookieImportExtensionDir: "/tmp/y-space-cookie-import",
@@ -117,5 +149,81 @@ describe("local Pipedream env-file IPC handler", () => {
       ).pipedreamClearEnvFile({}),
     ).resolves.toMatchObject({ connect: { state: "absent" } });
     expect(clearEnvironmentFile).toHaveBeenCalledOnce();
+  });
+
+  it("delegates the renderer-safe Connect lifecycle without accepting a tab id", async () => {
+    const flowId = "4d73cb38-1566-4e07-bf92-ce6edf1c82e8";
+    const beginConnect = vi.fn<(payload: { appSlug: string }) => Promise<unknown>>(async () => ({
+      opened: true as const,
+      expiresAt: "2026-08-27T12:10:00.000Z",
+      flowId,
+    }));
+    const getConnectFlowStatus = vi.fn<(payload: { flowId: string }) => Promise<{ state: "open" }>>(
+      async () => ({ state: "open" }),
+    );
+    const finishConnect = vi.fn<(payload: { flowId: string }) => Promise<void>>(
+      async () => undefined,
+    );
+    const cancelConnect = vi.fn<(payload: { flowId: string }) => Promise<void>>(
+      async () => undefined,
+    );
+    const handlers = makeHandlers(vi.fn<(filePath: string) => Promise<unknown>>(), undefined, {
+      beginConnect,
+      getConnectFlowStatus,
+      finishConnect,
+      cancelConnect,
+    });
+
+    await expect(handlers.pipedreamBeginConnect({ appSlug: "gmail" })).resolves.toMatchObject({
+      flowId,
+    });
+    await expect(handlers.pipedreamGetConnectFlowStatus({ flowId })).resolves.toEqual({
+      state: "open",
+    });
+    await handlers.pipedreamFinishConnect({ flowId });
+    await handlers.pipedreamCancelConnect({ flowId });
+
+    expect(beginConnect).toHaveBeenCalledExactlyOnceWith({ appSlug: "gmail" });
+    expect(getConnectFlowStatus).toHaveBeenCalledExactlyOnceWith({ flowId });
+    expect(finishConnect).toHaveBeenCalledExactlyOnceWith({ flowId });
+    expect(cancelConnect).toHaveBeenCalledExactlyOnceWith({ flowId });
+    expect(JSON.stringify({ flowId })).not.toMatch(/tabId|https?:|token=/i);
+  });
+
+  it("delegates only URL-free Personal Pipedream OAuth handles and coarse status", async () => {
+    const flowId = "4d73cb38-1566-4e07-bf92-ce6edf1c82e8";
+    const beginPersonalMcpOauth = vi.fn<() => Promise<unknown>>(async () => ({
+      state: "open",
+      flowId,
+    }));
+    const getPersonalMcpOauthFlowStatus = vi.fn<(payload: { flowId: string }) => Promise<unknown>>(
+      async () => ({ state: "authorized" }),
+    );
+    const cancelPersonalMcpOauth = vi.fn<(payload: { flowId: string }) => Promise<void>>(
+      async () => undefined,
+    );
+    const clearPersonalMcpOauth = vi.fn<() => Promise<void>>(async () => undefined);
+    const handlers = makeHandlers(vi.fn(), undefined, {
+      beginPersonalMcpOauth,
+      getPersonalMcpOauthFlowStatus,
+      cancelPersonalMcpOauth,
+      clearPersonalMcpOauth,
+    });
+
+    const begin = await handlers.pipedreamBeginPersonalMcpOauth({});
+    await expect(handlers.pipedreamGetPersonalMcpOauthFlowStatus({ flowId })).resolves.toEqual({
+      state: "authorized",
+    });
+    await handlers.pipedreamCancelPersonalMcpOauth({ flowId });
+    await handlers.pipedreamClearPersonalMcpOauth({});
+
+    expect(begin).toEqual({ state: "open", flowId });
+    expect(JSON.stringify(begin)).not.toMatch(
+      /authorizationUrl|renderer-secret-sentinel|code_challenge|tabId|supervisorFlowId/i,
+    );
+    expect(beginPersonalMcpOauth).toHaveBeenCalledOnce();
+    expect(getPersonalMcpOauthFlowStatus).toHaveBeenCalledWith({ flowId });
+    expect(cancelPersonalMcpOauth).toHaveBeenCalledWith({ flowId });
+    expect(clearPersonalMcpOauth).toHaveBeenCalledOnce();
   });
 });

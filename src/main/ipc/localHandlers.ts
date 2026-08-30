@@ -101,6 +101,8 @@ import { readProjectFilePreview } from "./readProjectFilePreview";
 interface CreateLocalIpcHandlersOptions {
   getMainWindow(): BrowserWindow | null;
   getBrowserPanelManager(): BrowserPanelManager | null;
+  /** Lets read-only hydration requests finish quietly after browser teardown begins. */
+  isQuitting?(): boolean;
   getRemoteAccessServer(): RemoteAccessServer | null;
   setRemoteAccessEnabled(enabled: boolean): Promise<RemoteAccessPairingInfo>;
   getRemoteAccessTailscaleStatus(): Promise<RemoteAccessTailscaleStatus>;
@@ -275,6 +277,16 @@ export function createLocalIpcHandlers(
       return result.filePath;
     },
     pipedreamBeginConnect: (payload) => options.pipedreamMainService.beginConnect(payload),
+    pipedreamBeginPersonalMcpOauth: () => options.pipedreamMainService.beginPersonalMcpOauth(),
+    pipedreamGetConnectFlowStatus: (payload) =>
+      options.pipedreamMainService.getConnectFlowStatus(payload),
+    pipedreamGetPersonalMcpOauthFlowStatus: (payload) =>
+      options.pipedreamMainService.getPersonalMcpOauthFlowStatus(payload),
+    pipedreamFinishConnect: (payload) => options.pipedreamMainService.finishConnect(payload),
+    pipedreamCancelConnect: (payload) => options.pipedreamMainService.cancelConnect(payload),
+    pipedreamCancelPersonalMcpOauth: (payload) =>
+      options.pipedreamMainService.cancelPersonalMcpOauth(payload),
+    pipedreamClearPersonalMcpOauth: () => options.pipedreamMainService.clearPersonalMcpOauth(),
     pipedreamChooseEnvFile: async ({ dialogTitle }) => {
       const result = await dialog.showOpenDialog(options.getMainWindow()!, {
         title: dialogTitle,
@@ -628,7 +640,12 @@ export function createLocalIpcHandlers(
     checkForUpdate: () => options.autoUpdater.checkForUpdate(),
     startUpdateDownload: () => options.autoUpdater.startUpdateDownload(),
     installUpdate: () => options.autoUpdater.installUpdate(),
-    browserGetState: () => requireBrowserPanel(options.getBrowserPanelManager).snapshot(),
+    browserGetState: () => {
+      const browserPanel = options.getBrowserPanelManager();
+      if (browserPanel) return browserPanel.snapshot();
+      if (options.isQuitting?.()) return { tabs: [], activeTabId: null };
+      return requireBrowserPanel(options.getBrowserPanelManager).snapshot();
+    },
     browserCreateTab: (payload) =>
       requireBrowserPanel(options.getBrowserPanelManager).createTab({
         ...(payload.url !== undefined ? { url: payload.url } : {}),
@@ -636,7 +653,7 @@ export function createLocalIpcHandlers(
         ...(payload.reveal !== undefined ? { reveal: payload.reveal } : {}),
       }),
     browserCreateSensitiveTab: (payload) =>
-      requireBrowserPanel(options.getBrowserPanelManager).createSensitiveIntegrationTab({
+      requireBrowserPanel(options.getBrowserPanelManager).createIsolatedSensitiveIntegrationTab({
         url: payload.url,
         ...(payload.activate !== undefined ? { activate: payload.activate } : {}),
         ...(payload.reveal !== undefined ? { reveal: payload.reveal } : {}),
@@ -645,6 +662,29 @@ export function createLocalIpcHandlers(
       requireBrowserPanel(options.getBrowserPanelManager).closeTab(tabId),
     browserActivateTab: ({ tabId }) => {
       requireBrowserPanel(options.getBrowserPanelManager).setActiveTab(tabId);
+    },
+    browserAcknowledgeAutomationPresentation: (payload, context) => {
+      // The renderer may unmount after orderly shutdown has already disposed
+      // the manager. Presentation lifecycle messages are acknowledgements, not
+      // browser operations, so a late one is safely ignored during teardown.
+      if (!context) return;
+      options
+        .getBrowserPanelManager()
+        ?.acknowledgeAutomationPresentation(
+          payload,
+          context.senderWebContentsId,
+          context.senderFrame,
+        );
+    },
+    browserInvalidateAutomationPresentation: (payload, context) => {
+      if (!context) return;
+      options
+        .getBrowserPanelManager()
+        ?.invalidateAutomationPresentation(
+          payload,
+          context.senderWebContentsId,
+          context.senderFrame,
+        );
     },
     browserMoveTab: ({ tabId, targetTabId, position }) => {
       requireBrowserPanel(options.getBrowserPanelManager).moveTab(tabId, targetTabId, position);
@@ -693,8 +733,25 @@ export function createLocalIpcHandlers(
       if (!bytes) return { dataUrl: null };
       return { dataUrl: `data:image/png;base64,${bytes.toString("base64")}` };
     },
-    browserAttachWebContents: ({ tabId, webContentsId }) => {
-      requireBrowserPanel(options.getBrowserPanelManager).attachWebContents(tabId, webContentsId);
+    browserAttachWebContents: ({ tabId, webContentsId }, context) => {
+      if (!context) return false;
+      return requireBrowserPanel(options.getBrowserPanelManager).attachWebContents(
+        tabId,
+        webContentsId,
+        context.senderWebContentsId,
+        context.senderFrame,
+      );
+    },
+    browserPresentSensitiveView: ({ tabId, bounds, visible, generation }, context) => {
+      if (!context) return;
+      requireBrowserPanel(options.getBrowserPanelManager).presentSensitiveIntegrationView(
+        tabId,
+        bounds,
+        visible,
+        generation,
+        context.senderWebContentsId,
+        context.senderFrame,
+      );
     },
     browserStartPicker: (payload) =>
       requireBrowserPanel(options.getBrowserPanelManager).startPicker(payload),

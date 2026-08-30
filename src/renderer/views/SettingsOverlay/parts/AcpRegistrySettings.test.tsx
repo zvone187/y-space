@@ -377,7 +377,9 @@ describe("AcpRegistrySettings", () => {
     render(<AcpRegistrySettings />);
 
     await screen.findByRole("heading", { name: "Agent Registry" });
-    const codexCard = screen.getByText(/First-class Codex CLI integration/u).closest(".rounded-lg");
+    const codexCard = (await screen.findByText(/First-class Codex CLI integration/u)).closest(
+      ".rounded-lg",
+    );
     expect(codexCard).toBeTruthy();
 
     fireEvent.click(within(codexCard as HTMLElement).getByRole("button", { name: "Install" }));

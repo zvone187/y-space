@@ -50,6 +50,7 @@ import {
   worktreeComposerInboxKey,
 } from "@/renderer/state/composerInputInbox";
 import { useComposerUiStore } from "@/renderer/state/composerUiStore";
+import { useConnectionsDialogStore } from "@/renderer/state/connectionsDialogStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { isDraftContentNonEmpty } from "@/renderer/state/slices/types";
@@ -944,6 +945,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                             onToggle: () => {},
                           }}
                           showFileOption={!usesRemoteTransport || props.pickFiles !== undefined}
+                          onOpenIntegrations={() =>
+                            useConnectionsDialogStore.getState().openDialog("composer")
+                          }
                           onPickFiles={() => {
                             void (
                               props.pickFiles

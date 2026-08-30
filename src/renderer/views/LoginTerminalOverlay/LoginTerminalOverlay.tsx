@@ -8,6 +8,7 @@ import {
   type LoginTerminalSession,
 } from "@/renderer/state/loginTerminalStore";
 import { watchRoutedTerminal } from "@/renderer/state/remoteTerminalFeed";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { disposeRoutedShellSession } from "@/renderer/utils/shellUtils";
 import { XTermSurface, type XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
 
@@ -27,6 +28,9 @@ export function LoginTerminalOverlay() {
   const [renderedSession, setRenderedSession] = useState<LoginTerminalSession | null>(null);
   const [visible, setVisible] = useState(false);
   const xtermRef = useRef<XTermSurfaceHandle | null>(null);
+  const overlayReady = useSensitiveNativeViewOverlayGate(
+    active !== null || renderedSession !== null,
+  );
 
   useEffect(() => {
     if (active) {
@@ -98,7 +102,7 @@ export function LoginTerminalOverlay() {
     }
   }
 
-  if (!renderedSession) return null;
+  if (!renderedSession || !overlayReady) return null;
 
   const isInstall = renderedSession.purpose === "install";
   const isUpdate = renderedSession.purpose === "update";

@@ -59,9 +59,9 @@ describe("opencode hosts Crossagents MCP on its shared server (live)", () => {
     mcp = registered;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     shutdownSpawnedOpenCodeServers();
-    runManager.cancelAllForThread(PARENT_THREAD_ID);
+    await runManager.cancelAllForThread(PARENT_THREAD_ID);
     ingress.dispose();
     rmSync(firstProjectDir, { recursive: true, force: true });
     rmSync(secondProjectDir, { recursive: true, force: true });

@@ -10,7 +10,7 @@ import { BrowserHost } from "./BrowserHost";
 
 const bridge = vi.hoisted(() => ({
   browserActivateTab: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-  browserAttachWebContents: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  browserAttachWebContents: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
   browserCloseTab: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   browserCreateTab:
     vi.fn<(payload: { url?: string; activate?: boolean }) => Promise<BrowserTabInfo>>(),

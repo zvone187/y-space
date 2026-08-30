@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type TransitionEvent } from "react";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { pushEscapeHandler } from "./overlayEscapeStack";
 
 export type OverlayShellMode = "fixed" | "absolute";
@@ -30,7 +31,10 @@ export function OverlayShell(props: {
   const { open, onExited, children, mode = "fixed", instantEnter = false } = props;
   const [mounted, setMounted] = useState(open);
   const [visible, setVisible] = useState(false);
+  const obstructionReady = useSensitiveNativeViewOverlayGate(open || mounted);
+  const presentedOpen = open && obstructionReady;
   const escapeClosingRef = useRef(false);
+  const wasPresentedRef = useRef(false);
   // Overlays that clear their own context on close (e.g. the GitHub Actions
   // view) drop their children in the same render that flips `open` to false,
   // which would blank the surface before the fade-out ran. Keep the last open
@@ -38,12 +42,15 @@ export function OverlayShell(props: {
   const exitChildrenRef = useRef(children);
 
   useEffect(() => {
-    if (open) exitChildrenRef.current = children;
-  }, [children, open]);
+    if (presentedOpen) {
+      wasPresentedRef.current = true;
+      exitChildrenRef.current = children;
+    }
+  }, [children, presentedOpen]);
 
   // Mount immediately when opened, fade in on next frame
   useEffect(() => {
-    if (open) {
+    if (presentedOpen) {
       if (escapeClosingRef.current) return undefined;
       setMounted(true);
       // Batched with setMounted into a single render, so the surface never
@@ -61,19 +68,29 @@ export function OverlayShell(props: {
     // Start fade-out
     setVisible(false);
     return undefined;
-  }, [open, instantEnter]);
+  }, [presentedOpen, instantEnter]);
+
+  // If the requested overlay closes before the native hide acknowledgment,
+  // there was no renderer surface to animate out. Tear it down immediately so
+  // its obstruction lease cannot wait forever for a transition that will
+  // never run.
+  useEffect(() => {
+    if (open || !mounted || wasPresentedRef.current) return;
+    setMounted(false);
+    onExited?.();
+  }, [mounted, onExited, open]);
 
   // Close on Escape via the overlay escape stack — only the topmost overlay
   // dismisses, so a transient overlay floating above this one (e.g. the
   // browser drawer at z-60 above Settings at z-50) consumes Escape first.
   useEffect(() => {
-    if (!open || !onExited) return;
+    if (!presentedOpen || !onExited) return;
     return pushEscapeHandler(() => {
       escapeClosingRef.current = true;
       setVisible(false);
       (document.activeElement as HTMLElement | null)?.blur();
     });
-  }, [open, onExited]);
+  }, [presentedOpen, onExited]);
 
   // Unmount after this surface's own fade-out completes. Overlay content
   // animates too, and those transitions bubble — unmounting on a child's
@@ -83,11 +100,12 @@ export function OverlayShell(props: {
     if (event.propertyName !== "opacity") return;
     if (!visible) {
       setMounted(false);
+      wasPresentedRef.current = false;
       onExited?.();
     }
   }
 
-  if (!mounted) return null;
+  if (!mounted || !obstructionReady) return null;
 
   const positionClass = mode === "fixed" ? "fixed inset-0 z-50" : "absolute inset-0 z-30";
   return (
@@ -104,7 +122,7 @@ export function OverlayShell(props: {
       }`}
       onTransitionEnd={handleTransitionEnd}
     >
-      {open ? children : exitChildrenRef.current}
+      {presentedOpen ? children : exitChildrenRef.current}
     </div>
   );
 }

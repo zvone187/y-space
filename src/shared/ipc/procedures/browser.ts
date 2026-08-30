@@ -32,7 +32,7 @@ export const browserTabGroupSchema = z.object({
 });
 export type BrowserTabGroupInfo = z.infer<typeof browserTabGroupSchema>;
 
-export const browserTabSchema = z.object({
+const browserTabBaseSchema = z.object({
   tabId: z.string(),
   url: z.string(),
   title: z.string(),
@@ -42,9 +42,26 @@ export const browserTabSchema = z.object({
   canGoForward: z.boolean(),
   devToolsOpen: z.boolean().optional(),
   groupId: z.string().optional(),
-  /** True for short-lived authorization tabs whose URL and title are redacted. */
-  sensitiveIntegration: z.literal(true).optional(),
 });
+
+export const browserTabSchema = z.union([
+  browserTabBaseSchema.extend({
+    sensitiveIntegration: z.undefined().optional(),
+    sensitiveSessionPartition: z.never().optional(),
+    sensitiveViewGeneration: z.never().optional(),
+  }),
+  browserTabBaseSchema.extend({
+    /** True for short-lived authorization tabs whose URL and title are redacted. */
+    sensitiveIntegration: z.literal(true),
+    /** Main-owned presentation epoch. A renderer must echo the current value
+     * with fresh geometry after host/surface invalidation before main will
+     * show the native OAuth view again. This is not an attachment authority. */
+    sensitiveViewGeneration: z.number().int().nonnegative(),
+    /** Sensitive sessions are owned by main-process WebContentsViews. A
+     * renderer must never receive the session partition or a guest capability. */
+    sensitiveSessionPartition: z.never().optional(),
+  }),
+]);
 export type BrowserTabInfo = z.infer<typeof browserTabSchema>;
 
 export const browserBookmarkSchema = z.object({
@@ -80,6 +97,46 @@ export const browserTabIdPayloadSchema = z.object({
   tabId: z.string().min(1),
 });
 
+export const browserAutomationPresentationSurfaceSchema = z.enum(["main", "extracted"]);
+export type BrowserAutomationPresentationSurface = z.infer<
+  typeof browserAutomationPresentationSurfaceSchema
+>;
+
+export const browserAcknowledgeAutomationPresentationPayloadSchema = z.object({
+  requestId: z.string().uuid(),
+  tabId: z.string().min(1),
+  surface: browserAutomationPresentationSurfaceSchema,
+  presented: z.boolean(),
+});
+export type BrowserAcknowledgeAutomationPresentationPayload = z.infer<
+  typeof browserAcknowledgeAutomationPresentationPayloadSchema
+>;
+
+export const browserAutomationPresentationInvalidationReasonSchema = z.enum([
+  "superseded",
+  "obstructed",
+  "browser-state-changed",
+  "workspace-tab-changed",
+  "panel-layout-changed",
+  "file-editor-changed",
+  "document-visibility-changed",
+  "viewport-resized",
+  "post-acknowledgement",
+  "renderer-unmounted",
+]);
+
+export const browserInvalidateAutomationPresentationPayloadSchema = z.object({
+  requestId: z.string().uuid(),
+  tabId: z.string().min(1),
+  surface: browserAutomationPresentationSurfaceSchema,
+  /** Diagnostic-only bounded source. No page URL, selector, or user data is
+   * allowed across this privileged IPC boundary. */
+  reason: browserAutomationPresentationInvalidationReasonSchema.optional(),
+});
+export type BrowserInvalidateAutomationPresentationPayload = z.infer<
+  typeof browserInvalidateAutomationPresentationPayloadSchema
+>;
+
 export const browserNavigatePayloadSchema = z.object({
   tabId: z.string().min(1),
   url: z.string().min(1),
@@ -94,6 +151,18 @@ export const browserMoveTabPayloadSchema = z.object({
 export const browserAttachWebContentsPayloadSchema = z.object({
   tabId: z.string().min(1),
   webContentsId: z.number().int().nonnegative(),
+});
+
+export const browserPresentSensitiveViewPayloadSchema = z.object({
+  tabId: z.string().min(1),
+  generation: z.number().int().nonnegative(),
+  visible: z.boolean(),
+  bounds: z.object({
+    x: z.number().finite(),
+    y: z.number().finite(),
+    width: z.number().finite().nonnegative(),
+    height: z.number().finite().nonnegative(),
+  }),
 });
 
 export const browserSetGroupCollapsedPayloadSchema = z.object({
@@ -211,6 +280,24 @@ export const browserProcedures = {
     void,
     "main-local"
   >("browserActivateTab", "main-local", browserTabIdPayloadSchema),
+  browserAcknowledgeAutomationPresentation: definePayloadProcedure<
+    BrowserAcknowledgeAutomationPresentationPayload,
+    void,
+    "main-local"
+  >(
+    "browserAcknowledgeAutomationPresentation",
+    "main-local",
+    browserAcknowledgeAutomationPresentationPayloadSchema,
+  ),
+  browserInvalidateAutomationPresentation: definePayloadProcedure<
+    BrowserInvalidateAutomationPresentationPayload,
+    void,
+    "main-local"
+  >(
+    "browserInvalidateAutomationPresentation",
+    "main-local",
+    browserInvalidateAutomationPresentationPayloadSchema,
+  ),
   browserMoveTab: definePayloadProcedure<
     z.infer<typeof browserMoveTabPayloadSchema>,
     void,
@@ -303,9 +390,14 @@ export const browserProcedures = {
   >("browserCapturePreview", "main-local", browserTabIdPayloadSchema),
   browserAttachWebContents: definePayloadProcedure<
     z.infer<typeof browserAttachWebContentsPayloadSchema>,
-    void,
+    boolean,
     "main-local"
   >("browserAttachWebContents", "main-local", browserAttachWebContentsPayloadSchema),
+  browserPresentSensitiveView: definePayloadProcedure<
+    z.infer<typeof browserPresentSensitiveViewPayloadSchema>,
+    void,
+    "main-local"
+  >("browserPresentSensitiveView", "main-local", browserPresentSensitiveViewPayloadSchema),
   browserStartPicker: definePayloadProcedure<
     z.infer<typeof browserStartPickerPayloadSchema>,
     BrowserStartPickerResult,

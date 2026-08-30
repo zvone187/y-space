@@ -105,6 +105,7 @@ function createHarness(
   const indexSessionRef = vi.fn<SessionRuntimeLifecycleContext["indexSessionRef"]>();
   const pollSessionRefDiscovery =
     vi.fn<SessionRuntimeLifecycleContext["pollSessionRefDiscovery"]>();
+  const releaseExitedMcpLaunch = vi.fn<(session: SessionRuntime) => void>();
 
   const lifecycle = new SessionRuntimeLifecycle({
     sessions,
@@ -122,6 +123,7 @@ function createHarness(
     failStructuredSession,
     indexSessionRef,
     pollSessionRefDiscovery,
+    releaseExitedMcpLaunch,
   });
 
   return {
@@ -157,6 +159,7 @@ function createHarness(
       failStructuredSession,
       indexSessionRef,
       pollSessionRefDiscovery,
+      releaseExitedMcpLaunch,
     },
   };
 }
@@ -446,6 +449,7 @@ describe("SessionRuntimeLifecycle", () => {
     harness.emitPtyExit(17);
 
     expect(harness.mocks.resolveExit).toHaveBeenCalledExactlyOnceWith(harness.session);
+    expect(harness.mocks.releaseExitedMcpLaunch).toHaveBeenCalledExactlyOnceWith(harness.session);
     expect(launchCleanup).toHaveBeenCalledTimes(1);
     expect(harness.session.launchCleanup).toBeUndefined();
     expect(harness.mocks.dispose).toHaveBeenCalledTimes(1);
@@ -468,6 +472,7 @@ describe("SessionRuntimeLifecycle", () => {
     } as SessionRuntime);
     stale.emitPtyExit(1);
     expect(stale.mocks.resolveExit).toHaveBeenCalledTimes(1);
+    expect(stale.mocks.releaseExitedMcpLaunch).not.toHaveBeenCalled();
     expect(stale.mocks.updateState).not.toHaveBeenCalled();
     expect(stale.mocks.emit).not.toHaveBeenCalled();
 
@@ -476,7 +481,23 @@ describe("SessionRuntimeLifecycle", () => {
     ignored.session.ignoreExit = true;
     ignored.emitPtyExit(2);
     expect(ignored.mocks.resolveExit).toHaveBeenCalledTimes(1);
+    expect(ignored.mocks.releaseExitedMcpLaunch).not.toHaveBeenCalled();
     expect(ignored.mocks.updateState).not.toHaveBeenCalled();
     expect(ignored.mocks.emit).not.toHaveBeenCalled();
   });
+
+  it.each(["working", "inactive"] as const)(
+    "releases an exact no-PTY MCP launch when its structured session closes from %s",
+    (status) => {
+      const harness = createHarness({
+        withPty: false,
+        session: { status },
+      });
+      harness.lifecycle.attach(harness.session);
+
+      harness.structuredListener?.onClose();
+
+      expect(harness.mocks.releaseExitedMcpLaunch).toHaveBeenCalledExactlyOnceWith(harness.session);
+    },
+  );
 });

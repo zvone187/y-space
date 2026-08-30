@@ -87,6 +87,10 @@ export type IpcProcedureResult<Name extends IpcProcedureName> =
 export const SUPERVISOR_INTERNAL_PROCEDURE_NAMES = [
   "resolveMcpCallerIdentity",
   "recordBrowserMcpToolCall",
+  "pipedreamInternalBeginPersonalMcpOauth",
+  "pipedreamInternalWaitPersonalMcpOauth",
+  "pipedreamInternalCancelPersonalMcpOauth",
+  "pipedreamInternalClearPersonalMcpOauth",
 ] as const satisfies readonly IpcProcedureName[];
 
 export type SupervisorInternalProcedureName = (typeof SUPERVISOR_INTERNAL_PROCEDURE_NAMES)[number];
@@ -177,6 +181,8 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "browserCreateSensitiveTab",
   "browserCloseTab",
   "browserActivateTab",
+  "browserAcknowledgeAutomationPresentation",
+  "browserInvalidateAutomationPresentation",
   "browserMoveTab",
   "browserSetGroupCollapsed",
   "browserUngroupGroup",
@@ -196,6 +202,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "browserCopyScreenshot",
   "browserCapturePreview",
   "browserAttachWebContents",
+  "browserPresentSensitiveView",
   "browserStartPicker",
   "browserCancelPicker",
   "browserSuggest",
@@ -240,6 +247,13 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "deletePrWatch",
   "syncPrWatchAgent",
   "pipedreamBeginConnect",
+  "pipedreamBeginPersonalMcpOauth",
+  "pipedreamGetConnectFlowStatus",
+  "pipedreamGetPersonalMcpOauthFlowStatus",
+  "pipedreamFinishConnect",
+  "pipedreamCancelConnect",
+  "pipedreamCancelPersonalMcpOauth",
+  "pipedreamClearPersonalMcpOauth",
   "pipedreamChooseEnvFile",
   "pipedreamClearEnvFile",
 ] as const satisfies readonly IpcProcedureName[];

@@ -763,7 +763,16 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       hasYSpaceBrowserMcp(this.mcpServers ?? []) !== hasYSpaceBrowserMcp(mcpServers);
     this.mcpServers = mcpServers;
     this.appliedPermissionSyncKey = undefined;
-    if (!this.activated || this.disposed || !this.acquired) return;
+    if (!this.activated || this.disposed) return;
+    // A previous connection-loss recovery may have disposed the old server and
+    // then failed before acquiring its replacement. The desired MCP set is
+    // already stored at that point, so presence comparison alone looks like a
+    // no-op. Treat a missing active acquisition as mandatory recovery instead
+    // of reporting a false success to the live-reload coordinator.
+    if (!this.acquired) {
+      await this.reacquireOpenCodeServer();
+      return;
+    }
     // Browser exclusivity is injected through OPENCODE_CONFIG_CONTENT when the
     // server process launches. Directory-level MCP updates cannot add or remove
     // those provider-native browser/search denies, so move the live session to

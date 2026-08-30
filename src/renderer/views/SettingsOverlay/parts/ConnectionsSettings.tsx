@@ -1,35 +1,33 @@
 import { useEffect, useState } from "react";
-import { Button, Input, Modal } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { FileKey2, LogIn, LogOut, RefreshCw, Search, Unplug } from "lucide-react";
+import { Blocks, LogIn, LogOut } from "lucide-react";
 import { readBridge } from "@/renderer/bridge";
-import { ToggleSwitch } from "@/renderer/components/common";
-import { useMcpServerOauth } from "@/renderer/components/mcp/useMcpServerOauth";
+import { useConnectionsDialogStore } from "@/renderer/state/connectionsDialogStore";
 import {
   useSharedSettings,
   waitForPendingSharedSettings,
 } from "@/renderer/state/sharedSettingsStore";
-import type {
-  McpServer,
-  PipedreamAccountSummary,
-  PipedreamAppSummary,
-  PipedreamListAppsResult,
-  PipedreamSnapshot,
+import {
+  PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+  PIPEDREAM_PERSONAL_MCP_SERVER_NAME,
+  PIPEDREAM_PERSONAL_MCP_URL,
+  type McpServer,
+  type PipedreamSnapshot,
 } from "@/shared/contracts";
 import { SettingsPage } from "./SettingsForm";
 
-const EMPTY_APPS: PipedreamListAppsResult = { apps: [], totalCount: 0 };
-const PERSONAL_MCP_URL = "https://mcp.pipedream.net/v2";
-const PERSONAL_MCP_ID = "pipedream-personal-mcp";
+const PERSONAL_MCP_OAUTH_POLL_MS = 250;
+const PERSONAL_MCP_OAUTH_MAX_MS = 5 * 60_000;
 
 function personalMcpServer(description: string): McpServer {
   return {
-    id: PERSONAL_MCP_ID,
-    name: "pd",
+    id: PIPEDREAM_PERSONAL_MCP_SERVER_ID,
+    name: PIPEDREAM_PERSONAL_MCP_SERVER_NAME,
     description,
     enabled: true,
     timeoutMs: 30_000,
-    transport: { type: "http", url: PERSONAL_MCP_URL, headers: {} },
+    transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
   };
 }
 
@@ -45,17 +43,17 @@ function withPersonalMcpServer(
       server.name.toLowerCase() === "pd" &&
       !(
         (server.transport.type === "http" || server.transport.type === "sse") &&
-        server.transport.url === PERSONAL_MCP_URL
+        server.transport.url === PIPEDREAM_PERSONAL_MCP_URL
       ),
   );
   if (collision) throw new Error("The MCP server name pd is already in use.");
 
   const canonical = personalMcpServer(description);
   const next = servers.filter((server) => {
-    if (server.id === PERSONAL_MCP_ID) return false;
+    if (server.id === PIPEDREAM_PERSONAL_MCP_SERVER_ID) return false;
     return !(
       (server.transport.type === "http" || server.transport.type === "sse") &&
-      server.transport.url === PERSONAL_MCP_URL
+      server.transport.url === PIPEDREAM_PERSONAL_MCP_URL
     );
   });
   return { server: canonical, servers: [...next, canonical] };
@@ -63,25 +61,22 @@ function withPersonalMcpServer(
 
 export function ConnectionsSettings() {
   const { t } = useLingui();
+  const revision = useConnectionsDialogStore((state) => state.revision);
   const [snapshot, setSnapshot] = useState<PipedreamSnapshot | null>(null);
-  const [apps, setApps] = useState<PipedreamListAppsResult>(EMPTY_APPS);
-  const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [disconnectCandidate, setDisconnectCandidate] = useState<PipedreamAccountSummary | null>(
-    null,
-  );
   const mcpServers = useSharedSettings((state) => state.mcpServers);
   const setMcpServers = useSharedSettings((state) => state.setMcpServers);
-  const personalOauth = useMcpServerOauth();
 
   useEffect(() => {
     let active = true;
     void readBridge()
       .pipedreamGetSnapshot()
       .then((next) => {
-        if (active) setSnapshot(next);
+        if (active) {
+          setSnapshot(next);
+          setError(null);
+        }
       })
       .catch(() => {
         if (active) setError(t`Could not load connections.`);
@@ -89,13 +84,12 @@ export function ConnectionsSettings() {
     return () => {
       active = false;
     };
-  }, [t]);
+  }, [revision, t]);
 
   const run = async (key: string, operation: () => Promise<void>) => {
     if (busy) return;
     setBusy(key);
     setError(null);
-    setNotice(null);
     try {
       await operation();
     } catch {
@@ -105,28 +99,12 @@ export function ConnectionsSettings() {
     }
   };
 
-  const searchApps = () =>
-    run("search", async () => {
-      setApps(
-        await readBridge().pipedreamListApps({
-          ...(query.trim() ? { query: query.trim() } : {}),
-          limit: 20,
-        }),
-      );
-    });
-
-  const connectApp = (app: PipedreamAppSummary) =>
-    run(`connect:${app.slug}`, async () => {
-      await readBridge().pipedreamBeginConnect({ appSlug: app.slug });
-      setNotice(t`Finish connecting in the new embedded browser tab, then refresh accounts.`);
-    });
-
   const signInPersonalMcp = () =>
     run("personal-mcp", async () => {
       const managed = withPersonalMcpServer(mcpServers, t`Personal Pipedream tools`);
       setMcpServers(managed.servers);
       await waitForPendingSharedSettings();
-      const authenticated = await personalOauth.authenticate(managed.server);
+      const authenticated = await authenticatePersonalPipedream();
       if (!authenticated) {
         setError(t`Personal MCP sign-in did not complete.`);
         return;
@@ -136,52 +114,41 @@ export function ConnectionsSettings() {
 
   const signOutPersonalMcp = () =>
     run("personal-mcp", async () => {
-      const managed = withPersonalMcpServer(mcpServers, t`Personal Pipedream tools`);
-      await personalOauth.signOut(managed.server);
+      await readBridge().pipedreamClearPersonalMcpOauth();
       setSnapshot(await readBridge().pipedreamGetSnapshot());
     });
 
-  const chooseEnvironmentFile = () =>
-    run("env-file", async () => {
-      const result = await readBridge().pipedreamChooseEnvFile({
-        dialogTitle: t`Choose Pipedream environment file`,
-      });
-      if (!result) return;
-      if (result.status === "invalid") {
-        if (result.reason === "unreadable") {
-          setError(t`The selected file could not be read.`);
-        } else if (result.reason === "too-large") {
-          setError(t`The selected file is too large.`);
-        } else {
-          setError(t`The selected file does not contain Pipedream credentials.`);
-        }
-        return;
-      }
-      setSnapshot(result.snapshot);
-      setNotice(t`Pipedream credentials loaded from the selected file.`);
-    });
-
-  const forgetEnvironmentFile = () =>
-    run("clear-env-file", async () => {
-      setSnapshot(await readBridge().pipedreamClearEnvFile());
-      setNotice(t`Saved environment file forgotten.`);
-    });
-
   const connect = snapshot?.connect;
+  const connectedCount = connect?.state === "ready" ? connect.accounts.length : 0;
+  const agentCount =
+    connect?.state === "ready"
+      ? connect.accounts.filter((account) => account.healthy && account.agentAccess).length
+      : 0;
+  const integrationSummary =
+    connect?.state === "ready"
+      ? connectedCount === 0
+        ? t`No integrations connected yet.`
+        : t`${connectedCount} connected · ${agentCount} available to agents`
+      : connect?.state === "partial"
+        ? t`Finish setup to connect your tools.`
+        : connect?.state === "error"
+          ? t`Integrations need attention.`
+          : t`Connect your first tool when you are ready.`;
+
   return (
     <SettingsPage
       title={t`Connections`}
-      description={t`Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents.`}
-      bodyClassName="space-y-5"
+      description={t`Connect your tools to Y Space and choose what agents can use.`}
+      bodyClassName="space-y-4"
     >
       <section className="rounded-xl border border-[var(--hairline)] p-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold text-foreground">
-              <Trans>Personal MCP</Trans>
+              <Trans>Personal Pipedream</Trans>
             </h2>
             <p className="mt-1 text-xs text-muted">
-              <Trans>End-user Pipedream MCP server named pd.</Trans>
+              <Trans>Use tools already connected to your Pipedream account.</Trans>
             </p>
           </div>
           <StatusBadge
@@ -195,12 +162,12 @@ export function ConnectionsSettings() {
             active={snapshot?.personalMcp.authenticated === true}
           />
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-3 flex justify-end">
           {snapshot?.personalMcp.authenticated ? (
             <Button
               variant="ghost"
               size="sm"
-              isDisabled={busy !== null || personalOauth.busyServerIds.has(PERSONAL_MCP_ID)}
+              isDisabled={busy !== null}
               onPress={() => void signOutPersonalMcp()}
             >
               <LogOut className="size-3.5" />
@@ -211,11 +178,7 @@ export function ConnectionsSettings() {
               variant="tertiary"
               size="sm"
               aria-label={snapshot?.personalMcp.enabled ? t`Sign in` : t`Add and sign in`}
-              isDisabled={
-                snapshot === null ||
-                busy !== null ||
-                personalOauth.busyServerIds.has(PERSONAL_MCP_ID)
-              }
+              isDisabled={snapshot === null || busy !== null}
               onPress={() => void signInPersonalMcp()}
             >
               <LogIn className="size-3.5" />
@@ -229,24 +192,27 @@ export function ConnectionsSettings() {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-xl border border-[var(--hairline)] p-4">
+      <section className="rounded-xl border border-[var(--hairline)] p-4">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">
-              <Trans>BYO Connect</Trans>
-            </h2>
-            <p className="mt-1 text-xs text-muted">
-              <Trans>
-                Pipedream-managed OAuth accounts available through authenticated local MCP relays.
-              </Trans>
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent-text">
+              <Blocks className="size-4" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-foreground">
+                <Trans>Y Space integrations</Trans>
+              </h2>
+              <p className="mt-1 text-xs text-muted">
+                <Trans>Connect apps once, then decide which ones agents can use.</Trans>
+              </p>
+            </div>
           </div>
           <StatusBadge
             label={
               connect?.state === "ready"
                 ? t`Ready`
                 : connect?.state === "partial"
-                  ? t`Incomplete setup`
+                  ? t`Setup needed`
                   : connect?.state === "error"
                     ? t`Needs attention`
                     : t`Not configured`
@@ -254,220 +220,44 @@ export function ConnectionsSettings() {
             active={connect?.state === "ready"}
           />
         </div>
-
-        {connect?.state === "partial" ? (
-          <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-            <Trans>Missing configuration:</Trans> {connect.missingKeys.join(", ")}
-          </p>
-        ) : null}
-        {connect?.state === "error" ? (
-          <p className="rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">
-            <Trans>Pipedream Connect could not be initialized.</Trans>
-          </p>
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--hairline)] px-3 py-2">
-          <p className="min-w-48 flex-1 text-xs text-muted">
-            <Trans>
-              Select a local environment file. Y Space stores only its location; credential values
-              stay outside renderer and agent processes.
-            </Trans>
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              isDisabled={busy !== null}
-              onPress={() => void forgetEnvironmentFile()}
-            >
-              <Trans>Forget environment file</Trans>
-            </Button>
-            <Button
-              variant="tertiary"
-              size="sm"
-              isPending={busy === "env-file"}
-              isDisabled={busy !== null}
-              onPress={() => void chooseEnvironmentFile()}
-            >
-              <FileKey2 className="size-3.5" />
-              <Trans>Choose environment file</Trans>
-            </Button>
-          </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted">{integrationSummary}</p>
+          <Button
+            variant="tertiary"
+            size="sm"
+            onPress={() => useConnectionsDialogStore.getState().openDialog("settings")}
+          >
+            <Blocks className="size-3.5" aria-hidden />
+            <Trans>Manage integrations</Trans>
+          </Button>
         </div>
-
-        {connect?.state === "ready" ? (
-          <>
-            <div className="flex items-center gap-2 text-xs text-muted">
-              <span>{connect.projectName}</span>
-              <span aria-hidden="true">·</span>
-              <span>{connect.environment}</span>
-              <span aria-hidden="true">·</span>
-              <span>{connect.projectIdHint}</span>
-            </div>
-            {connect.credentialSource === "environment" ? (
-              <p className="rounded-lg bg-success/10 px-3 py-2 text-xs text-success">
-                <Trans>
-                  Credentials are managed by the Y Space environment and never exposed to agents.
-                </Trans>
-              </p>
-            ) : null}
-
-            <div className="flex items-center gap-2">
-              <Input
-                aria-label={t`Search apps`}
-                value={query}
-                placeholder={t`Search Pipedream apps`}
-                onChange={(event) => setQuery(event.currentTarget.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void searchApps();
-                }}
-              />
-              <Button
-                variant="tertiary"
-                size="sm"
-                isDisabled={busy !== null}
-                onPress={() => void searchApps()}
-              >
-                <Search className="size-3.5" />
-                <Trans>Search</Trans>
-              </Button>
-            </div>
-
-            {apps.apps.length > 0 ? (
-              <div className="divide-y divide-[var(--hairline)] rounded-lg border border-[var(--hairline)]">
-                {apps.apps.map((app) => (
-                  <div key={app.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                    <span className="truncate text-sm text-foreground">{app.name}</span>
-                    <Button
-                      variant="tertiary"
-                      size="sm"
-                      aria-label={t`Connect ${app.name}`}
-                      isDisabled={busy !== null}
-                      onPress={() => void connectApp(app)}
-                    >
-                      <Trans>Connect</Trans>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
-                <Trans>Connected accounts</Trans>
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={t`Refresh accounts`}
-                isDisabled={busy !== null}
-                onPress={() =>
-                  void run("refresh", async () => {
-                    setSnapshot(await readBridge().pipedreamRefreshAccounts());
-                  })
-                }
-              >
-                <RefreshCw className={`size-3.5 ${busy === "refresh" ? "animate-spin" : ""}`} />
-                <Trans>Refresh</Trans>
-              </Button>
-            </div>
-
-            {connect.accounts.length === 0 ? (
-              <p className="text-xs text-muted">
-                <Trans>No connected accounts yet.</Trans>
-              </p>
-            ) : (
-              <div className="divide-y divide-[var(--hairline)] rounded-lg border border-[var(--hairline)]">
-                {connect.accounts.map((account) => (
-                  <div key={account.id} className="flex items-center gap-3 px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-foreground">{account.name}</p>
-                      <p className="text-xs text-muted">
-                        {account.app.name} · {account.healthy ? t`Healthy` : t`Needs attention`}
-                      </p>
-                    </div>
-                    <ToggleSwitch
-                      aria-label={t`Allow agents to use ${account.name}`}
-                      isSelected={account.agentAccess}
-                      isDisabled={busy !== null || !account.healthy}
-                      onChange={(enabled) =>
-                        void run(`access:${account.id}`, async () => {
-                          setSnapshot(
-                            await readBridge().pipedreamSetAccountAgentAccess({
-                              accountId: account.id,
-                              enabled,
-                            }),
-                          );
-                        })
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      isIconOnly
-                      aria-label={t`Disconnect ${account.name}`}
-                      isDisabled={busy !== null}
-                      onPress={() => setDisconnectCandidate(account)}
-                    >
-                      <Unplug className="size-3.5 text-danger" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        ) : null}
       </section>
 
-      {notice ? <p className="text-xs text-success">{notice}</p> : null}
       {error ? <p className="text-xs text-danger">{error}</p> : null}
-
-      <Modal.Backdrop
-        isOpen={disconnectCandidate !== null}
-        onOpenChange={(open) => !open && setDisconnectCandidate(null)}
-      >
-        <Modal.Container placement="center" size="sm">
-          <Modal.Dialog className="sm:max-w-md">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>
-                <Trans>Disconnect account?</Trans>
-              </Modal.Heading>
-            </Modal.Header>
-            <Modal.Body className="p-4 text-sm text-muted">
-              <Trans>
-                This removes the Pipedream account and immediately revokes agent access through Y
-                Space.
-              </Trans>
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="ghost" onPress={() => setDisconnectCandidate(null)}>
-                <Trans>Cancel</Trans>
-              </Button>
-              <Button
-                variant="danger"
-                aria-label={t`Confirm disconnect`}
-                isDisabled={busy !== null}
-                onPress={() => {
-                  const account = disconnectCandidate;
-                  if (!account) return;
-                  setDisconnectCandidate(null);
-                  void run(`disconnect:${account.id}`, async () => {
-                    setSnapshot(
-                      await readBridge().pipedreamDisconnectAccount({ accountId: account.id }),
-                    );
-                  });
-                }}
-              >
-                <Unplug className="size-3.5" />
-                <Trans>Disconnect</Trans>
-              </Button>
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-      </Modal.Backdrop>
     </SettingsPage>
   );
+}
+
+async function authenticatePersonalPipedream(): Promise<boolean> {
+  const bridge = readBridge();
+  const begin = await bridge.pipedreamBeginPersonalMcpOauth();
+  if (begin.state === "authorized") return true;
+  if (begin.state !== "open") return false;
+
+  const deadline = Date.now() + PERSONAL_MCP_OAUTH_MAX_MS;
+  try {
+    while (Date.now() < deadline) {
+      const status = await bridge.pipedreamGetPersonalMcpOauthFlowStatus({
+        flowId: begin.flowId,
+      });
+      if (status.state === "authorized") return true;
+      if (status.state !== "open") return false;
+      await new Promise<void>((resolve) => setTimeout(resolve, PERSONAL_MCP_OAUTH_POLL_MS));
+    }
+    return false;
+  } finally {
+    await bridge.pipedreamCancelPersonalMcpOauth({ flowId: begin.flowId }).catch(() => undefined);
+  }
 }
 
 function StatusBadge(props: { label: string; active: boolean }) {

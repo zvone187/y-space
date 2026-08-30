@@ -301,8 +301,9 @@ export const toolCallPayloadSchema = z.object({
   crossagentStatus: z.enum(["running", "completed", "failed", "cancelled"]).optional(),
   workflow: toolCallWorkflowSchema.optional(),
   /**
-   * App-owned proof that this exact successful action crossed the embedded
-   * Browser MCP ingress. Provider-authored MCP rows intentionally omit it.
+   * App-owned, privacy-bounded outcome proving that this exact action crossed
+   * the embedded Browser MCP ingress. `status` distinguishes success from a
+   * failed/ambiguous action. Provider-authored MCP rows intentionally omit it.
    */
   browserEvidence: z
     .object({

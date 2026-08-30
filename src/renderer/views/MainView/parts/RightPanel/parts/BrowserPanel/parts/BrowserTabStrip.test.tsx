@@ -197,6 +197,7 @@ describe("BrowserTabStrip", () => {
           url: "about:blank",
           title: "",
           sensitiveIntegration: true,
+          sensitiveViewGeneration: 0,
         },
       ],
       activeTabId: "tab-1",

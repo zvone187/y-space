@@ -1,19 +1,12 @@
 import { randomUUID } from "node:crypto";
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { BUILT_IN_MCP_SERVER_NAMES, type ResolvedMcpServer } from "@/shared/contracts";
 import { toWslUncPath } from "@/shared/wsl";
-import type { ResolvedMcpServer } from "@/shared/contracts";
-import type { GeminiMcpServerConfig as GeminiMcpServerEntry } from "../../userMcp";
 import { buildGeminiMcpServers } from "../../userMcp";
-import type { AgentEnvContext } from "../../base";
+import { getWslCommand, type AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
   buildNativeHookCommandHeads,
@@ -71,6 +64,8 @@ interface GeminiSettings {
     }
   >;
 }
+
+type GeminiSettingsDocument = Partial<GeminiSettings> & Record<string, unknown>;
 
 /**
  * Minimal hook surface for Gemini status tracking. Every entry produces a
@@ -149,86 +144,277 @@ function resolveSettingsWritePath(ctx: AgentEnvContext | undefined, settingsPath
   return isWslPluginContext(ctx) ? toWslUncPath(ctx.wslDistro, settingsPath) : settingsPath;
 }
 
-/**
- * Ensure Gemini has a Poracode-owned system settings file for MCP projection,
- * even when the optional status-hook plugin could not be installed. Existing
- * hook settings are preserved; a missing file is created only when requested.
- */
-export function ensureGeminiLaunchSettingsFile(
-  ctx: AgentEnvContext | undefined,
-  createIfMissing: boolean,
-): string | undefined {
-  const paths = getGeminiPluginPaths(ctx);
-  if (!paths.settingsPath) return undefined;
-  const settingsPath = resolveSettingsWritePath(ctx, paths.settingsPath);
-  if (existsSync(settingsPath)) return paths.settingsPath;
-  if (!createIfMissing) return undefined;
-  try {
-    mkdirSync(dirname(settingsPath), { recursive: true });
-    writeFileSync(settingsPath, "{}\n", "utf8");
-    return paths.settingsPath;
-  } catch {
-    return undefined;
-  }
-}
+const LEGACY_MANAGED_MCP_NAMES = new Set(
+  Object.values(BUILT_IN_MCP_SERVER_NAMES).map((name) => name.toLowerCase()),
+);
+const LEGACY_PIPEDREAM_MCP_NAME_RE = /^pipedream(?:[-_.:]|$)/u;
+const LEGACY_APP_ROUTING_SECRET_HEADERS = new Set(["x-poracode-token", "x-y-space-mcp-context"]);
+const trackedGeminiLaunchCleanups = new Set<() => boolean>();
+let geminiExitCleanupRegistered = false;
 
-/** Snapshot the managed settings into a file consumed by one CLI process only. */
-export function createGeminiThreadSettingsFile(
+/**
+ * Build one Gemini system-settings snapshot without ever projecting a launch
+ * bearer through the shared plugin settings file. Each caller gets a private
+ * directory so concurrent task launches cannot overwrite or clean up a
+ * sibling's MCP authorization.
+ */
+export function createGeminiLaunchSettingsFile(
   ctx: AgentEnvContext | undefined,
+  servers: readonly ResolvedMcpServer[],
 ): { settingsPath: string; cleanup: () => void } | undefined {
   const paths = getGeminiPluginPaths(ctx);
-  if (!paths.settingsPath) return undefined;
-  const sourcePath = resolveSettingsWritePath(ctx, paths.settingsPath);
-  if (!existsSync(sourcePath)) return undefined;
-
-  const fileName = `.poracode-thread-${randomUUID()}.json`;
-  const settingsPath = isWslPluginContext(ctx)
-    ? `${paths.pluginDir.replace(/\/$/u, "")}/${fileName}`
-    : join(paths.pluginDir, fileName);
-  const writePath = resolveSettingsWritePath(ctx, settingsPath);
-  try {
-    copyFileSync(sourcePath, writePath);
-  } catch {
+  if (!paths.settingsPath) {
+    if (servers.length > 0) {
+      throw new Error("Failed to resolve a private Gemini MCP launch settings path.");
+    }
     return undefined;
   }
-  return {
-    settingsPath,
-    cleanup: () => {
-      try {
-        unlinkSync(writePath);
-      } catch {
-        // The temp file may already have been removed by external cleanup.
-      }
-    },
+  const sharedWritePath = resolveSettingsWritePath(ctx, paths.settingsPath);
+  const sharedSettings = readAndScrubSharedGeminiSettings(sharedWritePath);
+  if (!sharedSettings && servers.length === 0) return undefined;
+
+  const launchMcpServers = buildGeminiMcpServers(servers);
+  const settings: GeminiSettingsDocument = { ...(sharedSettings ?? {}) };
+  const inheritedMcpServers = isRecord(settings.mcpServers) ? settings.mcpServers : {};
+  const mergedMcpServers = { ...inheritedMcpServers, ...launchMcpServers };
+  if (Object.keys(mergedMcpServers).length > 0) settings.mcpServers = mergedMcpServers;
+  else delete settings.mcpServers;
+
+  const launchDirName = `.poracode-launch-${randomUUID()}`;
+  const launchDir = isWslPluginContext(ctx)
+    ? `${paths.pluginDir.replace(/\/$/u, "")}/${launchDirName}`
+    : join(paths.pluginDir, launchDirName);
+  const settingsPath = isWslPluginContext(ctx)
+    ? `${launchDir}/settings.json`
+    : join(launchDir, "settings.json");
+  const writeDir = resolveSettingsWritePath(ctx, launchDir);
+  const writePath = resolveSettingsWritePath(ctx, settingsPath);
+  try {
+    const serialized = `${JSON.stringify(settings, null, 2)}\n`;
+    if (isWslPluginContext(ctx)) {
+      writePrivateGeminiLaunchSettingsInWsl(ctx.wslDistro, launchDir, settingsPath, serialized);
+    } else {
+      mkdirSync(dirname(writeDir), { recursive: true });
+      mkdirSync(writeDir, { mode: 0o700 });
+      chmodSync(writeDir, 0o700);
+      writeFileSync(writePath, serialized, {
+        encoding: "utf8",
+        flag: "wx",
+        mode: 0o600,
+      });
+      chmodSync(writePath, 0o600);
+    }
+  } catch (error) {
+    try {
+      if (isWslPluginContext(ctx)) removePrivateGeminiLaunchDirInWsl(ctx.wslDistro, launchDir);
+      else rmSync(writeDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort rollback must not hide the private-settings failure.
+    }
+    if (servers.length > 0) {
+      throw new Error("Failed to create private Gemini MCP launch settings.", { cause: error });
+    }
+    return undefined;
+  }
+  const cleanup = trackGeminiLaunchCleanup(() => {
+    if (isWslPluginContext(ctx)) removePrivateGeminiLaunchDirInWsl(ctx.wslDistro, launchDir);
+    else rmSync(writeDir, { recursive: true, force: true });
+  });
+  return { settingsPath, cleanup };
+}
+
+export function trackGeminiLaunchCleanup(cleanup: () => void): () => void {
+  let active = true;
+  const attempt = (): boolean => {
+    if (!active) return true;
+    try {
+      cleanup();
+    } catch {
+      return false;
+    }
+    active = false;
+    trackedGeminiLaunchCleanups.delete(attempt);
+    return true;
+  };
+  trackedGeminiLaunchCleanups.add(attempt);
+  if (!geminiExitCleanupRegistered) {
+    geminiExitCleanupRegistered = true;
+    process.once("exit", cleanupTrackedGeminiLaunchSettingsForExit);
+  }
+  return () => {
+    void attempt();
   };
 }
 
-function updateGeminiSettings(
-  settingsPath: string,
-  mutate: (settings: GeminiSettings) => void,
-): void {
-  try {
-    const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as GeminiSettings;
-    mutate(settings);
-    writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
-  } catch {
-    // Best-effort; stale settings should not block thread launch.
+export function cleanupTrackedGeminiLaunchSettingsForExit(): void {
+  for (const attempt of [...trackedGeminiLaunchCleanups]) {
+    void attempt();
   }
 }
 
-/** Replace the complete per-thread MCP projection with one settings-file update. */
-export function syncGeminiLaunchMcpSettings(
-  ctx: AgentEnvContext,
-  servers: readonly ResolvedMcpServer[],
+export function buildGeminiWslPrivateSettingsWriteSpec(
+  distro: string,
+  launchDir: string,
+  settingsPath: string,
+): { command: string; args: string[] } {
+  const script = [
+    "set -eu",
+    "umask 077",
+    'mkdir -p -- "$(dirname -- "$1")"',
+    'mkdir -- "$1"',
+    'chmod 700 -- "$1"',
+    'cat > "$2"',
+    'chmod 600 -- "$2"',
+    '[ "$(stat -c %a -- "$1")" = 700 ]',
+    '[ "$(stat -c %a -- "$2")" = 600 ]',
+  ].join("; ");
+  return {
+    command: getWslCommand(),
+    args: ["-d", distro, "--exec", "sh", "-c", script, "sh", launchDir, settingsPath],
+  };
+}
+
+function writePrivateGeminiLaunchSettingsInWsl(
+  distro: string,
+  launchDir: string,
+  settingsPath: string,
+  serialized: string,
 ): void {
-  const paths = getGeminiPluginPaths(ctx);
-  if (!paths.settingsPath) return;
-  const settingsPath = resolveSettingsWritePath(ctx, paths.settingsPath);
-  updateGeminiSettings(settingsPath, (settings) => {
-    const mcpServers: Record<string, GeminiMcpServerEntry> = buildGeminiMcpServers(servers);
-    if (Object.keys(mcpServers).length > 0) settings.mcpServers = mcpServers;
-    else delete settings.mcpServers;
+  const spec = buildGeminiWslPrivateSettingsWriteSpec(distro, launchDir, settingsPath);
+  const result = spawnSync(spec.command, spec.args, {
+    input: serialized,
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+    timeout: 10_000,
+    maxBuffer: 64 * 1024,
   });
+  if (result.error || result.status !== 0) {
+    throw new Error("Failed to write private Gemini MCP launch settings inside WSL.", {
+      cause: result.error,
+    });
+  }
+}
+
+function removePrivateGeminiLaunchDirInWsl(distro: string, launchDir: string): void {
+  if (!/\/\.poracode-launch-[0-9a-f-]+$/u.test(launchDir)) {
+    throw new Error("Refusing to remove an invalid Gemini launch settings directory.");
+  }
+  const result = spawnSync(
+    getWslCommand(),
+    ["-d", distro, "--exec", "sh", "-c", 'set -eu; rm -rf -- "$1"', "sh", launchDir],
+    { encoding: "utf8", shell: false, windowsHide: true, timeout: 10_000 },
+  );
+  if (result.error || result.status !== 0) {
+    throw new Error("Failed to remove private Gemini MCP launch settings inside WSL.", {
+      cause: result.error,
+    });
+  }
+}
+
+function readAndScrubSharedGeminiSettings(
+  settingsPath: string,
+): GeminiSettingsDocument | undefined {
+  if (!existsSync(settingsPath)) return undefined;
+  let settings: GeminiSettingsDocument;
+  let mustRewrite = false;
+  try {
+    const parsed = JSON.parse(readFileSync(settingsPath, "utf8")) as unknown;
+    if (isRecord(parsed)) settings = parsed as unknown as GeminiSettingsDocument;
+    else {
+      settings = {};
+      mustRewrite = true;
+    }
+  } catch {
+    // Invalid settings cannot safely be copied into a secret-bearing launch
+    // snapshot. Replace the unusable shared payload rather than leave a
+    // possible legacy bearer at rest.
+    settings = {};
+    mustRewrite = true;
+  }
+  mustRewrite = scrubLegacyGeminiLaunchSecrets(settings) || mustRewrite;
+  if (mustRewrite) writePrivateGeminiSettings(settingsPath, settings);
+  return settings;
+}
+
+function scrubLegacyGeminiLaunchSecrets(settings: GeminiSettingsDocument): boolean {
+  if (settings.mcpServers === undefined) return false;
+  if (!isRecord(settings.mcpServers)) {
+    delete settings.mcpServers;
+    return true;
+  }
+  let changed = false;
+  for (const [name, value] of Object.entries(settings.mcpServers)) {
+    const normalizedName = name.trim().toLowerCase();
+    if (
+      LEGACY_MANAGED_MCP_NAMES.has(normalizedName) ||
+      LEGACY_PIPEDREAM_MCP_NAME_RE.test(normalizedName)
+    ) {
+      delete settings.mcpServers[name];
+      changed = true;
+      continue;
+    }
+    if (!isRecord(value)) continue;
+    const isLoopback = isLoopbackGeminiMcpServer(value);
+    if (value.headers === undefined) continue;
+    if (!isRecord(value.headers)) {
+      if (isLoopback) {
+        delete value.headers;
+        changed = true;
+      }
+      continue;
+    }
+    for (const [headerName, headerValue] of Object.entries(value.headers)) {
+      const normalizedHeaderName = headerName.trim().toLowerCase();
+      const bearerAuthorization =
+        isLoopback &&
+        normalizedHeaderName === "authorization" &&
+        typeof headerValue === "string" &&
+        /^\s*bearer(?:\s|$)/iu.test(headerValue);
+      if (bearerAuthorization || LEGACY_APP_ROUTING_SECRET_HEADERS.has(normalizedHeaderName)) {
+        delete value.headers[headerName];
+        changed = true;
+      }
+    }
+    if (Object.keys(value.headers).length === 0) delete value.headers;
+  }
+  if (Object.keys(settings.mcpServers).length === 0) delete settings.mcpServers;
+  return changed;
+}
+
+function isLoopbackGeminiMcpServer(value: Record<string, unknown>): boolean {
+  const rawUrl =
+    typeof value.httpUrl === "string"
+      ? value.httpUrl
+      : typeof value.url === "string"
+        ? value.url
+        : undefined;
+  if (!rawUrl) return false;
+  try {
+    const hostname = new URL(rawUrl).hostname
+      .toLowerCase()
+      .replace(/^\[|\]$/gu, "")
+      .replace(/\.$/u, "");
+    if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+    if (hostname === "::" || hostname === "::1" || hostname === "0:0:0:0:0:0:0:1") return true;
+    const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/u);
+    return ipv4 !== null && (Number(ipv4[1]) === 127 || hostname === "0.0.0.0");
+  } catch {
+    return false;
+  }
+}
+
+function writePrivateGeminiSettings(settingsPath: string, settings: unknown): void {
+  mkdirSync(dirname(settingsPath), { recursive: true });
+  writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  chmodSync(settingsPath, 0o600);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 export interface InstallGeminiPluginOptions {
@@ -269,13 +455,7 @@ export function installGeminiPlugin(
           "WSL Gemini plugin install requires a resolved node path; the adapter must call resolveNodeForDistro before installing.",
       };
     }
-    return installGeminiPluginWsl(
-      ctx.wslDistro,
-      sourceDir,
-      manifest,
-      options.resolvedNodePath,
-      ctx.mcpServers ?? [],
-    );
+    return installGeminiPluginWsl(ctx.wslDistro, sourceDir, manifest, options.resolvedNodePath);
   }
 
   const pluginDir = getNativePluginBaseDir("gemini", ctx?.baseDir);
@@ -288,12 +468,11 @@ export function installGeminiPlugin(
   });
 
   const nativeCommands = buildNativeHookCommandHeads(wrapperPath);
-  const mcpServers = buildGeminiMcpServers(ctx?.mcpServers ?? []);
-  const settings = renderGeminiSettings({
-    headExpression: nativeCommands.command,
-    ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
-  });
-  writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+  const settings = {
+    ...(readAndScrubSharedGeminiSettings(settingsPath) ?? {}),
+    ...renderGeminiSettings({ headExpression: nativeCommands.command }),
+  };
+  writePrivateGeminiSettings(settingsPath, settings);
 
   console.log(
     `[supervisor] Gemini hook plugin staged v${manifest.version} at ${pluginDir} (forward.mjs, ${getNativeHookWrapperFilename()}, settings.json)`,
@@ -311,7 +490,6 @@ function installGeminiPluginWsl(
   sourceDir: string,
   manifest: PluginManifest,
   resolvedNodePath: string,
-  servers: readonly ResolvedMcpServer[],
 ): { ok: true; paths: GeminiPluginPaths; version: string } | { ok: false; reason: string } {
   const staged = stagePluginAssetsToWsl(distro, sourceDir, "gemini", {
     includeForwardRuntime: true,
@@ -326,12 +504,11 @@ function installGeminiPluginWsl(
 
   try {
     mkdirSync(dirname(uncSettingsPath), { recursive: true });
-    const mcpServers = buildGeminiMcpServers(servers);
-    const settings = renderGeminiSettings({
-      headExpression,
-      ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
-    });
-    writeFileSync(uncSettingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+    const settings = {
+      ...(readAndScrubSharedGeminiSettings(uncSettingsPath) ?? {}),
+      ...renderGeminiSettings({ headExpression }),
+    };
+    writePrivateGeminiSettings(uncSettingsPath, settings);
   } catch (error) {
     return {
       ok: false,

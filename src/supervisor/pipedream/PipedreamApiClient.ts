@@ -1,6 +1,7 @@
 import type { PipedreamAppSummary, PipedreamEnvironment } from "@/shared/contracts/pipedream";
 
 export const PIPEDREAM_API_BASE_URL = "https://api.pipedream.com/v1";
+export const PIPEDREAM_API_OPERATION_TIMEOUT_MS = 30_000;
 export const PIPEDREAM_CONNECT_TOKEN_SCOPE = "connect:accounts:read connect:accounts:write";
 export const PIPEDREAM_CONNECT_TOKEN_TTL_SECONDS = 600;
 
@@ -27,6 +28,11 @@ export interface PipedreamListAccountsInput {
   readonly appSlug?: string;
   readonly cursor?: string;
   readonly limit?: number;
+}
+
+export interface PipedreamConnectRedirects {
+  readonly successRedirectUrl: string;
+  readonly errorRedirectUrl: string;
 }
 
 export interface PipedreamPageInfo {
@@ -80,7 +86,6 @@ export class PipedreamApiClient {
 
   async listApps(input: PipedreamListAppsInput = {}): Promise<PipedreamListAppsResult> {
     const url = new URL(`${PIPEDREAM_API_BASE_URL}/connect/apps`);
-    url.searchParams.set("has_actions", "true");
     if (input.query !== undefined) url.searchParams.set("q", requireQuery(input.query));
     if (input.cursor !== undefined) url.searchParams.set("after", requireCursor(input.cursor));
     if (input.limit !== undefined) url.searchParams.set("limit", String(requireLimit(input.limit)));
@@ -111,12 +116,17 @@ export class PipedreamApiClient {
     return withPageInfo({ accounts }, payload);
   }
 
-  async createConnectToken(): Promise<PipedreamConnectTokenResult> {
+  async createConnectToken(
+    redirects: PipedreamConnectRedirects,
+  ): Promise<PipedreamConnectTokenResult> {
     const url = new URL(`${PIPEDREAM_API_BASE_URL}/connect/${this.#projectId}/tokens`);
     const payload = await this.#requestJson(url, "POST", {
+      allow_progressive_scopes: true,
       external_user_id: this.#externalUserId,
       expires_in: PIPEDREAM_CONNECT_TOKEN_TTL_SECONDS,
       scope: PIPEDREAM_CONNECT_TOKEN_SCOPE,
+      success_redirect_uri: redirects.successRedirectUrl,
+      error_redirect_uri: redirects.errorRedirectUrl,
     });
     if (!isRecord(payload)) throw new Error("Pipedream request returned an invalid response.");
 
@@ -148,15 +158,29 @@ export class PipedreamApiClient {
   }
 
   async #requestJson(url: URL, method: "GET" | "POST", body?: unknown): Promise<unknown> {
-    const response = await this.#request(url, method, body);
-    try {
-      return await response.json();
-    } catch {
-      throw new Error("Pipedream request returned an invalid response.");
-    }
+    return this.#withOperationTimeout(async (signal) => {
+      const response = await this.#sendRequest(url, method, signal, body);
+      try {
+        return await response.json();
+      } catch {
+        throw new Error("Pipedream request returned an invalid response.");
+      }
+    });
   }
 
-  async #request(url: URL, method: "GET" | "POST" | "DELETE", body?: unknown): Promise<Response> {
+  async #request(url: URL, method: "GET" | "POST" | "DELETE", body?: unknown): Promise<void> {
+    await this.#withOperationTimeout(async (signal) => {
+      const response = await this.#sendRequest(url, method, signal, body);
+      await response.body?.cancel().catch(() => undefined);
+    });
+  }
+
+  async #sendRequest(
+    url: URL,
+    method: "GET" | "POST" | "DELETE",
+    signal: AbortSignal,
+    body?: unknown,
+  ): Promise<Response> {
     let accessToken: string;
     try {
       accessToken = (await this.#getAccessToken()).trim();
@@ -169,7 +193,7 @@ export class PipedreamApiClient {
       authorization: `Bearer ${accessToken}`,
       "x-pd-environment": this.#environment,
     });
-    const init: RequestInit = { method, headers };
+    const init: RequestInit = { method, headers, signal };
     if (body !== undefined) {
       headers.set("content-type", "application/json");
       init.body = JSON.stringify(body);
@@ -187,6 +211,24 @@ export class PipedreamApiClient {
       throw new Error(`Pipedream request failed (HTTP ${response.status}).`);
     }
     return response;
+  }
+
+  async #withOperationTimeout<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const controller = new AbortController();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        controller.abort();
+        reject(new Error("Pipedream request failed."));
+      }, PIPEDREAM_API_OPERATION_TIMEOUT_MS);
+      timeout.unref?.();
+    });
+
+    try {
+      return await Promise.race([operation(controller.signal), timedOut]);
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
   }
 }
 

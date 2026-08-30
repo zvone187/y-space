@@ -142,6 +142,49 @@ describe("compactRuntimeItemsForHydration", () => {
     expect(ids.some((id) => id.startsWith("tool-call-summary:"))).toBe(false);
   });
 
+  it("keeps app-owned Browser evidence discrete so verification survives reload", () => {
+    const successEvidence = {
+      name: "click",
+      serverId: "browser",
+      status: "success",
+      browserEvidence: {
+        source: "y-space-browser-mcp",
+        occurredAt: 1,
+        tabId: "tab-authenticated",
+        url: "https://verified.example.test/path",
+      },
+    };
+    const failureEvidence = {
+      ...successEvidence,
+      name: "select",
+      status: "error",
+      browserEvidence: { ...successEvidence.browserEvidence, occurredAt: 2 },
+    };
+    const items = compactRuntimeItemsForHydration([
+      makeItem({
+        id: "provider-click",
+        type: "tool_call",
+        payload: { name: "browser_click", status: "success" },
+      }),
+      makeItem({ id: "browser-proof", type: "mcp_tool_call", payload: successEvidence }),
+      makeItem({
+        id: "provider-select",
+        type: "tool_call",
+        payload: { name: "browser_select", status: "error" },
+      }),
+      makeItem({ id: "browser-failure", type: "mcp_tool_call", payload: failureEvidence }),
+    ]);
+
+    expect(items.map((item) => item.id)).toEqual([
+      "provider-click",
+      "browser-proof",
+      "provider-select",
+      "browser-failure",
+    ]);
+    expect(items[1]?.payload).toEqual(successEvidence);
+    expect(items[3]?.payload).toEqual(failureEvidence);
+  });
+
   it("drops error items so stale errors do not resurface on reopen", () => {
     const items = compactRuntimeItemsForHydration([
       makeItem({ id: "user-1", type: "user_message" }),

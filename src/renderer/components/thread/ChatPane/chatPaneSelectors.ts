@@ -16,7 +16,7 @@ import {
   isDelegatedAgentTool,
 } from "@/shared/toolCallClassification";
 import { imageViewRendersInline } from "./parts/items/imageViewSource";
-import { isAppOwnedBrowserEvidenceItem } from "./parts/items/browserVerification";
+import { isAppOwnedBrowserOutcomeItem } from "./parts/items/browserVerification";
 import {
   getToolLikePayload,
   isToolGroupItem as isGroupableItemType,
@@ -363,7 +363,7 @@ export function buildChatDisplayTimelineEntries(
     if (!isCurrentTurn) {
       while (
         finalAnswerEnd > 0 &&
-        isAppOwnedBrowserEvidenceEntry(items, turnEntries[finalAnswerEnd - 1]!)
+        isAppOwnedBrowserOutcomeEntry(items, turnEntries[finalAnswerEnd - 1]!)
       ) {
         finalAnswerEnd -= 1;
       }
@@ -441,13 +441,13 @@ export function buildChatDisplayTimelineEntries(
   return result.length === 0 ? EMPTY_CHAT_DISPLAY_TIMELINE_ENTRIES : result;
 }
 
-function isAppOwnedBrowserEvidenceEntry(
+function isAppOwnedBrowserOutcomeEntry(
   items: Record<string, RuntimeChatItem> | undefined,
   entry: ChatTimelineEntry,
 ): boolean {
   const itemIds = entry.kind === "item" ? [entry.id] : entry.itemIds;
   return (
-    itemIds.length > 0 && itemIds.every((itemId) => isAppOwnedBrowserEvidenceItem(items?.[itemId]))
+    itemIds.length > 0 && itemIds.every((itemId) => isAppOwnedBrowserOutcomeItem(items?.[itemId]))
   );
 }
 

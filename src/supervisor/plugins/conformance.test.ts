@@ -679,6 +679,8 @@ describe("shipped packages", () => {
         "## Output",
         "browser.enable",
         "browser.disable",
+        "orange cursor",
+        "inventory and inspection stay in the background",
       ],
       "computer-use": [
         "## Workflow",

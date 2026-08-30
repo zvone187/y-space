@@ -20,6 +20,7 @@ import {
   resolveRuntimeContextLocation,
 } from "@/renderer/actions/createProjectActions";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { Input, PixelLoader, TuxIcon } from "@/renderer/components/common";
 import { formatRelativeTime } from "@/renderer/utils/formatTime";
@@ -51,17 +52,19 @@ function errorMessage(error: unknown, fallback: string): string {
  */
 export function CloneProjectModal() {
   const open = usePanelStore((s) => s.cloneProjectModalOpen);
+  const overlayReady = useSensitiveNativeViewOverlayGate(open);
+  const presentedOpen = open && overlayReady;
 
   return (
     <Modal.Backdrop
-      isOpen={open}
+      isOpen={presentedOpen}
       onOpenChange={(next) => {
         if (!next) usePanelStore.getState().closeCloneProjectModal();
       }}
     >
       <Modal.Container>
         <Modal.Dialog className="sm:max-w-[560px]">
-          {open ? <CloneProjectForm /> : null}
+          {presentedOpen ? <CloneProjectForm /> : null}
         </Modal.Dialog>
       </Modal.Container>
     </Modal.Backdrop>

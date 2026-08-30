@@ -33,6 +33,7 @@ export interface SessionRuntimeLifecycleContext {
   failStructuredSession(session: SessionRuntime, error: unknown): void;
   indexSessionRef(session: SessionRuntime, prevId: string | undefined): void;
   pollSessionRefDiscovery(session: SessionRuntime): void;
+  releaseExitedMcpLaunch(session: SessionRuntime): void;
 }
 
 /** Registers a newly-created runtime and owns its structured-session / PTY event bindings. */
@@ -209,6 +210,7 @@ export class SessionRuntimeLifecycle {
       if (session.ignoreExit) return;
       if (!this.context.isCurrentSession(session)) return;
 
+      context.releaseExitedMcpLaunch(session);
       void session.structuredSession?.dispose();
       context.outputPipeline.clearSessionTimers(session);
       context.outputPipeline.updateState(session, "inactive", "none");
@@ -226,6 +228,7 @@ export class SessionRuntimeLifecycle {
   }
 
   private handleStructuredSessionClosed(session: SessionRuntime): void {
+    this.context.releaseExitedMcpLaunch(session);
     if (session.status === "inactive") return;
     // onError is the authoritative non-clean boundary. A derivative transport
     // close must tear down the backing PTY without overwriting the visible

@@ -132,6 +132,11 @@ export function useAppHydration(options: { runtimeOwner?: boolean } = {}) {
       // snapshot cannot mark a fresh direct launch inactive and relaunch it.
       const requestedThreadIds = new Set(useAppStore.getState().threads.map((thread) => thread.id));
       const snapshotsPromise = readBridge().getThreadSnapshots();
+      // Transcript hydration below may remain pending while Electron begins an
+      // orderly quit. Attach a rejection observer now so a supervisor shutdown
+      // cannot become an unhandled rejection before the later awaited try/catch.
+      // The original promise is still awaited and reported through that path.
+      void snapshotsPromise.catch(() => undefined);
 
       const visibleGuiThreadIds = collectVisibleGuiThreadIds();
       if (visibleGuiThreadIds.length > 0) {
@@ -150,7 +155,12 @@ export function useAppHydration(options: { runtimeOwner?: boolean } = {}) {
 
       // Skill lists depend on the loaded plugin list, so it has to be there
       // before the first thread renders.
-      void usePlugins.getState().load();
+      void usePlugins
+        .getState()
+        .load()
+        .catch((error: unknown) => {
+          captureRendererException(error, { featureArea: "hydration" });
+        });
 
       try {
         const snapshots = await snapshotsPromise;

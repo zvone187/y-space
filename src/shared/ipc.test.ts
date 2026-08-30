@@ -4,6 +4,7 @@ import { createSupervisorIpcHandlers } from "@/supervisor/ipcHandlers";
 import {
   createInvokeBridge,
   createProcedureBridge,
+  browserTabSchema,
   ipcProcedureMap,
   MAIN_LOCAL_PROCEDURE_NAMES,
   RENDERER_IPC_PROCEDURE_NAMES,
@@ -40,6 +41,83 @@ describe("ipcProcedureMap", () => {
     await bridge.dbGetProjectNotes("project-1");
 
     expect(invoke).toHaveBeenCalledWith("dbGetProjectNotes", ["project-1"]);
+  });
+
+  it("validates exact automation presentation acknowledgement capabilities", () => {
+    const payload = {
+      requestId: "1b74121a-44ed-4ec0-aa75-68a5f4fb03ed",
+      tabId: "tab-target",
+      surface: "main" as const,
+      presented: true,
+    };
+
+    expect(ipcProcedureMap.browserAcknowledgeAutomationPresentation.parseArgs(payload)).toEqual(
+      payload,
+    );
+    expect(() =>
+      ipcProcedureMap.browserAcknowledgeAutomationPresentation.parseArgs({
+        ...payload,
+        requestId: "predictable",
+      }),
+    ).toThrow(/Invalid/u);
+    expect(() =>
+      ipcProcedureMap.browserAcknowledgeAutomationPresentation.parseArgs({
+        ...payload,
+        surface: "other" as never,
+      }),
+    ).toThrow(/Invalid/u);
+
+    const invalidation = {
+      requestId: payload.requestId,
+      tabId: payload.tabId,
+      surface: payload.surface,
+      reason: "workspace-tab-changed" as const,
+    };
+    expect(ipcProcedureMap.browserInvalidateAutomationPresentation.parseArgs(invalidation)).toEqual(
+      invalidation,
+    );
+    expect(() =>
+      ipcProcedureMap.browserInvalidateAutomationPresentation.parseArgs({
+        ...invalidation,
+        requestId: "predictable",
+      }),
+    ).toThrow(/Invalid/u);
+    expect(() =>
+      ipcProcedureMap.browserInvalidateAutomationPresentation.parseArgs({
+        ...invalidation,
+        reason: "page-supplied-reason" as never,
+      }),
+    ).toThrow(/Invalid/u);
+  });
+
+  it("never exposes a sensitive browser session partition through renderer metadata", () => {
+    const baseTab = {
+      tabId: "tab-1",
+      url: "about:blank",
+      title: "",
+      loading: true,
+      canGoBack: false,
+      canGoForward: false,
+    };
+    const sensitiveTab = {
+      ...baseTab,
+      sensitiveIntegration: true as const,
+      sensitiveViewGeneration: 7,
+    };
+
+    expect(browserTabSchema.parse(sensitiveTab)).toEqual(sensitiveTab);
+    expect(() =>
+      browserTabSchema.parse({
+        ...sensitiveTab,
+        sensitiveSessionPartition: "pipedream-oauth-11111111111111111111111111111111",
+      }),
+    ).toThrow(/Invalid/u);
+    expect(() =>
+      browserTabSchema.parse({
+        ...baseTab,
+        sensitiveSessionPartition: "persist:browser",
+      }),
+    ).toThrow(/Invalid/u);
   });
 
   it("repairs blank legacy thread models at the database persistence boundary", () => {
@@ -102,6 +180,7 @@ describe("ipcProcedureMap", () => {
       updatePowerSaveBlocker: vi.fn<() => void>(),
       autoUpdater: {
         initialize: vi.fn<() => void>(),
+        dispose: vi.fn<() => void>(),
         getStatus: vi.fn<() => null>(() => null),
         checkForUpdate: vi.fn<() => Promise<void>>(),
         startUpdateDownload: vi.fn<() => Promise<void>>(),

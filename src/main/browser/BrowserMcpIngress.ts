@@ -19,6 +19,7 @@ import {
   dispatchTool,
   formatToolResult,
   isKnownToolName,
+  normalizeToolName,
   type ToolContext,
 } from "./mcp/toolRegistry";
 
@@ -50,10 +51,8 @@ export class BrowserMcpIngress {
       instructions: BROWSER_MCP_INSTRUCTIONS,
       tools: TOOLS,
       isKnownToolName,
-      // Agent tool calls no longer force the browser panel open — the tab's
-      // <webview> stays alive off-screen (see BrowserHost "background" mode),
-      // so the agent works headless without stealing the user's UI. Hence no
-      // onBeforeToolCall reveal hook.
+      // Dispatch keeps passive inspection resident in the background and
+      // presents only the exact tab used by an interactive pointer action.
       buildContext: (identity) => this.buildContext(identity),
       contextUnavailableMessage: "browser panel not ready",
       dispatchTool,
@@ -94,6 +93,7 @@ export class BrowserMcpIngress {
       manager,
       allowEval: this.allowEval,
       allowDataAccess: this.allowDataAccess,
+      ...(identity.launchId ? { launchId: identity.launchId } : {}),
       ...(identity.threadId ? { threadId: identity.threadId } : {}),
       ...(identity.title ? { threadTitle: identity.title } : {}),
     };
@@ -113,12 +113,12 @@ export class BrowserMcpIngress {
     ) {
       return;
     }
-    const successfulProof = outcome.success && !isTimedOutToolResult(outcome.rawResult);
+    const successfulProof = outcome.success && !isUnsuccessfulProofResult(outcome.rawResult);
     const report: BrowserMcpToolCallReport = {
       threadId: identity.threadId,
       launchId: identity.launchId,
       turnId: identity.browserEvidenceTurnId,
-      toolName: boundText(outcome.name, MAX_BROWSER_EVIDENCE_TOOL_NAME_LENGTH),
+      toolName: boundText(normalizeToolName(outcome.name), MAX_BROWSER_EVIDENCE_TOOL_NAME_LENGTH),
       success: successfulProof,
       occurredAt: outcome.occurredAt,
       ...(successfulProof ? extractSafeTabEvidence(outcome.rawResult, ctx) : {}),
@@ -149,12 +149,10 @@ function extractSafeTabEvidence(rawResult: unknown, ctx: ToolContext): BrowserMc
   }
 }
 
-function isTimedOutToolResult(value: unknown): boolean {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    (value as Record<string, unknown>).timedOut === true
-  );
+function isUnsuccessfulProofResult(value: unknown): boolean {
+  if (value === null || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  return result.timedOut === true || result.ambiguous === true;
 }
 
 function readResultTabId(value: unknown): string | undefined {

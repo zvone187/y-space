@@ -180,6 +180,16 @@ msgstr "{0}({envName}) は v{newVersion}に更新されました。"
 msgid "{0} ({envName}) updated."
 msgstr "{0}({envName}) が更新されました。"
 
+#. placeholder {0}: props.accounts.length
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
+msgid "{0} accounts"
+msgstr "{0} 件のアカウント"
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{0} agent access is off."
+msgstr "{0} のエージェントアクセスはオフです。"
+
 #. placeholder {0}: days.map((day) => weekdayNames[day]).join(", ")
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "{0} at {time}"
@@ -191,6 +201,36 @@ msgstr "{0}の{time}"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} authenticated."
 msgstr "{0}が認証されました。"
+
+#. placeholder {0}: current.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+#~ msgid "{0} connected and available to agents."
+#~ msgstr "{0} に接続しました。エージェントが利用できます。"
+
+#. placeholder {0}: current.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+#~ msgid "{0} connected, but the account needs attention before agents can use it."
+#~ msgstr "{0} に接続しましたが、エージェントが使用するにはアカウントの確認が必要です。"
+
+#. placeholder {0}: current.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{0} connected. Turn on agent access for the account you want agents to use."
+msgstr "{0} に接続しました。エージェントに使用させるアカウントのエージェントアクセスを有効にしてください。"
+
+#. placeholder {0}: attempt.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{0} connection cancelled."
+msgstr "{0} への接続をキャンセルしました。"
+
+#. placeholder {0}: attempt.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{0} connection failed."
+msgstr "{0} への接続に失敗しました。"
+
+#. placeholder {0}: attempt.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{0} connection timed out."
+msgstr "{0} への接続がタイムアウトしました。"
 
 #. placeholder {0}: domain.cookieCount
 #. placeholder {1}: domain.unsupportedCount
@@ -212,6 +252,11 @@ msgstr "{0}資格情報が保存されました。"
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0} devices"
 msgstr "{0}台のデバイス"
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{0} disconnected."
+msgstr "{0} の接続を解除しました。"
 
 #. placeholder {0}: props.agentLabel
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
@@ -242,6 +287,11 @@ msgstr "{0} はすでにリストにあります。"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
 msgid "{0} is already up to date."
 msgstr "{0}はすでに最新です。"
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{0} is available to agents."
+msgstr "エージェントが {0} を利用できます。"
 
 #. placeholder {0}: entry.judgeLabel
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
@@ -277,6 +327,12 @@ msgstr "{0}には認証が必要です。"
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
 msgid "{0} needs input."
 msgstr "{0}には入力が必要です。"
+
+#. placeholder {0}: props.catalog.apps.length
+#. placeholder {1}: props.catalog.totalCount
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "{0} of {1} integrations shown"
+msgstr "{0} / {1} 件の連携を表示"
 
 #. placeholder {0}: job.steps.filter((step) => step.status === "completed").length
 #. placeholder {1}: job.steps.length
@@ -426,6 +482,14 @@ msgstr "{agentLabel}:{statusLabel}。マウスを移動するとステータス�
 msgid "{agentLead} needs your input to continue."
 msgstr "{agentLead}が続行するには入力が必要です。"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{appName} access changed, but running agents could not be updated. Restart them before using the integration."
+msgstr "{appName} のアクセスが変更されましたが、実行中のエージェントを更新できませんでした。統合を使用する前に再起動してください。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "{appName} access changed. Restart running agents to apply the update."
+msgstr "{appName} のアクセスが変更されました。更新を適用するには、実行中のエージェントを再起動してください。"
+
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{commitsCount, plural, one {# commit} other {# commits}}"
 msgstr "{commitsCount, plural, one {# 件のコミット} other {# 件のコミット}}"
@@ -434,6 +498,10 @@ msgstr "{commitsCount, plural, one {# 件のコミット} other {# 件のコミ�
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunList.tsx
 #~ msgid "{completedSteps} of {0} steps"
 #~ msgstr "{completedSteps}/{0} ステップ完了"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "{connectedCount} connected · {agentCount} available to agents"
+msgstr "{connectedCount} 件接続済み · {agentCount} 件がエージェントで利用可能"
 
 #: src/mobile/views/pr/PrOverviewPage.tsx
 msgid "{conversationCount, plural, one {# comment or review} other {# comments & reviews}}"
@@ -977,6 +1045,10 @@ msgstr "アクションの追加"
 msgid "Add an existing folder"
 msgstr "既存のフォルダーを追加"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Add an integration"
+msgstr "連携を追加"
+
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Add and sign in"
 msgstr "追加してサインイン"
@@ -1121,6 +1193,10 @@ msgstr "エージェント"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Agent ({subagent}): {description}"
 msgstr "エージェント ({subagent}):{description}"
+
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
+msgid "Agent access off"
+msgstr "エージェントアクセスはオフ"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #~ msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
@@ -1322,7 +1398,7 @@ msgid "Allow agents to read/write cookies and storage"
 msgstr "エージェントに Cookie とストレージの読み取り/書き込みを許可する"
 
 #. placeholder {0}: account.name
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
 msgid "Allow agents to use {0}"
 msgstr "エージェントによる {0} の使用を許可"
 
@@ -1754,6 +1830,10 @@ msgstr "利用可能"
 msgid "Available ACP Agents"
 msgstr "利用可能なACPエージェント"
 
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
+msgid "Available to agents"
+msgstr "エージェントが利用可能"
+
 #: src/renderer/views/ProfileOverlay/parts/EditProfileDialog.tsx
 msgid "Avatar color"
 msgstr "アバターの色"
@@ -2092,8 +2172,8 @@ msgid "by tokens"
 msgstr "トークン数順"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "BYO Connect"
-msgstr "BYO Connect"
+#~ msgid "BYO Connect"
+#~ msgstr "BYO Connect"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 msgid "Bypass branch protection rules"
@@ -2125,6 +2205,7 @@ msgstr "リモートサーバーに接続できません。オンラインであ
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmationPopover.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
@@ -2149,13 +2230,17 @@ msgstr "リモートサーバーに接続できません。オンラインであ
 #: src/renderer/views/ProfileOverlay/parts/EditProfileDialog.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 #: src/renderer/views/SchedulesView/ScheduleEditor.tsx
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteHostFolderPicker.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Cancel"
 msgstr "キャンセル"
+
+#. placeholder {0}: attempt.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Cancel {0} connection"
+msgstr "{0} への接続をキャンセル"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Cancel cookie import"
@@ -2455,8 +2540,8 @@ msgid "Choose cookie file"
 msgstr "Cookie ファイルを選択"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Choose environment file"
-msgstr "環境ファイルを選択"
+#~ msgid "Choose environment file"
+#~ msgstr "環境ファイルを選択"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
 msgid "Choose how to sign in for {env}."
@@ -2475,9 +2560,13 @@ msgstr "Y Space が手動マージと PR の自動マージを行う方法を選
 msgid "Choose import destination"
 msgstr "インポート先を選択"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "Choose Pipedream environment file"
 msgstr "Pipedream 環境ファイルを選択"
+
+#: src/renderer/components/connections/ConnectionsConfigurationState.tsx
+msgid "Choose setup file"
+msgstr "設定ファイルを選択"
 
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Choose shells for the Terminal panel and Y Space's internal commands."
@@ -2491,6 +2580,10 @@ msgstr "SSH 秘密鍵ファイルを選択"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Choose the display language for Y Space's interface."
 msgstr "Y Space のインターフェースの表示言語を選択します。"
+
+#: src/renderer/components/connections/ConnectionsConfigurationState.tsx
+msgid "Choose the Pipedream setup file you added for Y Space. Your credentials stay private and are never shared with agents."
+msgstr "Y Space 用に追加した Pipedream の設定ファイルを選択してください。認証情報は非公開のまま、エージェントと共有されることはありません。"
 
 #: src/renderer/views/SettingsOverlay/parts/CursorProviderSettings.tsx
 #~ msgid "Choose the runtime for new Cursor GUI chats. SDK becomes available after its package is detected and its API key is authenticated."
@@ -2773,6 +2866,10 @@ msgstr "グループを閉じる"
 #: src/mobile/views/threadActionSurfaces.tsx
 msgid "Close group actions"
 msgstr "グループのアクションを閉じる"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Close integrations"
+msgstr "連携を閉じる"
 
 #: src/mobile/TodoActionsSheet.tsx
 #: src/mobile/UserMessageActionsSheet.tsx
@@ -3180,7 +3277,7 @@ msgstr "スレッドを削除する前に確認"
 #~ msgid "Confirm before deleting worktrees"
 #~ msgstr "ワークツリーを削除する前に確認"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "Confirm disconnect"
 msgstr "切断を確認"
 
@@ -3198,15 +3295,15 @@ msgid "Conflicts with a managed skill"
 msgstr "管理対象スキルと競合しています"
 
 #: src/mobile/setupEmptyState.tsx
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 #: src/renderer/components/plugins/PluginDetail.tsx
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Connect"
 msgstr "接続"
 
 #. placeholder {0}: app.name
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 msgid "Connect {0}"
 msgstr "{0} に接続"
 
@@ -3222,6 +3319,10 @@ msgstr "PRを監視する前にエージェントを接続してください。"
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Connect an agent to create schedules."
 msgstr "スケジュールを作成するにはエージェントを接続してください。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Connect apps once, then decide which ones agents can use."
+msgstr "アプリを一度接続し、エージェントが使用できるアプリを選択します。"
 
 #: src/mobile/setupEmptyState.tsx
 msgid "Connect desktop"
@@ -3247,6 +3348,19 @@ msgstr "OpenCode が使用できる AI プロバイダーをここで接続し�
 msgid "Connect Y Space on your desktop before starting a thread."
 msgstr "スレッドを開始する前に、デスクトップの Y Space に接続してください。"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Connect your first tool when you are ready."
+msgstr "準備ができたら、最初のツールを接続しましょう。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Connect your tools and make them available to your agents."
+msgstr "ツールを接続して、エージェントが利用できるようにします。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Connect your tools to Y Space and choose what agents can use."
+msgstr "ツールを Y Space に接続し、エージェントが使用できるものを選択します。"
+
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/plugins/PluginDetail.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
@@ -3254,8 +3368,13 @@ msgid "Connected"
 msgstr "接続済み"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Connected accounts"
-msgstr "接続済みアカウント"
+#~ msgid "Connected accounts"
+#~ msgstr "接続済みアカウント"
+
+#. placeholder {0}: attempt.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Connecting {0}"
+msgstr "{0} に接続中"
 
 #: src/mobile/views/BrowserView.tsx
 msgid "Connecting to the desktop browser…"
@@ -3538,6 +3657,10 @@ msgstr "Cookie のインポートをキャンセルできませんでした。�
 msgid "Could not complete the merge"
 msgstr "マージを完了できませんでした"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not configure Pipedream. Try again."
+msgstr "Pipedream を設定できませんでした。もう一度お試しください。"
+
 #: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "Could not create a cookie preview. Check that the extension is connected."
 msgstr "Cookie のプレビューを作成できませんでした。拡張機能が接続されていることを確認してください。"
@@ -3545,6 +3668,11 @@ msgstr "Cookie のプレビューを作成できませんでした。拡張機�
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Could not create the project folder."
 msgstr "プロジェクトフォルダーを作成できませんでした。"
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access has been revoked."
+msgstr "{0} の接続を解除できませんでした。エージェントアクセスは取り消されました。"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
@@ -3571,6 +3699,10 @@ msgstr "ブラウザの Cookie インポート設定を読み込めませんで�
 msgid "Could not load connections."
 msgstr "接続を読み込めませんでした。"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not load integrations. Try again."
+msgstr "連携を読み込めませんでした。もう一度お試しください。"
+
 #. placeholder {0}: failure.project.name
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 msgid "Could not load pull requests for {0}."
@@ -3592,6 +3724,10 @@ msgstr "その Cookie ファイルをプレビューできませんでした。C
 msgid "Could not read file."
 msgstr "ファイルを読み取れませんでした。"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not refresh connected accounts. Try again."
+msgstr "接続済みアカウントを更新できませんでした。もう一度お試しください。"
+
 #: src/renderer/components/mcp/useMcpServerOauth.ts
 msgid "Could not sign in to {serverName}: {message}"
 msgstr "{serverName} にサインインできませんでした: {message}"
@@ -3606,9 +3742,19 @@ msgstr "{serverName} にサインインできませんでした。"
 msgid "Could not sign out of {serverName}."
 msgstr "{serverName} からサインアウトできませんでした。"
 
+#. placeholder {0}: app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not start {0} connection. Try again."
+msgstr "{0} への接続を開始できませんでした。もう一度お試しください。"
+
 #: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "Could not start browser pairing. Try again."
 msgstr "ブラウザのペアリングを開始できませんでした。もう一度お試しください。"
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not update {0} agent access. Try again."
+msgstr "{0} のエージェントアクセスを更新できませんでした。もう一度お試しください。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Couldn't access the GitHub account \"{login}\". Run \"gh auth login\" and try again."
@@ -3819,8 +3965,8 @@ msgid "Credentials are configured."
 msgstr "資格情報が設定されています。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Credentials are managed by the Y Space environment and never exposed to agents."
-msgstr "認証情報は Y Space 環境によって管理され、エージェントに公開されることはありません。"
+#~ msgid "Credentials are managed by the Y Space environment and never exposed to agents."
+#~ msgstr "認証情報は Y Space 環境によって管理され、エージェントに公開されることはありません。"
 
 #: src/renderer/components/providers/usageFormat.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
@@ -4535,18 +4681,23 @@ msgstr "{path}の未保存の変更を破棄しますか?"
 msgid "Discard unsaved editor changes?"
 msgstr "保存されていないエディターの変更を破棄しますか?"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "Disconnect"
 msgstr "切断"
 
 #. placeholder {0}: account.name
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
 msgid "Disconnect {0}"
 msgstr "{0} との接続を切断"
 
+#. placeholder {0}: disconnectCandidate.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Disconnect {0} and revoke agent access?"
+msgstr "{0} の接続を解除して、エージェントアクセスを取り消しますか？"
+
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Disconnect account?"
-msgstr "アカウントの接続を切断しますか？"
+#~ msgid "Disconnect account?"
+#~ msgstr "アカウントの接続を切断しますか？"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Disconnect server"
@@ -4871,8 +5022,8 @@ msgid "Enables <0>cookies</0> and <1>storage</1>. Cookies can contain session to
 msgstr "<0>Cookie</0> と <1>ストレージ</1> を有効にします。Cookie にはセッション トークンが含まれることがあり、ストレージには認証状態が保持されることが多いため、エージェントとエージェントが訪問するサイトの両方を信頼できる場合にのみ有効にしてください。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "End-user Pipedream MCP server named pd."
-msgstr "pd という名前のエンドユーザー向け Pipedream MCP サーバーです。"
+#~ msgid "End-user Pipedream MCP server named pd."
+#~ msgstr "pd という名前のエンドユーザー向け Pipedream MCP サーバーです。"
 
 #: src/mobile/views/DesktopsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
@@ -5435,8 +5586,16 @@ msgid "Find in terminal"
 msgstr "ターミナル内を検索"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Finish connecting in the new embedded browser tab, then refresh accounts."
-msgstr "新しい埋め込みブラウザタブで接続を完了してから、アカウントを更新してください。"
+#~ msgid "Finish connecting in the new embedded browser tab, then refresh accounts."
+#~ msgstr "新しい埋め込みブラウザタブで接続を完了してから、アカウントを更新してください。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Finish setup to connect your tools."
+msgstr "ツールを接続するには、設定を完了してください。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Finish the secure connection in the embedded browser."
+msgstr "埋め込みブラウザで安全な接続を完了してください。"
 
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Finish your review"
@@ -5619,8 +5778,8 @@ msgid "Forget {0}"
 msgstr "{0} の登録を解除"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Forget environment file"
-msgstr "環境ファイルの登録を解除"
+#~ msgid "Forget environment file"
+#~ msgstr "環境ファイルの登録を解除"
 
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Fork"
@@ -5989,7 +6148,7 @@ msgstr "未送信の下書きがあります"
 msgid "Headers"
 msgstr "ヘッダー"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
 msgid "Healthy"
 msgstr "正常"
 
@@ -6306,8 +6465,8 @@ msgid "Include in sync"
 msgstr "同期に追加"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Incomplete setup"
-msgstr "セットアップ未完了"
+#~ msgid "Incomplete setup"
+#~ msgstr "セットアップ未完了"
 
 #: src/renderer/components/plugins/PluginDetail.tsx
 msgid "Information"
@@ -6529,6 +6688,23 @@ msgstr "指示"
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "Instructions agents follow when choosing which agent or model to delegate to."
 msgstr "どのエージェントやモデルに委任するかを選ぶ際に、エージェントが従う指示。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Integration access changed, but running agents could not be updated. Restart them before using integrations."
+msgstr "統合へのアクセスが変更されましたが、実行中のエージェントを更新できませんでした。統合を使用する前に再起動してください。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Integration access changed. Restart running agents to apply the update."
+msgstr "統合へのアクセスが変更されました。更新を適用するには、実行中のエージェントを再起動してください。"
+
+#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Integrations"
+msgstr "連携"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Integrations need attention."
+msgstr "確認が必要な連携があります。"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -6764,6 +6940,14 @@ msgstr "ライブ"
 msgid "Live {0}"
 msgstr "ライブ {0}"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Load more"
+msgstr "さらに読み込む"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Load more integrations"
+msgstr "連携をさらに読み込む"
+
 #: src/renderer/components/common/PixelLoader.tsx
 msgid "Loading"
 msgstr "読み込み中"
@@ -6776,6 +6960,10 @@ msgstr "アカウントを読み込み中…"
 msgid "Loading browser profiles…"
 msgstr "ブラウザプロファイルを読み込み中…"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Loading catalog…"
+msgstr "カタログを読み込み中…"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitDiffContent/parts/SingleFileDiff.tsx
 msgid "Loading diff..."
 msgstr "差分を読み込み中..."
@@ -6787,6 +6975,10 @@ msgstr "エディターを読み込み中…"
 #: src/renderer/components/thread/ChatPane/parts/items/useReadAbsoluteFile.tsx
 msgid "Loading file…"
 msgstr "ファイルをロード中…"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Loading integrations…"
+msgstr "連携を読み込み中…"
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunDetail.tsx
 msgid "Loading jobs"
@@ -6981,6 +7173,10 @@ msgstr "管理"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #~ msgid "Manage global and project agent skills, including skills imported from other providers."
 #~ msgstr "他のプロバイダーからインポートしたスキルを含む、グローバルおよびプロジェクトのエージェントスキルを管理します。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Manage integrations"
+msgstr "連携を管理"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarRemoteServers.tsx
 #~ msgid "Manage remote environments"
@@ -7404,8 +7600,8 @@ msgid "Mirroring is unavailable."
 msgstr "ミラーリングは利用できません。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Missing configuration:"
-msgstr "不足している設定："
+#~ msgid "Missing configuration:"
+#~ msgstr "不足している設定："
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Mobile push notifications"
@@ -7671,6 +7867,7 @@ msgstr "組み込みブラウザー MCP でページを移動・検査・テス�
 msgid "Needs approval"
 msgstr "承認が必要です"
 
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Needs attention"
 msgstr "要確認"
@@ -8014,7 +8211,7 @@ msgstr "コミットが見つかりませんでした。"
 msgid "No configured MCP servers yet"
 msgstr "設定済みのMCPサーバーはまだありません"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
 msgid "No connected accounts yet."
 msgstr "接続済みのアカウントはまだありません。"
 
@@ -8103,6 +8300,14 @@ msgstr "アイコンが見つかりません"
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "No installed agents with selectable models are available for this project."
 #~ msgstr "このプロジェクトで利用できる、選択可能なモデルを持つインストール済みエージェントはありません。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "No integrations connected yet."
+msgstr "接続済みの連携はまだありません。"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "No integrations match this search."
+msgstr "この検索に一致する連携はありません。"
 
 #: src/renderer/views/GitHubActionsView/GitHubActionsRunDetail.tsx
 msgid "No jobs reported for this run."
@@ -9171,12 +9376,16 @@ msgid "Personal"
 msgstr "個人"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Personal MCP"
-msgstr "個人用 MCP"
+#~ msgid "Personal MCP"
+#~ msgstr "個人用 MCP"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal MCP sign-in did not complete."
 msgstr "個人用 MCP へのサインインが完了しませんでした。"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Personal Pipedream"
+msgstr "個人用 Pipedream"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 msgid "Personal Pipedream tools"
@@ -9240,16 +9449,24 @@ msgid "Pinned task routes"
 msgstr "固定されたタスクルート"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Pipedream Connect could not be initialized."
-msgstr "Pipedream Connect を初期化できませんでした。"
+#~ msgid "Pipedream Connect could not be initialized."
+#~ msgstr "Pipedream Connect を初期化できませんでした。"
+
+#: src/renderer/components/connections/ConnectionsConfigurationState.tsx
+msgid "Pipedream could not be initialized."
+msgstr "Pipedream を初期化できませんでした。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Pipedream credentials loaded from the selected file."
-msgstr "選択したファイルから Pipedream 認証情報を読み込みました。"
+#~ msgid "Pipedream credentials loaded from the selected file."
+#~ msgstr "選択したファイルから Pipedream 認証情報を読み込みました。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Pipedream is ready. You can now connect integrations."
+msgstr "Pipedream の準備ができました。連携を接続できます。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
-msgstr "認証済みのローカル MCP リレーを通じて利用できる、Pipedream 管理の OAuth アカウントです。"
+#~ msgid "Pipedream-managed OAuth accounts available through authenticated local MCP relays."
+#~ msgstr "認証済みのローカル MCP リレーを通じて利用できる、Pipedream 管理の OAuth アカウントです。"
 
 #: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/layout/PanelDock/panelTabMeta.ts
@@ -9982,7 +10199,6 @@ msgstr "通知内容を伏せる"
 #: src/renderer/views/PrReviewOverlay/PrReviewOverlay.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
 #: src/renderer/views/SettingsOverlay/parts/AgentProfileList.tsx
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/UsageSettings.tsx
 msgid "Refresh"
@@ -9997,7 +10213,7 @@ msgstr "{0}認証を更新します"
 msgid "Refresh {label}"
 msgstr "{label} を更新する"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectedAccountsPanel.tsx
 msgid "Refresh accounts"
 msgstr "アカウントを更新"
 
@@ -10533,6 +10749,7 @@ msgstr "目標を再開"
 #: src/mobile/views/BrowserView.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/mobile/views/TerminalView.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useSourceBranchData.ts
@@ -10541,6 +10758,11 @@ msgstr "目標を再開"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "再試行"
+
+#. placeholder {0}: attempt.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Retry {0} connection"
+msgstr "{0} への接続を再試行"
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 msgid "Retry {serverName}"
@@ -10905,8 +11127,8 @@ msgid "Saved credentials are shared across all environments."
 msgstr "保存された認証情報はすべての環境で共有されます。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Saved environment file forgotten."
-msgstr "保存済み環境ファイルの登録を解除しました。"
+#~ msgid "Saved environment file forgotten."
+#~ msgstr "保存済み環境ファイルの登録を解除しました。"
 
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 msgid "Saved shell"
@@ -11032,7 +11254,6 @@ msgstr "SDK 未インストール"
 #: src/renderer/views/MainView/parts/SidebarHeaderControls.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SearchSection.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/SettingsSidebar.tsx
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SearchSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Search"
@@ -11047,17 +11268,25 @@ msgid "Search agents..."
 msgstr "エージェントを検索..."
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Search apps"
-msgstr "アプリを検索"
+#~ msgid "Search apps"
+#~ msgstr "アプリを検索"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Search branches..."
 msgstr "ブランチを検索..."
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Search every available integration."
+msgstr "利用可能なすべての連携を検索します。"
+
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView.tsx
 msgid "Search files"
 msgstr "ファイルの検索"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Search Gmail, Slack, Notion…"
+msgstr "Gmail、Slack、Notion を検索…"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Search icons"
@@ -11066,6 +11295,10 @@ msgstr "アイコンを検索"
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectIconPicker.tsx
 msgid "Search icons..."
 msgstr "アイコンを検索..."
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Search integrations"
+msgstr "連携を検索"
 
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Search marketplace skills"
@@ -11096,8 +11329,8 @@ msgid "Search or enter address"
 msgstr "アドレスを検索または入力"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Search Pipedream apps"
-msgstr "Pipedream アプリを検索"
+#~ msgid "Search Pipedream apps"
+#~ msgstr "Pipedream アプリを検索"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 msgid "Search plugins"
@@ -11208,8 +11441,8 @@ msgstr "編集を開始するファイルを選択します。"
 #~ msgstr "ローカルの環境ファイルを選択してください。Y Space はその場所のみを保存し、認証情報の値はメインプロセス内に保持します。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Select a local environment file. Y Space stores only its location; credential values stay outside renderer and agent processes."
-msgstr "ローカルの環境ファイルを選択してください。Y Space はその場所のみを保存し、認証情報の値はレンダラーおよびエージェントプロセスの外部に保持します。"
+#~ msgid "Select a local environment file. Y Space stores only its location; credential values stay outside renderer and agent processes."
+#~ msgstr "ローカルの環境ファイルを選択してください。Y Space はその場所のみを保存し、認証情報の値はレンダラーおよびエージェントプロセスの外部に保持します。"
 
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #~ msgid "Select a project before importing to Project."
@@ -11352,6 +11585,10 @@ msgstr "実験目標を設定または表示する"
 msgid "Set shortcut"
 msgstr "ショートカットを設定"
 
+#: src/renderer/components/connections/ConnectionsConfigurationState.tsx
+msgid "Set up integrations"
+msgstr "連携を設定"
+
 #: src/renderer/components/composer/ComposerAddMenu.tsx
 msgid "Set when this session started — start a new thread to change servers"
 msgstr "このセッションの開始時に確定されます — サーバーを変更するには新しいスレッドを開始してください"
@@ -11365,6 +11602,10 @@ msgstr "このセッションの開始時に確定されます — サーバー�
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
 msgstr "設定"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Setup needed"
+msgstr "設定が必要"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ScriptsSection.tsx
 msgid "Setup script"
@@ -12601,6 +12842,10 @@ msgstr "{0} のグローバル WSL スコープ"
 msgid "The host is restarting to install the update."
 msgstr "アップデートをインストールするためにホストを再起動しています。"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "The integration catalog couldn't be loaded."
+msgstr "連携カタログを読み込めませんでした。"
+
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "the Linux user"
 msgstr "Linux ユーザー"
@@ -12641,11 +12886,15 @@ msgstr "リモートの Y Space サーバーからペアリング認証情報が
 msgid "The repository location on disk. Update it if you moved the folder."
 msgstr "ディスク上のリポジトリの場所。フォルダーを移動した場合は更新してください。"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectionsConfigurationState.tsx
+msgid "The selected configuration is incomplete."
+msgstr "選択した設定が不完全です。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file could not be read."
 msgstr "選択したファイルを読み取れませんでした。"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file does not contain Pipedream credentials."
 msgstr "選択したファイルに Pipedream 認証情報が含まれていません。"
 
@@ -12653,7 +12902,7 @@ msgstr "選択したファイルに Pipedream 認証情報が含まれていま�
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "選択したファイルに有効なMCPサーバー設定が含まれていません。"
 
-#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file is too large."
 msgstr "選択したファイルが大きすぎます。"
 
@@ -12785,6 +13034,10 @@ msgstr "この API キーは、このプロファイルの SDK チャットと�
 msgid "This browser does not support system notifications here; you will still see in-app toasts."
 msgstr "このブラウザはここでシステム通知をサポートしていません。アプリ内トーストは引き続き表示されます。"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "This card will update automatically when authorization finishes."
+msgstr "認証が完了すると、このカードは自動的に更新されます。"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #~ msgid "This catalog manages downloads through its website."
 #~ msgstr "このカタログはウェブサイト経由でダウンロードを管理します。"
@@ -12913,8 +13166,8 @@ msgid "This removes later messages and restores files when a checkpoint snapshot
 msgstr "これにより、後続のメッセージが削除され、チェックポイント スナップショットが利用可能な場合はファイルが復元されます。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "This removes the Pipedream account and immediately revokes agent access through Y Space."
-msgstr "この操作により Pipedream アカウントが削除され、Y Space を介したエージェントのアクセス権が直ちに取り消されます。"
+#~ msgid "This removes the Pipedream account and immediately revokes agent access through Y Space."
+#~ msgstr "この操作により Pipedream アカウントが削除され、Y Space を介したエージェントのアクセス権が直ちに取り消されます。"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "This removes the schedule and its latest result from this device."
@@ -13225,6 +13478,10 @@ msgstr "信頼して接続"
 #: src/mobile/views/ThreadsView.tsx
 msgid "Try a different search or project filter."
 msgstr "別の検索語句またはプロジェクトフィルターを試してください。"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Try again"
+msgstr "もう一度試す"
 
 #: src/renderer/components/plugins/PluginDetail.tsx
 msgid "Try now"
@@ -13898,8 +14155,8 @@ msgstr "1 つの共通フォルダを使用するか、各プロジェクトの�
 #~ msgstr "1 つのグローバルフォルダーを使用するか、各プロジェクト内の .poracode/worktrees にワークツリーをネストします。"
 
 #: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
-msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
-msgstr "自分の Pipedream ツールには個人用 MCP を使用し、選択したアプリアカウントをローカルエージェントに許可するには BYO Connect を使用します。"
+#~ msgid "Use Personal MCP for your own Pipedream tools or BYO Connect to grant selected app accounts to local agents."
+#~ msgstr "自分の Pipedream ツールには個人用 MCP を使用し、選択したアプリアカウントをローカルエージェントに許可するには BYO Connect を使用します。"
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"
@@ -13921,6 +14178,10 @@ msgstr "このアカウントを使用状況の追跡に使用するか、続行
 #: src/renderer/views/SettingsOverlay/parts/RemoteHostFolderPicker.tsx
 msgid "Use this folder"
 msgstr "このフォルダーを使用"
+
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Use tools already connected to your Pipedream account."
+msgstr "Pipedream アカウントに接続済みのツールを使用します。"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -14576,6 +14837,10 @@ msgstr "Y Space Helper はまだ準備できていません（HTTP {status}）�
 msgid "Y Space Helper returned an invalid response."
 msgstr "Y Space Helper から無効な応答が返されました。"
 
+#: src/renderer/views/SettingsOverlay/parts/ConnectionsSettings.tsx
+msgid "Y Space integrations"
+msgstr "Y Space の連携"
+
 #: src/renderer/components/startup/StartupRecoveryScreen.tsx
 msgid "Y Space may be waiting on saved data or a background service. You can keep waiting, restart, or install an available update."
 msgstr "Y Space は保存済みデータまたはバックグラウンドサービスを待機している可能性があります。待機を続けるか、再起動するか、利用可能なアップデートをインストールできます。"
@@ -14625,6 +14890,10 @@ msgstr "あなたの名前"
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #~ msgid "Your pick"
 #~ msgstr "あなたの選択"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Your provider will show the requested permissions. You can choose which optional permissions to approve; required permissions still apply."
+msgstr "プロバイダーに要求された権限が表示されます。承認する任意の権限を選択できますが、必須の権限は引き続き適用されます。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Your stashed local changes were re-applied."

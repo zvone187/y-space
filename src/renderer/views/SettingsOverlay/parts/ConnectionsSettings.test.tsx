@@ -1,57 +1,27 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
-import type {
-  PipedreamBeginConnectPayload,
-  PipedreamBeginConnectResult,
-  PipedreamChooseEnvFilePayload,
-  PipedreamDisconnectAccountPayload,
-  PipedreamEnvFileImportResult,
-  PipedreamListAppsPayload,
-  PipedreamListAppsResult,
-  PipedreamSetAccountAgentAccessPayload,
-  PipedreamSnapshot,
-  McpServer,
-} from "@/shared/contracts";
+import { useConnectionsDialogStore } from "@/renderer/state/connectionsDialogStore";
+import type { McpServer, PipedreamSnapshot } from "@/shared/contracts";
+import type { PoracodeBridge } from "@/shared/ipc";
 
 const bridgeMock = vi.hoisted(() => ({
   pipedreamGetSnapshot: vi.fn<() => Promise<PipedreamSnapshot>>(),
-  pipedreamListApps:
-    vi.fn<(payload: PipedreamListAppsPayload) => Promise<PipedreamListAppsResult>>(),
-  pipedreamRefreshAccounts: vi.fn<() => Promise<PipedreamSnapshot>>(),
-  pipedreamBeginConnect:
-    vi.fn<(payload: PipedreamBeginConnectPayload) => Promise<PipedreamBeginConnectResult>>(),
-  pipedreamChooseEnvFile:
-    vi.fn<
-      (payload: PipedreamChooseEnvFilePayload) => Promise<PipedreamEnvFileImportResult | null>
-    >(),
-  pipedreamClearEnvFile: vi.fn<() => Promise<PipedreamSnapshot>>(),
-  pipedreamDisconnectAccount:
-    vi.fn<(payload: PipedreamDisconnectAccountPayload) => Promise<PipedreamSnapshot>>(),
-  pipedreamSetAccountAgentAccess:
-    vi.fn<(payload: PipedreamSetAccountAgentAccessPayload) => Promise<PipedreamSnapshot>>(),
+  pipedreamBeginPersonalMcpOauth: vi.fn<PoracodeBridge["pipedreamBeginPersonalMcpOauth"]>(),
+  pipedreamGetPersonalMcpOauthFlowStatus:
+    vi.fn<PoracodeBridge["pipedreamGetPersonalMcpOauthFlowStatus"]>(),
+  pipedreamCancelPersonalMcpOauth: vi.fn<PoracodeBridge["pipedreamCancelPersonalMcpOauth"]>(),
+  pipedreamClearPersonalMcpOauth: vi.fn<PoracodeBridge["pipedreamClearPersonalMcpOauth"]>(),
 }));
 const settingsMock = vi.hoisted(() => ({
   mcpServers: [] as McpServer[],
   setMcpServers: vi.fn<(servers: McpServer[]) => void>(),
 }));
-const authenticatePersonalMcp = vi.hoisted(() => vi.fn<(server: McpServer) => Promise<boolean>>());
-const signOutPersonalMcp = vi.hoisted(() => vi.fn<(server: McpServer) => Promise<void>>());
-
 vi.mock("@/renderer/bridge", () => ({ readBridge: () => bridgeMock }));
 vi.mock("@/renderer/state/sharedSettingsStore", () => ({
   useSharedSettings: (selector: (state: typeof settingsMock) => unknown) => selector(settingsMock),
   waitForPendingSharedSettings: () => Promise.resolve(),
 }));
-vi.mock("@/renderer/components/mcp/useMcpServerOauth", () => ({
-  useMcpServerOauth: () => ({
-    authenticatedUrls: new Set<string>(),
-    busyServerIds: new Set<string>(),
-    authenticate: authenticatePersonalMcp,
-    signOut: signOutPersonalMcp,
-  }),
-}));
-
 import { ConnectionsSettings } from "./ConnectionsSettings";
 
 const SNAPSHOT = {
@@ -73,46 +43,20 @@ const SNAPSHOT = {
       },
     ],
   },
-};
+} satisfies PipedreamSnapshot;
 
 describe("ConnectionsSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useConnectionsDialogStore.setState({ isOpen: false, source: null, revision: 0 });
     bridgeMock.pipedreamGetSnapshot.mockResolvedValue(SNAPSHOT);
-    bridgeMock.pipedreamListApps.mockResolvedValue({
-      apps: [{ id: "app_Github123", slug: "github", name: "GitHub" }],
-      totalCount: 1,
-    });
-    bridgeMock.pipedreamRefreshAccounts.mockResolvedValue(SNAPSHOT);
-    bridgeMock.pipedreamBeginConnect.mockResolvedValue({
-      opened: true,
-      expiresAt: "2026-08-27T12:10:00.000Z",
-    });
-    bridgeMock.pipedreamChooseEnvFile.mockResolvedValue({
-      status: "configured",
-      snapshot: SNAPSHOT,
-    });
-    bridgeMock.pipedreamClearEnvFile.mockResolvedValue({
-      personalMcp: { enabled: true, authenticated: true, serverName: "pd" },
-      connect: { state: "absent" },
-    });
-    bridgeMock.pipedreamSetAccountAgentAccess.mockResolvedValue({
-      ...SNAPSHOT,
-      connect: {
-        ...SNAPSHOT.connect,
-        accounts: [{ ...SNAPSHOT.connect.accounts[0]!, agentAccess: true }],
-      },
-    });
-    bridgeMock.pipedreamDisconnectAccount.mockResolvedValue({
-      ...SNAPSHOT,
-      connect: { ...SNAPSHOT.connect, accounts: [] },
-    });
+    bridgeMock.pipedreamBeginPersonalMcpOauth.mockResolvedValue({ state: "authorized" });
+    bridgeMock.pipedreamCancelPersonalMcpOauth.mockResolvedValue(undefined);
+    bridgeMock.pipedreamClearPersonalMcpOauth.mockResolvedValue(undefined);
     settingsMock.mcpServers = [];
     settingsMock.setMcpServers.mockImplementation((servers) => {
       settingsMock.mcpServers = servers;
     });
-    authenticatePersonalMcp.mockResolvedValue(true);
-    signOutPersonalMcp.mockResolvedValue(undefined);
   });
 
   it("adds, enables, and authenticates the managed Personal MCP server in one embedded flow", async () => {
@@ -135,100 +79,92 @@ describe("ConnectionsSettings", () => {
       enabled: true,
       transport: { type: "http", url: "https://mcp.pipedream.net/v2" },
     });
-    expect(authenticatePersonalMcp).toHaveBeenCalledWith(personal);
+    expect(bridgeMock.pipedreamBeginPersonalMcpOauth).toHaveBeenCalledOnce();
   });
 
-  it("shows Personal MCP and BYO Connect status without rendering secret material", async () => {
-    render(<ConnectionsSettings />);
-    expect(await screen.findByText("Personal MCP")).toBeInTheDocument();
-    expect(screen.getByText("Authenticated")).toBeInTheDocument();
-    expect(screen.getByText("Y Space Slack")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Credentials are managed by the Y Space environment and never exposed to agents.",
-      ),
-    ).toBeInTheDocument();
-    expect(document.body.textContent).not.toMatch(
-      /client[_-]?secret|access[_-]?token|connect[_-]?token/i,
-    );
-  });
-
-  it("chooses a Pipedream env file through main and applies the redacted snapshot", async () => {
+  it("routes managed Personal Pipedream sign-in through the URL-free main coordinator", async () => {
     const notConfigured: PipedreamSnapshot = {
       personalMcp: { enabled: false, authenticated: false, serverName: "pd" },
       connect: { state: "absent" },
     };
-    bridgeMock.pipedreamGetSnapshot.mockResolvedValue(notConfigured);
+    bridgeMock.pipedreamGetSnapshot.mockResolvedValueOnce(notConfigured).mockResolvedValue({
+      ...notConfigured,
+      personalMcp: { enabled: true, authenticated: true, serverName: "pd" },
+    });
+
+    render(<ConnectionsSettings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add and sign in" }));
+
+    await waitFor(() => expect(bridgeMock.pipedreamBeginPersonalMcpOauth).toHaveBeenCalledOnce());
+    expect(JSON.stringify(bridgeMock.pipedreamBeginPersonalMcpOauth.mock.results)).not.toMatch(
+      /authorizationUrl|state=|code_challenge/i,
+    );
+  });
+
+  it("preserves Personal MCP sign-out behavior", async () => {
     render(<ConnectionsSettings />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Choose environment file" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
 
-    await waitFor(() =>
-      expect(bridgeMock.pipedreamChooseEnvFile).toHaveBeenCalledExactlyOnceWith({
-        dialogTitle: "Choose Pipedream environment file",
-      }),
-    );
-    expect(await screen.findByText("Pipedream Connect")).toBeInTheDocument();
+    await waitFor(() => expect(bridgeMock.pipedreamClearPersonalMcpOauth).toHaveBeenCalledOnce());
+  });
+
+  it("shows compact Personal MCP and Y Space integration summaries without duplicate controls or secrets", async () => {
+    render(<ConnectionsSettings />);
+
+    expect(await screen.findByText("Personal Pipedream")).toBeInTheDocument();
+    expect(screen.getByText("Authenticated")).toBeInTheDocument();
+    expect(screen.getByText("Y Space integrations")).toBeInTheDocument();
+    expect(screen.getByText("1 connected · 0 available to agents")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Manage integrations" })).toBeInTheDocument();
+    expect(screen.queryByText("Y Space Slack")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Search apps" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Disconnect/i })).not.toBeInTheDocument();
     expect(
-      screen.getByText("Pipedream credentials loaded from the selected file."),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: "Choose environment file" }),
+    ).not.toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(
-      /client[_-]?secret|envFilePath|\/private\/config/i,
+      /client[_-]?secret|access[_-]?token|connect[_-]?token|apn_Account123/i,
     );
   });
 
-  it("surfaces a safe validation error for a file without Pipedream values", async () => {
-    bridgeMock.pipedreamChooseEnvFile.mockResolvedValue({
-      status: "invalid",
-      reason: "no-supported-values",
+  it("opens the shared Integrations dialog from Settings", async () => {
+    render(<ConnectionsSettings />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Manage integrations" }));
+
+    expect(useConnectionsDialogStore.getState()).toMatchObject({
+      isOpen: true,
+      source: "settings",
     });
-    render(<ConnectionsSettings />);
-
-    fireEvent.click(await screen.findByRole("button", { name: "Choose environment file" }));
-
-    expect(
-      await screen.findByText("The selected file does not contain Pipedream credentials."),
-    ).toBeInTheDocument();
   });
 
-  it("forgets persisted env-file metadata and applies the fallback snapshot", async () => {
+  it("refetches its compact summary when the shared dialog revision changes", async () => {
+    const updated = {
+      ...SNAPSHOT,
+      connect: {
+        ...SNAPSHOT.connect,
+        accounts: [
+          { ...SNAPSHOT.connect.accounts[0]!, agentAccess: true },
+          {
+            id: "apn_Gmail456",
+            name: "Work Gmail",
+            healthy: true,
+            connectedAt: "2026-08-28T12:00:00.000Z",
+            agentAccess: false,
+            app: { id: "app_Gmail456", slug: "gmail", name: "Gmail" },
+          },
+        ],
+      },
+    } satisfies PipedreamSnapshot;
+    bridgeMock.pipedreamGetSnapshot.mockResolvedValueOnce(SNAPSHOT).mockResolvedValue(updated);
     render(<ConnectionsSettings />);
+    expect(await screen.findByText("1 connected · 0 available to agents")).toBeInTheDocument();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Forget environment file" }));
+    act(() => useConnectionsDialogStore.getState().bumpRevision());
 
-    await waitFor(() => expect(bridgeMock.pipedreamClearEnvFile).toHaveBeenCalledOnce());
-    expect(await screen.findByText("Not configured")).toBeInTheDocument();
-    expect(screen.getByText("Saved environment file forgotten.")).toBeInTheDocument();
-  });
-
-  it("connects an app, toggles agent access, refreshes, and disconnects through safe bridge calls", async () => {
-    render(<ConnectionsSettings />);
-    fireEvent.change(await screen.findByRole("textbox", { name: "Search apps" }), {
-      target: { value: "github" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    expect(await screen.findByText("GitHub")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Connect GitHub" }));
-    await waitFor(() =>
-      expect(bridgeMock.pipedreamBeginConnect).toHaveBeenCalledWith({ appSlug: "github" }),
-    );
-
-    fireEvent.click(screen.getByRole("switch", { name: "Allow agents to use Y Space Slack" }));
-    await waitFor(() =>
-      expect(bridgeMock.pipedreamSetAccountAgentAccess).toHaveBeenCalledWith({
-        accountId: "apn_Account123",
-        enabled: true,
-      }),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Refresh accounts" }));
-    await waitFor(() => expect(bridgeMock.pipedreamRefreshAccounts).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole("button", { name: "Disconnect Y Space Slack" }));
-    expect(bridgeMock.pipedreamDisconnectAccount).not.toHaveBeenCalled();
-    fireEvent.click(await screen.findByRole("button", { name: "Confirm disconnect" }));
-    await waitFor(() =>
-      expect(bridgeMock.pipedreamDisconnectAccount).toHaveBeenCalledWith({
-        accountId: "apn_Account123",
-      }),
-    );
+    expect(await screen.findByText("2 connected · 1 available to agents")).toBeInTheDocument();
+    expect(bridgeMock.pipedreamGetSnapshot).toHaveBeenCalledTimes(2);
   });
 });

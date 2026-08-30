@@ -50,14 +50,27 @@
       (function () {
         try {
           var root = document.documentElement;
+          var themeDefaultVersion = 1;
           var boot = JSON.parse(localStorage.getItem("poracode-boot") || "null");
+          var bootIsCurrent =
+            boot &&
+            Number.isInteger(boot.themeDefaultVersion) &&
+            boot.themeDefaultVersion >= themeDefaultVersion;
           var appearance =
-            boot && (boot.appearance === "light" || boot.appearance === "dark")
+            bootIsCurrent && (boot.appearance === "light" || boot.appearance === "dark")
               ? boot.appearance
               : null;
           if (!appearance) {
             var settings = JSON.parse(localStorage.getItem("poracode-shared-settings") || "null");
             var mode = settings && settings.themeMode;
+            var themePreset = (settings && settings.themePreset) || "default";
+            var settingsUseLightDefault =
+              !settings ||
+              !Number.isInteger(settings.themeDefaultVersion) ||
+              settings.themeDefaultVersion < themeDefaultVersion;
+            if (settingsUseLightDefault && mode === "dark" && themePreset === "default") {
+              mode = "light";
+            }
             var prefersDark =
               !window.matchMedia || window.matchMedia("(prefers-color-scheme: dark)").matches;
             // prettier-ignore
@@ -73,7 +86,7 @@
           root.classList.remove("light", "dark");
           root.classList.add(appearance);
           root.dataset.theme = appearance;
-          if (boot && boot.bg) root.style.backgroundColor = boot.bg;
+          if (bootIsCurrent && boot.bg) root.style.backgroundColor = boot.bg;
         } catch (e) {
           // Ignore; the renderer applies real settings shortly after mount.
         }

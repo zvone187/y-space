@@ -6,6 +6,7 @@ import {
   Info,
   Monitor,
   Paperclip,
+  Plug,
   Plus,
   Server,
   Settings2,
@@ -110,6 +111,8 @@ export function ComposerAddMenu(props: {
   customMcpServers?: readonly ComposerCustomMcpItem[];
   showFileOption?: boolean;
   onPickFiles: () => void;
+  /** Opens the shared Connections dialog without changing session-bound MCP state. */
+  onOpenIntegrations?: () => void;
   /**
    * Computer Use is a launch-time capability handled separately from the MCP
    * registry (it gates on project location + agent kind, not the shared MCP
@@ -133,7 +136,14 @@ export function ComposerAddMenu(props: {
   readOnly?: boolean;
   readOnlyCaption?: ReactNode;
 }) {
-  const { mcpServers, showFileOption = true, onPickFiles, computerUse, experiment } = props;
+  const {
+    mcpServers,
+    showFileOption = true,
+    onPickFiles,
+    onOpenIntegrations,
+    computerUse,
+    experiment,
+  } = props;
   const customMcpServers = props.customMcpServers ?? [];
   const readOnly = props.readOnly === true;
   const { t } = useLingui();
@@ -160,7 +170,7 @@ export function ComposerAddMenu(props: {
     customMcpServers.filter((server) => server.enabled).length +
     (showComputerUse && computerUse.enabled ? 1 : 0);
 
-  if (!showFileOption && !hasMcpMenu && !experiment) return null;
+  if (!showFileOption && !onOpenIntegrations && !hasMcpMenu && !experiment) return null;
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -172,6 +182,12 @@ export function ComposerAddMenu(props: {
     setIsOpen(false);
     setMobileView("root");
     onPickFiles();
+  };
+
+  const handleOpenIntegrations = () => {
+    setIsOpen(false);
+    setMobileView("root");
+    onOpenIntegrations?.();
   };
 
   // The MCP submenu is a multiple-selection menu (Computer Use included as one
@@ -233,6 +249,14 @@ export function ComposerAddMenu(props: {
           </span>
           <span className="shrink-0 text-xs text-muted">
             <Trans>Attach</Trans>
+          </span>
+        </button>
+      ) : null}
+      {onOpenIntegrations ? (
+        <button type="button" className="m-sheet-action" onClick={handleOpenIntegrations}>
+          <Plug className="size-4 text-muted" />
+          <span className="flex-1 truncate">
+            <Trans>Integrations</Trans>
           </span>
         </button>
       ) : null}
@@ -392,6 +416,7 @@ export function ComposerAddMenu(props: {
           selectionMode="none"
           onAction={(key) => {
             if (key === "file") handlePickFiles();
+            if (key === "integrations") handleOpenIntegrations();
             if (key === "experiment" && experiment) {
               experiment.onToggle(!experiment.enabled);
             }
@@ -409,6 +434,14 @@ export function ComposerAddMenu(props: {
               </span>
             </Dropdown.Item>
           ) : null}
+          {onOpenIntegrations ? (
+            <Dropdown.Item id="integrations" textValue={t`Integrations`}>
+              <Plug className="size-4 text-muted" />
+              <Label className="flex-1 truncate">
+                <Trans>Integrations</Trans>
+              </Label>
+            </Dropdown.Item>
+          ) : null}
           {experiment ? (
             <Dropdown.Item
               id="experiment"
@@ -423,7 +456,9 @@ export function ComposerAddMenu(props: {
               <MenuSwitch checked={experiment.enabled} />
             </Dropdown.Item>
           ) : null}
-          {(showFileOption || experiment) && hasMcpMenu ? <Separator /> : null}
+          {(showFileOption || onOpenIntegrations || experiment) && hasMcpMenu ? (
+            <Separator />
+          ) : null}
           {hasMcpMenu ? (
             <Dropdown.SubmenuTrigger>
               <Dropdown.Item id="mcp-servers" textValue={t`MCP servers`}>

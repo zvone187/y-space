@@ -314,7 +314,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
         <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div
-            className={`${dragHandleRef ? "poracode-content-over-drag-region" : "poracode-content-over-drag-region--drag"} poracode-thread-header-glass @container ${alignClass} my-1 flex w-full max-w-[920px] items-center gap-2 px-2 py-1`}
+            className={`${dragHandleRef ? "poracode-content-over-drag-region" : "poracode-content-over-drag-region--drag"} poracode-thread-header-glass @container ${alignClass} my-1.5 flex w-full max-w-[920px] items-center gap-2 px-2.5 py-1.5`}
           >
             <ThreadHeaderStatusButton
               threadId={thread.id}

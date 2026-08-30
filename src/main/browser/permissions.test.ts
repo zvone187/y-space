@@ -10,6 +10,8 @@ vi.mock("electron", () => ({
 }));
 
 import {
+  installNavigationGuards,
+  installSensitiveSessionPermissions,
   installSessionPermissions,
   isNavigationUrlAllowed,
   openMicrophoneSettings,
@@ -21,20 +23,31 @@ type RequestHandler = (
   permission: string,
   callback: (granted: boolean) => void,
 ) => void;
+type CheckHandler = (webContents: FakeWebContents | null, permission: string) => boolean;
 
-function createFakeSession() {
+function createBareFakeSession() {
   let requestHandler: RequestHandler | null = null;
+  let checkHandler: CheckHandler | null = null;
   const session = {
     setPermissionRequestHandler: vi.fn<(handler: RequestHandler) => void>((handler) => {
       requestHandler = handler;
     }),
-    setPermissionCheckHandler: vi.fn<() => boolean>(),
+    setPermissionCheckHandler: vi.fn<(handler: CheckHandler) => void>((handler) => {
+      checkHandler = handler;
+    }),
   };
-  installSessionPermissions(session as unknown as Parameters<typeof installSessionPermissions>[0]);
   return {
     session,
     getRequestHandler: () => requestHandler,
+    getCheckHandler: () => checkHandler,
   };
+}
+
+function createFakeSession() {
+  const fake = createBareFakeSession();
+  const { session } = fake;
+  installSessionPermissions(session as unknown as Parameters<typeof installSessionPermissions>[0]);
+  return fake;
 }
 
 function installAndCaptureRequestHandler(): RequestHandler {
@@ -222,5 +235,100 @@ describe("installSessionPermissions non-media permissions", () => {
   it("denies permissions outside the allow-list", async () => {
     const handler = installAndCaptureRequestHandler();
     await expect(requestPermission(handler, windowContents, "geolocation")).resolves.toBe(false);
+  });
+});
+
+describe("installSensitiveSessionPermissions", () => {
+  it("denies request and check paths on the exact ephemeral OAuth session", async () => {
+    const exactSensitiveSession = createBareFakeSession();
+    installSensitiveSessionPermissions(
+      exactSensitiveSession.session as unknown as Parameters<
+        typeof installSensitiveSessionPermissions
+      >[0],
+    );
+    const requestHandler = exactSensitiveSession.getRequestHandler();
+    const checkHandler = exactSensitiveSession.getCheckHandler();
+    if (!requestHandler || !checkHandler) throw new Error("Sensitive permission handlers missing");
+
+    await expect(
+      requestPermission(requestHandler, webviewContents, "clipboard-read"),
+    ).resolves.toBe(false);
+    await expect(requestPermission(requestHandler, webviewContents, "fullscreen")).resolves.toBe(
+      false,
+    );
+    await expect(requestPermission(requestHandler, webviewContents, "geolocation")).resolves.toBe(
+      false,
+    );
+    expect(checkHandler(webviewContents, "clipboard-read")).toBe(false);
+    expect(checkHandler(webviewContents, "fullscreen")).toBe(false);
+  });
+});
+
+describe("installNavigationGuards redirects", () => {
+  function createNavigationWebContents() {
+    const handlers = new Map<string, (...args: unknown[]) => void>();
+    return {
+      handlers,
+      webContents: {
+        setWindowOpenHandler: vi.fn<() => void>(),
+        on: vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>(
+          (event, handler) => handlers.set(event, handler),
+        ),
+        removeListener: vi.fn<(event: string) => void>((event) => handlers.delete(event)),
+      },
+    };
+  }
+
+  it("cancels blocked ordinary server redirects", () => {
+    const { handlers, webContents } = createNavigationWebContents();
+    installNavigationGuards(webContents as never, vi.fn<() => void>());
+    const blocked = { preventDefault: vi.fn<() => void>() };
+    const allowed = { preventDefault: vi.fn<() => void>() };
+
+    handlers.get("will-redirect")?.(blocked, "javascript:alert(document.domain)");
+    handlers.get("will-redirect")?.(allowed, "https://example.com/next");
+
+    expect(blocked.preventDefault).toHaveBeenCalledOnce();
+    expect(allowed.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("restricts sensitive redirects to HTTPS and main-owned loopback HTTP", () => {
+    const { handlers, webContents } = createNavigationWebContents();
+    installNavigationGuards(webContents as never, vi.fn<() => void>(), "sensitive");
+    const localPdf = { preventDefault: vi.fn<() => void>() };
+    const customScheme = { preventDefault: vi.fn<() => void>() };
+    const remoteHttp = { preventDefault: vi.fn<() => void>() };
+    const loopbackV4 = { preventDefault: vi.fn<() => void>() };
+    const loopbackV6 = { preventDefault: vi.fn<() => void>() };
+    const localhost = { preventDefault: vi.fn<() => void>() };
+    const https = { preventDefault: vi.fn<() => void>() };
+
+    handlers.get("will-redirect")?.(localPdf, "file:///Users/me/report.pdf");
+    handlers.get("will-redirect")?.(customScheme, "y-space://oauth/callback");
+    handlers.get("will-redirect")?.(remoteHttp, "http://accounts.example/callback");
+    handlers.get("will-redirect")?.(loopbackV4, "http://127.0.0.1:43123/success/private");
+    handlers.get("will-redirect")?.(loopbackV6, "http://[::1]:43123/success/private");
+    handlers.get("will-redirect")?.(localhost, "http://localhost:43123/error/private");
+    handlers.get("will-redirect")?.(https, "https://accounts.example/callback");
+
+    expect(localPdf.preventDefault).toHaveBeenCalledOnce();
+    expect(customScheme.preventDefault).toHaveBeenCalledOnce();
+    expect(remoteHttp.preventDefault).toHaveBeenCalledOnce();
+    expect(loopbackV4.preventDefault).not.toHaveBeenCalled();
+    expect(loopbackV6.preventDefault).not.toHaveBeenCalled();
+    expect(localhost.preventDefault).not.toHaveBeenCalled();
+    expect(https.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("replaces the popup callback with permanent deny during teardown", () => {
+    const { webContents } = createNavigationWebContents();
+    const cleanup = installNavigationGuards(webContents as never, vi.fn<() => void>(), "sensitive");
+
+    cleanup();
+
+    const finalHandler = (
+      webContents.setWindowOpenHandler.mock.calls as unknown as Array<[() => { action: string }]>
+    ).at(-1)?.[0];
+    expect(finalHandler?.()).toEqual({ action: "deny" });
   });
 });

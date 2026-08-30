@@ -35,6 +35,8 @@ describe("Y Space bundled skills", () => {
 
     expect(source).toContain("browser.list_tabs");
     expect(source).toContain("embedded browser");
+    expect(source).toContain("orange cursor");
+    expect(source).toContain("inventory and inspection stay in the background");
     expect(source).toContain("Do not open or control an external browser");
   });
 
@@ -42,6 +44,9 @@ describe("Y Space bundled skills", () => {
     const source = await readFile(join(SKILLS_ROOT, "y-space-integrations", "SKILL.md"), "utf8");
 
     expect(source).toContain("Pipedream");
+    expect(source).toContain("composer **+** menu");
+    expect(source).toContain("embedded browser");
+    expect(source).toContain("available to the running agent automatically");
     expect(source).toContain("never request, reveal, or persist credentials");
   });
 });

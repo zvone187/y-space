@@ -103,12 +103,12 @@ export function RightWorkspaceTabStrip({
   };
 
   return (
-    <div className="poracode-workspace-tab-strip poracode-glass-chrome flex h-9 min-w-0 shrink-0 items-center px-1">
+    <div className="poracode-workspace-tab-strip poracode-glass-chrome flex h-10 min-w-0 shrink-0 items-center px-1.5">
       <div
         role="tablist"
         aria-label={t`Tabs`}
         aria-orientation="horizontal"
-        className="flex min-w-0 flex-1 items-end gap-0.5 overflow-x-auto"
+        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
       >
         {tabs.map((tab) => {
           const selected = tab.id === selectedTabId;
@@ -120,9 +120,9 @@ export function RightWorkspaceTabStrip({
               key={tab.id}
               draggable={Boolean(onReorder)}
               data-selected={selected}
-              className={`poracode-workspace-tab group flex h-7 max-w-56 min-w-16 shrink-0 items-center rounded-lg border-b-2 px-1 transition-colors ${
+              className={`poracode-workspace-tab group relative flex h-8 max-w-56 min-w-16 shrink-0 items-center rounded-xl border px-1 ${
                 selected
-                  ? "border-[var(--accent)] text-foreground"
+                  ? "border-[var(--glass-border)] text-foreground"
                   : "border-transparent text-muted hover:text-foreground"
               } ${draggingTabId === tab.id ? "opacity-50" : ""}`}
               onDragStart={(event) => {
@@ -184,10 +184,13 @@ export function RightWorkspaceTabStrip({
                     event.stopPropagation();
                     closeTab(tab.id);
                   }}
-                  className="flex size-5 shrink-0 items-center justify-center rounded-sm text-muted outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+                  className="flex size-5 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-foreground/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
+              ) : null}
+              {selected ? (
+                <span aria-hidden="true" className="poracode-workspace-tab__accent" />
               ) : null}
             </div>
           );

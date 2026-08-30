@@ -1,4 +1,4 @@
-/** Privacy-bounded proof emitted only after the app-owned Browser MCP runs. */
+/** Privacy-bounded metadata emitted only after the app-owned Browser MCP runs. */
 export interface BrowserMcpSafeTabEvidence {
   tabId?: string | undefined;
   url?: string | undefined;
@@ -22,7 +22,7 @@ export const MAX_BROWSER_EVIDENCE_TITLE_LENGTH = 256;
 export const MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN = 64;
 export const MAX_BROWSER_EVIDENCE_THREADS = 256;
 
-/** Marker stored on canonical tool payloads; provider-authored rows cannot forge it. */
+/** Marker stored on canonical Browser outcomes; provider-authored rows cannot forge it. */
 export const Y_SPACE_BROWSER_EVIDENCE_SOURCE = "y-space-browser-mcp" as const;
 
 export type BrowserEvidenceActionKind = "navigation" | "inspection" | "interaction";

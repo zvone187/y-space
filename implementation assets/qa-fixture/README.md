@@ -24,6 +24,25 @@ session, prefix, and path-scoped rows are present in Y Space while partitioned a
 absent. After quitting and relaunching Y Space, confirm persistent rows remain and `ys_session` is
 absent.
 
+Open `/cursor-a` and `/cursor-b` for two immutable, visibly labeled browser peers during Codex and
+OpenCode isolation tests. `/cursor` remains the Cursor A default, while `/cursor?fixture=B` provides
+the query-selected Cursor B variant. A query cannot override the identity of `/cursor-a` or
+`/cursor-b`.
+
+Each light, self-contained page has widely separated hover, focus, fill/type, targeted-key,
+check/uncheck, select, click, double-click, and nested-wheel targets. Adversarial cases move or remove
+themselves only after trusted pointer entry, cover a target with a real hit-testable occluder, expose
+a disabled control, and name one selector that never exists. The sticky ledger keeps a bounded
+48-event sequence with event type, fixed target ID, `isTrusted` provenance, pointer coordinates,
+safe input categories, wheel/scroll geometry, and a generic result. It never reads or renders text,
+checkbox, or selected-option values, cookies, storage, or secrets, and it makes no network requests.
+
+Run the fixture contract tests with:
+
+```sh
+node --test 'implementation assets/qa-fixture/server.test.mjs'
+```
+
 To verify the exact Electron runtime independently of Y Space UI, run:
 
 ```sh

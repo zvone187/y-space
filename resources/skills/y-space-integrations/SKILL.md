@@ -14,7 +14,7 @@ Y Space exposes two Pipedream-backed connection paths:
 
 1. Inspect the available MCP servers/tools and use an already connected service when it matches the request.
 2. Prefer a purpose-built service tool for semantic operations. Use the embedded browser only when visual interaction, a rendered page, or local web testing is required.
-3. If the required account is missing, identify the exact app and ask the user to connect it in **Settings → Connections**. Resume after Y Space reports that the account is connected.
+3. If the required account is missing, identify the exact app and ask the user to open **Integrations** from the composer **+** menu or **Settings → Connections → Manage integrations**. Y Space opens authorization in its embedded browser and makes a healthy connection available to the running agent automatically.
 4. Treat each connection as user-scoped. Do not reuse a connection that belongs to another task or identity when Y Space rejects the session binding.
 
 ## Credential boundary

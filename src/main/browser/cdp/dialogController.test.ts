@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CdpClient } from "./cdpClient";
 import { DialogController } from "./dialogController";
 
@@ -27,6 +27,10 @@ function createCdp() {
 }
 
 describe("DialogController suspension", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("unbinds the destroyed CDP client and carries the next disposition to the replacement", async () => {
     const dialogs = new DialogController();
     const first = createCdp();
@@ -81,5 +85,49 @@ describe("DialogController suspension", () => {
 
     expect(first.rawCdp.on).not.toHaveBeenCalled();
     expect(second.rawCdp.on).toHaveBeenCalledOnce();
+  });
+
+  it("bounds a Page.enable command that never settles", async () => {
+    vi.useFakeTimers();
+    const dialogs = new DialogController();
+    const target = createCdp();
+    target.rawCdp.send.mockReturnValue(new Promise<void>(() => {}));
+
+    const enabling = dialogs.enable(target.cdp);
+    const observed = enabling.then(
+      () => "enabled" as const,
+      () => "rejected" as const,
+    );
+
+    await vi.advanceTimersByTimeAsync(1_100);
+
+    expect(await Promise.race([observed, Promise.resolve("pending" as const)])).toBe("rejected");
+    expect(target.rawCdp.on).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+
+    target.rawCdp.send.mockResolvedValue(undefined);
+    await dialogs.enable(target.cdp);
+    expect(target.rawCdp.on).toHaveBeenCalledOnce();
+    dialogs.dispose();
+  });
+
+  it("settles and cancels a pending enable immediately when suspended", async () => {
+    vi.useFakeTimers();
+    const dialogs = new DialogController();
+    const target = createCdp();
+    target.rawCdp.send.mockReturnValue(new Promise<void>(() => {}));
+    const enabling = dialogs.enable(target.cdp);
+    const observed = enabling.then(
+      () => "settled" as const,
+      () => "rejected" as const,
+    );
+
+    dialogs.suspend();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(await Promise.race([observed, Promise.resolve("pending" as const)])).toBe("settled");
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

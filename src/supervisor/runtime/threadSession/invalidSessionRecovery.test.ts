@@ -15,9 +15,10 @@ const CONFIG: ThreadConfig = { model: "recover-test/model" };
 
 function createHarness() {
   const events: string[] = [];
+  const launchCleanup = vi.fn<() => void>();
   const buildLaunchArgv = vi.fn<AgentAdapter["buildLaunchArgv"]>(() => {
     events.push("build");
-    return { binary: "recover-test", args: ["--fresh"] };
+    return { binary: "recover-test", args: ["--fresh"], cleanup: launchCleanup };
   });
   const adapter = {
     kind: "recover-test",
@@ -168,6 +169,7 @@ function createHarness() {
     session,
     events,
     buildLaunchArgv,
+    launchCleanup,
     dispose,
     spawnThread,
     resolveMcpServersForLaunch,
@@ -306,6 +308,7 @@ describe("InvalidSessionRecoveryCoordinator", () => {
 
     expect(harness.buildLaunchArgv).toHaveBeenCalledTimes(1);
     expect(harness.spawnThread).not.toHaveBeenCalled();
+    expect(harness.launchCleanup).toHaveBeenCalledOnce();
   });
 
   it("exposes launch failures through the awaitable recovery", async () => {

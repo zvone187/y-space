@@ -21,9 +21,13 @@ If the user says “the tab,” “a tab I opened,” or names a page without an
 1. Establish state with `browser.get_url` and `browser.snapshot` or `browser.find`.
 2. Prefer accessible roles, names, and returned `@e` refs over coordinates or brittle selectors.
 3. Use `browser.fill` to replace field contents and `browser.type` only to append.
-4. After navigation or any state-changing action, wait for the expected URL, text, or element and inspect the resulting state.
-5. For web-app testing, check relevant console errors and failed network requests. Capture a screenshot when appearance matters.
-6. Call `browser.disable` before pausing for user input, waiting on an external event, or finishing.
+4. Interactive tools automatically present the exact global browser tab and move Y Space's visible
+   orange cursor to the real target before the action. Use one meaningful tool call per intended
+   action; do not add ornamental hovers or clicks just to manufacture cursor motion. Passive tab
+   inventory and inspection stay in the background until an interaction is required.
+5. After navigation or any state-changing action, wait for the expected URL, text, or element and inspect the resulting state.
+6. For web-app testing, check relevant console errors and failed network requests. Capture a screenshot when appearance matters.
+7. Call `browser.disable` before pausing for user input, waiting on an external event, or finishing.
 
 ## Browser boundary
 

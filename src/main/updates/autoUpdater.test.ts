@@ -74,6 +74,33 @@ describe("createAutoUpdaterController", () => {
     expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(true);
   });
 
+  it("does not let the optional initial update timer own process liveness", () => {
+    const timeoutHandle = setTimeout(() => {}, 0);
+    clearTimeout(timeoutHandle);
+    const unref = vi.fn<() => void>();
+    Object.assign(timeoutHandle, { unref });
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout").mockReturnValueOnce(timeoutHandle);
+    const controller = createAutoUpdaterController(vi.fn(), "stable", false);
+
+    controller.initialize();
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), INITIAL_CHECK_DELAY_MS);
+    expect(unref).toHaveBeenCalledOnce();
+    setTimeoutSpy.mockRestore();
+  });
+
+  it("cancels both scheduled checks when the controller is disposed", async () => {
+    const controller = createAutoUpdaterController(vi.fn(), "stable", false);
+    controller.initialize();
+    expect(vi.getTimerCount()).toBe(2);
+
+    controller.dispose();
+
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(INITIAL_CHECK_DELAY_MS + PERIODIC_CHECK_INTERVAL_MS);
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
+  });
+
   it("retains the latest status for a renderer that subscribes after the update finishes", () => {
     const controller = createAutoUpdaterController(vi.fn(), "stable", false);
     controller.initialize();

@@ -1,40 +1,43 @@
 {
-  "version": 7,
+  "version": 9,
   "project": "Y Space",
-  "branch": "y-space-glass-polish",
+  "branch": "y-space-pipedream-live",
   "platform": "macOS Apple Silicon desktop",
-  "testedOn": "2026-08-28",
-  "status": "glass_polish_verified",
+  "testedOn": "2026-08-30",
+  "status": "final_hardened_package_verified_pipedream_oauth_pending",
   "currentPhase": {
-    "name": "Modern restrained glass polish",
-    "baseBranch": "fork/y-space-browser-default-collapse",
-    "baseCommit": "9fdadda3",
-    "baseline": "912 passed files, 5 skipped files, 10,345 passed tests, and 85 skipped tests under Node 24.13.0 after preparing the ignored WSL helper bundle",
-    "failFirst": "Three focused files failed as designed: 8 failed and 9 passed. Failures cover sidebar frosting defaults/floors, shared glass material contracts, browser/thread content-plane boundaries, the 20px composer, reduced-transparency fallback, and global-tab capsule semantics.",
-    "implementationStatus": "complete",
-    "performanceBoundary": "Real backdrop blur is limited to stable shared chrome. Browser/thread content planes, browser hosts, webviews, and individual global tabs stay unfiltered.",
-    "reviewStatus": "Fresh diff review completed. Reduced-transparency cascade priority and dark-mode highlight density findings were fixed and covered by a focused regression."
+    "name": "Trusted visible agent cursor and Pipedream completion architecture",
+    "baseBranch": "y-space-glass-polish",
+    "baseCommit": "361aab63",
+    "baseline": "924 passed files, 5 skipped files, 10,794 passed tests, and 85 skipped tests under Node 24.13.0",
+    "failFirst": "Cursor, native-input, sensitive presentation, guest-attachment, Pipedream relay, OAuth lifecycle, and shutdown regressions were added before their implementation fixes.",
+    "implementationStatus": "complete_with_external_oauth_and_claude_auth_gates",
+    "performanceBoundary": "One reusable aria-hidden cursor overlay is retained per resident page; ordinary browser guests, sensitive guests, presentation feedback, timers, and tab metadata remain explicitly bounded.",
+    "reviewStatus": "Final packaged Codex and OpenCode runs both produced trusted native pointermove, pointerdown, pointerup, and click events in the visible embedded browser. Final adversarial regressions also cover OAuth generation races, strict atomic sign-out, pending and child agent revocation, disconnect quarantine, sensitive-tab ownership, and bounded teardown. Gmail OAuth and live Claude inference remain unclaimed external authorization gates."
   },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
     "app": "release/mac-arm64/Y Space.app",
     "dmg": "release/Y-Space-1.6.6-arm64.dmg",
     "architecture": "arm64",
-    "sha256": "a4cac2968027c07012e760fa3e800a25147b04beff227a38401cd3f26124db2f",
-    "bytes": 156275751,
-    "appAsarSha256": "655f328778c00d9b1459f2c2a07994dddad2728911f7826ca12f7bb7e0a055bb",
-    "executableSha256": "11a1b210e43079f97fe93ffee664bba209b8a48077b4b8ef176ec75d39bf04a4",
+    "sha256": "6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0",
+    "bytes": 156367170,
+    "appAsarSha256": "153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08",
+    "appAsarBytes": 136466433,
+    "executableSha256": "c2d188f17d11d1540d10b468961ad9fcdedb89d5d5010c9424748e0f2f66a820",
+    "executableBytes": 52896,
     "codesign": "codesign --verify --deep --strict passed; ad-hoc/runtime signature with no Team ID",
+    "qaLaunch": "Packaged UI tests launch with the explicit --use-mock-keychain flag and remain open between test cases; ordinary release launches do not enable the mock keychain.",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
       "status": "pass on the final reviewed source state under Node.js 24.13.0",
-      "passedFiles": 912,
+      "passedFiles": 924,
       "skippedFiles": 5,
-      "passedTests": 10349,
+      "passedTests": 10794,
       "skippedTests": 85,
-      "durationSeconds": 199.89
+      "durationSeconds": 115.31
     },
     "targetedBranding": {
       "status": "pass",
@@ -55,7 +58,7 @@
       "lint": "pass",
       "typeAwareLint": "pass",
       "format": "pass",
-      "i18n": "pass: 3,281 extracted messages and 0 missing across 12 translated catalogs",
+      "i18n": "pass: 3,343 extracted messages and 0 missing across 12 translated catalogs",
       "websiteTypecheck": "pass",
       "diffCheck": "pass"
     },
@@ -73,6 +76,52 @@
       "policy": "true LRU with the active page protected; evicted pages retain bounded resume metadata and remount on user or agent activation"
     },
     "manualProcessObservation": "A packaged two-cycle churn run created and closed 30 disposable browser peers. Metadata reached the hard cap of 30, a 31st creation was rejected, and both peaks retained exactly six guest renderers. Both cleanups returned to the four-renderer baseline; final browser-core RSS was 0.9% above baseline, no disposable tab restored after restart, and no helper survived quit."
+  },
+  "pipedreamCompletionPhase": {
+    "name": "Complete Pipedream connections",
+    "branch": "y-space-pipedream-live",
+    "worktree": "repository worktree y-space-pipedream-live (local path intentionally omitted)",
+    "baseBranch": "y-space-glass-polish",
+    "baseCommit": "361aab633035cad78d4c8f079117d345841c4a06",
+    "upstreamBase": "fork/y-space-browser-default-collapse@9fdadda30245452c6c696da43a023c6b0d9b2413",
+    "fetch": "git fetch fork --prune completed successfully on 2026-08-28; the upstream base remained unchanged.",
+    "setup": {
+      "environment": "Ignored .env.pipedream copied into the worktree at mode 0600. Only the four required key names and file mode were checked; no value was printed or copied into evidence.",
+      "dependencies": "pnpm 11.19.0 dependencies are installed and pnpm list --depth 0 passes under Node 26.8.1.",
+      "husky": "Husky prepare output is present. The pre-commit hook runs pnpm exec lint-staged followed by pnpm run typecheck."
+    },
+    "baseline": {
+      "status": "pass_with_isolated_performance_recheck",
+      "passedFiles": 911,
+      "passedTests": 10348,
+      "note": "One performance threshold was an outlier only under full-suite load and passed when rerun in isolation. It is retained as visible baseline evidence, not hidden or reported as a product failure."
+    },
+    "failFirst": {
+      "status": "expected_failures_confirmed",
+      "confirmedBackend": "Three expected failures with 15 existing tests passing: the catalog still forces an action-only filter, the relay does not pin x-pd-registry=all, and an out-of-scope account id can reach remote DELETE.",
+      "confirmedMainLifecycle": "The focused main-service sensitive-flow run produced five expected failures with five existing tests passing, covering the bounded Connect completion and lifecycle behavior that production implementation must supply.",
+      "confirmedRenderer": "The focused renderer run exited 1 as intended: 14 existing ComposerAddMenu tests passed and three new Integrations-entry expectations failed; the planned eight-case ConnectionsDialog suite stopped at the expected missing ./ConnectionsDialog import before collection.",
+      "confirmedLiveReload": "The focused live-session run exited 1 as intended: one targeted test failed and 41 tests were skipped. The failure is exactly TypeError: manager.reloadPipedreamMcpServers is not a function, proving the approved provider-neutral reload seam is absent before implementation.",
+      "confirmedFiles": [
+        "src/main/pipedream/PipedreamMainService.test.ts",
+        "src/supervisor/pipedream/PipedreamApiClient.test.ts",
+        "src/supervisor/pipedream/PipedreamMcpRelay.test.ts",
+        "src/supervisor/pipedream/PipedreamSupervisorService.test.ts",
+        "src/renderer/components/composer/ComposerAddMenu.test.tsx",
+        "src/renderer/components/connections/ConnectionsDialog.test.tsx",
+        "src/supervisor/runtime/threadSessionManager.startClose.test.ts"
+      ]
+    },
+    "readiness": "implemented_pre_oauth_with_external_authorization_gate"
+  },
+  "visibleAgentCursorPhase": {
+    "name": "Visible agent browser control",
+    "branch": "y-space-pipedream-live",
+    "worktree": "repository worktree y-space-pipedream-live (local path intentionally omitted)",
+    "existingBehavior": "Historical fail-first baseline: a legacy purple overlay covered only a subset of selector actions. Current implementation uses a bounded orange-and-white cursor, trusted native input, exact presentation leases, distinct action feedback, reduced-motion behavior, and packaged Codex/OpenCode proof.",
+    "researchBoundary": "Official OpenAI material confirms a shared built-in browser across tabs and coordinate-bearing computer actions. The exact Codex cursor animation is a product presentation detail, so Y Space will reproduce the observable interaction contract without claiming access to OpenAI's private implementation.",
+    "failFirst": "Focused Node 24 run: 22 existing tests passed and 4 new expectations failed exactly on legacy purple identity, reduced-motion and bounded-feedback absence, unconditional pre-action ripple, and missing action-specific cursor phases for click, hover, text, and scroll.",
+    "readiness": "implemented_and_final_package_verified"
   },
   "tests": [
     {
@@ -191,7 +240,12 @@
       "id": "YS-E2E-010",
       "title": "Personal Pipedream MCP OAuth",
       "status": "not_run_authorization_required",
-      "evidence": ["The implementation and automated tests are present."],
+      "evidence": [
+        "The main process alone owns the authorization URL, PKCE state, supervisor flow id, sensitive session partition, exact tab tree, expiry, cancellation, and terminal cleanup; the renderer receives only an opaque flow id and coarse state.",
+        "Per-server credential epochs prevent deferred registration, exchange, or refresh work from persisting or returning a bearer after cancel or clear.",
+        "Personal sign-out uses strict same-directory atomic persistence, invalidates pending/root/child launch authority, and kills a stale credential-bearing process before bounded best-effort provider cleanup.",
+        "Public generic OAuth begin and clear reject canonical and aliased Personal Pipedream URLs; only the privileged main-owned path can mutate Personal OAuth state."
+      ],
       "reason": "A live run would create an OAuth grant/account connection, which was not separately authorized."
     },
     {
@@ -222,14 +276,14 @@
       "id": "YS-E2E-012",
       "title": "Pipedream disable, disconnect, and restart cleanup",
       "status": "automated_pass_live_not_run",
-      "reason": "Live teardown requires first creating an authorized account connection; relay, reconciliation, revocation, and restart behavior are covered by automated suites."
+      "reason": "Live teardown requires first creating an authorized account connection; automated suites cover local-first relay revocation, pending-disconnect quarantine, refresh/access-enable races, final stale-row removal, live-session re-resolution, pending-root cancellation, active-child teardown, bounded provider disposal, and restart behavior."
     },
     {
       "id": "YS-E2E-013",
       "title": "Pipedream relay spoofing and consequential retry safety",
       "status": "automated_pass",
       "evidence": [
-        "Tests cover launch bearer enforcement, pinned routing headers, session-to-binding isolation, safe read retry after 401, and no tools/call replay."
+        "Tests cover launch bearer enforcement, pinned routing headers, session-to-binding isolation, safe read retry after 401, no tools/call replay, credential-epoch revalidation before process attachment, and immediate revocation of copied Personal OAuth headers."
       ]
     },
     {
@@ -460,7 +514,7 @@
       "evidence": [
         "Brand-contract tests passed for owned desktop, mobile, PWA, social, and website assets.",
         "The final executable is thin arm64 and the unsigned/ad-hoc app passed deep/strict code-sign verification with no Team ID.",
-        "The final DMG is 155866606 bytes with SHA-256 5cd6e6964f772721fc904e7d3ec335b0277501e5636570ccf7ed3c2c94b4131f.",
+        "The final DMG is 156367170 bytes with SHA-256 6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0.",
         "The packaged Contents/Resources/icon.icns is byte-identical to build/icon.icns (SHA-256 f597bd9d2d3917cbde3d98319a6bbcad2f5beb31eae8e16525fac2d20ae77eab).",
         "The native application menu remained Y Space and the isolated packaged process left no helper after clean quit."
       ],
@@ -805,6 +859,316 @@
       ],
       "artifact": "implementation assets/glass-browser-residency-qa.json",
       "status": "pass_residency_and_accessibility_memory_inconclusive"
+    },
+    {
+      "id": "YS-PIPEDREAM-COMPLETE-E2E-001",
+      "title": "Shared glass Connections popup and complete app catalog",
+      "userStory": "As a user, I want the same simple integrations popup from the composer and Settings, with every Pipedream app searchable without developer-oriented setup screens.",
+      "setup": "Launch the unsigned packaged app in light mode with BYO Connect configured, no popup already open, and network capture limited to sanitized request metadata.",
+      "instrumentation": "Use Computer Use for visible clicks and keyboard navigation; record catalog request query keys, cursor transitions, unique app ids, total count, focus order, and screenshots without authorization headers or environment values.",
+      "steps": [
+        "Open Connections from the draft composer plus menu, close it, then open the same popup from an active task and from Settings.",
+        "Load the initial catalog, search for Gmail, clear the search, and traverse pages until the API reports no next cursor.",
+        "Exercise loading, no-results, retry, keyboard focus, Escape close, and narrow-window states."
+      ],
+      "expected": [
+        "All three entry points render one shared glass popup with the same current accounts, catalog state, actions, and accessible labels.",
+        "Catalog requests do not force has_actions, every cursor advances once, results remain ordered and duplicate-free, and search returns Gmail.",
+        "No nested settings surface, dark fallback, clipped control, secret-bearing network detail, or unbounded list render appears."
+      ],
+      "proofToCapture": [
+        "Composer and Settings popup screenshots",
+        "Sanitized paginated request ledger and unique-result count",
+        "Keyboard and narrow-layout evidence"
+      ],
+      "evidence": [
+        "Computer Use clicked the final packaged app's composer plus menu, selected Integrations, and opened the shared light glass popup.",
+        "Computer Use then opened Settings, selected Connections, and clicked Manage integrations; the same popup and renderer-owned search state appeared.",
+        "The live catalog reported 3,235 integrations, advanced through a second cursor page, returned six Gmail matches, and rendered the explicit zero-result state for a synthetic query.",
+        "The packaged app was quit through its native menu, left no helper or listener, relaunched against the same isolated profile, returned to Ready, and reloaded the same live catalog.",
+        "A fail-first renderer regression proved the underlying Settings Escape handler previously won; the shared overlay stack fix now closes only Integrations and restores its Settings trigger.",
+        "Computer Use repeated Settings → Connections → Manage integrations in the freshly rebuilt ARM64 package and verified both Escape and the popup close button return to the still-open Connections settings surface.",
+        "The final hardened package was launched once with --use-mock-keychain and kept open across composer, compact More menu, Settings, Connections, popup-stack, and embedded-Browser checks; the same PID remained live and no credential prompt appeared.",
+        "Automated cursor regressions cover duplicate in-flight cursors, A-to-B-to-A loops, and retry after a failed page. Full manual cursor exhaustion plus narrow-window and induced-retry presentation checks are not claimed here."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/pipedream-final-composer-gmail-escape-fixed.jpeg",
+        "implementation assets/qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg"
+      ],
+      "status": "partial_pass_packaged_catalog_narrow_retry_edges_pending"
+    },
+    {
+      "id": "YS-PIPEDREAM-COMPLETE-E2E-002",
+      "title": "Real Gmail OAuth completes in Y Space with an explicit account grant",
+      "userStory": "As a user, I want Gmail connection to finish inside Y Space, then explicitly choose which connected account my agents may use.",
+      "setup": "Use the unsigned packaged app, the configured Pipedream project, an authorized test Gmail account, and no pre-existing Gmail account for the Y Space external user. Record the pre-connect account list without credentials.",
+      "instrumentation": "Capture sensitive-tab lifecycle only as redacted tab id/state, bounded poll timestamps, renderer-safe account snapshots, and the post-connect grant state. Never capture the OAuth URL, cookies, tokens, or email contents.",
+      "steps": [
+        "Search Gmail in the shared popup and choose Connect.",
+        "Complete Google authorization in the redacted embedded browser tab and return without pressing Refresh.",
+        "Observe terminal completion, automatic sensitive-tab closure, and the new healthy Gmail account without an inferred grant.",
+        "Turn on agent access for that exact visible Gmail account."
+      ],
+      "expected": [
+        "Only a sensitive Y Space browser tab handles authorization; its private URL never reaches renderer state, persistence, screenshots, or agent browser tools.",
+        "Polling terminates on success within its documented bound, refreshes only renderer-safe account data, closes the auth tab, and restores focus.",
+        "The new Gmail account appears exactly once with agent access off until the user enables the exact intended row; no same-app account-delta heuristic can grant an unrelated concurrent connection."
+      ],
+      "proofToCapture": [
+        "Before/after redacted account snapshots",
+        "Bounded poll and sensitive-tab lifecycle ledger",
+        "Connected popup plus explicit-grant screenshot"
+      ],
+      "status": "awaiting_explicit_oauth_confirmation"
+    },
+    {
+      "id": "YS-PIPEDREAM-COMPLETE-E2E-003",
+      "title": "Gmail account and grant persist and reconcile across restart",
+      "userStory": "As a returning user, I want my approved integration to survive restart while stale or unhealthy remote state is corrected before an agent can use it.",
+      "setup": "Start from the connected Gmail result of E2E-002 with a copied disposable Y Space profile and a renderer-safe baseline snapshot.",
+      "instrumentation": "Record file modes and redacted JSON field names, app restart boundaries, remote account-list calls with include_credentials=false, and pre/post-reconciliation summaries.",
+      "steps": [
+        "Quit Y Space cleanly, inspect the persisted connection metadata schema and permissions without printing identifiers or values, then relaunch.",
+        "Open the popup before and after remote reconciliation and verify the Gmail account and grant converge without duplication.",
+        "Exercise one controlled renamed or unhealthy remote-account fixture and confirm stale access is not launched."
+      ],
+      "expected": [
+        "Only scoped renderer-safe summaries, a local opaque alias, and the grant persist atomically at restrictive permissions.",
+        "The account appears after relaunch and remote reconciliation preserves a valid grant while correcting health/name/removal state.",
+        "No credentials are requested from Pipedream, and unhealthy or removed accounts receive no usable relay binding."
+      ],
+      "proofToCapture": [
+        "Redacted persisted-schema and mode evidence",
+        "Relaunch popup screenshot",
+        "Sanitized reconciliation ledger"
+      ],
+      "evidence": [
+        "Before OAuth, the real packaged profile persisted pipedream-connections.json as mode 0600 with version 2, one 64-character scope hash, and an empty accounts array.",
+        "Native Quit exited the app and every helper/listener within one second; relaunch against the same isolated profile returned Connections to Ready and reconciled zero accounts without duplication.",
+        "Healthy Gmail account and grant persistence remain dependent on E2E-002 and are not claimed."
+      ],
+      "status": "partial_pass_pre_oauth"
+    },
+    {
+      "id": "YS-PIPEDREAM-COMPLETE-E2E-004",
+      "title": "Live agents reload the pinned all-tools Gmail relay and perform a read-only call",
+      "userStory": "As a user, I want an already-running agent to gain my newly approved Gmail connection and use it safely without another task.",
+      "setup": "Authenticate the supported Codex, Claude Code, and OpenCode modes, start packaged tasks before granting Gmail, and use a Gmail account whose inbox may be read but must not be changed.",
+      "instrumentation": "Capture provider MCP inventories, reload events, sanitized relay headers, local binding ids, Pipedream tools/list results, and one privacy-minimized read-only tool result. Redact bearer, project, external-user, account, message, and sender values.",
+      "steps": [
+        "Connect Gmail, explicitly enable its exact account row while each provider task is already running, then trigger the supported live MCP reload path.",
+        "Verify each effective relay pins x-pd-registry=all and trusted routing despite spoofed inbound x-pd-* values.",
+        "Ask a live agent to discover Gmail tools and run one explicitly read-only operation, such as a bounded unread-count or metadata-only list, with no send/delete/modify action."
+      ],
+      "expected": [
+        "Supported live sessions discover the new Gmail MCP without starting a replacement task; any unsupported mode reports restart-required explicitly rather than pretending to reload.",
+        "The upstream request uses the app-owned registry and routing values, while provider configuration contains only the local relay URL and memory-only bearer.",
+        "The read-only operation returns bounded proof through the Y Space-managed relay and creates no Gmail mutation or duplicate tools/call retry."
+      ],
+      "proofToCapture": [
+        "Provider-by-provider MCP inventory before and after reload",
+        "Sanitized x-pd-registry=all routing evidence",
+        "Privacy-minimized read-only Gmail result and no-mutation statement"
+      ],
+      "status": "awaiting_connected_gmail_account"
+    },
+    {
+      "id": "YS-PIPEDREAM-COMPLETE-E2E-005",
+      "title": "Scoped disconnect revokes only the chosen account",
+      "userStory": "As a user, I want disconnect to remove exactly the account I confirmed and immediately stop every agent from using it.",
+      "setup": "Use the connected Gmail account plus a second controlled connected account when available, with live relay bindings and a captured redacted account inventory.",
+      "instrumentation": "Record confirmation labels, local binding status, sanitized DELETE path shape, sibling summary/grant state, restart reconciliation, and post-revocation HTTP status without exposing upstream ids.",
+      "steps": [
+        "Attempt to disconnect a syntactically valid account id that is absent from the current scoped store.",
+        "Confirm disconnect for the visible Gmail row while an agent binding exists, then probe the old local relay and inspect the sibling account.",
+        "Restart and reconcile to verify Gmail remains absent and the sibling account remains unchanged."
+      ],
+      "expected": [
+        "An out-of-scope id is rejected before any remote DELETE.",
+        "The exact visible Gmail account is locally revoked before its one scoped remote DELETE; the old relay becomes unusable immediately.",
+        "No sibling account or grant changes, and restart reconciliation does not restore stale Gmail access."
+      ],
+      "proofToCapture": [
+        "Scoped rejection and zero-DELETE evidence",
+        "Disconnect confirmation plus revoked-relay proof",
+        "Sibling and post-restart account snapshots"
+      ],
+      "status": "awaiting_connected_gmail_account_and_disconnect_confirmation"
+    },
+    {
+      "id": "YS-PIPEDREAM-COMPLETE-E2E-006",
+      "title": "Pipedream secret boundary survives the complete packaged workflow",
+      "userStory": "As a user, I want integrations to work without any credential, token, OAuth URL, account secret, or local bearer leaking into agents or desktop diagnostics.",
+      "setup": "Place a unique non-production sentinel in a disposable Pipedream credential fixture, then repeat catalog, OAuth, reload, read-only use, disconnect, quit, and relaunch in an isolated packaged profile.",
+      "instrumentation": "Hash the sentinel for reporting and scan renderer DevTools state, agent prompts/config/argv, logs, telemetry fixtures, crash context, screenshots, persisted files, and report artifacts. Never print the sentinel or any real secret.",
+      "steps": [
+        "Run the complete integration flow and capture only redacted evidence artifacts.",
+        "Scan every allowed diagnostics and persistence surface for the sentinel and secret-bearing key classes.",
+        "Quit and verify sensitive tabs, local relay bindings, provider helpers, and in-memory token routes are gone."
+      ],
+      "expected": [
+        "Every scan is negative; public IPC and UI contain only renderer-safe summaries and redacted status.",
+        "Provider configuration exposes only its launch-scoped loopback URL and local bearer, never upstream identity, credentials, or routing headers.",
+        "No sensitive tab, relay route, or Y Space-owned helper survives clean quit."
+      ],
+      "proofToCapture": [
+        "Hashed-sentinel negative scan ledger",
+        "Redacted provider and persisted-field inventory",
+        "Post-quit process and route cleanup evidence"
+      ],
+      "evidence": [
+        "A final release scan covered 549 regular files in the app bundle and found zero exact matches for the configured Pipedream client ID, client secret, or project ID; no environment file name was packaged.",
+        "A final tracked-source scan covered 3,135 readable files and found zero exact matches for those same three configured values.",
+        "The only persisted Pipedream metadata before OAuth was a mode-0600 versioned file containing a scope hash and an empty accounts array.",
+        "Native Quit removed the main process, all packaged helpers, and the QA listener; the same clean profile then relaunched successfully.",
+        "Agent-provider configuration and post-OAuth sensitive-tab/relay scans remain dependent on E2E-002 and E2E-004."
+      ],
+      "status": "partial_pass_pre_oauth"
+    },
+    {
+      "id": "YS-PIPEDREAM-COMPLETE-E2E-007",
+      "title": "Unsigned packaged Pipedream completion acceptance",
+      "userStory": "As a desktop user, I want the polished integration workflow proven by real clicks in the app I will run, not only by mocks.",
+      "setup": "Build and ad-hoc sign the final unsigned Apple Silicon package from the reviewed source, use an isolated profile plus the authorized Gmail account, and keep external browsers closed.",
+      "instrumentation": "Use Computer Use for all visible app interaction; capture package identity/hash, full-window screenshots, sanitized network/provider ledgers, and the E2E artifacts from tests 001-006.",
+      "steps": [
+        "Execute both popup entry points, full catalog search/pagination, Gmail OAuth, explicit account grant, live-session reload, and the read-only Gmail call.",
+        "Quit/relaunch, verify persistence/reconciliation, then disconnect Gmail and prove scoped revocation.",
+        "Run secret and process cleanup checks and confirm the app remains the white-and-orange Y Space design with bounded glass surfaces."
+      ],
+      "expected": [
+        "Every Pipedream completion E2E passes in the final unsigned package with matching screenshots and machine-readable evidence.",
+        "No external browser opens, no consequential Gmail effect occurs, and no unrelated account or provider state changes.",
+        "The final package passes automated checks and leaves no secret or helper behind."
+      ],
+      "proofToCapture": [
+        "Final package path, architecture, hash, and codesign result",
+        "Full-window popup, Gmail-connected, reload, relaunch, and disconnect screenshots",
+        "Linked sanitized ledgers for every preceding Pipedream E2E"
+      ],
+      "evidence": [
+        "Final DMG: release/Y-Space-1.6.6-arm64.dmg, 156,367,170 bytes, SHA-256 6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0.",
+        "The packaged app.asar SHA-256 is 153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08 and its main executable SHA-256 is c2d188f17d11d1540d10b468961ad9fcdedb89d5d5010c9424748e0f2f66a820.",
+        "The app executable is thin arm64; deep/strict codesign verification passed with an ad-hoc hardened-runtime signature and no Team ID.",
+        "Authoritative Node 24 validation passed 924 files and 10,794 tests with 5 files and 85 tests skipped, plus 32 focused files / 649 security-browser-Pipedream tests, typecheck, standard/type-aware lint, formatting, 3,343-message localization extraction with zero missing translations, fixture, JSON/diff integrity, website build, package signature, and exact-secret scans.",
+        "A final P1 audit found and fixed a same-directory OpenCode relay-sharing boundary: front-door bindings now rotate per thread launch, and regressions prove distinct routes/bearers plus independent 404 revocation while a sibling task remains live.",
+        "Computer Use verified both popup entry points, live pagination/search/no-results, white/orange glass presentation, stacked Escape behavior, and live packaged Codex/OpenCode trusted-input flows. The final hardened app remained one persistent --use-mock-keychain process across all last UI checks.",
+        "A final adversarial pass added generation-safe OAuth writes/returns, strict atomic clear, main-only generic-clear rejection, pending/root/child authority revocation, bounded disposal, disconnect quarantine, and exact sensitive-tab cleanup ownership.",
+        "Gmail OAuth, the explicit account grant, live agent read, connected-account persistence, and scoped disconnect remain at the explicit authorization boundary and are not claimed."
+      ],
+      "status": "partial_pass_oauth_pending"
+    },
+    {
+      "id": "YS-AGENT-CURSOR-E2E-001",
+      "title": "Codex visibly moves and clicks in the embedded browser",
+      "userStory": "As a user supervising Codex, I want to see the exact browser target it is about to use so browser work is observable and trustworthy.",
+      "setup": "Launch the final unsigned light-mode package with a local deterministic fixture containing separated buttons, text inputs, a select, checkbox, and visible result state; start an authenticated Codex task with Y Space Browser as its sole browser route.",
+      "instrumentation": "Use Computer Use to observe the packaged window and capture before/moving/pressed/after frames plus the fixture's own event/result ledger. Browser MCP screenshots remain cursor-free by contract.",
+      "steps": [
+        "Ask Codex to inspect the fixture, click a distant button, fill and submit a text field, select an option, and verify the visible result.",
+        "Repeat one action without an explicit browser.enable preamble to prove actual tool use still reveals presence.",
+        "Compare the visible cursor landing point with the fixture element center and the fixture's final event/result state."
+      ],
+      "expected": [
+        "One orange-and-white Y Space cursor visibly glides to each real target before that action, with a click pulse only for click-like actions and a text indicator for typing.",
+        "The final page state proves the browser action really happened; the pointer does not imply success on a failed/missing target.",
+        "No Chrome, external browser, headless browser, or second nested tab system opens."
+      ],
+      "proofToCapture": [
+        "Packaged full-window cursor motion/click sequence",
+        "Fixture event/result ledger",
+        "Codex Browser-tool transcript and cursor-free Browser MCP screenshot"
+      ],
+      "evidence": [
+        "The final packaged Codex GPT-5.6 Sol task found and focused the existing cursor-b global Browser tab, clicked #cursor-click-button exactly once, and returned Browser verified.",
+        "The value-free fixture ledger recorded 16 native events. Its newest pointermove, pointerdown, pointerup, and click entries all reported Trusted: yes.",
+        "Computer Use captured implementation assets/qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg with the final answer beside the visible embedded Browser."
+      ],
+      "status": "pass_final_package"
+    },
+    {
+      "id": "YS-AGENT-CURSOR-E2E-002",
+      "title": "Scroll, hover, text, and reduced-motion feedback remain truthful",
+      "userStory": "As a user, I want different browser operations to look different and respect my motion preference rather than showing a fake click for everything.",
+      "setup": "Use the deterministic tall fixture in the final package, first with ordinary motion and then with Chromium prefers-reduced-motion enabled in the isolated QA profile.",
+      "instrumentation": "Capture visible Computer Use frames and fixture scroll/focus/hover/input state; inspect only bounded overlay counts and computed presentation properties.",
+      "steps": [
+        "Ask the agent to hover a target, scroll from the viewport and from a targeted element, focus and fill an input, and press a targeted key.",
+        "Run list_tabs, snapshot, screenshot, console, requests, wait, and navigate and observe that none fabricate pointer clicks.",
+        "Repeat the interactive sequence with reduced motion."
+      ],
+      "expected": [
+        "Hover moves without a click ripple; scroll shows origin/direction feedback; text/key work shows a bounded distinct indicator at the actual target.",
+        "Non-pointer tools do not move or pulse the cursor merely to look busy.",
+        "Reduced motion places the cursor directly with a restrained pulse and preserves the same real action result."
+      ],
+      "proofToCapture": [
+        "Ordinary and reduced-motion packaged sequences",
+        "Fixture state and computed overlay contract",
+        "Negative non-pointer action observation"
+      ],
+      "evidence": [
+        "Packaged cursor QA captured distinct trusted checkbox, select, wheel, and click interactions; cursorOverlay DOM/unit regressions cover hover, text/key, scroll, failure, hidden-page, and reduced-motion phases.",
+        "Read-only Browser tools do not request cursor presentation, while native pointer tools fail closed if the exact global Browser page is not visibly presented.",
+        "A final manual reduced-motion replay was not repeated in the last package and is not claimed as fresh packaged evidence."
+      ],
+      "status": "partial_pass_native_actions_packaged_reduced_motion_automated"
+    },
+    {
+      "id": "YS-AGENT-CURSOR-E2E-003",
+      "title": "OpenCode cursor presence is tab- and launch-isolated",
+      "userStory": "As a user running multiple agents, I want each agent's visible browser activity to stay on the tab it actually controls.",
+      "setup": "Open two peer browser tabs with distinct local fixtures and run two same-directory OpenCode GUI tasks with distinct launch identities, plus one Codex task where useful for cross-provider overlap.",
+      "instrumentation": "Record redacted thread/launch/tab mappings, visible tab frames, automation session transitions, and post-close route outcomes without prompt or page-content capture beyond the fixtures.",
+      "steps": [
+        "Have each task act on only its assigned browser peer while switching the globally active workspace tab between them.",
+        "Disable or close one task and confirm its tab presence disappears while the sibling session remains active.",
+        "Close, suspend/remount, navigate, and replace a guest, then repeat one safe action."
+      ],
+      "expected": [
+        "Cursor motion appears only in the exact targeted tab and never in a sibling, inactive sensitive OAuth page, or unrelated global file/tool tab.",
+        "Ending one launch does not hide another launch's owned presence, and stale launch/tab state cannot reactivate it.",
+        "Guest teardown/remount leaves no old overlay, listener, or timer and the next action installs exactly one current overlay."
+      ],
+      "proofToCapture": [
+        "Two-task packaged tab-isolation sequence",
+        "Redacted ownership/lifecycle ledger",
+        "Post-remount single-overlay evidence"
+      ],
+      "evidence": [
+        "The final packaged OpenCode Big Pickle task reused Codex's exact existing cursor-b global Browser tab and added one new seven-event trusted click sequence, increasing the ledger from 16 to 23.",
+        "The OpenCode final answer reported the newest pointermove, pointerdown, pointerup, and click as Trusted: yes; Computer Use captured the orange cursor directly over the Single-click target in implementation assets/qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg.",
+        "Automated launch/thread/tab authority regressions cover concurrent same-directory OpenCode routes, sibling revocation isolation, navigation/remount invalidation, and sensitive-tab exclusion."
+      ],
+      "status": "pass_single_launch_packaged_multi_launch_automated"
+    },
+    {
+      "id": "YS-AGENT-CURSOR-E2E-004",
+      "title": "Cursor cleanup, boundedness, and final unsigned acceptance",
+      "userStory": "As a desktop user, I want visible agent activity without browser memory growth, stuck overlays, or interference with my own input.",
+      "setup": "Use the final reviewed ARM64 package, an isolated profile, the deterministic fixture, external browsers closed, and baseline browser guest/RSS/overlay counts.",
+      "instrumentation": "Run a bounded repeated-action sample, inspect renderer process and overlay counts, use Computer Use for manual clicks during and after agent control, and record package hash/signature.",
+      "steps": [
+        "Run repeated click, hover, fill, and scroll cycles across resident and remounted tabs, including a failed target and a hidden/minimized interval.",
+        "Call browser.disable or finish the task, then manually operate the embedded page and close/reopen the browser tab.",
+        "Quit Y Space and verify no helper, cursor node, timer-owned activity, or guest survives; relaunch and repeat one action."
+      ],
+      "expected": [
+        "Each resident page has at most one reusable cursor and a bounded transient feedback count; repeated actions do not accumulate overlays, timers, guests, or material RSS trend.",
+        "Presence is aria-hidden, pointer-events none, absent from Browser MCP screenshots, and cannot block manual clicking, typing, focus, or accessibility.",
+        "The final package passes focused/full checks, architecture/signature validation, cleanup, and one post-relaunch live action."
+      ],
+      "proofToCapture": [
+        "Bounded overlay/process/RSS ledger",
+        "Manual input and cursor-free screenshot proof",
+        "Final package identity, codesign, cleanup, and post-relaunch sequence"
+      ],
+      "evidence": [
+        "The complete Node 24 suite passed 924 files and 10,794 tests; focused fixture tests passed 2 of 2, and typecheck, standard/type-aware lint, formatting, localization, JSON, and diff checks passed.",
+        "The final ARM64 package passed deep/strict ad-hoc codesign verification. Cursor overlay, transient feedback, animation/timer cleanup, presentation lease, guest residency, sensitive guest, and shutdown boundaries are covered by passing regressions.",
+        "Final DMG SHA-256: 6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0; app.asar SHA-256: 153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08."
+      ],
+      "status": "pass_automated_package_and_live_provider_actions"
     }
   ]
 }

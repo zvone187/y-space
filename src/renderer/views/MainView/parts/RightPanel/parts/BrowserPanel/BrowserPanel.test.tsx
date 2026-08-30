@@ -1,19 +1,31 @@
-import { act, fireEvent } from "@testing-library/react";
+import { act, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BrowserTabInfo } from "@/shared/ipc";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import {
+  acquireSensitiveNativeViewObstruction,
+  subscribeBrowserAutomationPresentationObstruction,
+  useSensitiveNativeViewOverlayGate,
+} from "@/renderer/state/sensitiveNativeViewObstruction";
 import { BrowserPanel } from "./BrowserPanel";
 
 const bridge = vi.hoisted(() => ({
   browserCreateTab: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-  browserAttachWebContents: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  browserAttachWebContents: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+  browserPresentSensitiveView: vi
+    .fn<(payload: unknown) => Promise<void>>()
+    .mockResolvedValue(undefined),
   browserReload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   browserHardReload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   browserExtractToWindow: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   browserInjectToMain: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+
+const browserToolbar = vi.hoisted(() => ({
+  onMenuPreviewChange: null as ((dataUrl: string | null) => void) | null,
 }));
 
 vi.mock("./hooks/useElementPicker", () => ({
@@ -28,7 +40,10 @@ vi.mock("./hooks/useElementPicker", () => ({
 }));
 
 vi.mock("./parts/BrowserToolbar", () => ({
-  BrowserToolbar: () => <div data-testid="browser-toolbar" />,
+  BrowserToolbar: (props: { onMenuPreviewChange: (dataUrl: string | null) => void }) => {
+    browserToolbar.onMenuPreviewChange = props.onMenuPreviewChange;
+    return <div data-testid="browser-toolbar" />;
+  },
 }));
 
 vi.mock("@/renderer/bridge", () => ({
@@ -37,6 +52,7 @@ vi.mock("@/renderer/bridge", () => ({
   readBridge: () => ({
     browserCreateTab: bridge.browserCreateTab,
     browserAttachWebContents: bridge.browserAttachWebContents,
+    browserPresentSensitiveView: bridge.browserPresentSensitiveView,
     browserReload: bridge.browserReload,
     browserHardReload: bridge.browserHardReload,
     browserExtractToWindow: bridge.browserExtractToWindow,
@@ -70,9 +86,17 @@ function setBrowserTabs(tabs: BrowserTabInfo[], activeTabId: string | null) {
   });
 }
 
+function GatedRendererOverlay(props: { open: boolean }) {
+  const ready = useSensitiveNativeViewOverlayGate(props.open);
+  return ready ? <div data-testid="gated-renderer-overlay" /> : null;
+}
+
 describe("BrowserPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    bridge.browserAttachWebContents.mockResolvedValue(true);
+    bridge.browserPresentSensitiveView.mockResolvedValue(undefined);
+    browserToolbar.onMenuPreviewChange = null;
     useRightWorkspaceTabsStore.getState().reset();
     useBrowserPanelStore.setState({
       tabs: [],
@@ -129,6 +153,58 @@ describe("BrowserPanel", () => {
     expect((webviews[1] as HTMLElement).style.display).toBe("flex");
     expect((webviews[1] as HTMLElement).style.opacity).toBe("0");
     expect((webviews[1] as HTMLElement).style.pointerEvents).toBe("none");
+  });
+
+  it("signals presentation obstruction before a menu preview hides the live webview", async () => {
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-1",
+          url: "https://example.com/",
+          title: "Example",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      "tab-1",
+    );
+    const view = render(<BrowserPanel visible />);
+    const webview = view.container.querySelector("webview") as HTMLElement;
+    let opacityAtSignal: string | null = null;
+    let finishInvalidation!: () => void;
+    const invalidationCompleted = new Promise<void>((resolve) => {
+      finishInvalidation = resolve;
+    });
+    const unsubscribe = subscribeBrowserAutomationPresentationObstruction(() => {
+      opacityAtSignal = webview.style.opacity;
+      return invalidationCompleted;
+    });
+
+    try {
+      await act(async () => {
+        browserToolbar.onMenuPreviewChange?.("data:image/png;base64,cHJldmlldw==");
+        await Promise.resolve();
+      });
+
+      expect(opacityAtSignal).toBe("1");
+      expect(webview.style.opacity).toBe("1");
+      expect(view.container.querySelector("img")).toBeNull();
+
+      await act(async () => {
+        finishInvalidation();
+        await invalidationCompleted;
+        await Promise.resolve();
+      });
+
+      expect(webview.style.opacity).toBe("0");
+      expect(view.container.querySelector("img")).toHaveAttribute(
+        "src",
+        "data:image/png;base64,cHJldmlldw==",
+      );
+    } finally {
+      unsubscribe();
+    }
   });
 
   it("never renders a nested browser tablist on panel, overlay, or window surfaces", () => {
@@ -197,6 +273,7 @@ describe("BrowserPanel", () => {
       canGoBack: false,
       canGoForward: false,
       sensitiveIntegration: true as const,
+      sensitiveViewGeneration: 0,
     };
     useBrowserPanelStore.setState({
       tabs: [...ordinaryTabs, sensitiveTab],
@@ -209,58 +286,220 @@ describe("BrowserPanel", () => {
         .map((webview) => webview.getAttribute("data-tab-id"))
         .sort();
 
-    expect(mountedTabIds()).toEqual([
-      "tab-3",
-      "tab-4",
-      "tab-5",
-      "tab-6",
-      "tab-7",
-      "tab-8",
-      "tab-auth",
-    ]);
+    expect(mountedTabIds()).toEqual(["tab-3", "tab-4", "tab-5", "tab-6", "tab-7", "tab-8"]);
+    expect(
+      view.container.querySelector('[data-sensitive-integration-view="tab-auth"]'),
+    ).toBeInTheDocument();
 
     act(() => useBrowserPanelStore.getState().setActive("tab-1"));
     act(() => useBrowserPanelStore.getState().setActive("tab-2"));
     act(() => useBrowserPanelStore.getState().setActive("tab-4"));
 
-    expect(mountedTabIds()).toEqual([
-      "tab-1",
-      "tab-2",
-      "tab-4",
-      "tab-6",
-      "tab-7",
-      "tab-8",
-      "tab-auth",
-    ]);
+    expect(mountedTabIds()).toEqual(["tab-1", "tab-2", "tab-4", "tab-6", "tab-7", "tab-8"]);
     expect(
       view.container.querySelector<HTMLElement>('webview[data-tab-id="tab-4"]')?.style.opacity,
     ).toBe("1");
+    expect(view.container.querySelector('webview[data-tab-id="tab-auth"]')).toBeNull();
+    expect(
+      view.container.querySelector('webview[data-tab-id="tab-8"]')?.getAttribute("partition"),
+    ).toBe("persist:lightcode-browser");
 
     // Backend reordering must not reset activation recency or fall back to the
     // first six metadata entries.
     act(() => {
       useBrowserPanelStore.setState({ tabs: [sensitiveTab, ...ordinaryTabs].reverse() });
     });
-    expect(mountedTabIds()).toEqual([
-      "tab-1",
-      "tab-2",
-      "tab-4",
-      "tab-6",
-      "tab-7",
-      "tab-8",
-      "tab-auth",
-    ]);
+    expect(mountedTabIds()).toEqual(["tab-1", "tab-2", "tab-4", "tab-6", "tab-7", "tab-8"]);
 
     act(() => useBrowserPanelStore.getState().setActive("tab-3"));
-    expect(mountedTabIds()).toEqual([
-      "tab-1",
-      "tab-2",
-      "tab-3",
-      "tab-4",
-      "tab-7",
-      "tab-8",
+    expect(mountedTabIds()).toEqual(["tab-1", "tab-2", "tab-3", "tab-4", "tab-7", "tab-8"]);
+  });
+
+  it("never presents a native sensitive view while the browser host is background-only", () => {
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-auth",
+          url: "about:blank",
+          title: "",
+          loading: true,
+          canGoBack: false,
+          canGoForward: false,
+          sensitiveIntegration: true,
+          sensitiveViewGeneration: 0,
+        },
+      ],
       "tab-auth",
-    ]);
+    );
+
+    const view = render(
+      <div data-y-space-browser-host="" aria-hidden="true" inert>
+        <BrowserPanel visible />
+      </div>,
+    );
+
+    expect(view.container.querySelector("webview")).toBeNull();
+    expect(bridge.browserPresentSensitiveView).toHaveBeenCalledWith(
+      expect.objectContaining({ tabId: "tab-auth", visible: false }),
+    );
+  });
+
+  it("waits for the native sensitive view to hide before painting an overlapping renderer UI", async () => {
+    let finishHide!: () => void;
+    const hideCompleted = new Promise<void>((resolve) => {
+      finishHide = resolve;
+    });
+    bridge.browserPresentSensitiveView.mockImplementation((payload: unknown) => {
+      const presentation = payload as { visible: boolean };
+      return presentation.visible ? Promise.resolve() : hideCompleted;
+    });
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-auth",
+          url: "about:blank",
+          title: "Secure connection",
+          loading: true,
+          canGoBack: false,
+          canGoForward: false,
+          sensitiveIntegration: true,
+          sensitiveViewGeneration: 7,
+        },
+      ],
+      "tab-auth",
+    );
+
+    const view = render(
+      <>
+        <BrowserPanel visible />
+        <GatedRendererOverlay open={false} />
+      </>,
+    );
+    bridge.browserPresentSensitiveView.mockClear();
+
+    view.rerender(
+      <>
+        <BrowserPanel visible />
+        <GatedRendererOverlay open />
+      </>,
+    );
+    await act(async () => Promise.resolve());
+
+    expect(view.queryByTestId("gated-renderer-overlay")).not.toBeInTheDocument();
+    expect(bridge.browserPresentSensitiveView).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tabId: "tab-auth",
+        generation: 7,
+        visible: false,
+      }),
+    );
+
+    await act(async () => {
+      finishHide();
+      await hideCompleted;
+      await Promise.resolve();
+    });
+
+    expect(view.getByTestId("gated-renderer-overlay")).toBeInTheDocument();
+  });
+
+  it("waits for the exact hide acknowledgment when a sensitive presenter unmounts", async () => {
+    let finishHide!: () => void;
+    const hideCompleted = new Promise<void>((resolve) => {
+      finishHide = resolve;
+    });
+    bridge.browserPresentSensitiveView.mockImplementation((payload: unknown) => {
+      const presentation = payload as { visible: boolean };
+      return presentation.visible ? Promise.resolve() : hideCompleted;
+    });
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-auth",
+          url: "about:blank",
+          title: "Secure connection",
+          loading: true,
+          canGoBack: false,
+          canGoForward: false,
+          sensitiveIntegration: true,
+          sensitiveViewGeneration: 7,
+        },
+      ],
+      "tab-auth",
+    );
+    const view = render(
+      <>
+        <BrowserPanel visible />
+        <GatedRendererOverlay open={false} />
+      </>,
+    );
+
+    view.rerender(
+      <>
+        <BrowserPanel visible />
+        <GatedRendererOverlay open />
+      </>,
+    );
+    await act(async () => Promise.resolve());
+    expect(view.queryByTestId("gated-renderer-overlay")).not.toBeInTheDocument();
+
+    view.rerender(<GatedRendererOverlay open />);
+
+    await act(async () => Promise.resolve());
+    expect(view.queryByTestId("gated-renderer-overlay")).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishHide();
+      await hideCompleted;
+      await Promise.resolve();
+    });
+
+    expect(view.getByTestId("gated-renderer-overlay")).toBeInTheDocument();
+  });
+
+  it("restores an obstructed sensitive view with its current presentation generation", async () => {
+    const sensitiveTab = {
+      tabId: "tab-auth",
+      url: "about:blank",
+      title: "Secure connection",
+      loading: true,
+      canGoBack: false,
+      canGoForward: false,
+      sensitiveIntegration: true as const,
+      sensitiveViewGeneration: 7,
+    };
+    setBrowserTabs([sensitiveTab], "tab-auth");
+    render(<BrowserPanel visible />);
+
+    const lease = acquireSensitiveNativeViewObstruction();
+    try {
+      await act(async () => lease.hidden);
+      expect(bridge.browserPresentSensitiveView).toHaveBeenCalledWith(
+        expect.objectContaining({ generation: 7, visible: false }),
+      );
+
+      act(() => {
+        setBrowserTabs([{ ...sensitiveTab, sensitiveViewGeneration: 8 }], "tab-auth");
+      });
+      await act(async () => Promise.resolve());
+      bridge.browserPresentSensitiveView.mockClear();
+
+      await act(async () => {
+        lease.release();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(bridge.browserPresentSensitiveView).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          tabId: "tab-auth",
+          generation: 8,
+          visible: true,
+        }),
+      );
+    } finally {
+      lease.release();
+    }
   });
 
   it("mounts only global browser pages marked resident", () => {
@@ -413,6 +652,77 @@ describe("BrowserPanel", () => {
     rerender(<BrowserPanel visible />);
 
     expect(bridge.browserAttachWebContents).toHaveBeenCalledWith({
+      tabId: "tab-1",
+      webContentsId: 42,
+    });
+  });
+
+  it("retries a host-reload attach rejection without another visibility or dom-ready event", async () => {
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-1",
+          url: "https://example.com/",
+          title: "Example",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      "tab-1",
+    );
+    const { container } = render(<BrowserPanel visible={false} />);
+    const webview = container.querySelector("webview") as HTMLElement & {
+      getWebContentsId(): number;
+    };
+    webview.getWebContentsId = vi.fn<() => number>().mockReturnValue(42);
+    bridge.browserAttachWebContents.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    await act(async () => fireEvent(webview, new Event("dom-ready")));
+    expect(bridge.browserAttachWebContents).toHaveBeenCalledOnce();
+
+    await waitFor(() => expect(bridge.browserAttachWebContents).toHaveBeenCalledTimes(2));
+    expect(bridge.browserAttachWebContents).toHaveBeenLastCalledWith({
+      tabId: "tab-1",
+      webContentsId: 42,
+    });
+  });
+
+  it("retries when the visible webview id is not readable during its first mount", async () => {
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-1",
+          url: "https://example.com/",
+          title: "Example",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      "tab-1",
+    );
+    const { container, rerender } = render(<BrowserPanel visible={false} />);
+    const webview = container.querySelector("webview") as HTMLElement & {
+      getWebContentsId(): number;
+    };
+
+    // Electron can make the custom-element method available just after the
+    // React effect's eager attempt. A dom-ready event may already have fired,
+    // so recovery must not depend on receiving another lifecycle event.
+    webview.getWebContentsId = vi
+      .fn<() => number>()
+      .mockImplementationOnce(() => {
+        throw new Error("guest is not attached yet");
+      })
+      .mockReturnValue(42);
+    bridge.browserAttachWebContents.mockClear();
+
+    rerender(<BrowserPanel visible />);
+
+    await waitFor(() => expect(webview.getWebContentsId).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(bridge.browserAttachWebContents).toHaveBeenCalledOnce());
+    expect(bridge.browserAttachWebContents).toHaveBeenLastCalledWith({
       tabId: "tab-1",
       webContentsId: 42,
     });

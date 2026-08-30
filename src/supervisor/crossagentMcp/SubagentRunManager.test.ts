@@ -554,8 +554,9 @@ describe("SubagentRunManager", () => {
     const h = makeHarness();
     const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
     await flush();
-    h.manager.cancelAllForThread(PARENT);
-    await flush();
+    const cancellation = h.manager.cancelAllForThread(PARENT);
+    expect(cancellation).toBeInstanceOf(Promise);
+    await cancellation;
     expect(h.handles[0]!.disposed).toBe(true);
     // Record evicted → unknown run_id.
     expect(h.manager.getStatus(runId).output).toContain("Unknown run_id");
@@ -565,7 +566,7 @@ describe("SubagentRunManager", () => {
     const h = makeHarness({ deferCreate: true });
     h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
     await flush();
-    h.manager.cancelAllForThread(PARENT);
+    await h.manager.cancelAllForThread(PARENT);
     h.releaseCreate();
     await flush();
     await flush();

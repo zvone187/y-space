@@ -94,6 +94,12 @@ export interface SessionRuntime {
    * explicitly aborts via `clearPendingSteer`. Replace-latest on edit.
    */
   pendingSteer?: PendingSteerSlot | undefined;
+  /**
+   * A Pipedream grant changed while this GUI provider could not update MCPs
+   * in place. The next safe structured turn transparently resumes the same
+   * provider thread through a freshly configured session.
+   */
+  pendingPipedreamMcpReload?: boolean | undefined;
   structuredTurnInterruptRequested?: boolean | undefined;
   /**
    * Force-stop watchdog for a structured (GUI) turn. Armed when the user

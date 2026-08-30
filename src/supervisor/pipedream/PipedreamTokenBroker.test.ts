@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   PIPEDREAM_DEVELOPER_SCOPE,
+  PIPEDREAM_OAUTH_TOKEN_TIMEOUT_MS,
   PIPEDREAM_OAUTH_TOKEN_URL,
   PipedreamTokenBroker,
 } from "./PipedreamTokenBroker";
@@ -75,6 +76,56 @@ describe("PipedreamTokenBroker", () => {
     broker.invalidate();
     expect(await broker.getAccessToken()).toBe("developer-token-2");
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts a hung token exchange at the operation-local deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      let requestSignal: AbortSignal | null | undefined;
+      const fetchMock = vi.fn<typeof fetch>(
+        (_input, init) =>
+          new Promise<Response>(() => {
+            requestSignal = init?.signal;
+          }),
+      );
+      const broker = makeBroker(fetchMock);
+
+      const token = broker.getAccessToken();
+      const outcome = token.then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        (error: unknown) => ({ status: "rejected" as const, error }),
+      );
+      expect(requestSignal?.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(PIPEDREAM_OAUTH_TOKEN_TIMEOUT_MS);
+
+      const result = await outcome;
+      if (result.status !== "rejected") throw new Error("Expected token exchange to time out.");
+      expect(result.error).toEqual(new Error("Pipedream authentication failed."));
+      expect(requestSignal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears the exchange deadline after either success or failure", async () => {
+    vi.useFakeTimers();
+    try {
+      const successful = makeBroker(vi.fn<typeof fetch>(async () => tokenResponse("fast-token")));
+      expect(await successful.getAccessToken()).toBe("fast-token");
+      expect(vi.getTimerCount()).toBe(0);
+
+      const failed = makeBroker(
+        vi.fn<typeof fetch>(async () => {
+          throw new Error("network unavailable");
+        }),
+      );
+      await expect(failed.getAccessToken()).rejects.toThrow("Pipedream authentication failed.");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("never copies credentials or provider response bodies into thrown errors", async () => {

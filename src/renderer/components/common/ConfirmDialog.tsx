@@ -1,5 +1,6 @@
 import { AlertDialog } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { Button } from "./Button";
 
 type ConfirmVariant = "danger" | "primary" | "secondary";
@@ -27,10 +28,12 @@ export function ConfirmDialog(props: {
     onConfirm,
     onClose,
   } = props;
+  const overlayReady = useSensitiveNativeViewOverlayGate(isOpen);
+  const presentedOpen = isOpen && overlayReady;
   const resolvedCancelLabel = cancelLabel ?? t`Cancel`;
 
   return (
-    <AlertDialog.Backdrop isOpen={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <AlertDialog.Backdrop isOpen={presentedOpen} onOpenChange={(open) => !open && onClose()}>
       <AlertDialog.Container>
         <AlertDialog.Dialog>
           <AlertDialog.Header>

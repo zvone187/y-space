@@ -1,10 +1,185 @@
 import { useEffect } from "react";
 import { readBridge } from "@/renderer/bridge";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { selectAnyObstructingOverlayOpen, usePanelStore } from "@/renderer/state/panelStore";
 import { useRightWorkspaceTabsStore } from "@/renderer/state/rightWorkspaceTabsStore";
+import {
+  isSensitiveNativeViewObstructed,
+  subscribeBrowserAutomationPresentationObstruction,
+} from "@/renderer/state/sensitiveNativeViewObstruction";
 import { WORKSPACE_TAB_CYCLE_EVENT } from "@/renderer/commands/workspaceTabCycle";
-import type { BrowserState, BrowserTabInfo } from "@/shared/ipc";
+import type {
+  BrowserInvalidateAutomationPresentationPayload,
+  BrowserState,
+  BrowserTabInfo,
+} from "@/shared/ipc";
+import type { BrowserLinkPresentationMode } from "@/shared/settings";
+
+const AUTOMATION_PRESENTATION_PAINT_TIMEOUT_MS = 1_500;
+type AutomationPresentationInvalidationReason = NonNullable<
+  BrowserInvalidateAutomationPresentationPayload["reason"]
+>;
+type ActiveAutomationPresentation = Omit<BrowserInvalidateAutomationPresentationPayload, "reason">;
+
+function waitForTwoPaintFrames(signal: AbortSignal): Promise<boolean> {
+  return new Promise((resolve) => {
+    let firstFrame: number | null = null;
+    let secondFrame: number | null = null;
+    let timeout: number | null = null;
+    let settled = false;
+    const usesAnimationFrame =
+      typeof window.requestAnimationFrame === "function" &&
+      typeof window.cancelAnimationFrame === "function";
+    const scheduleFrame = (callback: FrameRequestCallback) =>
+      usesAnimationFrame
+        ? window.requestAnimationFrame(callback)
+        : window.setTimeout(() => callback(performance.now()), 16);
+    const cancelFrame = (handle: number) => {
+      if (usesAnimationFrame) window.cancelAnimationFrame(handle);
+      else window.clearTimeout(handle);
+    };
+    const onAbort = () => finish(false);
+    const finish = (painted: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (firstFrame !== null) cancelFrame(firstFrame);
+      if (secondFrame !== null) cancelFrame(secondFrame);
+      if (timeout !== null) window.clearTimeout(timeout);
+      signal.removeEventListener("abort", onAbort);
+      resolve(painted);
+    };
+
+    if (signal.aborted) {
+      finish(false);
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    timeout = window.setTimeout(() => finish(false), AUTOMATION_PRESENTATION_PAINT_TIMEOUT_MS);
+    firstFrame = scheduleFrame(() => {
+      firstFrame = null;
+      secondFrame = scheduleFrame(() => {
+        secondFrame = null;
+        finish(true);
+      });
+    });
+  });
+}
+
+function findPresentedWebview(tabId: string): HTMLElement | null {
+  return (
+    [...document.querySelectorAll<HTMLElement>("webview[data-tab-id]")].find(
+      (candidate) => candidate.dataset.tabId === tabId,
+    ) ?? null
+  );
+}
+
+function isExactWebviewPresented(tabId: string, surface: "main" | "extracted"): boolean {
+  // A focused Electron <webview> owns focus in a separate renderer process, so
+  // the host document legitimately reports hasFocus() === false while the page
+  // is still the foreground, user-visible surface. Exact renderer geometry and
+  // visibility—not transient desktop focus—prove presentation for native CDP input.
+  if (document.visibilityState !== "visible") return false;
+  const webview = findPresentedWebview(tabId);
+  if (
+    !webview?.isConnected ||
+    webview.style.display === "none" ||
+    webview.style.opacity !== "1" ||
+    webview.style.pointerEvents !== "auto" ||
+    webview.getAttribute("aria-hidden") === "true" ||
+    webview.hasAttribute("inert")
+  ) {
+    return false;
+  }
+  const rect = webview.getBoundingClientRect();
+  if (
+    rect.width <= 0 ||
+    rect.height <= 0 ||
+    rect.right <= 0 ||
+    rect.bottom <= 0 ||
+    rect.left >= window.innerWidth ||
+    rect.top >= window.innerHeight
+  ) {
+    return false;
+  }
+  if (surface === "extracted") {
+    return webview.closest("[data-poracode-browser]") !== null;
+  }
+  const host = webview.closest<HTMLElement>("[data-y-space-browser-host]");
+  return (
+    host !== null && host.getAttribute("aria-hidden") !== "true" && !host.hasAttribute("inert")
+  );
+}
+
+function presentMainBrowserPage(tabId: string, mode?: BrowserLinkPresentationMode): boolean {
+  const browser = useBrowserPanelStore.getState();
+  const target = browser.tabs.find((tab) => tab.tabId === tabId);
+  if (!target || target.sensitiveIntegration) return false;
+  browser.setActive(tabId);
+  useRightWorkspaceTabsStore.getState().selectBrowserPage(tabId);
+  const panel = usePanelStore.getState();
+  const wantsFullscreen = mode === "overlay";
+  panel.setBrowserPanelOpen(true);
+  panel.setRightPanelTab("browser");
+  if (wantsFullscreen || selectAnyObstructingOverlayOpen()) {
+    panel.setBrowserOverlayMaximized(wantsFullscreen);
+    panel.setBrowserOverlayOpen(true);
+  } else if (mode === "panel") {
+    panel.setBrowserOverlayOpen(false);
+  }
+  return true;
+}
+
+function isMainBrowserPagePresented(tabId: string): boolean {
+  const browser = useBrowserPanelStore.getState();
+  const target = browser.tabs.find((tab) => tab.tabId === tabId);
+  if (
+    browser.extracted ||
+    browser.activeTabId !== tabId ||
+    !target ||
+    target.sensitiveIntegration
+  ) {
+    return false;
+  }
+  const workspace = useRightWorkspaceTabsStore.getState();
+  if (workspace.hidden) return false;
+  const selected = workspace.tabs.find((tab) => tab.id === workspace.activeTabId);
+  if (
+    selected?.kind !== "browser-page" ||
+    selected.browserTabId !== tabId ||
+    selected.resident === false
+  ) {
+    return false;
+  }
+  const panel = usePanelStore.getState();
+  const browserSurfaceVisible =
+    panel.browserOverlayOpen || (panel.browserPanelOpen && panel.rightPanelTab === "browser");
+  return (
+    browserSurfaceVisible &&
+    (panel.browserOverlayOpen || !selectAnyObstructingOverlayOpen()) &&
+    isExactWebviewPresented(tabId, "main")
+  );
+}
+
+function presentExtractedBrowserPage(tabId: string): boolean {
+  const browser = useBrowserPanelStore.getState();
+  const target = browser.tabs.find((tab) => tab.tabId === tabId);
+  if (!browser.extracted || !target || target.sensitiveIntegration) return false;
+  browser.setActive(tabId);
+  return true;
+}
+
+function isExtractedBrowserPagePresented(tabId: string): boolean {
+  const browser = useBrowserPanelStore.getState();
+  const target = browser.tabs.find((tab) => tab.tabId === tabId);
+  return (
+    browser.extracted &&
+    browser.activeTabId === tabId &&
+    target !== undefined &&
+    !target.sensitiveIntegration &&
+    isExactWebviewPresented(tabId, "extracted")
+  );
+}
 
 function workspacePage(tab: BrowserTabInfo) {
   const title =
@@ -36,9 +211,51 @@ export function useBrowserSync(): void {
 
   useEffect(() => {
     let cancelled = false;
+    const presentationAbort = new AbortController();
     let receivedLiveState = false;
     const liveTabUpdates = new Map<string, BrowserTabInfo>();
-    const isMainWindow = readBridge().windowKind === "main";
+    const bridge = readBridge();
+    const isMainWindow = bridge.windowKind === "main";
+    const isExtractedWindow = bridge.windowKind === "browserExtract";
+    let currentPresentation: ActiveAutomationPresentation | null = null;
+    const invalidateCurrentPresentation = async (
+      reason: AutomationPresentationInvalidationReason,
+    ): Promise<void> => {
+      const presentation = currentPresentation;
+      if (!presentation) return;
+      await bridge.browserInvalidateAutomationPresentation({ ...presentation, reason });
+      if (currentPresentation === presentation) currentPresentation = null;
+    };
+    const invalidateCurrentPresentationBestEffort = (
+      reason: AutomationPresentationInvalidationReason,
+    ) => {
+      void invalidateCurrentPresentation(reason).catch(() => {});
+    };
+    const unsubscribePresentationObstruction = subscribeBrowserAutomationPresentationObstruction(
+      () => invalidateCurrentPresentation("obstructed"),
+    );
+    const revalidateCurrentPresentation = (reason: AutomationPresentationInvalidationReason) => {
+      const presentation = currentPresentation;
+      if (!presentation) return;
+      const stillPresented =
+        !isSensitiveNativeViewObstructed() &&
+        (presentation.surface === "main"
+          ? isMainBrowserPagePresented(presentation.tabId)
+          : isExtractedBrowserPagePresented(presentation.tabId));
+      if (!stillPresented) invalidateCurrentPresentationBestEffort(reason);
+    };
+    const presentationStoreUnsubscribers = [
+      useBrowserPanelStore.subscribe(() => revalidateCurrentPresentation("browser-state-changed")),
+      useRightWorkspaceTabsStore.subscribe(() =>
+        revalidateCurrentPresentation("workspace-tab-changed"),
+      ),
+      usePanelStore.subscribe(() => revalidateCurrentPresentation("panel-layout-changed")),
+      useFileEditorStore.subscribe(() => revalidateCurrentPresentation("file-editor-changed")),
+    ];
+    const onVisibilityChange = () => revalidateCurrentPresentation("document-visibility-changed");
+    const onViewportResize = () => revalidateCurrentPresentation("viewport-resized");
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("resize", onViewportResize);
     // Overlay/panel presentation side-effects belong to the main window alone,
     // and never while the browser is extracted to its own window — the extract
     // window subscribes purely to mirror tab/bookmark state.
@@ -69,7 +286,7 @@ export function useBrowserSync(): void {
         panel.setBrowserPanelOpen(false);
       }
     };
-    const unsub = readBridge().onBrowserEvent((event) => {
+    const unsub = bridge.onBrowserEvent((event) => {
       if (event.type === "state") {
         receivedLiveState = true;
         liveTabUpdates.clear();
@@ -105,28 +322,54 @@ export function useBrowserSync(): void {
         );
       } else if (event.type === "open-panel") {
         if (!reactsToPresentation()) return;
-        const panel = usePanelStore.getState();
-        const wantsFullscreen = event.mode === "overlay";
         // Browser pages are already projected into the global strip before a
         // reveal event is emitted. Select the exact active page, then choose
         // docked/drawer/fullscreen presentation without creating a singleton.
         const activeBrowserTabId = useBrowserPanelStore.getState().activeTabId;
         if (activeBrowserTabId) {
-          useRightWorkspaceTabsStore.getState().selectBrowserPage(activeBrowserTabId);
+          presentMainBrowserPage(activeBrowserTabId, event.mode);
         }
-        panel.setBrowserPanelOpen(true);
-        panel.setRightPanelTab("browser");
-        if (wantsFullscreen || selectAnyObstructingOverlayOpen()) {
-          // Float the overlay above any active z-50 surface. Fullscreen when the
-          // user explicitly chose "overlay" presentation, drawer (z-60) when
-          // forced because an obstructing overlay would otherwise hide the page.
-          panel.setBrowserOverlayMaximized(wantsFullscreen);
-          panel.setBrowserOverlayOpen(true);
-        } else {
-          if (event.mode === "panel") {
-            panel.setBrowserOverlayOpen(false);
+      } else if (event.type === "automation-presentation-request") {
+        const ownsRequest =
+          (event.surface === "main" && reactsToPresentation()) ||
+          (event.surface === "extracted" &&
+            isExtractedWindow &&
+            useBrowserPanelStore.getState().extracted);
+        if (!ownsRequest) return;
+        invalidateCurrentPresentationBestEffort("superseded");
+        const selected =
+          !isSensitiveNativeViewObstructed() &&
+          (event.surface === "main"
+            ? presentMainBrowserPage(event.tabId, "panel")
+            : presentExtractedBrowserPage(event.tabId));
+        void (async () => {
+          const painted = selected && (await waitForTwoPaintFrames(presentationAbort.signal));
+          if (cancelled) return;
+          const presented =
+            painted &&
+            !isSensitiveNativeViewObstructed() &&
+            (event.surface === "main"
+              ? isMainBrowserPagePresented(event.tabId)
+              : isExtractedBrowserPagePresented(event.tabId));
+          const presentation = {
+            requestId: event.requestId,
+            tabId: event.tabId,
+            surface: event.surface,
+          } satisfies ActiveAutomationPresentation;
+          if (presented) currentPresentation = presentation;
+          const acknowledged = await bridge
+            .browserAcknowledgeAutomationPresentation({
+              ...presentation,
+              presented,
+            })
+            .then(() => true)
+            .catch(() => false);
+          if (!acknowledged && currentPresentation === presentation) {
+            currentPresentation = null;
+            return;
           }
-        }
+          revalidateCurrentPresentation("post-acknowledgement");
+        })();
       } else if (event.type === "automation-active") {
         setAutomationActive(event.active);
       } else if (event.type === "ensure-browser-page-resident") {
@@ -150,7 +393,7 @@ export function useBrowserSync(): void {
         clearUsageLoginDeviceCode(event.providerId);
       }
     });
-    readBridge()
+    bridge
       .browserGetState()
       .then((state) => {
         // A live state event is newer than this initial request. Never let a
@@ -165,7 +408,13 @@ export function useBrowserSync(): void {
       })
       .catch(() => {});
     return () => {
+      invalidateCurrentPresentationBestEffort("renderer-unmounted");
       cancelled = true;
+      presentationAbort.abort();
+      unsubscribePresentationObstruction();
+      for (const unsubscribe of presentationStoreUnsubscribers) unsubscribe();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("resize", onViewportResize);
       unsub();
     };
   }, [

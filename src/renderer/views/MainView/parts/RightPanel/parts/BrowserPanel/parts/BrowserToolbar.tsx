@@ -21,6 +21,7 @@ import { BROWSER_HOME_URL } from "@/shared/browserDefaults";
 import { readBridge } from "@/renderer/bridge";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { panelHeaderIconButtonClass } from "@/renderer/components/layout/sidebarChrome";
 import type { BrowserHistoryEntryInfo } from "@/shared/ipc";
 import type { PickDestination, PickerThreadTarget } from "../hooks/useElementPicker";
@@ -52,7 +53,10 @@ export function BrowserToolbar(props: {
   const bookmarkBarVisible = useBrowserPanelStore((s) => s.bookmarkBarVisible);
   const openSettingsSection = usePanelStore((s) => s.openSettingsSection);
   const [recentHistory, setRecentHistory] = useState<BrowserHistoryEntryInfo[]>([]);
+  const [menuRequested, setMenuRequested] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuOverlayReady = useSensitiveNativeViewOverlayGate(menuRequested);
+  const pickerOverlayReady = useSensitiveNativeViewOverlayGate(props.hasPendingPick);
 
   const disabled = !activeTab;
   const bookmarked = !!activeTab && bookmarks.some((b) => b.url === activeTab.url);
@@ -88,6 +92,7 @@ export function BrowserToolbar(props: {
   }, [onMenuPreviewChange]);
 
   const onMenuOpenChange = (open: boolean) => {
+    setMenuRequested(open);
     if (!open) return;
     readBridge()
       .browserRecentHistory({ limit: 8 })
@@ -187,7 +192,7 @@ export function BrowserToolbar(props: {
     <div
       role="toolbar"
       aria-label={t`Browser`}
-      className="poracode-browser-chrome mx-1.5 mb-1 flex items-center gap-1 px-1.5 py-1"
+      className="poracode-browser-chrome mx-2 mb-1.5 flex items-center gap-1 px-2 py-1.5"
     >
       <button
         type="button"
@@ -254,7 +259,7 @@ export function BrowserToolbar(props: {
           </button>
           {createPortal(
             <Dropdown
-              isOpen
+              isOpen={pickerOverlayReady}
               onOpenChange={(open) => {
                 if (!open) props.onCancelPendingPick();
               }}
@@ -280,7 +285,7 @@ export function BrowserToolbar(props: {
         </>
       ) : props.hasPendingPick ? (
         <Dropdown
-          isOpen
+          isOpen={pickerOverlayReady}
           onOpenChange={(open) => {
             if (!open) props.onCancelPendingPick();
           }}
@@ -326,7 +331,7 @@ export function BrowserToolbar(props: {
       >
         <TerminalSquare className="size-3.5" />
       </button>
-      <Dropdown onOpenChange={onMenuOpenChange}>
+      <Dropdown isOpen={menuRequested && menuOverlayReady} onOpenChange={onMenuOpenChange}>
         <Button
           isIconOnly
           aria-label={t`Browser menu`}

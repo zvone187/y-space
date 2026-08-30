@@ -9,8 +9,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
+import { useState } from "react";
 import { PanelTabDragButton } from "@/renderer/components/layout/PanelDock/PanelTabDragButton";
 import { DOCKABLE_PANEL_TABS, type RightPanelTab } from "@/renderer/state/panelStore";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 
 export interface RightWorkspaceToolMenuItem {
   id: RightPanelTab;
@@ -52,6 +54,8 @@ export function RightWorkspaceActionsMenu(props: {
   onHide: () => void;
 }) {
   const { t } = useLingui();
+  const [menuRequested, setMenuRequested] = useState(false);
+  const menuReady = useSensitiveNativeViewOverlayGate(menuRequested);
   const visibleTools = props.tools.filter((tool) => tool.visible);
   const visibleToolIds = new Set(visibleTools.map((tool) => tool.id));
   const selectedTools = new Set([
@@ -86,7 +90,7 @@ export function RightWorkspaceActionsMenu(props: {
   };
 
   return (
-    <Dropdown>
+    <Dropdown isOpen={menuRequested && menuReady} onOpenChange={(open) => setMenuRequested(open)}>
       <Button
         isIconOnly
         aria-label={label}

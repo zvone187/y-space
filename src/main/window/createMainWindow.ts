@@ -17,6 +17,8 @@ import {
 } from "./windowHardening";
 import { rectOverlapsWorkArea } from "./windowGeometry";
 
+const SENSITIVE_WEBVIEW_PARTITION_PATTERN = /^(?:pipedream|sensitive)-oauth-[a-f0-9]{32}$/u;
+
 interface WindowBounds {
   x?: number;
   y?: number;
@@ -180,7 +182,13 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
     delete webPreferences.preload;
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
-    if (typeof params?.src === "string" && !isNavigationUrlAllowed(params.src)) {
+    if (
+      (typeof params?.partition === "string" &&
+        SENSITIVE_WEBVIEW_PARTITION_PATTERN.test(params.partition)) ||
+      (typeof webPreferences.partition === "string" &&
+        SENSITIVE_WEBVIEW_PARTITION_PATTERN.test(webPreferences.partition)) ||
+      (typeof params?.src === "string" && !isNavigationUrlAllowed(params.src))
+    ) {
       event.preventDefault();
     }
   });

@@ -105,9 +105,9 @@ describe("Crossagents MCP (live)", () => {
     mcp = registered;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     try {
-      runManager?.cancelAllForThread(PARENT_THREAD_ID);
+      await runManager?.cancelAllForThread(PARENT_THREAD_ID);
       ingress?.dispose();
     } finally {
       if (projectDir) rmSync(projectDir, { recursive: true, force: true });

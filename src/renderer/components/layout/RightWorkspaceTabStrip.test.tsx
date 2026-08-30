@@ -53,7 +53,7 @@ describe("RightWorkspaceTabStrip", () => {
     expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute("tabindex", "-1");
   });
 
-  it("uses one flat strip with an orange selected indicator and embedded actions", () => {
+  it("uses one floating strip with a bounded orange selected indicator and embedded actions", () => {
     render(
       <RightWorkspaceTabStrip
         tabs={tabs}
@@ -71,23 +71,20 @@ describe("RightWorkspaceTabStrip", () => {
       "poracode-glass-chrome",
     );
     expect(screen.getByRole("button", { name: "Open workspace tools" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Git" }).parentElement).toHaveClass(
+    const selectedTab = screen.getByRole("tab", { name: "Git" }).parentElement;
+    expect(selectedTab).toHaveClass(
       "poracode-workspace-tab",
-      "border-b-2",
-      "border-[var(--accent)]",
-      "rounded-lg",
+      "rounded-xl",
+      "border",
+      "border-[var(--glass-border)]",
     );
-    expect(screen.getByRole("tab", { name: "Git" }).parentElement).toHaveAttribute(
-      "data-selected",
-      "true",
-    );
-    expect(screen.getByRole("tab", { name: "Files" }).parentElement).not.toHaveClass(
-      "border-[var(--accent)]",
-    );
-    expect(screen.getByRole("tab", { name: "Files" }).parentElement).toHaveAttribute(
-      "data-selected",
-      "false",
-    );
+    expect(selectedTab).toHaveAttribute("data-selected", "true");
+    expect(selectedTab?.querySelector(".poracode-workspace-tab__accent")).toBeInTheDocument();
+
+    const idleTab = screen.getByRole("tab", { name: "Files" }).parentElement;
+    expect(idleTab).toHaveClass("border-transparent");
+    expect(idleTab).toHaveAttribute("data-selected", "false");
+    expect(idleTab?.querySelector(".poracode-workspace-tab__accent")).not.toBeInTheDocument();
   });
 
   it("moves focus and requests activation with Arrow, Home, and End keys", () => {

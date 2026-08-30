@@ -3,19 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space — Modern Glass Polish Readiness</title>
+    <title>Y Space Integrations + Visible Browser Control — Implementation Readiness</title>
     <style>
       :root {
         --canvas: #f6f2e8;
-        --paper: #ffffff;
         --ink: #172026;
-        --muted: #66737b;
-        --line: #2d353a;
-        --orange: #ffdfc9;
-        --green: #dff5df;
+        --muted: #65727a;
+        --border: #2c3338;
+        --paper: #ffffff;
         --blue: #d9ecff;
+        --green: #dff5df;
         --yellow: #fff1b8;
         --pink: #ffe2eb;
+        --purple: #eadfff;
+        --orange: #ff8a4c;
         --shadow: 7px 7px 0 rgba(23, 32, 38, 0.18);
         font-family:
           Inter,
@@ -26,93 +27,87 @@
           "Segoe UI",
           sans-serif;
       }
+
       * {
         box-sizing: border-box;
       }
+      html {
+        scroll-behavior: smooth;
+      }
       body {
-        margin: 0;
-        color: var(--ink);
-        line-height: 1.45;
         background:
           linear-gradient(90deg, rgba(47, 58, 66, 0.07) 1px, transparent 1px),
           linear-gradient(rgba(47, 58, 66, 0.07) 1px, transparent 1px), var(--canvas);
         background-size: 28px 28px;
+        color: var(--ink);
+        line-height: 1.45;
+        margin: 0;
       }
       main {
-        width: min(1240px, 100%);
         margin: 0 auto;
-        padding: 30px 22px 56px;
+        padding: 30px 22px 52px;
+        width: min(1240px, 100%);
       }
       header {
         display: grid;
-        grid-template-columns: 1.45fr 0.75fr;
         gap: 18px;
+        grid-template-columns: 1.4fr 0.8fr;
+        margin-bottom: 22px;
       }
       h1,
       h2,
       h3,
+      h4,
       p {
         margin: 0;
       }
       h1 {
-        font-size: clamp(2.1rem, 5vw, 4.5rem);
-        line-height: 0.96;
+        font-size: clamp(2rem, 5vw, 4.4rem);
         letter-spacing: -0.045em;
+        line-height: 0.96;
       }
       h2 {
-        font-size: 1.05rem;
+        font-size: 1.1rem;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
       }
       h3 {
         font-size: 1.05rem;
-        margin-bottom: 8px;
+      }
+      a {
+        color: #0f5f85;
+        font-weight: 760;
+        text-decoration: none;
       }
       code {
-        border: 1px solid rgba(47, 58, 66, 0.23);
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(47, 58, 66, 0.24);
         border-radius: 6px;
-        background: rgba(255, 255, 255, 0.75);
         padding: 2px 5px;
       }
       .hero,
       .card,
-      .note,
-      details {
-        border: 2px solid var(--line);
-        background: var(--paper);
+      details,
+      .sticky,
+      .e2e-card {
+        border: 2px solid var(--border);
         box-shadow: var(--shadow);
       }
       .hero,
       .card,
-      details {
+      details,
+      .e2e-card {
+        background: var(--paper);
         border-radius: 16px;
       }
       .hero {
         padding: 26px;
       }
       .hero p {
-        max-width: 780px;
-        margin-top: 13px;
         color: var(--muted);
+        margin-top: 12px;
+        max-width: 760px;
       }
-      .tag,
-      .status {
-        display: inline-flex;
-        border: 2px solid var(--line);
-        border-radius: 999px;
-        padding: 5px 10px;
-        font-size: 0.77rem;
-        font-weight: 900;
-        text-transform: uppercase;
-      }
-      .tag {
-        margin-bottom: 12px;
-        background: var(--orange);
-      }
-      .status {
-        background: var(--green);
-      }
-      .stack,
+      .meta-stack,
       .grid {
         display: grid;
         gap: 14px;
@@ -127,98 +122,131 @@
         padding: 16px;
       }
       .card small {
-        display: block;
         color: var(--muted);
-        font-size: 0.76rem;
+        display: block;
+        font-size: 0.78rem;
         font-weight: 850;
         text-transform: uppercase;
       }
       .card strong {
         display: block;
-        margin-top: 5px;
-        font-size: 1.18rem;
+        font-size: 1.2rem;
         line-height: 1.15;
+        margin-top: 4px;
       }
-      section {
-        margin-top: 25px;
+      .tag,
+      .pill {
+        border: 2px solid var(--border);
+        border-radius: 999px;
+        display: inline-flex;
+        font-size: 0.76rem;
+        font-weight: 900;
+        padding: 5px 9px;
+        text-transform: uppercase;
+      }
+      .tag {
+        background: var(--yellow);
+        margin-bottom: 12px;
+      }
+      .pill {
+        margin: 0 6px 6px 0;
+      }
+      .pill.pending {
+        background: var(--yellow);
+      }
+      .pill.fail {
+        background: var(--pink);
+      }
+      .pill.pass {
+        background: var(--green);
+      }
+      .board-section {
+        margin-top: 26px;
       }
       .section-title {
-        display: flex;
         align-items: center;
+        display: flex;
         gap: 10px;
         margin-bottom: 12px;
       }
       .pin {
-        width: 16px;
-        height: 16px;
-        border: 2px solid var(--line);
-        border-radius: 50%;
-        background: #ff5a1f;
-      }
-      .note {
-        min-height: 130px;
-        border-radius: 3px;
-        padding: 16px;
-        transform: rotate(-0.35deg);
-      }
-      .note:nth-child(even) {
-        transform: rotate(0.35deg);
-      }
-      .note p,
-      .note li {
-        color: #344149;
-        font-size: 0.93rem;
-      }
-      .note ul,
-      .note ol {
-        margin: 8px 0 0;
-        padding-left: 19px;
-      }
-      .orange {
         background: var(--orange);
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        height: 16px;
+        width: 16px;
       }
-      .green {
-        background: var(--green);
+      .sticky {
+        border-radius: 3px;
+        min-height: 128px;
+        padding: 16px;
+        transform: rotate(-0.45deg);
       }
-      .blue {
+      .sticky:nth-child(even) {
+        transform: rotate(0.45deg);
+      }
+      .sticky h3 {
+        margin-bottom: 8px;
+      }
+      .sticky p,
+      .sticky li {
+        color: #334148;
+        font-size: 0.92rem;
+      }
+      .sticky ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .bg-blue {
         background: var(--blue);
       }
-      .yellow {
+      .bg-green {
+        background: var(--green);
+      }
+      .bg-yellow {
         background: var(--yellow);
       }
-      .pink {
+      .bg-pink {
         background: var(--pink);
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        border: 2px solid var(--line);
-        background: var(--paper);
-        box-shadow: var(--shadow);
+      .bg-purple {
+        background: var(--purple);
       }
-      th,
-      td {
-        padding: 11px 12px;
-        border: 1px solid var(--line);
-        text-align: left;
-        vertical-align: top;
+      .e2e-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      th {
-        background: var(--yellow);
-        font-size: 0.8rem;
-        text-transform: uppercase;
+      .e2e-card {
+        padding: 17px;
       }
-      td {
+      .e2e-card h3 {
+        margin: 7px 0 10px;
+      }
+      .e2e-card p {
+        color: #334148;
         font-size: 0.9rem;
+        margin-top: 7px;
       }
-      details {
-        margin-bottom: 12px;
+      .e2e-card strong {
+        color: var(--ink);
+      }
+      .criteria {
+        columns: 2;
+        column-gap: 28px;
+        margin: 0;
+        padding-left: 22px;
+      }
+      .criteria li {
+        break-inside: avoid;
+        color: #334148;
+        margin: 0 0 10px;
       }
       summary {
         cursor: pointer;
+        font-weight: 850;
         list-style: none;
         padding: 14px 16px;
-        font-weight: 850;
       }
       summary::-webkit-details-marker {
         display: none;
@@ -226,26 +254,34 @@
       summary::before {
         content: "+";
         display: inline-block;
-        width: 16px;
-        margin-right: 8px;
+        font-weight: 900;
+        margin-right: 10px;
+        width: 14px;
       }
       details[open] summary::before {
         content: "−";
       }
-      .detail {
-        border-top: 2px solid var(--line);
+      .detail-body {
+        border-top: 2px solid var(--border);
+        color: #334148;
         padding: 14px 16px 16px;
-        color: #344149;
       }
-      .detail ul {
-        margin: 7px 0 0;
-        padding-left: 20px;
+      .detail-body ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+      .callout {
+        border-left: 8px solid var(--orange);
       }
       @media (max-width: 900px) {
         header,
         .grid.two,
-        .grid.three {
+        .grid.three,
+        .e2e-grid {
           grid-template-columns: 1fr;
+        }
+        .criteria {
+          columns: 1;
         }
       }
     </style>
@@ -253,257 +289,534 @@
   <body>
     <main>
       <header>
-        <div class="hero">
-          <span class="tag">Pre-implementation report</span>
-          <h1>Bright glass. Quiet depth. Still unmistakably Y Space.</h1>
+        <section class="hero" aria-labelledby="title">
+          <span class="tag">Pre-implementation readiness</span>
+          <h1 id="title">Complete integrations and visible browser control</h1>
           <p>
-            This focused visual iteration makes the existing white-and-orange desktop feel softer
-            and more modern. Real blur stays on a few stable shell surfaces; thread and browser
-            content remain opaque and fast. Pane structure, one global tab model, and embedded
-            browser lifecycle limits do not change.
+            Pipedream implementation is packaged through the live OAuth boundary. The additive
+            browser phase now has explicit criteria, packaged E2Es, and four confirmed fail-first
+            regressions for the legacy purple cursor, misleading feedback, missing reduced motion,
+            and incomplete action coverage. Production cursor work may begin against PC-86–PC-90.
           </p>
-        </div>
-        <div class="stack">
-          <div class="card green"><small>Readiness</small><strong>Ready to implement</strong></div>
-          <div class="card blue"><small>Branch</small><strong>y-space-glass-polish</strong></div>
-          <div class="card yellow"><small>Base</small><strong>9fdadda3</strong></div>
-        </div>
+        </section>
+        <aside class="meta-stack" aria-label="Report metadata">
+          <div class="card bg-green">
+            <small>Status</small><strong>Ready for implementation: yes</strong>
+          </div>
+          <div class="card bg-blue">
+            <small>Scope</small><strong>Pipedream + visible agent cursor · PC-76–PC-90</strong>
+          </div>
+          <div class="card bg-green"><small>Date</small><strong>2026-08-29</strong></div>
+        </aside>
       </header>
 
-      <section>
+      <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Readiness gates</h2>
+          <h2>Fast Answer</h2>
         </div>
         <div class="grid three">
-          <article class="note green">
-            <h3>Environment clean</h3>
+          <div class="sticky bg-blue">
+            <h3>Current state</h3>
             <p>
-              A new matching worktree and branch were created from
-              <code>fork/y-space-browser-default-collapse</code>. Dependencies, Husky, the ignored
-              Pipedream environment, native SQLite binding, and ignored WSL helper assets are
-              prepared without printing credential values.
+              Secure Pipedream credentials, popup/catalog, persisted summaries, scoped relays, and
+              agent MCP wiring are implemented. A legacy page cursor exists, but it is purple,
+              unconditional, often hidden by headless tab selection, and disconnected from several
+              real interaction types.
             </p>
-          </article>
-          <article class="note blue">
-            <h3>Baseline green</h3>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Implementation path</h3>
             <p>
-              Node 24.13.0 baseline: 912 passed files, 5 skipped files, 10,345 passed tests, and 85
-              skipped tests. The initial missing-helper failure was a clean-worktree setup issue and
-              passed after the generated bundle was prepared.
+              Replace the legacy visual with one bounded Y Space orange/white controller, reveal
+              only real interactive targets, resolve final viewport coordinates once, distinguish
+              click/hover/text/scroll feedback, respect reduced motion, and preserve screenshot,
+              focus, accessibility, tab isolation, and teardown guarantees.
             </p>
-          </article>
-          <article class="note yellow">
-            <h3>Fail-first captured</h3>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Readiness gate</h3>
             <p>
-              Three focused files fail for the missing design: 8 failed and 9 passed. They lock the
-              sidebar frosting floors, shared glass contract, 20px composer, softened browser and
-              thread chrome, content-plane exclusions, and global-tab capsule semantics.
+              The cursor-focused run passed 22 existing tests and failed four new expectations at
+              the intended gaps. Pipedream remains packaged with Gmail OAuth intentionally paused
+              until the user explicitly authorizes the persistent grant.
             </p>
-          </article>
+          </div>
         </div>
       </section>
 
-      <section>
+      <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Design opportunity and invariant</h2>
+          <h2>Worktree And Setup</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-blue">
+            <h3>Branch and base</h3>
+            <p>
+              <a href="../">y-space-pipedream-live</a>
+              on branch <code>y-space-pipedream-live</code>, created from
+              <code>y-space-glass-polish@361aab63</code>. Upstream base:
+              <code>fork/y-space-browser-default-collapse@9fdadda3</code>.
+            </p>
+          </div>
+          <div class="sticky bg-green">
+            <h3>Fetch, install, Husky</h3>
+            <p>
+              <code>git fetch fork --prune</code> passed and the upstream base was unchanged. pnpm
+              11.19.0 dependencies are installed; <code>pnpm list --depth 0</code> passes. Husky is
+              installed and pre-commit runs lint-staged plus typecheck.
+            </p>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Local environment</h3>
+            <p>
+              Ignored <code>.env.pipedream</code> was copied into this worktree at mode
+              <code>0600</code>. Only the four required key names and file mode were checked; no
+              value was printed, copied into evidence, or exposed to an agent.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Baseline And Fail-First</h2>
         </div>
         <div class="grid two">
-          <article class="note pink">
-            <h3>What feels flat today</h3>
+          <div class="sticky bg-green">
+            <h3>Healthy baseline</h3>
             <ul>
-              <li>The light sidebar is technically translucent but its 98% tint reads opaque.</li>
-              <li>The global tab rail and browser toolbar are flush, square separators.</li>
-              <li>The composer already blurs but its material reads like a plain white card.</li>
-              <li>Softening every pane would create visual noise and costly compositor layers.</li>
+              <li>911 test files and 10,348 tests passed.</li>
+              <li>One performance threshold was a full-load outlier and passed isolated.</li>
+              <li>
+                The isolated pass is recorded; the load outlier is not hidden or called a product
+                failure.
+              </li>
             </ul>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Fail-first status</h3>
+            <ul>
+              <li><strong>Backend:</strong> 3 expected failures; 15 existing tests passed.</li>
+              <li>
+                <strong>Sensitive flow:</strong> 5 expected main-service failures; 5 existing tests
+                passed.
+              </li>
+              <li>
+                <strong>Renderer:</strong> 14 existing composer tests passed; 3 Integrations
+                expectations failed; the eight-case dialog suite stopped at its expected missing
+                component import.
+              </li>
+              <li>
+                <strong>Live reload:</strong> 1 focused expected failure; 41 non-target tests
+                skipped. The missing provider-neutral reload seam is the exact failure.
+              </li>
+              <li>
+                <strong>Visible cursor:</strong> 22 existing tests passed and 4 new expectations
+                failed exactly on legacy branding, reduced motion/bounded feedback, truthful
+                move-before-complete phases, and action-specific click/hover/text/scroll routing.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>Pass Criteria</h2>
+        </div>
+        <div class="card callout">
+          <ol class="criteria" start="76">
+            <li>
+              <strong>PC-76:</strong> one shared accessible glass popup opens from draft composer,
+              active composer, and Settings.
+            </li>
+            <li>
+              <strong>PC-77:</strong> the complete unfiltered catalog supports debounced search and
+              duplicate-free cursor pagination.
+            </li>
+            <li>
+              <strong>PC-78:</strong> sensitive OAuth ends through bounded success, expiry, cancel,
+              or error; the user then explicitly grants the exact visible connected-account row.
+            </li>
+            <li>
+              <strong>PC-79:</strong> safe summaries and grants persist atomically, reopen
+              immediately, and reconcile before launch.
+            </li>
+            <li>
+              <strong>PC-80:</strong> only a current scoped account can be disconnected; local
+              revocation precedes one exact remote DELETE.
+            </li>
+            <li>
+              <strong>PC-81:</strong> connection and grant changes reload supported live agent MCPs;
+              unsafe modes state restart-required explicitly.
+            </li>
+            <li>
+              <strong>PC-82:</strong> the relay pins <code>x-pd-registry: all</code> and app-owned
+              routing while stripping spoofed inputs.
+            </li>
+            <li>
+              <strong>PC-83:</strong> packaged Gmail OAuth leads to one live, explicitly read-only
+              Gmail tool call with no mutation.
+            </li>
+            <li>
+              <strong>PC-84:</strong> credentials, tokens, OAuth URLs, upstream routing, local
+              bearers, and sentinels leak nowhere.
+            </li>
+            <li>
+              <strong>PC-85:</strong> new regressions, full checks, unsigned package, and all
+              pending Pipedream E2Es pass with evidence.
+            </li>
+            <li>
+              <strong>PC-86:</strong> every pointer-bearing agent action visibly moves one Y Space
+              cursor to the actual target before truthful completion feedback; passive tools never
+              fabricate movement.
+            </li>
+            <li>
+              <strong>PC-87:</strong> hover, click, text/key, toggle/select, and scroll use distinct
+              orange-and-white feedback at their real target or viewport origin.
+            </li>
+            <li>
+              <strong>PC-88:</strong> actual tool use reveals presence even when advisory
+              <code>browser.enable</code> was omitted, while exact tab/session ownership and every
+              teardown boundary remain fail-closed.
+            </li>
+            <li>
+              <strong>PC-89:</strong> presence is click-through, aria-hidden, reduced-motion aware,
+              absent from Browser MCP screenshots, and unable to alter layout, focus, hit testing,
+              accessibility, or page results.
+            </li>
+            <li>
+              <strong>PC-90:</strong> one reusable overlay plus bounded/coalesced feedback survives
+              rapid actions, tab churn, suspension, navigation, relaunch, full checks, and packaged
+              Codex/OpenCode Computer Use acceptance.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="board-section" id="e2e-plan">
+        <div class="section-title">
+          <span class="pin"></span>
+          <h2>End-To-End Verification Plan</h2>
+        </div>
+        <div class="e2e-grid">
+          <article class="e2e-card">
+            <span class="pill pending">Pending · E2E-001</span>
+            <h3>Shared popup + complete catalog</h3>
+            <p>
+              <strong>Setup:</strong> unsigned light-mode package, configured BYO Connect, sanitized
+              request ledger.
+            </p>
+            <p>
+              <strong>Run:</strong> open from draft, active task, and Settings; search Gmail; clear;
+              paginate to the final cursor; exercise keyboard, retry, empty, and narrow states.
+            </p>
+            <p>
+              <strong>Proof:</strong> three matching popup screenshots, no <code>has_actions</code>,
+              advancing cursors, unique ordered app ids, accessible focus evidence.
+            </p>
           </article>
-          <article class="note orange">
-            <h3>New visual invariant</h3>
-            <ul>
-              <li>One glass capsule contains every global workspace tab.</li>
-              <li>Real blur is limited to stable shell chrome, never a tab or webview.</li>
-              <li>Browser/thread toolbars imitate glass with paint-only highlights and shadows.</li>
-              <li>Orange remains the only strong action, focus, and selected accent.</li>
-            </ul>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · E2E-002</span>
+            <h3>Real Gmail OAuth + explicit account grant</h3>
+            <p>
+              <strong>Setup:</strong> authorized test Gmail account and no existing Gmail account
+              for this Y Space external user.
+            </p>
+            <p>
+              <strong>Run:</strong> start Gmail connection from Y Space, complete the compliant
+              authorization handoff, then enable agent access on the exact visible account row.
+            </p>
+            <p>
+              <strong>Proof:</strong> redacted authorization lifecycle, bounded polling ledger,
+              close/focus return, and one healthy Gmail account that remains unavailable to agents
+              until its exact row is explicitly enabled.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · E2E-003</span>
+            <h3>Persistence + reconciliation</h3>
+            <p><strong>Setup:</strong> connected Gmail result in a disposable packaged profile.</p>
+            <p>
+              <strong>Run:</strong> quit, inspect only safe field names/modes, relaunch, reconcile,
+              and exercise one controlled renamed or unhealthy remote fixture.
+            </p>
+            <p>
+              <strong>Proof:</strong> mode-0600 schema evidence, relaunch popup, sanitized
+              account-list call with credentials excluded, and no stale relay.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · E2E-004</span>
+            <h3>Live reload + registry all + read-only Gmail</h3>
+            <p>
+              <strong>Setup:</strong> authenticated Codex, Claude Code, and OpenCode tasks already
+              running before Gmail is granted.
+            </p>
+            <p>
+              <strong>Run:</strong> reload supported live MCPs, verify app-owned routing and
+              <code>x-pd-registry: all</code>, discover tools, then run one metadata-only Gmail
+              read.
+            </p>
+            <p>
+              <strong>Proof:</strong> before/after MCP inventories, sanitized headers,
+              privacy-minimized result, and explicit no-send/delete/modify statement.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · E2E-005</span>
+            <h3>Scoped disconnect</h3>
+            <p>
+              <strong>Setup:</strong> live Gmail binding and a second controlled sibling account
+              when available.
+            </p>
+            <p>
+              <strong>Run:</strong> reject an absent account id before DELETE; confirm Gmail
+              disconnect; probe the old relay; restart and reconcile.
+            </p>
+            <p>
+              <strong>Proof:</strong> zero-DELETE rejection, exact confirmation, unusable old route,
+              one scoped DELETE, unchanged sibling, and post-restart absence.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · E2E-006</span>
+            <h3>Secret boundary + cleanup</h3>
+            <p>
+              <strong>Setup:</strong> disposable sentinel fixture reported only by hash and an
+              isolated packaged profile.
+            </p>
+            <p>
+              <strong>Run:</strong> repeat the full flow, scan every allowed
+              renderer/agent/log/persistence/report surface, then quit.
+            </p>
+            <p>
+              <strong>Proof:</strong> negative sentinel ledger, redacted provider/persisted
+              inventory, no sensitive tab or relay route, and no Y Space helper after quit.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · E2E-007</span>
+            <h3>Final unsigned package acceptance</h3>
+            <p>
+              <strong>Setup:</strong> final reviewed Apple Silicon package, ad-hoc signature,
+              isolated profile, authorized Gmail, and no ordinary external browsing; only an
+              explicitly approved one-time authorization handoff may leave Y Space.
+            </p>
+            <p>
+              <strong>Run:</strong> execute E2E-001 through E2E-006 by visible clicks, including
+              restart and disconnect, then run final automated and cleanup checks.
+            </p>
+            <p>
+              <strong>Proof:</strong> package hash/architecture/signature, full-window screenshots,
+              and linked sanitized evidence for every preceding Pipedream E2E.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · CURSOR-001</span>
+            <h3>Codex moves, clicks, and types visibly</h3>
+            <p>
+              <strong>Setup:</strong> final package, authenticated Codex, deterministic local page
+              with separated controls and a visible event/result ledger.
+            </p>
+            <p>
+              <strong>Run:</strong> inspect, click, fill, select, submit, and repeat one interaction
+              without an explicit enable preamble.
+            </p>
+            <p>
+              <strong>Proof:</strong> full-window move/press/after frames, exact target/result
+              correlation, Browser transcript, and cursor-free Browser screenshot.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · CURSOR-002</span>
+            <h3>Truthful hover, scroll, text, and reduced motion</h3>
+            <p>
+              <strong>Setup:</strong> tall deterministic fixture under ordinary and reduced-motion
+              modes.
+            </p>
+            <p>
+              <strong>Run:</strong> hover, targeted/viewport scroll, focus, fill, and targeted key;
+              then run passive inventory/snapshot/screenshot/console/request operations.
+            </p>
+            <p>
+              <strong>Proof:</strong> distinct action visuals, no fake passive movement, equivalent
+              real outcomes, and direct-placement reduced-motion evidence.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · CURSOR-003</span>
+            <h3>OpenCode tab and launch isolation</h3>
+            <p>
+              <strong>Setup:</strong> two browser peers and two same-directory OpenCode GUI tasks
+              with distinct launch identities.
+            </p>
+            <p>
+              <strong>Run:</strong> operate each assigned peer, end one session, then close,
+              suspend/remount, navigate, and replace a guest.
+            </p>
+            <p>
+              <strong>Proof:</strong> exact-tab-only motion, sibling continuity, redacted ownership
+              ledger, and one current overlay after remount.
+            </p>
+          </article>
+          <article class="e2e-card">
+            <span class="pill pending">Pending · CURSOR-004</span>
+            <h3>Bounded cleanup and unsigned acceptance</h3>
+            <p>
+              <strong>Setup:</strong> final ARM64 package, isolated profile, baseline guest/RSS and
+              overlay counts, external browsers closed.
+            </p>
+            <p>
+              <strong>Run:</strong> repeat click/hover/fill/scroll across resident/remounted tabs,
+              include failure and minimized intervals, disable, manually click, quit, and relaunch.
+            </p>
+            <p>
+              <strong>Proof:</strong> one reusable overlay, bounded feedback/timers, manual input
+              pass-through, cleanup ledger, package identity/signature, and post-relaunch action.
+            </p>
           </article>
         </div>
       </section>
 
-      <section>
+      <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Implementation boundaries</h2>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Boundary</th>
-              <th>Required change</th>
-              <th>Fail-first proof</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Theme material tokens</td>
-              <td>
-                Add a 14px shared chrome radius, specular gradient, stronger stable blur,
-                glass-local muted ink, and light/dark variants.
-              </td>
-              <td>2 failures</td>
-            </tr>
-            <tr>
-              <td>Native sidebar</td>
-              <td>
-                Use platform-specific light defaults and safety floors: 90/88 on macOS and 94/92 on
-                Windows, with contrast-safe muted text.
-              </td>
-              <td>3 failures</td>
-            </tr>
-            <tr>
-              <td>Global tab strip</td>
-              <td>
-                Convert the one outer strip into a rounded glass capsule; use a faint selected fill
-                plus the existing orange underline without adding blur per tab.
-              </td>
-              <td>1 failure</td>
-            </tr>
-            <tr>
-              <td>Composer</td>
-              <td>
-                Increase the shell to 20px, reuse the shared glass edge and specular highlight, and
-                retain diffuse elevation in the focused orange state.
-              </td>
-              <td>1 failure</td>
-            </tr>
-            <tr>
-              <td>Browser and thread chrome</td>
-              <td>
-                Add narrow semantic markers and faux-glass paint to the toolbars and address field;
-                mark content planes explicitly and keep them unfiltered.
-              </td>
-              <td>1 failure</td>
-            </tr>
-            <tr>
-              <td>Accessibility</td>
-              <td>
-                Make reduced transparency opaque, preserve higher-contrast boundaries, and test
-                worst-case light-material text contrast at or above 4.5:1.
-              </td>
-              <td>Contract coverage</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section>
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>End-to-end verification plan</h2>
+          <h2>Safety Gates</h2>
         </div>
         <div class="grid three">
-          <article class="note blue">
-            <h3>Resting light shell</h3>
+          <div class="sticky bg-pink">
+            <h3>OAuth is sensitive</h3>
             <p>
-              Launch the unsigned package with a representative task and embedded browser visible.
-              Capture sidebar, thread header, one global tab strip, browser controls, and composer.
+              Private Connect URLs, browser cookies, tokens, and authorization pages never become
+              renderer screenshots, persistence, or agent Browser targets.
             </p>
-          </article>
-          <article class="note green">
-            <h3>Focus and menus</h3>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Gmail remains read-only</h3>
             <p>
-              Focus the composer, open a browser or overflow menu, and verify the orange focus
-              state, glass depth, text clarity, dismissal, and keyboard semantics.
+              The acceptance call may list bounded metadata or count unread items. Sending,
+              deleting, moving, labeling, or marking mail is outside this test authorization.
             </p>
-          </article>
-          <article class="note pink">
-            <h3>Global tabs</h3>
+          </div>
+          <div class="sticky bg-purple">
+            <h3>Disconnect is exact</h3>
             <p>
-              Switch Browser, Files, Git, and a document with mouse and keyboard; reorder and close
-              a disposable peer. One tablist and one selected orange indicator must remain.
+              Authorization derives from the scoped local account store, not a renderer-supplied
+              syntactically valid id. Revoke locally before remote mutation.
             </p>
-          </article>
-          <article class="note yellow">
-            <h3>Embedded browser</h3>
-            <p>
-              Type into the rounded address field, navigate, reload, open the browser menu, and
-              resize the pane. Web content must stay crisp and every control must remain clickable.
-            </p>
-          </article>
-          <article class="note orange">
-            <h3>Accessibility</h3>
-            <p>
-              Verify reduced-transparency opaque fallbacks and a brief dark-mode regression, then
-              return to the requested light appearance. Check all boundaries and muted text.
-            </p>
-          </article>
-          <article class="note green">
-            <h3>Layer and memory guard</h3>
-            <p>
-              Exercise more than six browser metadata tabs in an isolated profile. Confirm only the
-              single strip blurs, resident guests stay capped at six, and cleanup has no new leak
-              slope.
-            </p>
-          </article>
+          </div>
         </div>
       </section>
 
-      <section>
+      <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
-          <h2>Risks and controls</h2>
+          <h2>Open The Cards</h2>
         </div>
         <details open>
-          <summary>Too much glass</summary>
-          <div class="detail">
-            Glass is restricted to the native sidebar, global strip, composer, and small menus.
-            Browser/thread toolbars use faux material; panes and content remain opaque.
+          <summary>Confirmed fail-first evidence</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                <code>src/main/pipedream/PipedreamMainService.test.ts</code> covers bounded Connect
+                completion and sensitive-tab lifecycle behavior.
+              </li>
+              <li>
+                <code>src/supervisor/pipedream/PipedreamApiClient.test.ts</code> expects the catalog
+                request to omit the forced action-only filter.
+              </li>
+              <li>
+                <code>src/supervisor/pipedream/PipedreamMcpRelay.test.ts</code> expects app-owned
+                <code>x-pd-registry: all</code>.
+              </li>
+              <li>
+                <code>src/supervisor/pipedream/PipedreamSupervisorService.test.ts</code> expects an
+                unknown scoped account id to be rejected before DELETE.
+              </li>
+              <li>
+                <code>src/renderer/components/composer/ComposerAddMenu.test.tsx</code> adds desktop,
+                sole-mobile-action, and read-only-session Integrations entry expectations.
+              </li>
+              <li>
+                <code>src/renderer/components/connections/ConnectionsDialog.test.tsx</code> defines
+                eight popup, catalog, race, OAuth, explicit-grant, cancellation, timeout, and
+                redaction expectations and stops at the expected missing component import.
+              </li>
+              <li>
+                <code>src/supervisor/runtime/threadSessionManager.startClose.test.ts</code> proves
+                an existing supported session must re-resolve grant and revocation without changing
+                its trusted thread or launch identity.
+              </li>
+              <li>
+                Narrow results: backend 3 expected failures and 15 existing passes; sensitive main
+                flow 5 expected failures and 5 existing passes; renderer exit 1 with 14 existing
+                composer passes, 3 expected composer failures, and the missing dialog import; live
+                reload exit 1 with 1 expected failure and 41 skipped at the missing
+                <code>reloadPipedreamMcpServers</code> seam. Formatting and
+                <code>git diff --check</code> passed.
+              </li>
+              <li>
+                Cursor fail-first: the focused two-file run passed 22 existing tests and failed four
+                new expectations. The received source still contained
+                <code>#__poracode_cursor__</code>, <code>#7d6cf6</code>, unconditional
+                <code>__pcRipple</code>, no reduced-motion or reusable feedback contract, and no
+                action-specific Y Space cursor phases for click, hover, text, or scroll.
+              </li>
+            </ul>
           </div>
         </details>
         <details>
-          <summary>Contrast over unknown wallpaper</summary>
-          <div class="detail">
-            Platform-specific frosting floors keep a theme scrim behind text. Glass-local muted ink
-            clears 4.5:1 in pessimistic light blends, and reduced transparency paints solid
-            surfaces.
+          <summary>Readiness decision</summary>
+          <div class="detail-body">
+            Every planned Pipedream and visible-cursor fail-first regression is present and fails at
+            its intended pre-implementation gap. Cursor production implementation may begin.
+            Completion still requires PC-76–PC-90, the full automated suite, unsigned packaging,
+            Pipedream E2E-001 through E2E-007, and Cursor E2E-001 through E2E-004; no pending live
+            OAuth or cursor outcome is claimed here.
           </div>
         </details>
         <details>
-          <summary>Memory and browser residency</summary>
-          <div class="detail">
-            Closed work bodies are unmounted. Existing browser LRU limits remain unchanged: six
-            ordinary live webviews, four sensitive live webviews, and thirty metadata entries. No
-            filter, rounded clipping, opacity, or persistent will-change touches browser guests.
+          <summary>Baseline and setup detail</summary>
+          <div class="detail-body">
+            The branch was created from the completed glass-polish commit without switching any
+            existing checkout. A fresh <code>git fetch fork --prune</code> completed successfully.
+            Dependencies and Husky were already installed in this worktree. The baseline recorded
+            911 passing files and 10,348 passing tests; one full-load-only performance outlier
+            passed its isolated rerun. The ignored mode-0600 Pipedream file contains the four
+            required key names; values were never printed.
           </div>
         </details>
         <details>
-          <summary>Interaction geometry</summary>
-          <div class="detail">
-            Structural pane edges and resize handles stay square. New radius is applied inside those
-            boundaries, with global-tab roving focus, drag/reorder, close targeting, browser
-            actions, and macOS drag regions covered by regression tests and hands-on clicks.
+          <summary>Artifacts</summary>
+          <div class="detail-body">
+            <ul>
+              <li><a href="./pass-criteria.md">Explicit pass criteria PC-76–PC-90</a></li>
+              <li>
+                <a href="./qa-e2e-tests.json">Pending Pipedream and cursor E2E definitions</a>
+              </li>
+              <li>
+                <a
+                  href="https://help.openai.com/en/articles/20001277-using-the-built-in-browser-in-the-chatgpt-desktop-app"
+                  >Official shared built-in browser behavior</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://developers.openai.com/api/reference/ruby/resources/beta/subresources/responses"
+                  >Official coordinate-bearing computer action semantics</a
+                >
+              </li>
+              <li>
+                <a href="../">Implementation worktree</a>
+              </li>
+            </ul>
           </div>
         </details>
-      </section>
-
-      <section>
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Decision</h2>
-        </div>
-        <div class="card green">
-          <span class="status">Ready</span>
-          <strong>Production implementation may begin.</strong>
-          <p style="margin-top: 8px; color: var(--muted)">
-            No new dependency is planned. The work reuses the existing theme tokens, native material
-            integration, one global tab strip, composer, browser lifecycle controls, reduced-
-            transparency fallback, and packaging workflow. Completion requires focused and full
-            verification, an unsigned package, hands-on Computer Use proof, a Husky-validated local
-            commit, and an evidence-backed handoff. No pull request was requested; no merge or force
-            push is authorized.
-          </p>
-        </div>
       </section>
     </main>
   </body>

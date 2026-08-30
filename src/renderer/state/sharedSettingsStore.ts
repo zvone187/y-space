@@ -43,6 +43,7 @@ import {
   uninstallPlugin as removeInstalledPlugin,
 } from "@/shared/plugins/catalog";
 import { incrementAgentSelectionUsage } from "@/shared/crossagentRanking";
+import { THEME_DEFAULT_VERSION } from "@/shared/themeMode";
 
 const STORAGE_KEY = "poracode-shared-settings";
 
@@ -304,7 +305,7 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
   ...initialSettings,
   sharedSettingsHydrated: initialLoadDone,
   setThemeMode: (themeMode) => {
-    set({ themeMode });
+    set({ themeMode, themeDefaultVersion: THEME_DEFAULT_VERSION });
     persistSettings(selectSharedSettings(get()));
   },
   setThemePreset: (themePreset) => {
@@ -968,6 +969,7 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
 function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
   return {
     themeMode: state.themeMode,
+    themeDefaultVersion: state.themeDefaultVersion,
     themePreset: state.themePreset,
     locale: state.locale,
     gitTextLanguage: state.gitTextLanguage,

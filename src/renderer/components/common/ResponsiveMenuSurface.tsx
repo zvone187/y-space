@@ -4,6 +4,7 @@ import { Popover, useMediaQuery } from "@heroui/react";
 import { useLingui } from "@lingui/react/macro";
 import { isRemoteSession } from "@/renderer/bridge";
 import { SheetGrabber, useSheetGrabber } from "@/renderer/components/common/useSheetGrabber";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { lockMobileSheetViewport } from "./mobileSheetViewportLock";
 
 /** The placement union HeroUI's popover accepts, derived from the component. */
@@ -67,6 +68,8 @@ export function ResponsiveMenuSurface(props: {
   // this, closing the drawer unmounts it synchronously and no animation plays).
   const [rendered, setRendered] = useState(props.isOpen);
   const [closing, setClosing] = useState(false);
+  const overlayReady = useSensitiveNativeViewOverlayGate(props.isOpen || (mobile && rendered));
+  const presentedOpen = props.isOpen && overlayReady;
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { sheetRef, expanded, dragging, grabberHandlers } = useSheetGrabber({
     expandable: true,
@@ -134,11 +137,11 @@ export function ResponsiveMenuSurface(props: {
 
   if (!mobile) {
     return (
-      <Popover isOpen={props.isOpen} onOpenChange={props.onOpenChange}>
+      <Popover isOpen={presentedOpen} onOpenChange={props.onOpenChange}>
         <Popover.Trigger {...(props.triggerClassName ? { className: props.triggerClassName } : {})}>
           {props.trigger}
         </Popover.Trigger>
-        {props.isOpen ? (
+        {presentedOpen ? (
           <Popover.Content
             placement={props.placement ?? "top start"}
             {...(props.contentClassName ? { className: props.contentClassName } : {})}
@@ -161,7 +164,7 @@ export function ResponsiveMenuSurface(props: {
       ) : (
         props.trigger
       )}
-      {rendered && mobilePortalTarget
+      {rendered && overlayReady && mobilePortalTarget
         ? // Portal to the top-level mobile shell, outside the transformed
           // composer. Keeping the sheet in the page compositor preserves
           // Safari's transparent floating toolbar; tests/non-shell consumers

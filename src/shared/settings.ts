@@ -22,6 +22,7 @@ import {
   installedPluginsSchema,
   workspaceListSchema,
 } from "./contracts";
+import { migrateLegacyThemeDefault, THEME_DEFAULT_VERSION } from "./themeMode";
 import { DEFAULT_SEARCH_EXCLUDE } from "./searchExclude";
 import { AI_LANGUAGE_VALUES, LOCALE_SETTING_VALUES } from "./locale";
 import { QWEN_DEFAULT_MODEL_ID, QWEN_RETIRED_PREVIEW_MODEL_ID } from "./agents/qwenModels";
@@ -241,6 +242,12 @@ export function normalizeSidebarShortcutOrder(
 
 export const sharedSettingsSchema = z.object({
   themeMode: themeModeSchema,
+  /**
+   * Marks selections saved after the Y Space factory appearance became light.
+   * Unversioned dark + default-preset settings are the former factory default
+   * and migrate once; a subsequent explicit dark choice remains dark.
+   */
+  themeDefaultVersion: z.number().int().min(THEME_DEFAULT_VERSION),
   /**
    * Selected app theme preset id (see `renderer/theme/themePresets`). The
    * matching light/dark variant is chosen by `themeMode`. Free-form string so
@@ -623,6 +630,7 @@ export type SharedSettingsInput = Omit<
 
 export const defaultSharedSettings: SharedSettings = {
   themeMode: "light",
+  themeDefaultVersion: THEME_DEFAULT_VERSION,
   themePreset: "default",
   locale: "system",
   gitTextLanguage: "en",
@@ -912,6 +920,12 @@ export function normalizeSharedSettings(value: unknown): SharedSettings {
     : undefined;
   return migrateRetiredQwenPreviewModel({
     ...normalized,
+    themeMode: migrateLegacyThemeDefault(
+      normalized.themeMode,
+      normalized.themePreset,
+      parsed.data.themeDefaultVersion,
+    ),
+    themeDefaultVersion: Math.max(THEME_DEFAULT_VERSION, normalized.themeDefaultVersion),
     sidebarShortcutOrder: normalizeSidebarShortcutOrder(normalized.sidebarShortcutOrder),
     prAutomationDefault: hasAutomationMode ? normalized.prAutomationDefault : legacyAutomationMode,
     preventSleep: migratedPreventSleep,

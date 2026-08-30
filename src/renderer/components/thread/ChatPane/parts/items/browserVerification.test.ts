@@ -20,6 +20,24 @@ describe("browser final-response verification", () => {
     ).toEqual({ kind: "verified", actionCount: 2 });
   });
 
+  it("fails closed when a successful Browser action is followed by an authenticated failure", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-1", "click"),
+      failedEvidence("browser-2", "select"),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-1", "browser-2", "answer-1"],
+        ["answer-1"],
+        "I clicked and selected everything in the browser successfully.",
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
   it("does not accept provider-authored Browser-looking rows as proof", () => {
     const items = byId([
       item("user-1", "user_message"),
@@ -79,6 +97,67 @@ describe("browser final-response verification", () => {
     expect(claimsBrowserVerification("I opened the browser tab and checked the web page.")).toBe(
       true,
     );
+  });
+
+  it.each([
+    "I double-clicked the button in the browser.",
+    "I focused the email input in the browser.",
+    "I typed the value in the browser form.",
+    "I checked the checkbox in the browser.",
+    "I unchecked the checkbox in the browser.",
+    "I selected the requested option in the browser.",
+    "I pressed Enter in the browser.",
+    "I hovered over the menu in the browser.",
+    "I scrolled the browser page.",
+    "I accepted the confirmation dialog in the browser.",
+    "I evaluated JavaScript in the browser.",
+    "I added a script to the browser page.",
+    "I added a style to the browser page.",
+  ])("recognizes every Browser interaction claim: %s", (claim) => {
+    expect(claimsBrowserVerification(claim)).toBe(true);
+  });
+
+  it.each([
+    "I double-clicked the button in the browser.",
+    "I focused the email input in the browser.",
+    "I typed the value in the browser form.",
+    "I checked the checkbox in the browser.",
+    "I unchecked the checkbox in the browser.",
+    "I selected the requested option in the browser.",
+    "I pressed Enter in the browser.",
+    "I hovered over the menu in the browser.",
+    "I scrolled the browser page.",
+    "I accepted the confirmation dialog in the browser.",
+    "I evaluated JavaScript in the browser.",
+    "I added a script to the browser page.",
+    "I added a style to the browser page.",
+  ])("requires interaction evidence for Browser interaction claims: %s", (claim) => {
+    const user = item("user-1", "user_message");
+    const answer = item("answer-1", "assistant_message");
+    const inspected = byId([user, evidence("browser-1", "snapshot"), answer]);
+    expect(
+      resolveBrowserVerificationBadge(
+        inspected,
+        ["user-1", "browser-1", "answer-1"],
+        ["answer-1"],
+        claim,
+      ),
+    ).toEqual({ kind: "unverified" });
+
+    const interacted = byId([user, evidence("browser-2", "click"), answer]);
+    expect(
+      resolveBrowserVerificationBadge(
+        interacted,
+        ["user-1", "browser-2", "answer-1"],
+        ["answer-1"],
+        claim,
+      ),
+    ).toEqual({ kind: "verified", actionCount: 1 });
+  });
+
+  it("does not relabel ordinary non-browser typing or file selection as Browser work", () => {
+    expect(claimsBrowserVerification("I typed the release notes in README.md.")).toBe(false);
+    expect(claimsBrowserVerification("I selected the PDF file in Finder.")).toBe(false);
   });
 
   it("does not treat Browser setup or tab metadata as proof of a website test", () => {
@@ -326,6 +405,50 @@ describe("browser final-response verification", () => {
       ),
     ).toEqual({ kind: "verified", actionCount: 1 });
   });
+
+  it("ignores an ellipsis-truncated repeat of an already authenticated Browser tab ID", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-1", "click", {
+        tabId: "tab-acf68c7a-22d9-4ffe-a927-74cf719a63bf",
+        url: "http://localhost:41739/cursor-b",
+      }),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-1", "answer-1"],
+        ["answer-1"],
+        [
+          "Clicked Browser tab tab-acf68c7a-22d9-4ffe-a927-74cf719a63bf",
+          "at http://localhost:41739/cursor-b.",
+          "The earlier reload used tab-acf68c7a-... and succeeded.",
+        ].join(" "),
+      ),
+    ).toEqual({ kind: "verified", actionCount: 1 });
+  });
+
+  it("keeps a truncated-only Browser tab claim fail-closed", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-1", "click", {
+        tabId: "tab-acf68c7a-22d9-4ffe-a927-74cf719a63bf",
+        url: "http://localhost:41739/cursor-b",
+      }),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-1", "answer-1"],
+        ["answer-1"],
+        "Clicked Browser tab tab-acf68c7a-... successfully.",
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
 });
 
 function item(id: string, type: RuntimeChatItem["type"]): RuntimeChatItem {
@@ -344,6 +467,18 @@ function evidence(
       serverId: "browser",
       status: "success",
       browserEvidence: { source: "y-space-browser-mcp", occurredAt: 1, ...metadata },
+    },
+  };
+}
+
+function failedEvidence(id: string, name: string): RuntimeChatItem {
+  return {
+    ...item(id, "mcp_tool_call"),
+    payload: {
+      name,
+      serverId: "browser",
+      status: "error",
+      browserEvidence: { source: "y-space-browser-mcp", occurredAt: 1 },
     },
   };
 }

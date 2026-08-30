@@ -1,7 +1,7 @@
 import type { ToolSpec } from "./types";
 import { Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE } from "@/shared/browserExclusivePolicy";
 
-export const BROWSER_MCP_INSTRUCTIONS = `${Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE} Before the first browsing action, call browser.enable once and keep it enabled across the whole uninterrupted browser session so agent presence stays consistent between calls. Always call browser.disable before pausing to ask for user input, waiting for an external event, or finishing, and enable again when you resume. Prefer browser.snapshot or browser.find before browser.click/fill/type, use @e refs from snapshots when possible, and call browser.api when you need the complete API map.`;
+export const BROWSER_MCP_INSTRUCTIONS = `${Y_SPACE_BROWSER_EXCLUSIVE_GUIDANCE} Before the first browsing action, call browser.enable once and keep it enabled across the whole uninterrupted browser session so agent presence stays consistent between calls. Interactive actions automatically present the exact global browser tab and move Y Space's visible orange cursor to the real target; do not add ornamental pointer actions, and expect passive inspection to remain in the background. Always call browser.disable before pausing to ask for user input, waiting for an external event, or finishing, and enable again when you resume. Prefer browser.snapshot or browser.find before browser.click/fill/type, use @e refs from snapshots when possible, and call browser.api when you need the complete API map.`;
 
 const RAW_TOOLS: ToolSpec[] = [
   {

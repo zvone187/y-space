@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import type { BrowserMcpToolCallReport } from "@/shared/browserMcpEvidence";
 import { createMcpLaunchContextToken, type McpLaunchContext } from "@/shared/mcpLaunchContext";
-import { BrowserMcpIngress } from "./BrowserMcpIngress";
+import type { StreamableHttpMcpToolCallOutcome } from "../mcp/StreamableHttpMcpIngress";
+import { BrowserMcpIngress, type BrowserMcpIngressOptions } from "./BrowserMcpIngress";
 import type { BrowserPanelManager } from "./BrowserPanelManager";
+import type { ToolContext } from "./mcp/toolRegistry";
 
 let ingress: BrowserMcpIngress | null = null;
 
@@ -10,6 +13,138 @@ afterEach(() => {
   ingress?.dispose();
   ingress = null;
 });
+
+function confirmedCursorOverlayEvaluation(expression: string): unknown {
+  if (expression.includes('const phase="session-show"')) {
+    return {
+      ok: true,
+      sessionOwned: false,
+      screenshotOwnerCount: 0,
+      hostCount: 0,
+      hiddenHostCount: 0,
+      visibleHostCount: 0,
+    };
+  }
+  if (expression.includes('const phase="hide"')) {
+    return { ok: true, tokenOwned: true, hostCount: 0, hiddenHostCount: 0 };
+  }
+  if (expression.includes('const phase="restore"')) {
+    return {
+      ok: true,
+      tokenOwned: false,
+      screenshotOwnerCount: 0,
+      sessionOwned: false,
+      hostCount: 0,
+      visibleHostCount: 0,
+    };
+  }
+  if (expression.includes('const phase="path-verify"')) {
+    return { ok: true };
+  }
+  return true;
+}
+
+function createSecureCursorSend() {
+  const targetBackendNodeId = 700;
+  let queriedSelector = "button";
+  return vi.fn<(method: string, params?: Record<string, unknown>) => Promise<unknown>>(
+    async (method, params) => {
+      if (method === "Runtime.evaluate") {
+        const expression = String(params?.expression ?? "");
+        if (expression.includes('const phase="move"')) {
+          return {
+            result: {
+              type: "object",
+              value: {
+                ok: true,
+                x: 120,
+                y: 80,
+                startX: 120,
+                startY: 80,
+                kind: "element",
+                reducedMotion: true,
+              },
+            },
+          };
+        }
+        return { result: { type: "object", value: confirmedCursorOverlayEvaluation(expression) } };
+      }
+      if (method === "DOM.getDocument") return { root: { nodeId: 1 } };
+      if (method === "DOM.querySelector") {
+        queriedSelector = String(params?.selector ?? queriedSelector);
+        return { nodeId: 2 };
+      }
+      if (method === "DOM.describeNode") {
+        return {
+          node: {
+            nodeId: 2,
+            backendNodeId: targetBackendNodeId,
+            nodeName: queriedSelector.includes("input") ? "INPUT" : "BUTTON",
+          },
+        };
+      }
+      if (method === "Page.getFrameTree") {
+        return {
+          frameTree: {
+            frame: {
+              id: "main",
+              loaderId: "loader-main-1",
+              url: "https://example.test/",
+            },
+          },
+        };
+      }
+      if (method === "Page.createIsolatedWorld") return { executionContextId: 41 };
+      if (method === "DOM.resolveNode") {
+        return {
+          object: {
+            objectId: Number(params?.backendNodeId) === targetBackendNodeId ? "target" : "hit",
+          },
+        };
+      }
+      if (method === "Runtime.callFunctionOn") {
+        const functionDeclaration = String(params?.functionDeclaration ?? "");
+        if (functionDeclaration.includes("actual.endsWith")) {
+          return { result: { type: "boolean", value: true } };
+        }
+        if (functionDeclaration.includes("active:activeMatches,editable:editable")) {
+          return {
+            result: { type: "object", value: { active: true, editable: true, length: 0 } },
+          };
+        }
+        if (functionDeclaration.includes("shadowActiveDescriptor")) {
+          return { result: { type: "boolean", value: true } };
+        }
+        return {
+          result: {
+            type: "object",
+            value: { connected: true, disabled: false, visible: true },
+          },
+        };
+      }
+      if (method === "Runtime.releaseObject") return {};
+      if (method === "DOM.scrollIntoViewIfNeeded") return {};
+      if (method === "DOM.getBoxModel") {
+        return {
+          model: {
+            border: [80, 60, 160, 60, 160, 100, 80, 100],
+            width: 80,
+            height: 40,
+          },
+        };
+      }
+      if (method === "Page.getLayoutMetrics") {
+        return {
+          cssLayoutViewport: { pageX: 0, pageY: 0, clientWidth: 900, clientHeight: 700 },
+        };
+      }
+      if (method === "DOM.getNodeForLocation") {
+        return { backendNodeId: targetBackendNodeId, frameId: "main" };
+      }
+      return {};
+    },
+  );
+}
 
 describe("BrowserMcpIngress", () => {
   it("reports only a bounded authoritative HTTP(S) origin and omits page-controlled titles", async () => {
@@ -258,8 +393,30 @@ describe("BrowserMcpIngress", () => {
       },
       cdp: {
         attach: vi.fn<() => Promise<void>>(async () => undefined),
-        send: vi.fn<(method: string) => Promise<unknown>>(async (method) =>
-          method === "Runtime.evaluate" ? { result: { type: "boolean", value: true } } : {},
+        send: vi.fn<(method: string, params?: Record<string, unknown>) => Promise<unknown>>(
+          async (method, params) => {
+            if (method === "Page.getFrameTree") {
+              return {
+                frameTree: {
+                  frame: {
+                    id: "main",
+                    loaderId: "loader-main-1",
+                    url: "https://example.test/",
+                  },
+                },
+              };
+            }
+            if (method === "Page.createIsolatedWorld") return { executionContextId: 41 };
+            if (method === "Runtime.evaluate") {
+              return {
+                result: {
+                  type: "object",
+                  value: confirmedCursorOverlayEvaluation(String(params?.expression ?? "")),
+                },
+              };
+            }
+            return {};
+          },
         ),
       },
     };
@@ -310,6 +467,129 @@ describe("BrowserMcpIngress", () => {
       success: false,
       occurredAt: expect.any(Number),
     });
+  });
+
+  it("does not mint successful proof for an ambiguous native input result", async () => {
+    const onToolCallReport = vi.fn<(report: BrowserMcpToolCallReport) => Promise<void>>(
+      async () => undefined,
+    );
+    const options: BrowserMcpIngressOptions = {
+      resolveLaunchContextIdentity: async (context) => context.identity,
+      onToolCallReport,
+    };
+    ingress = new BrowserMcpIngress(options);
+    const tab = {
+      tabId: "tab-ambiguous-input",
+      snapshot: () => ({ url: "https://ambiguous.example.test/private", title: "Ambiguous" }),
+    };
+    const manager = {
+      getTab: () => tab,
+    } as unknown as BrowserPanelManager;
+    const reportToolCall = (
+      ingress as unknown as {
+        reportToolCall(
+          ingressOptions: BrowserMcpIngressOptions,
+          outcome: StreamableHttpMcpToolCallOutcome,
+          ctx: ToolContext,
+          identity: McpThreadIdentity,
+        ): Promise<void>;
+      }
+    ).reportToolCall.bind(ingress);
+
+    await reportToolCall(
+      options,
+      {
+        name: "click",
+        occurredAt: 1234,
+        success: true,
+        rawResult: {
+          ok: false,
+          ambiguous: true,
+          transportRejected: true,
+          reason: "pointer-release-rejected",
+        },
+      },
+      {
+        manager,
+        allowEval: false,
+        allowDataAccess: false,
+        resolvedTabIdForToolCall: tab.tabId,
+      },
+      {
+        threadId: "thread-ambiguous-input",
+        launchId: "launch-ambiguous-input",
+        browserEvidenceTurnId: "turn-ambiguous-input",
+      },
+    );
+
+    expect(onToolCallReport).toHaveBeenCalledWith({
+      threadId: "thread-ambiguous-input",
+      launchId: "launch-ambiguous-input",
+      turnId: "turn-ambiguous-input",
+      toolName: "click",
+      success: false,
+      occurredAt: 1234,
+    });
+  });
+
+  it("normalizes executed tool aliases before reporting canonical Browser proof", async () => {
+    const onToolCallReport = vi.fn<(report: BrowserMcpToolCallReport) => Promise<void>>(
+      async () => undefined,
+    );
+    const options: BrowserMcpIngressOptions = {
+      resolveLaunchContextIdentity: async (context) => context.identity,
+      onToolCallReport,
+    };
+    ingress = new BrowserMcpIngress(options);
+    const tab = {
+      tabId: "tab-alias-proof",
+      snapshot: () => ({ url: "https://aliases.example.test/private", title: "Aliases" }),
+    };
+    const manager = {
+      getTab: () => tab,
+    } as unknown as BrowserPanelManager;
+    const reportToolCall = (
+      ingress as unknown as {
+        reportToolCall(
+          ingressOptions: BrowserMcpIngressOptions,
+          outcome: StreamableHttpMcpToolCallOutcome,
+          ctx: ToolContext,
+          identity: McpThreadIdentity,
+        ): Promise<void>;
+      }
+    ).reportToolCall.bind(ingress);
+    const identity = {
+      threadId: "thread-alias-proof",
+      launchId: "launch-alias-proof",
+      browserEvidenceTurnId: "turn-alias-proof",
+    };
+    const ctx: ToolContext = {
+      manager,
+      allowEval: false,
+      allowDataAccess: false,
+      resolvedTabIdForToolCall: tab.tabId,
+    };
+
+    for (const [alias, canonical] of [
+      ["goto", "navigate"],
+      ["key", "press"],
+      ["keyboard_type", "type"],
+    ] as const) {
+      await reportToolCall(
+        options,
+        { name: alias, occurredAt: 1234, success: true, rawResult: { ok: true } },
+        ctx,
+        identity,
+      );
+      expect(onToolCallReport).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          toolName: canonical,
+          success: true,
+          tabId: tab.tabId,
+          url: "https://aliases.example.test",
+        }),
+      );
+    }
   });
 
   it("reports Browser failures without tab metadata", async () => {
@@ -446,6 +726,8 @@ describe("BrowserMcpIngress", () => {
       () =>
         ({
           createTab,
+          getActiveTab: () => null,
+          getActiveTabForThread: () => null,
           touchAutomationSession: vi.fn<() => void>(),
           recordAutomationTarget: vi.fn<() => void>(),
           showAutomationCursor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -498,20 +780,26 @@ describe("BrowserMcpIngress", () => {
     ingress = new BrowserMcpIngress({
       resolveLaunchContextIdentity: async (context) => context.identity,
     });
-    const send = vi.fn<(method: string, params?: Record<string, unknown>) => Promise<unknown>>(
-      async (method) => {
-        if (method === "Runtime.evaluate") {
-          return { result: { type: "boolean", value: true } };
-        }
-        return {};
-      },
-    );
-    const revealPanel = vi.fn<() => void>();
+    const send = createSecureCursorSend();
+    const presentationLease = {
+      requestId: "9a0bdd8c-34c7-4248-85df-f941e3f0de2c",
+      tabId: "tab-1",
+      surface: "main" as const,
+      revision: 1,
+    };
+    const presentAutomationTarget = vi
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValue(presentationLease);
+    const setAutomationSession = vi.fn<() => boolean>().mockReturnValue(true);
     const tab = {
       tabId: "tab-1",
       snapshot: () => ({ url: "https://example.test/page", title: "Example Page" }),
       webContents: {
         focus: vi.fn<() => void>(),
+        isFocused: vi.fn<() => boolean>().mockReturnValue(true),
+        isDestroyed: vi.fn<() => boolean>().mockReturnValue(false),
+        sendInputEvent: vi.fn<(event: Electron.KeyboardInputEvent) => void>(),
+        insertText: vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined),
         executeJavaScript: vi
           .fn<(script: string, userGesture?: boolean) => Promise<unknown>>()
           .mockResolvedValue(true),
@@ -524,7 +812,8 @@ describe("BrowserMcpIngress", () => {
     ingress.setManagerAccessor(
       () =>
         ({
-          revealPanel,
+          presentAutomationTarget,
+          validateAutomationPresentation: vi.fn<() => boolean>().mockReturnValue(true),
           snapshot: () => ({
             tabs: [
               {
@@ -545,7 +834,7 @@ describe("BrowserMcpIngress", () => {
           getTab: () => tab,
           ensureTabReady: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
           createTab: vi.fn<() => Promise<unknown>>().mockResolvedValue({ tabId: "tab-1" }),
-          setAutomationSession: vi.fn<() => boolean>().mockReturnValue(true),
+          setAutomationSession,
           touchAutomationSession: vi.fn<() => void>(),
           recordAutomationTarget: vi.fn<() => void>(),
           showAutomationCursor: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -555,6 +844,7 @@ describe("BrowserMcpIngress", () => {
     const info = await ingress.start();
     const launchToken = createMcpLaunchContextToken(info.token, "browser", {
       threadId: "thread-browser-test",
+      launchId: "launch-browser-test",
     });
 
     const callTool = async (name: string, args: Record<string, unknown>) => {
@@ -584,6 +874,7 @@ describe("BrowserMcpIngress", () => {
     await expect(callTool("get_url", {})).resolves.toMatchObject({
       result: { content: [{ type: "text", text: '{\n  "url": "https://example.test/page"\n}' }] },
     });
+    expect(presentAutomationTarget).not.toHaveBeenCalled();
     const fill = await callTool("fill", { selector: "input", text: "hello", submit: true });
     expect(fill.result.isError).toBeUndefined();
     const click = await callTool("click", { selector: "button" });
@@ -593,18 +884,40 @@ describe("BrowserMcpIngress", () => {
     const press = await callTool("press", { selector: "input", key: "Enter" });
     expect(press.result.isError).toBeUndefined();
 
-    // Agent tool calls run headless: they must NOT force the browser panel
-    // open (the tab's <webview> stays alive off-screen instead).
-    expect(revealPanel).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalledWith("Input.insertText", { text: "hello" });
-    expect(send.mock.calls.some(([method]) => String(method).startsWith("Input."))).toBe(false);
-    expect(tab.webContents.executeJavaScript).toHaveBeenCalled();
+    // Passive calls remain headless, while each pointer-bearing action presents
+    // the exact first-class Browser page under its launch-scoped lease.
+    expect(presentAutomationTarget).toHaveBeenCalledTimes(4);
+    expect(presentAutomationTarget).toHaveBeenCalledWith("tab-1");
+    expect(setAutomationSession).toHaveBeenCalledWith("launch:launch-browser-test", true);
     expect(
-      tab.webContents.executeJavaScript.mock.calls.some(([script]) =>
-        String(script).includes('press("Enter", "input", false)'),
+      (presentAutomationTarget as unknown as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
+    ).toBeGreaterThan(0);
+    expect(tab.webContents.insertText).toHaveBeenCalledWith("hello");
+    expect(send.mock.calls.some(([method]) => method === "Input.insertText")).toBe(false);
+    expect(send.mock.calls.some(([method]) => method === "Input.dispatchKeyEvent")).toBe(false);
+    expect(send).toHaveBeenCalledWith(
+      "Input.dispatchMouseEvent",
+      expect.objectContaining({ type: "mousePressed", x: 120, y: 80 }),
+    );
+    expect(send).toHaveBeenCalledWith("DOM.focus", { backendNodeId: 700 });
+    expect(send).toHaveBeenCalledWith("Page.createIsolatedWorld", {
+      frameId: "main",
+      worldName: "y-space-agent-cursor-v1",
+    });
+    expect(send.mock.calls.some(([method]) => method === "Runtime.callFunctionOn")).toBe(true);
+    expect(send.mock.calls.some(([method]) => method === "Runtime.releaseObject")).toBe(true);
+    expect(send.mock.calls.some(([method]) => method === "DOM.getNodeForLocation")).toBe(true);
+    expect(
+      send.mock.calls.some(
+        ([method, params]) =>
+          method === "Runtime.evaluate" &&
+          String(params?.expression ?? "").includes("elementFromPoint"),
       ),
-    ).toBe(true);
-    expect(tab.webContents.focus).not.toHaveBeenCalled();
+    ).toBe(false);
+    expect(tab.webContents.executeJavaScript).not.toHaveBeenCalled();
+    expect(tab.webContents.focus).toHaveBeenCalledTimes(3);
+    expect(tab.webContents.isFocused).toHaveBeenCalled();
+    expect(tab.webContents.sendInputEvent).toHaveBeenCalled();
   });
 
   it("keeps implicit targets per thread and can find or focus existing tabs", async () => {

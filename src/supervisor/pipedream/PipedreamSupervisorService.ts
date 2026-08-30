@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type {
+  PipedreamAccountSummary,
   PipedreamBeginConnectPayload,
   PipedreamDisconnectAccountPayload,
   PipedreamListAppsPayload,
@@ -21,8 +22,16 @@ import type {
   PipedreamPrivilegedConnectLinkResult,
 } from "@/shared/pipedreamPrivilegedIpc";
 import type { WslHostAccessResolver } from "@/supervisor/wsl/hostAccess";
-import { PipedreamApiClient, type PipedreamRemoteAccountSummary } from "./PipedreamApiClient";
-import { PipedreamConnectionStore } from "./PipedreamConnectionStore";
+import {
+  PipedreamApiClient,
+  type PipedreamConnectRedirects,
+  type PipedreamRemoteAccountSummary,
+} from "./PipedreamApiClient";
+import {
+  PipedreamConnectionStore,
+  type PipedreamConnectionStoreOptions,
+  type PipedreamGrantedRelayAccount,
+} from "./PipedreamConnectionStore";
 import {
   PipedreamLoopbackRelay,
   type PipedreamLoopbackRelayOptions,
@@ -30,8 +39,6 @@ import {
   type RegisterPipedreamRelayBindingInput,
 } from "./PipedreamLoopbackRelay";
 import { PipedreamTokenBroker } from "./PipedreamTokenBroker";
-
-export const PIPEDREAM_PERSONAL_MCP_URL = "https://mcp.pipedream.net/v2";
 
 export interface PipedreamSupervisorServiceOptions {
   readonly baseDir: string;
@@ -42,6 +49,7 @@ export interface PipedreamSupervisorServiceOptions {
   readonly fetch?: typeof globalThis.fetch;
   readonly wslHostAccess?: WslHostAccessResolver;
   readonly createRelay?: (options: PipedreamLoopbackRelayOptions) => PipedreamRelay;
+  readonly writeConnectionsFile?: PipedreamConnectionStoreOptions["writeFile"];
 }
 
 export interface PipedreamRelay {
@@ -86,37 +94,44 @@ export class PipedreamSupervisorService {
   readonly #pendingBindings = new Map<string, PendingRelayBinding>();
   readonly #bindingKeysByThread = new Map<string, Set<string>>();
   readonly #accountIdByBindingKey = new Map<string, string>();
+  readonly #relayDisposals = new Set<Promise<void>>();
+  readonly #revokedAccounts = new Map<string, PipedreamAccountSummary>();
+  readonly #pendingDisconnectAccountIds = new Set<string>();
   #bootstrap: PipedreamPrivilegedBootstrapPayload["bootstrap"] = { state: "absent" };
   #ready: ReadyRuntime | undefined;
-  #accountsReconciled = false;
   #accountsRefresh: Promise<void> | undefined;
   #projectName = "Pipedream Connect";
-  #errorCode: "authentication-failed" | "configuration-invalid" | "request-failed" | undefined;
+  #configurationError: "configuration-invalid" | undefined;
   #authorizationRevision = 0;
+  #accountMutationRevision = 0;
 
   constructor(options: PipedreamSupervisorServiceOptions) {
     this.#options = options;
     this.#store = new PipedreamConnectionStore({
       filePath: join(options.baseDir, "pipedream-connections.json"),
+      ...(options.writeConnectionsFile ? { writeFile: options.writeConnectionsFile } : {}),
     });
   }
 
   configure(payload: PipedreamPrivilegedBootstrapPayload): void {
     this.#authorizationRevision += 1;
+    this.#accountMutationRevision += 1;
     const previousRelay = this.#ready?.relay;
     this.#ready = undefined;
     this.#sharedBindings.clear();
     this.#pendingBindings.clear();
     this.#bindingKeysByThread.clear();
     this.#accountIdByBindingKey.clear();
-    this.#accountsReconciled = false;
+    this.#revokedAccounts.clear();
+    this.#pendingDisconnectAccountIds.clear();
     this.#accountsRefresh = undefined;
     this.#projectName = "Pipedream Connect";
-    if (previousRelay) void previousRelay.dispose();
+    if (previousRelay) void this.#trackRelayDisposal(previousRelay);
     this.#bootstrap = payload.bootstrap;
-    this.#errorCode = undefined;
+    this.#configurationError = undefined;
     if (payload.bootstrap.state !== "ready") return;
 
+    let nextRelay: PipedreamRelay | undefined;
     try {
       const { credentials } = payload.bootstrap;
       const broker = new PipedreamTokenBroker({
@@ -140,7 +155,7 @@ export class PipedreamSupervisorService {
         invalidateAccessToken: () => broker.invalidate(),
         ...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
       };
-      const relay =
+      nextRelay =
         this.#options.createRelay?.(relayOptions) ?? new PipedreamLoopbackRelay(relayOptions);
       this.#store.configureScope(
         [credentials.projectId, credentials.environment, payload.externalUserId.trim()].join(
@@ -151,10 +166,11 @@ export class PipedreamSupervisorService {
         projectId: credentials.projectId,
         environment: credentials.environment,
         api,
-        relay,
+        relay: nextRelay,
       };
     } catch {
-      this.#errorCode = "configuration-invalid";
+      if (nextRelay) void this.#trackRelayDisposal(nextRelay);
+      this.#configurationError = "configuration-invalid";
     }
   }
 
@@ -165,10 +181,10 @@ export class PipedreamSupervisorService {
       authenticated: personal.authenticated,
       serverName: "pd" as const,
     };
-    if (this.#errorCode) {
+    if (this.#configurationError) {
       return pipedreamSnapshotSchema.parse({
         personalMcp,
-        connect: { state: "error", code: this.#errorCode },
+        connect: { state: "error", code: this.#configurationError },
       });
     }
     if (this.#bootstrap.state === "absent") {
@@ -194,7 +210,7 @@ export class PipedreamSupervisorService {
         environment: this.#ready.environment,
         projectIdHint: projectIdHint(this.#ready.projectId),
         projectName: this.#projectName,
-        accounts: this.#store.list(),
+        accounts: this.#accountsForSnapshot(),
       },
     });
   }
@@ -222,9 +238,10 @@ export class PipedreamSupervisorService {
 
   async createConnectLink(
     payload: PipedreamBeginConnectPayload,
+    redirects: PipedreamConnectRedirects,
   ): Promise<PipedreamPrivilegedConnectLinkResult> {
     const { appSlug } = pipedreamBeginConnectPayloadSchema.parse(payload);
-    const result = await this.#withReadyRequest((ready) => ready.api.createConnectToken());
+    const result = await this.#withReadyRequest((ready) => ready.api.createConnectToken(redirects));
     const connectLink = new URL(result.connectLinkUrl);
     connectLink.searchParams.set("app", appSlug);
     return { connectLinkUrl: connectLink.toString(), expiresAt: result.expiresAt };
@@ -233,22 +250,105 @@ export class PipedreamSupervisorService {
   async disconnectAccount(payload: PipedreamDisconnectAccountPayload): Promise<PipedreamSnapshot> {
     const { accountId } = pipedreamDisconnectAccountPayloadSchema.parse(payload);
     this.#requireReady();
+    if (this.#pendingDisconnectAccountIds.has(accountId)) {
+      throw new Error("Pipedream account disconnect is already in progress.");
+    }
+    const account = this.#store.getScopedAccount(accountId) ?? this.#revokedAccounts.get(accountId);
+    if (!account) {
+      throw new Error("Pipedream account is not connected.");
+    }
     // Local authorization is the security boundary. Revoke it before the
     // upstream request so a slow or failed disconnect can never leave an
     // already-running agent route usable.
     this.#authorizationRevision += 1;
-    this.#store.remove(accountId);
+    this.#accountMutationRevision += 1;
+    this.#pendingDisconnectAccountIds.add(accountId);
+    this.#revokedAccounts.set(accountId, { ...account, agentAccess: false });
     this.#releaseBindingsUsingAccount(accountId);
-    await this.#withReadyRequest((ready) => ready.api.disconnectAccount(accountId));
-    return this.getSnapshot();
+    try {
+      this.#store.remove(accountId);
+    } catch {
+      // The failed write left the durable grant unchanged. Keep the account
+      // quarantined in this process, expose it as access-off for retry, and do
+      // not risk deleting the remote account without a durable local revoke.
+      this.#finishPendingDisconnect(accountId, false);
+      throw new Error("Pipedream request failed.");
+    }
+
+    let deleteError: unknown;
+    try {
+      await this.#withReadyRequest((ready) => ready.api.disconnectAccount(accountId));
+    } catch (error) {
+      deleteError = error;
+    }
+
+    if (deleteError === undefined) {
+      // A refresh can legitimately observe the upstream row while DELETE is
+      // still pending and restore it locally with access forced off. Invalidate
+      // every older refresh before removing that stale projection a final time.
+      this.#accountMutationRevision += 1;
+      try {
+        this.#store.remove(accountId);
+      } catch {
+        this.#finishPendingDisconnect(accountId, false);
+        throw new Error("Pipedream request failed.");
+      }
+      this.#finishPendingDisconnect(accountId, true);
+      return this.getSnapshot();
+    }
+
+    const disconnectError =
+      deleteError instanceof Error ? deleteError : new Error("Pipedream request failed.");
+    if (!this.#pendingDisconnectAccountIds.has(accountId)) throw disconnectError;
+    try {
+      // DELETE failed or its result was ambiguous. Reconcile before returning
+      // the failure so the renderer can immediately show the still-remote
+      // account as retryable without ever restoring its agent authorization.
+      try {
+        await this.#refreshAllAccounts();
+        // A failed response can be ambiguous after Pipedream already applied
+        // the DELETE. If a follow-up read proves the account is gone, report
+        // the verified end state as success instead of showing a false retry.
+        if (!this.#store.hasScopedAccount(accountId)) {
+          this.#finishPendingDisconnect(accountId, true);
+          return this.getSnapshot();
+        }
+      } catch {
+        // If the follow-up read is also unavailable, preserve a renderer-safe
+        // retry row locally. Its provider alias rotates and access remains off.
+        try {
+          this.#store.restoreRevokedAccount(account);
+        } catch {
+          // Keep the in-memory quarantine and safe retry projection. The
+          // original sanitized disconnect failure remains the public result.
+        }
+      }
+      const keepQuarantined = !this.#store.hasScopedAccount(accountId);
+      this.#finishPendingDisconnect(accountId, !keepQuarantined);
+      throw disconnectError;
+    } catch (error) {
+      if (this.#pendingDisconnectAccountIds.has(accountId)) {
+        this.#finishPendingDisconnect(accountId, false);
+      }
+      throw error instanceof Error ? error : new Error("Pipedream request failed.");
+    }
   }
 
   setAccountAgentAccess(payload: PipedreamSetAccountAgentAccessPayload): PipedreamSnapshot {
     const { accountId, enabled } = pipedreamSetAccountAgentAccessPayloadSchema.parse(payload);
     this.#requireReady();
-    this.#authorizationRevision += 1;
+    if (this.#pendingDisconnectAccountIds.has(accountId)) {
+      if (enabled) throw new Error("Pipedream account disconnect is in progress.");
+      return this.getSnapshot();
+    }
+    const previousGrantSignature = this.#grantedRelaySignature();
     this.#store.setAgentAccess(accountId, enabled);
-    if (!enabled) this.#releaseBindingsUsingAccount(accountId);
+    this.#revokedAccounts.delete(accountId);
+    const nextGrantSignature = this.#grantedRelaySignature();
+    if (previousGrantSignature !== nextGrantSignature) {
+      this.#authorizationRevision += 1;
+      if (!enabled) this.#releaseBindingsUsingAccount(accountId);
+    }
     return this.getSnapshot();
   }
 
@@ -259,13 +359,14 @@ export class PipedreamSupervisorService {
   }): Promise<ResolvedMcpServer[]> {
     const ready = this.#ready;
     if (!ready) return [];
-    if (!this.#accountsReconciled) {
-      try {
-        await this.#refreshAllAccounts();
-      } catch {
-        this.releaseMcpBindings(input.threadId);
-        return [];
-      }
+    try {
+      // The remote account set is an authorization input, so every launch
+      // reconciles it. #refreshAllAccounts shares one in-flight read across
+      // concurrent launches without allowing a completed read to stay cached.
+      await this.#refreshAllAccounts();
+    } catch {
+      this.releaseMcpBindings(input.threadId);
+      return [];
     }
 
     const reachability = await this.#resolveReachability(input.projectLocation);
@@ -274,7 +375,7 @@ export class PipedreamSupervisorService {
       return [];
     }
 
-    const accounts = this.#store.listGrantedForRelay();
+    const accounts = this.#grantedAccountsForRelay();
     const authorizationRevision = this.#authorizationRevision;
     const providerBindingId = input.providerBindingId?.trim() || `thread:${input.threadId}`;
     const desiredKeys = new Set(
@@ -342,25 +443,46 @@ export class PipedreamSupervisorService {
     this.#sharedBindings.clear();
     this.#pendingBindings.clear();
     this.#accountIdByBindingKey.clear();
+    this.#revokedAccounts.clear();
+    this.#pendingDisconnectAccountIds.clear();
     this.#accountsRefresh = undefined;
     this.#authorizationRevision += 1;
+    this.#accountMutationRevision += 1;
     const relay = this.#ready?.relay;
     this.#ready = undefined;
-    await relay?.dispose();
+    if (relay) void this.#trackRelayDisposal(relay);
+    await Promise.all([...this.#relayDisposals]);
+  }
+
+  #trackRelayDisposal(relay: PipedreamRelay): Promise<void> {
+    let disposal: Promise<void>;
+    try {
+      disposal = relay.dispose();
+    } catch {
+      return Promise.resolve();
+    }
+    let tracked!: Promise<void>;
+    tracked = disposal.catch(() => undefined).finally(() => this.#relayDisposals.delete(tracked));
+    this.#relayDisposals.add(tracked);
+    return tracked;
   }
 
   async #refreshAllAccounts(): Promise<void> {
     if (this.#accountsRefresh) return this.#accountsRefresh;
     const readyAtStart = this.#ready;
+    const mutationRevisionAtStart = this.#accountMutationRevision;
     let refresh!: Promise<void>;
-    refresh = this.#loadAllAccounts(readyAtStart).finally(() => {
+    refresh = this.#loadAllAccounts(readyAtStart, mutationRevisionAtStart).finally(() => {
       if (this.#accountsRefresh === refresh) this.#accountsRefresh = undefined;
     });
     this.#accountsRefresh = refresh;
     return refresh;
   }
 
-  async #loadAllAccounts(readyAtStart: ReadyRuntime | undefined): Promise<void> {
+  async #loadAllAccounts(
+    readyAtStart: ReadyRuntime | undefined,
+    mutationRevisionAtStart: number,
+  ): Promise<void> {
     const accounts = await this.#withReadyRequest(async (ready) => {
       const byId = new Map<string, PipedreamRemoteAccountSummary>();
       const seenCursors = new Set<string>();
@@ -382,13 +504,21 @@ export class PipedreamSupervisorService {
       }
       return [...byId.values()];
     });
-    if (!readyAtStart || this.#ready !== readyAtStart) {
-      throw new Error("Pipedream configuration changed while refreshing accounts.");
+    if (
+      !readyAtStart ||
+      this.#ready !== readyAtStart ||
+      this.#accountMutationRevision !== mutationRevisionAtStart
+    ) {
+      throw new Error("Pipedream request failed.");
     }
-    this.#store.replaceRemoteAccounts(accounts);
-    this.#authorizationRevision += 1;
-    this.#revokeBindingsNoLongerGranted();
-    this.#accountsReconciled = true;
+    const previousGrantSignature = this.#grantedRelaySignature();
+    const revokedAccountIds = new Set(this.#revokedAccounts.keys());
+    this.#store.replaceRemoteAccounts(accounts, revokedAccountIds);
+    const nextGrantSignature = this.#grantedRelaySignature();
+    if (previousGrantSignature !== nextGrantSignature) {
+      this.#authorizationRevision += 1;
+      this.#revokeBindingsNoLongerGranted();
+    }
     const project = await readyAtStart.api.getProject().catch(() => undefined);
     if (project && this.#ready === readyAtStart) this.#projectName = project.name;
   }
@@ -509,16 +639,11 @@ export class PipedreamSupervisorService {
     const ready = this.#requireReady();
     try {
       const result = await run(ready);
-      this.#errorCode = undefined;
+      if (this.#ready !== ready) throw new Error("Pipedream configuration changed.");
       return result;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      this.#errorCode = /authentication/i.test(message)
-        ? "authentication-failed"
-        : "request-failed";
+    } catch {
       // Deliberately do not preserve the upstream error as `cause`: it may
       // contain provider response details that must not cross public IPC.
-      // oxlint-disable-next-line eslint/preserve-caught-error
       throw new Error("Pipedream request failed.");
     }
   }
@@ -541,7 +666,7 @@ export class PipedreamSupervisorService {
 
   #revokeBindingsNoLongerGranted(): void {
     const grantedAccountIds = new Set(
-      this.#store.listGrantedForRelay().map(({ account }) => account.id),
+      this.#grantedAccountsForRelay().map(({ account }) => account.id),
     );
     for (const binding of [...this.#sharedBindings.values()]) {
       if (!grantedAccountIds.has(binding.upstreamAccountId)) this.#revokeSharedBinding(binding);
@@ -552,14 +677,58 @@ export class PipedreamSupervisorService {
   }
 
   #isGrantCurrent(accountId: string, localAccountId: string, appSlug: string): boolean {
+    return this.#grantedAccountsForRelay().some(
+      (candidate) =>
+        candidate.account.id === accountId &&
+        candidate.localAccountId === localAccountId &&
+        candidate.account.app.slug === appSlug,
+    );
+  }
+
+  /**
+   * The authorization revision protects pending relay creation from a grant
+   * changing underneath it. Account refreshes also update display metadata,
+   * so only the effective healthy, agent-enabled relay grant set belongs in
+   * that revision. Otherwise a harmless poll can invalidate a concurrent
+   * launch and make the agent start without its integration.
+   */
+  #grantedRelaySignature(): string {
+    const grants = this.#grantedAccountsForRelay()
+      .map(({ account, localAccountId }) => [account.id, localAccountId, account.app.slug] as const)
+      .sort((left, right) => {
+        const leftKey = JSON.stringify(left);
+        const rightKey = JSON.stringify(right);
+        return leftKey.localeCompare(rightKey);
+      });
+    return JSON.stringify(grants);
+  }
+
+  #grantedAccountsForRelay(): PipedreamGrantedRelayAccount[] {
     return this.#store
       .listGrantedForRelay()
-      .some(
-        (candidate) =>
-          candidate.account.id === accountId &&
-          candidate.localAccountId === localAccountId &&
-          candidate.account.app.slug === appSlug,
-      );
+      .filter(({ account }) => !this.#revokedAccounts.has(account.id));
+  }
+
+  #finishPendingDisconnect(accountId: string, clearQuarantine: boolean): void {
+    this.#accountMutationRevision += 1;
+    this.#pendingDisconnectAccountIds.delete(accountId);
+    if (clearQuarantine) this.#revokedAccounts.delete(accountId);
+  }
+
+  #accountsForSnapshot(): PipedreamAccountSummary[] {
+    const accounts = this.#store.list();
+    const indexById = new Map(accounts.map((account, index) => [account.id, index]));
+    for (const revoked of this.#revokedAccounts.values()) {
+      const safe = { ...revoked, agentAccess: false, app: { ...revoked.app } };
+      const index = indexById.get(revoked.id);
+      if (index === undefined) {
+        indexById.set(revoked.id, accounts.length);
+        accounts.push(safe);
+      } else {
+        accounts[index] = { ...accounts[index]!, agentAccess: false };
+      }
+    }
+    return accounts;
   }
 
   #isBindingDesired(key: string): boolean {

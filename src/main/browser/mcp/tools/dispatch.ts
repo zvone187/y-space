@@ -23,20 +23,31 @@ import {
   waitForUrl,
 } from "../../cdp/tools";
 import {
-  clickSelector,
-  doubleClickSelector,
-  fillSelector,
-  focusSelector,
-  hoverSelector,
-  pressKey,
-  scrollPage,
-  selectOption,
-  setCheckedSelector,
-  typeIntoSelector,
-} from "../../pageDriver";
-import { glideCursorToSelector } from "../../cursorOverlay";
+  completeCursorAction,
+  confirmCursorTarget,
+  dispatchNativeFocus,
+  dispatchNativeKey,
+  dispatchNativeSelect,
+  dispatchNativeText,
+  dispatchNativeToggle,
+  dispatchPointerClick,
+  dispatchPointerWheel,
+  glideCursorToActiveTarget,
+  glideCursorToSelector,
+  glideCursorToViewportCenter,
+  setCursorOverlayVisible,
+  type AgentCursorTarget,
+  type NativeInputAuthorization,
+  type NativeInputOutcome,
+  type NativeKeyboardInputDispatcher,
+  type NativeKeyboardInputOptions,
+  type NativeSelectMenuKey,
+  type NativeSelectMenuKeyDispatcher,
+} from "../../cursorOverlay";
+import type { AutomationPresentationLease } from "../../BrowserPanelManager";
 import {
   agentTabOpts,
+  automationSessionId,
   clampInteger,
   requireTab,
   resolveSelectorArg,
@@ -44,9 +55,595 @@ import {
 } from "./helpers";
 import { runScreenshotTool } from "./screenshot";
 import { compactToolSpec, normalizeToolName, TOOLS } from "./specs";
-import type { ToolContext } from "./types";
+import type { ResolvedBrowserTab, ToolContext } from "./types";
 
 const MAX_EVAL_RESULT = 64 * 1024;
+const INTERACTIVE_TOOLS = new Set([
+  "click",
+  "dblclick",
+  "focus",
+  "type",
+  "fill",
+  "check",
+  "uncheck",
+  "select",
+  "hover",
+  "press",
+  "scroll",
+]);
+const SERIALIZED_BROWSER_TOOLS = new Set([
+  ...INTERACTIVE_TOOLS,
+  "disable",
+  "activate_tab",
+  "new_tab",
+  "open_or_focus_tab",
+  "close_tab",
+  "navigate",
+  "back",
+  "forward",
+  "reload",
+  "screenshot",
+]);
+const interactiveQueues = new WeakMap<object, Map<string, Promise<void>>>();
+const NATIVE_SELECT_MENU_KEY_SETTLE_MS = 16;
+const NATIVE_KEYBOARD_SETTLE_MS = 16;
+const NATIVE_TEXT_INPUT_CAP_MS = 2_000;
+const NATIVE_DOCUMENT_GUARD_CAP_MS = 750;
+
+const NATIVE_SELECT_MENU_KEY_CODE: Record<NativeSelectMenuKey, string> = {
+  ArrowDown: "Down",
+  Enter: "Enter",
+  Escape: "Escape",
+  Home: "Home",
+};
+
+const NATIVE_KEY_CODE: Record<string, string> = {
+  ArrowDown: "Down",
+  ArrowLeft: "Left",
+  ArrowRight: "Right",
+  ArrowUp: "Up",
+  Backspace: "Backspace",
+  Delete: "Delete",
+  End: "End",
+  Enter: "Enter",
+  Esc: "Escape",
+  Escape: "Escape",
+  Home: "Home",
+  Tab: "Tab",
+  " ": "Space",
+};
+
+function interactiveInputResult(outcome: NativeInputOutcome): Record<string, unknown> {
+  if (outcome.status === "completed") return { ok: true };
+  if (outcome.status === "ambiguous") {
+    const timedOut = outcome.reason.endsWith("-timeout");
+    const transportRejected =
+      !timedOut &&
+      (outcome.reason.endsWith("-rejected") || outcome.reason.endsWith("-interrupted"));
+    const pointerMoveCompleted = outcome.partial === "pointer-move";
+    const singleClickCompleted = outcome.partial === "single-click";
+    const atLeastOneClickCompleted = outcome.partial === "at-least-one-click";
+    return {
+      ok: false,
+      ambiguous: true,
+      ...(timedOut ? { timedOut: true } : {}),
+      ...(transportRejected ? { transportRejected: true } : {}),
+      reason: outcome.reason,
+      ...(outcome.partial ? { partial: outcome.partial } : {}),
+      ...(typeof outcome.clickDispatched === "boolean"
+        ? { clickDispatched: outcome.clickDispatched }
+        : {}),
+      hint: pointerMoveCompleted
+        ? "Trusted pointer movement reached Chromium and page hover/mousemove handlers may have run. No click was dispatched. Inspect page state before any retry."
+        : singleClickCompleted
+          ? "One trusted click completed, but the requested double-click did not. Inspect page state before any retry."
+          : atLeastOneClickCompleted
+            ? "At least one trusted click completed, and the second click outcome is uncertain. Inspect page state before any retry."
+            : "Native input may already have reached Chromium. Inspect page state before any retry.",
+    };
+  }
+  const reason =
+    outcome.reason === "presentation-authorization-revoked"
+      ? "presentation-changed"
+      : outcome.reason;
+  return { error: `Native browser input failed: ${reason}` };
+}
+
+function nativeInputAuthorized(authorize: NativeInputAuthorization): boolean {
+  try {
+    return authorize() === true;
+  } catch {
+    return false;
+  }
+}
+
+interface PageFrameTreeResult {
+  frameTree?: { frame?: { id?: string; loaderId?: string } };
+}
+
+interface PresentedDocumentGuard {
+  readonly webContents: ResolvedBrowserTab["webContents"];
+  readonly cdp: ResolvedBrowserTab["cdp"];
+  readonly mainDocumentIdentity: string;
+}
+
+async function readMainDocumentIdentity(cdp: ResolvedBrowserTab["cdp"]): Promise<string | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      Promise.resolve(cdp.send<PageFrameTreeResult>("Page.getFrameTree")).then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        () => ({ status: "rejected" as const }),
+      ),
+      new Promise<{ status: "timed-out" }>((resolve) => {
+        timeout = setTimeout(() => resolve({ status: "timed-out" }), NATIVE_DOCUMENT_GUARD_CAP_MS);
+      }),
+    ]);
+    if (result.status !== "fulfilled") return null;
+    const frameId = result.value.frameTree?.frame?.id;
+    const loaderId = result.value.frameTree?.frame?.loaderId;
+    if (!frameId || !loaderId) return null;
+    return `${frameId.length}:${frameId}:${loaderId.length}:${loaderId}`;
+  } catch {
+    return null;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function capturePresentedDocument(
+  tab: ResolvedBrowserTab,
+  mainDocumentIdentity: string,
+): PresentedDocumentGuard | null {
+  try {
+    return {
+      webContents: tab.webContents,
+      cdp: tab.cdp,
+      mainDocumentIdentity,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function presentedGuestStillExact(tab: ResolvedBrowserTab, guard: PresentedDocumentGuard): boolean {
+  try {
+    return (
+      tab.webContents === guard.webContents &&
+      tab.cdp === guard.cdp &&
+      !guard.webContents.isDestroyed()
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function presentedDocumentStillExact(
+  tab: ResolvedBrowserTab,
+  guard: PresentedDocumentGuard,
+): Promise<boolean> {
+  if (!presentedGuestStillExact(tab, guard)) return false;
+  const identity = await readMainDocumentIdentity(guard.cdp);
+  return identity === guard.mainDocumentIdentity && presentedGuestStillExact(tab, guard);
+}
+
+function interactiveQueueTarget(
+  ctx: ToolContext,
+  payload: Record<string, unknown>,
+): { key: string; tabId?: string } {
+  const requested = typeof payload.tabId === "string" ? payload.tabId : undefined;
+  if (requested) return { key: "visible-browser-surface", tabId: requested };
+  const active = ctx.threadId
+    ? ctx.manager.getActiveTabForThread(ctx.threadId)
+    : ctx.manager.getActiveTab();
+  if (active) return { key: "visible-browser-surface", tabId: active.tabId };
+  return { key: "visible-browser-surface" };
+}
+
+async function serializeInteractive<T>(
+  ctx: ToolContext,
+  key: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  let queues = interactiveQueues.get(ctx.manager);
+  if (!queues) {
+    queues = new Map();
+    interactiveQueues.set(ctx.manager, queues);
+  }
+  const previous = queues.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.catch(() => {}).then(() => gate);
+  queues.set(key, tail);
+  await previous.catch(() => {});
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (queues.get(key) === tail) queues.delete(key);
+    if (queues.size === 0) interactiveQueues.delete(ctx.manager);
+  }
+}
+
+/** Interactive tools reveal their exact first-class tab and wait for a
+ * renderer/compositor acknowledgement before native input is eligible to run.
+ * Clearing the page hide style also makes an action visible when browser.enable
+ * was omitted or a previous session already called disable. */
+async function requireInteractiveTab(
+  ctx: ToolContext,
+  payload: Record<string, unknown>,
+): Promise<{
+  tab: ResolvedBrowserTab;
+  presentation: AutomationPresentationLease;
+  authorize: NativeInputAuthorization;
+}> {
+  // Interactive calls are self-contained: omitted browser.enable still starts
+  // a bounded lease that browser.disable (or expiry) can cleanly release.
+  ctx.manager.setAutomationSession(automationSessionId(ctx), true);
+  const result = await requireTab(ctx, payload);
+  const presentation = await ctx.manager.presentAutomationTarget(result.tab.tabId);
+  if (!presentation) {
+    throw new Error(
+      `Native browser input failed: presentation-unavailable for tab ${result.tab.tabId}`,
+    );
+  }
+  if (!(await setCursorOverlayVisible(result.tab.cdp, true))) {
+    throw new Error("Native browser input failed: cursor-unavailable");
+  }
+  const authorize: NativeInputAuthorization = () =>
+    ctx.manager.validateAutomationPresentation(presentation);
+  return { ...result, presentation, authorize };
+}
+
+function presentationChanged(
+  ctx: ToolContext,
+  presentation: AutomationPresentationLease,
+  target: AgentCursorTarget,
+): Record<string, unknown> | null {
+  if (target.nativeMoveAmbiguous) {
+    return interactiveInputResult({
+      status: "ambiguous",
+      reason: target.nativeMoveReason ?? "pointer-path-timeout",
+      ...(target.nativeMoveCompletedBeforeFailure
+        ? { partial: "pointer-move", clickDispatched: false }
+        : {}),
+    });
+  }
+  if (nativeInputAuthorized(() => ctx.manager.validateAutomationPresentation(presentation))) {
+    return null;
+  }
+  return target.nativeMoveCompletedBeforeFailure
+    ? interactiveInputResult({
+        status: "ambiguous",
+        reason: "presentation-changed",
+        partial: "pointer-move",
+        clickDispatched: false,
+      })
+    : { error: "Native browser input failed: presentation-changed" };
+}
+
+type FocusedPresentedGuest =
+  | { ok: true; authorize: NativeInputAuthorization }
+  | { ok: false; outcome: NativeInputOutcome };
+
+function completedPointerMoveOnly(reason: string): NativeInputOutcome {
+  return {
+    status: "ambiguous",
+    reason,
+    partial: "pointer-move",
+    clickDispatched: false,
+  };
+}
+
+/**
+ * CDP's DOM.focus only changes document focus. On macOS, printable key input
+ * is routed through the window's first-responder WebContents, so the exact
+ * visible guest must also own native focus before any keyboard side effect.
+ * Capture that guest and keep it in the authorization predicate so a tab/view
+ * replacement or focus theft stops the sequence before the next key.
+ */
+async function focusPresentedGuest(
+  tab: ResolvedBrowserTab,
+  authorize: NativeInputAuthorization,
+  mainDocumentIdentity: string,
+): Promise<FocusedPresentedGuest> {
+  const documentGuard = capturePresentedDocument(tab, mainDocumentIdentity);
+  if (!documentGuard) {
+    return { ok: false, outcome: completedPointerMoveOnly("guest-target-unavailable") };
+  }
+  const presentedWebContents = documentGuard.webContents;
+  if (!(await presentedDocumentStillExact(tab, documentGuard))) {
+    return { ok: false, outcome: completedPointerMoveOnly("guest-target-replaced") };
+  }
+  if (!nativeInputAuthorized(authorize)) {
+    return {
+      ok: false,
+      outcome: completedPointerMoveOnly("presentation-authorization-revoked"),
+    };
+  }
+  try {
+    presentedWebContents.focus();
+  } catch {
+    return { ok: false, outcome: completedPointerMoveOnly("guest-focus-rejected") };
+  }
+  if (!(await presentedDocumentStillExact(tab, documentGuard))) {
+    return { ok: false, outcome: completedPointerMoveOnly("guest-target-replaced") };
+  }
+  if (!nativeInputAuthorized(authorize)) {
+    return {
+      ok: false,
+      outcome: completedPointerMoveOnly("presentation-authorization-revoked"),
+    };
+  }
+  try {
+    if (!presentedWebContents.isFocused()) {
+      return {
+        ok: false,
+        outcome: completedPointerMoveOnly("guest-focus-did-not-apply"),
+      };
+    }
+  } catch {
+    return { ok: false, outcome: completedPointerMoveOnly("guest-focus-rejected") };
+  }
+  return {
+    ok: true,
+    authorize: () => {
+      if (!presentedGuestStillExact(tab, documentGuard) || !nativeInputAuthorized(authorize)) {
+        return false;
+      }
+      try {
+        return presentedWebContents.isFocused();
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
+function electronKeyboardModifiers(
+  options: NativeKeyboardInputOptions,
+): Electron.InputEvent["modifiers"] {
+  const mask = (options.modifiers ?? 0) | (options.shift ? 8 : 0);
+  const modifiers: NonNullable<Electron.InputEvent["modifiers"]> = [];
+  if (mask & 1) modifiers.push("alt");
+  if (mask & 2) modifiers.push("control");
+  if (mask & 4) modifiers.push("meta");
+  if (mask & 8) modifiers.push("shift");
+  return modifiers.length > 0 ? modifiers : undefined;
+}
+
+function electronKeyCode(key: string): string | null {
+  const mapped = NATIVE_KEY_CODE[key];
+  if (mapped) return mapped;
+  if (key.length !== 1) return null;
+  return /^[a-z]$/iu.test(key) ? key.toUpperCase() : key;
+}
+
+/** Bind every keyboard/text side effect to the exact presented guest. Unlike
+ * CDP key dispatch, WebContents-native input cannot follow the host renderer's
+ * first responder when the Y Space composer previously owned focus. */
+function createNativeKeyboardDispatcher(
+  tab: ResolvedBrowserTab,
+  authorize: NativeInputAuthorization,
+  mainDocumentIdentity: string,
+): NativeKeyboardInputDispatcher {
+  const documentGuard = capturePresentedDocument(tab, mainDocumentIdentity);
+  if (!documentGuard) {
+    return {
+      async key() {
+        return { status: "failed", reason: "guest-target-unavailable" };
+      },
+      async insertText() {
+        return { status: "failed", reason: "guest-target-unavailable" };
+      },
+    };
+  }
+  const presentedWebContents = documentGuard.webContents;
+  const synchronousGuardReason = (): string | null => {
+    try {
+      if (!presentedGuestStillExact(tab, documentGuard)) return "guest-target-replaced";
+      if (!nativeInputAuthorized(authorize)) return "presentation-authorization-revoked";
+      if (!presentedWebContents.isFocused()) return "guest-focus-lost";
+      return null;
+    } catch {
+      return "guest-target-unavailable";
+    }
+  };
+  const guardReason = async (): Promise<string | null> => {
+    if (!(await presentedDocumentStillExact(tab, documentGuard))) {
+      return "guest-target-replaced";
+    }
+    return synchronousGuardReason();
+  };
+  const releaseStillTargetsOriginalDocument = async (): Promise<boolean> => {
+    if (presentedWebContents.isDestroyed()) return false;
+    try {
+      if (tab.webContents !== presentedWebContents) {
+        return (
+          (await readMainDocumentIdentity(documentGuard.cdp)) === documentGuard.mainDocumentIdentity
+        );
+      }
+    } catch {
+      return false;
+    }
+    return await presentedDocumentStillExact(tab, documentGuard);
+  };
+  const releaseBestEffort = async (
+    keyCode: string,
+    modifiers: Electron.InputEvent["modifiers"],
+  ): Promise<void> => {
+    try {
+      if (!(await releaseStillTargetsOriginalDocument())) return;
+      presentedWebContents.sendInputEvent({
+        type: "keyUp",
+        keyCode,
+        ...(modifiers ? { modifiers } : {}),
+      });
+    } catch {}
+  };
+
+  return {
+    async key(key, options = {}) {
+      const keyCode = electronKeyCode(key);
+      if (!keyCode) return { status: "failed", reason: "native-key-unsupported" };
+      const modifiers = electronKeyboardModifiers(options);
+      const printable = key.length === 1 && !((options.modifiers ?? 0) & (1 | 2 | 4));
+      const printableKey = options.shift && /^[a-z]$/u.test(key) ? key.toUpperCase() : key;
+      const before = await guardReason();
+      if (before) return { status: "failed", reason: before };
+      try {
+        presentedWebContents.sendInputEvent({
+          type: "keyDown",
+          keyCode,
+          ...(modifiers ? { modifiers } : {}),
+        });
+      } catch {
+        return { status: "failed", reason: "native-key-down-rejected" };
+      }
+      const afterDown = await guardReason();
+      if (afterDown) {
+        await releaseBestEffort(keyCode, modifiers);
+        return { status: "ambiguous", reason: afterDown };
+      }
+      if (printable) {
+        try {
+          presentedWebContents.sendInputEvent({
+            type: "char",
+            keyCode: printableKey,
+            ...(modifiers ? { modifiers } : {}),
+          });
+        } catch {
+          await releaseBestEffort(keyCode, modifiers);
+          return { status: "ambiguous", reason: "native-char-rejected" };
+        }
+      }
+      const beforeUp = await guardReason();
+      if (beforeUp) {
+        await releaseBestEffort(keyCode, modifiers);
+        return { status: "ambiguous", reason: beforeUp };
+      }
+      try {
+        presentedWebContents.sendInputEvent({
+          type: "keyUp",
+          keyCode,
+          ...(modifiers ? { modifiers } : {}),
+        });
+      } catch {
+        await releaseBestEffort(keyCode, modifiers);
+        return { status: "ambiguous", reason: "native-key-up-rejected" };
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, NATIVE_KEYBOARD_SETTLE_MS);
+      });
+      return { status: "completed" };
+    },
+    async insertText(text) {
+      const before = await guardReason();
+      if (before) return { status: "failed", reason: before };
+      let result: "fulfilled" | "rejected" | "timed-out";
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        result = await Promise.race([
+          Promise.resolve(presentedWebContents.insertText(text)).then(
+            () => "fulfilled" as const,
+            () => "rejected" as const,
+          ),
+          new Promise<"timed-out">((resolve) => {
+            timeout = setTimeout(() => resolve("timed-out"), NATIVE_TEXT_INPUT_CAP_MS);
+          }),
+        ]);
+      } catch {
+        result = "rejected";
+      } finally {
+        if (timeout) clearTimeout(timeout);
+      }
+      if (result !== "fulfilled") {
+        return {
+          status: "ambiguous",
+          reason: result === "timed-out" ? "text-input-timeout" : "text-input-rejected",
+        };
+      }
+      const after = await guardReason();
+      if (after) return { status: "ambiguous", reason: after };
+      return { status: "completed" };
+    },
+  };
+}
+
+/** Bind OS-owned select-menu input to the exact guest that received the
+ * presentation proof on platforms whose native picker accepts raw menu keys. */
+function createNativeSelectMenuKeyDispatcher(
+  tab: ResolvedBrowserTab,
+  authorize: NativeInputAuthorization,
+  mainDocumentIdentity: string,
+): NativeSelectMenuKeyDispatcher {
+  const documentGuard = capturePresentedDocument(tab, mainDocumentIdentity);
+  if (!documentGuard) {
+    return async () => ({ status: "failed", reason: "select-native-menu-target-replaced" });
+  }
+  const presentedWebContents = documentGuard.webContents;
+  const releaseStillTargetsOriginalDocument = async (): Promise<boolean> => {
+    if (presentedWebContents.isDestroyed()) return false;
+    try {
+      if (tab.webContents !== presentedWebContents) {
+        return (
+          (await readMainDocumentIdentity(documentGuard.cdp)) === documentGuard.mainDocumentIdentity
+        );
+      }
+    } catch {
+      return false;
+    }
+    return await presentedDocumentStillExact(tab, documentGuard);
+  };
+  const releaseBestEffort = async (keyCode: string): Promise<void> => {
+    try {
+      if (!(await releaseStillTargetsOriginalDocument())) return;
+      presentedWebContents.sendInputEvent({ type: "keyUp", keyCode });
+    } catch {}
+  };
+
+  return async (key, options = {}) => {
+    const cleanup = options.cleanup === true && key === "Escape";
+    const keyCode = NATIVE_SELECT_MENU_KEY_CODE[key];
+    // The document proof is asynchronous, then the exact guest and synchronous
+    // presentation proof are rechecked immediately before the native side
+    // effect. Cleanup Escape may bypass presentation revocation only while the
+    // original document is still current.
+    if (!(await presentedDocumentStillExact(tab, documentGuard))) {
+      return { status: "failed", reason: "select-native-menu-target-replaced" };
+    }
+    if (!cleanup && !nativeInputAuthorized(authorize)) {
+      return { status: "failed", reason: "presentation-authorization-revoked" };
+    }
+    try {
+      presentedWebContents.sendInputEvent({ type: "rawKeyDown", keyCode });
+    } catch {
+      return { status: "failed", reason: "select-native-key-down-rejected" };
+    }
+    if (!(await presentedDocumentStillExact(tab, documentGuard))) {
+      await releaseBestEffort(keyCode);
+      return { status: "ambiguous", reason: "select-native-menu-target-replaced" };
+    }
+    if (!cleanup && !nativeInputAuthorized(authorize)) {
+      await releaseBestEffort(keyCode);
+      return { status: "ambiguous", reason: "presentation-authorization-revoked" };
+    }
+    try {
+      presentedWebContents.sendInputEvent({ type: "keyUp", keyCode });
+    } catch {
+      await releaseBestEffort(keyCode);
+      return { status: "ambiguous", reason: "select-native-key-up-rejected" };
+    }
+    // sendInputEvent enqueues native work. Yield one frame-equivalent so the
+    // OS menu can update before the next exact-node/:open revalidation.
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, NATIVE_SELECT_MENU_KEY_SETTLE_MS);
+    });
+    return { status: "completed" };
+  };
+}
 
 /** Raw dispatch returning JS objects. The MCP wrapper formats these into the
  *  proper content shape. */
@@ -55,7 +652,26 @@ export async function dispatchTool(
   payload: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<unknown> {
-  switch (normalizeToolName(name)) {
+  const normalized = normalizeToolName(name);
+  if (SERIALIZED_BROWSER_TOOLS.has(normalized)) {
+    const target = interactiveQueueTarget(ctx, payload);
+    return await serializeInteractive(ctx, target.key, async () =>
+      dispatchToolUnqueued(
+        normalized,
+        target.tabId ? { ...payload, tabId: target.tabId } : payload,
+        ctx,
+      ),
+    );
+  }
+  return await dispatchToolUnqueued(normalized, payload, ctx);
+}
+
+async function dispatchToolUnqueued(
+  name: string,
+  payload: Record<string, unknown>,
+  ctx: ToolContext,
+): Promise<unknown> {
+  switch (name) {
     case "api":
       return {
         server: "browser",
@@ -68,6 +684,7 @@ export async function dispatchTool(
           "Use fill for form fields when replacing text; use type only when appending text to the current value.",
           "Use wait after navigation or mutations instead of fixed sleeps unless a plain ms delay is intentional.",
           "Use requests and console after actions to verify web app behavior and diagnose failures.",
+          "Interactive tools present the exact global browser tab and move the orange Y Space cursor to the real target; passive inspection remains in the background without ornamental cursor activity.",
           "Use eval, cookies, and storage only when the corresponding Y Space setting allows it.",
         ],
         workflows: {
@@ -114,7 +731,7 @@ export async function dispatchTool(
         tabs: tabOverview(ctx),
       };
     case "enable": {
-      const sessionId = ctx.threadId ?? "unscoped";
+      const sessionId = automationSessionId(ctx);
       ctx.manager.setAutomationSession(sessionId, true);
       const tab = ctx.threadId
         ? ctx.manager.getActiveTabForThread(ctx.threadId)
@@ -127,7 +744,9 @@ export async function dispatchTool(
       return { enabled: true };
     }
     case "disable": {
-      ctx.manager.setAutomationSession(ctx.threadId ?? "unscoped", false);
+      // The manager-wide queue places disable after every already-enqueued
+      // input or tab mutation, so presence cannot disappear mid-gesture.
+      ctx.manager.setAutomationSession(automationSessionId(ctx), false);
       return { enabled: false };
     }
     case "list_tabs":
@@ -153,7 +772,7 @@ export async function dispatchTool(
     case "new_tab": {
       const url = typeof payload.url === "string" ? payload.url : undefined;
       const activate = payload.activate !== false;
-      const sessionId = ctx.threadId ?? "unscoped";
+      const sessionId = automationSessionId(ctx);
       ctx.manager.touchAutomationSession(sessionId);
       const tab = await ctx.manager.createTab(
         { ...(url ? { url } : {}), activate },
@@ -168,9 +787,10 @@ export async function dispatchTool(
       if (!ctx.manager.getTab(tabId)) throw new Error(`unknown tab ${tabId}`);
       ctx.manager.setActiveTab(tabId);
       if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, tabId);
-      ctx.manager.recordAutomationTarget(ctx.threadId ?? "unscoped", tabId);
+      const sessionId = automationSessionId(ctx);
+      ctx.manager.recordAutomationTarget(sessionId, tabId);
       await ctx.manager.ensureTabReady(tabId);
-      await ctx.manager.showAutomationCursor(ctx.threadId ?? "unscoped", tabId);
+      await ctx.manager.showAutomationCursor(sessionId, tabId);
       return { ok: true };
     }
     case "open_or_focus_tab": {
@@ -184,13 +804,14 @@ export async function dispatchTool(
       if (existing) {
         if (payload.activate !== false) ctx.manager.setActiveTab(existing.tabId);
         if (ctx.threadId) ctx.manager.rememberTabForThread(ctx.threadId, existing.tabId);
-        ctx.manager.recordAutomationTarget(ctx.threadId ?? "unscoped", existing.tabId);
+        const sessionId = automationSessionId(ctx);
+        ctx.manager.recordAutomationTarget(sessionId, existing.tabId);
         await ctx.manager.ensureTabReady(existing.tabId);
-        await ctx.manager.showAutomationCursor(ctx.threadId ?? "unscoped", existing.tabId);
+        await ctx.manager.showAutomationCursor(sessionId, existing.tabId);
         return { created: false, tab: existing };
       }
       const activate = payload.activate !== false;
-      const sessionId = ctx.threadId ?? "unscoped";
+      const sessionId = automationSessionId(ctx);
       ctx.manager.touchAutomationSession(sessionId);
       const tab = await ctx.manager.createTab({ url, activate }, agentTabOpts(ctx));
       ctx.manager.recordAutomationTarget(sessionId, tab.tabId);
@@ -257,73 +878,171 @@ export async function dispatchTool(
       return { found };
     }
     case "click": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await clickSelector(tab.webContents, selector);
+      const target = await glideCursorToSelector(tab.cdp, selector, "click", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const outcome = await dispatchPointerClick(tab.cdp, target, 1, authorize);
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "click", {}, authorize);
       return { ok: true };
     }
     case "dblclick": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await doubleClickSelector(tab.webContents, selector);
+      const target = await glideCursorToSelector(tab.cdp, selector, "double-click", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const outcome = await dispatchPointerClick(tab.cdp, target, 2, authorize);
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "double-click", {}, authorize);
       return { ok: true };
     }
     case "focus": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await focusSelector(tab.webContents, selector);
+      const target = await glideCursorToSelector(tab.cdp, selector, "focus", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const focusedGuest = await focusPresentedGuest(tab, authorize, target.mainDocumentIdentity);
+      if (!focusedGuest.ok) return interactiveInputResult(focusedGuest.outcome);
+      const outcome = await dispatchNativeFocus(tab.cdp, selector, target, focusedGuest.authorize);
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "focus", {}, authorize);
       return { ok: true };
     }
     case "type": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const text = String(payload.text ?? "");
       const submit = payload.submit === true;
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await typeIntoSelector(tab.webContents, selector, text, submit);
+      const target = await glideCursorToSelector(tab.cdp, selector, "text", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const focusedGuest = await focusPresentedGuest(tab, authorize, target.mainDocumentIdentity);
+      if (!focusedGuest.ok) return interactiveInputResult(focusedGuest.outcome);
+      const nativeKeyboard = createNativeKeyboardDispatcher(
+        tab,
+        authorize,
+        target.mainDocumentIdentity,
+      );
+      const outcome = await dispatchNativeText(
+        tab.cdp,
+        selector,
+        target,
+        text,
+        {
+          replace: false,
+          submit,
+        },
+        focusedGuest.authorize,
+        nativeKeyboard,
+      );
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "text", {}, authorize);
       return { ok: true };
     }
     case "fill": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const text = String(payload.text ?? "");
       const submit = payload.submit === true;
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await fillSelector(tab.webContents, selector, text, submit);
+      const target = await glideCursorToSelector(tab.cdp, selector, "text", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const focusedGuest = await focusPresentedGuest(tab, authorize, target.mainDocumentIdentity);
+      if (!focusedGuest.ok) return interactiveInputResult(focusedGuest.outcome);
+      const nativeKeyboard = createNativeKeyboardDispatcher(
+        tab,
+        authorize,
+        target.mainDocumentIdentity,
+      );
+      const outcome = await dispatchNativeText(
+        tab.cdp,
+        selector,
+        target,
+        text,
+        {
+          replace: true,
+          submit,
+        },
+        focusedGuest.authorize,
+        nativeKeyboard,
+      );
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "text", {}, authorize);
       return { ok: true };
     }
     case "check": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await setCheckedSelector(tab.webContents, selector, true);
+      const target = await glideCursorToSelector(tab.cdp, selector, "toggle", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const outcome = await dispatchNativeToggle(tab.cdp, selector, target, true, authorize);
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "toggle", { label: "✓" }, authorize);
       return { ok: true };
     }
     case "uncheck": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await setCheckedSelector(tab.webContents, selector, false);
+      const target = await glideCursorToSelector(tab.cdp, selector, "toggle", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const outcome = await dispatchNativeToggle(tab.cdp, selector, target, false, authorize);
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "toggle", { label: "–" }, authorize);
       return { ok: true };
     }
     case "select": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const value = String(payload.value ?? "");
       if (!value) throw new Error("value required");
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await selectOption(tab.webContents, selector, value);
+      const target = await glideCursorToSelector(tab.cdp, selector, "select", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const focusedGuest = await focusPresentedGuest(tab, authorize, target.mainDocumentIdentity);
+      if (!focusedGuest.ok) return interactiveInputResult(focusedGuest.outcome);
+      const nativeKeyboard = createNativeKeyboardDispatcher(
+        tab,
+        authorize,
+        target.mainDocumentIdentity,
+      );
+      const outcome = await dispatchNativeSelect(
+        tab.cdp,
+        selector,
+        target,
+        value,
+        createNativeSelectMenuKeyDispatcher(
+          tab,
+          focusedGuest.authorize,
+          target.mainDocumentIdentity,
+        ),
+        focusedGuest.authorize,
+        process.platform === "darwin" ? "typeahead" : "native-menu",
+        nativeKeyboard,
+      );
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "select", {}, authorize);
       return { ok: true };
     }
     case "eval": {
@@ -408,25 +1127,51 @@ export async function dispatchTool(
       });
     }
     case "hover": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const selector = await resolveSelectorArg(tab, payload);
       if (!selector) throw new Error("selector or ref required");
-      await glideCursorToSelector(tab.cdp, selector);
-      await hoverSelector(tab.webContents, selector);
+      const target = await glideCursorToSelector(tab.cdp, selector, "hover", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const outcome = await confirmCursorTarget(tab.cdp, target);
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
       return { ok: true };
     }
     case "press": {
-      const { tab } = await requireTab(ctx, payload);
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
       const key = String(payload.key ?? "");
       if (!key) throw new Error("key required");
       const hasTarget = typeof payload.selector === "string" || typeof payload.ref === "string";
       const selector = hasTarget ? await resolveSelectorArg(tab, payload) : undefined;
       if (hasTarget && !selector) throw new Error("selector or ref required");
       const shift = payload.shift === true;
-      // Glide to a concrete target (like the other element-acting cases); an
-      // untargeted page-level press has nowhere to move the cursor.
-      if (selector) await glideCursorToSelector(tab.cdp, selector);
-      await pressKey(tab.webContents, key, selector ?? undefined, { shift });
+      const target = selector
+        ? await glideCursorToSelector(tab.cdp, selector, "press", authorize)
+        : await glideCursorToActiveTarget(tab.cdp, "press", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      const focusedGuest = await focusPresentedGuest(tab, authorize, target.mainDocumentIdentity);
+      if (!focusedGuest.ok) return interactiveInputResult(focusedGuest.outcome);
+      const nativeKeyboard = createNativeKeyboardDispatcher(
+        tab,
+        authorize,
+        target.mainDocumentIdentity,
+      );
+      const outcome = await dispatchNativeKey(
+        tab.cdp,
+        selector ?? undefined,
+        target,
+        key,
+        {
+          shift,
+        },
+        focusedGuest.authorize,
+        nativeKeyboard,
+      );
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "press", { label: key }, authorize);
       return { ok: true };
     }
     case "wait": {
@@ -461,16 +1206,34 @@ export async function dispatchTool(
       throw new Error("wait requires selector, text, url, js, or ms");
     }
     case "scroll": {
-      const { tab } = await requireTab(ctx, payload);
-      const selector =
-        typeof payload.selector === "string" || typeof payload.ref === "string"
-          ? await resolveSelectorArg(tab, payload)
-          : undefined;
-      await scrollPage(tab.webContents, {
-        ...(selector ? { selector } : {}),
-        ...(typeof payload.x === "number" ? { x: payload.x } : {}),
-        ...(typeof payload.y === "number" ? { y: payload.y } : {}),
-      });
+      const { tab, presentation, authorize } = await requireInteractiveTab(ctx, payload);
+      const hasTarget = typeof payload.selector === "string" || typeof payload.ref === "string";
+      const selector = hasTarget
+        ? ((await resolveSelectorArg(tab, payload)) ?? undefined)
+        : undefined;
+      if (hasTarget && !selector) throw new Error("selector or ref required");
+      const deltaX = typeof payload.x === "number" && Number.isFinite(payload.x) ? payload.x : 0;
+      const deltaY = typeof payload.y === "number" && Number.isFinite(payload.y) ? payload.y : 0;
+      const target = selector
+        ? await glideCursorToSelector(tab.cdp, selector, "scroll", authorize)
+        : await glideCursorToViewportCenter(tab.cdp, "scroll", authorize);
+      if (!target) return { error: "Native browser input failed: target-unavailable" };
+      const changed = presentationChanged(ctx, presentation, target);
+      if (changed) return changed;
+      let outcome: NativeInputOutcome;
+      if (selector) {
+        // A selector without deltas means "bring into view"; the move phase did
+        // that before drawing the matching cursor trajectory. With deltas, send
+        // a real wheel at the selected element (including nested scrollers).
+        outcome =
+          deltaX !== 0 || deltaY !== 0
+            ? await dispatchPointerWheel(tab.cdp, target, deltaX, deltaY, authorize)
+            : await confirmCursorTarget(tab.cdp, target);
+      } else {
+        outcome = await dispatchPointerWheel(tab.cdp, target, deltaX, deltaY, authorize);
+      }
+      if (outcome.status !== "completed") return interactiveInputResult(outcome);
+      await completeCursorAction(tab.cdp, target, "scroll", { deltaX, deltaY }, authorize);
       return { ok: true };
     }
     case "wait_for_url": {

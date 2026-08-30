@@ -104,14 +104,16 @@ describe("base control styles", () => {
   });
 
   it("uses a calm elevated composer with one orange send action", () => {
-    expect(exactRuleFor(".poracode-composer-shell")).toContain("border-radius: 20px");
+    expect(exactRuleFor(".poracode-composer-shell")).toContain("border-radius: 24px");
     expect(exactRuleFor(".poracode-composer-shell")).toContain(
       "backdrop-filter: var(--glass-backdrop)",
     );
-    expect(exactRuleFor(".poracode-composer-shell")).toContain("0 12px 36px");
-    expect(exactRuleFor(".poracode-composer-shell:focus-within")).toContain("var(--accent)");
+    expect(exactRuleFor(".poracode-composer-shell")).toContain("0 22px 52px -30px");
     expect(exactRuleFor(".poracode-composer-shell:focus-within")).toContain(
-      "border-color: var(--accent)",
+      "border-color: color-mix(in oklab, var(--accent) 62%, var(--glass-border))",
+    );
+    expect(exactRuleFor(".poracode-composer-shell:focus-within")).toContain(
+      "0 0 0 3px color-mix(in oklab, var(--accent) 12%, transparent)",
     );
     expect(exactRuleFor(".poracode-composer-send")).toContain("background: var(--accent)");
     expect(exactRuleFor(".poracode-composer-send")).toContain("color: var(--accent-foreground)");
@@ -129,7 +131,7 @@ describe("base control styles", () => {
     expect(glassRule).toContain("-webkit-backdrop-filter: var(--glass-backdrop)");
     expect(glassRule).toContain("box-shadow: var(--glass-shadow)");
 
-    expect(styles).toContain("--glass-chrome-radius: 14px");
+    expect(styles).toContain("--glass-chrome-radius: 16px");
     expect(styles).toContain("--glass-muted: #504f4c");
     expect(contrastRatio("#504f4c", "#cccccc")).toBeGreaterThanOrEqual(4.5);
   });
@@ -152,9 +154,10 @@ describe("base control styles", () => {
     expect(threadView).toContain("poracode-thread-header-glass");
     expect(threadView).toContain("poracode-thread-content-plane");
     expect(omnibox).toContain("poracode-browser-omnibox");
+    expect(omnibox).toContain("rounded-full");
 
     expect(styles).toMatch(
-      /\.poracode-thread-header-glass,\s*\.poracode-browser-chrome\s*\{[^}]*border:\s*1px solid var\(--glass-border\);[^}]*border-radius:\s*12px;[^}]*background-image:\s*var\(--glass-specular\);[^}]*box-shadow:/s,
+      /\.poracode-thread-header-glass,\s*\.poracode-browser-chrome\s*\{[^}]*border:\s*1px solid var\(--glass-border\);[^}]*border-radius:\s*16px;[^}]*background-image:\s*var\(--glass-specular\);[^}]*box-shadow:/s,
     );
     const cssWithoutComments = styles.replace(/\/\*[\s\S]*?\*\//g, "");
     for (const rule of cssWithoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -165,6 +168,17 @@ describe("base control styles", () => {
         /webview|data-y-space-browser-host|poracode-browser-content-plane|poracode-thread-content-plane/,
       );
     }
+  });
+
+  it("uses a soft tab capsule with a small orange accent instead of a hard underline", () => {
+    expect(exactRuleFor('.poracode-workspace-tab[data-selected="true"]')).toContain(
+      "border-color: var(--glass-border)",
+    );
+    const accentRule = exactRuleFor(".poracode-workspace-tab__accent");
+    expect(accentRule).toContain("width: 18px");
+    expect(accentRule).toContain("height: 2px");
+    expect(accentRule).toContain("border-radius: 999px");
+    expect(accentRule).toContain("background: var(--accent)");
   });
 
   it("limits translucent chrome to stable shell surfaces with an opaque accessibility fallback", () => {
@@ -183,7 +197,7 @@ describe("base control styles", () => {
   it("uses theme-aware glass edge and elevation tokens", () => {
     expect(styles).toContain("--glass-edge-highlight: rgb(255 255 255 / 0.62)");
     expect(styles).toContain("--glass-edge-highlight-strong: rgb(255 255 255 / 0.74)");
-    expect(styles).toContain("--glass-elevation: rgb(24 20 16 / 0.09)");
+    expect(styles).toContain("--glass-elevation: rgb(24 20 16 / 0.075)");
     expect(styles).toMatch(
       /\.dark,[^{]*\[data-theme="dark"\]\s*\{[^}]*--glass-edge-highlight:\s*rgb\(255 255 255 \/ 0\.07\);[^}]*--glass-edge-highlight-strong:\s*rgb\(255 255 255 \/ 0\.09\);[^}]*--glass-elevation:\s*rgb\(0 0 0 \/ 0\.3\);/s,
     );

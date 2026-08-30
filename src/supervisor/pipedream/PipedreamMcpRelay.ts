@@ -54,6 +54,7 @@ export function buildPipedreamMcpUpstreamHeaders(
     requireBounded(input.externalUserId, 250, "external user id"),
   );
   headers.set("x-pd-app-slug", requirePattern(input.appSlug, APP_SLUG_PATTERN, "app slug"));
+  headers.set("x-pd-registry", "all");
   if (input.accountId !== undefined) {
     headers.set(
       "x-pd-account-id",
@@ -68,10 +69,31 @@ export interface PipedreamMcpSessionBinding {
   readonly sessionId: string;
 }
 
+export interface PipedreamMcpSessionRegistryOptions {
+  readonly maxSessionsPerBinding?: number;
+  readonly maxSessionsTotal?: number;
+}
+
+const DEFAULT_MAX_SESSIONS_PER_BINDING = 64;
+const DEFAULT_MAX_SESSIONS_TOTAL = 4_096;
+
 /** Tracks ownership so an upstream MCP session cannot be replayed by another binding. */
 export class PipedreamMcpSessionRegistry {
   readonly #ownerBySessionId = new Map<string, string>();
   readonly #sessionIdsByBinding = new Map<string, Set<string>>();
+  readonly #maxSessionsPerBinding: number;
+  readonly #maxSessionsTotal: number;
+
+  constructor(options: PipedreamMcpSessionRegistryOptions = {}) {
+    this.#maxSessionsPerBinding = requirePositiveInteger(
+      options.maxSessionsPerBinding ?? DEFAULT_MAX_SESSIONS_PER_BINDING,
+      "per-binding MCP session limit",
+    );
+    this.#maxSessionsTotal = requirePositiveInteger(
+      options.maxSessionsTotal ?? DEFAULT_MAX_SESSIONS_TOTAL,
+      "global MCP session limit",
+    );
+  }
 
   bind(binding: PipedreamMcpSessionBinding): void {
     const bindingId = requireBounded(binding.bindingId, 256, "relay binding id");
@@ -82,8 +104,14 @@ export class PipedreamMcpSessionRegistry {
     }
     if (existingOwner === bindingId) return;
 
-    this.#ownerBySessionId.set(sessionId, bindingId);
     const ownedSessions = this.#sessionIdsByBinding.get(bindingId) ?? new Set<string>();
+    if (ownedSessions.size >= this.#maxSessionsPerBinding) {
+      throw new Error("Pipedream MCP session limit reached for this relay binding.");
+    }
+    if (this.#ownerBySessionId.size >= this.#maxSessionsTotal) {
+      throw new Error("Pipedream MCP relay session limit reached.");
+    }
+    this.#ownerBySessionId.set(sessionId, bindingId);
     ownedSessions.add(sessionId);
     this.#sessionIdsByBinding.set(bindingId, ownedSessions);
   }
@@ -93,6 +121,20 @@ export class PipedreamMcpSessionRegistry {
     const sessionId = binding.sessionId.trim();
     if (!bindingId || !sessionId) return false;
     return this.#ownerBySessionId.get(sessionId) === bindingId;
+  }
+
+  clearSession(binding: PipedreamMcpSessionBinding): boolean {
+    const bindingId = binding.bindingId.trim();
+    const sessionId = binding.sessionId.trim();
+    if (!bindingId || !sessionId || this.#ownerBySessionId.get(sessionId) !== bindingId) {
+      return false;
+    }
+
+    this.#ownerBySessionId.delete(sessionId);
+    const ownedSessions = this.#sessionIdsByBinding.get(bindingId);
+    ownedSessions?.delete(sessionId);
+    if (ownedSessions?.size === 0) this.#sessionIdsByBinding.delete(bindingId);
+    return true;
   }
 
   clearBinding(bindingId: string): void {
@@ -108,6 +150,11 @@ export class PipedreamMcpSessionRegistry {
     this.#ownerBySessionId.clear();
     this.#sessionIdsByBinding.clear();
   }
+}
+
+function requirePositiveInteger(value: number, label: string): number {
+  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`Invalid Pipedream ${label}.`);
+  return value;
 }
 
 export interface PipedreamUnauthorizedRetryInput {

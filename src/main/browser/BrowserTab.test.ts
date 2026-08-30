@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const installSessionPermissions = vi.hoisted(() => vi.fn<() => void>());
+const installSensitiveSessionPermissions = vi.hoisted(() => vi.fn<() => void>());
+const removeNavigationGuards = vi.hoisted(() => vi.fn<() => void>());
 const installNavigationGuards = vi.hoisted(() =>
-  vi.fn<() => () => void>(() => vi.fn<() => void>()),
+  vi.fn<() => () => void>(() => removeNavigationGuards),
 );
 const dialogEnable = vi.hoisted(() => vi.fn<() => Promise<void>>().mockResolvedValue(undefined));
 const dialogSuspend = vi.hoisted(() => vi.fn<() => void>());
@@ -20,6 +22,7 @@ vi.mock("./cdp/cdpClient", () => ({
   CdpClient: class CdpClient {
     attach = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     detach = vi.fn<() => void>();
+    isAttached = vi.fn<() => boolean>().mockReturnValue(true);
     send: CdpSend;
 
     constructor() {
@@ -55,6 +58,7 @@ vi.mock("./cdp/networkCapture", () => ({
 }));
 
 vi.mock("./permissions", () => ({
+  installSensitiveSessionPermissions,
   installSessionPermissions,
   installNavigationGuards,
   isNavigationUrlAllowed: () => true,
@@ -116,6 +120,7 @@ describe("BrowserTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cdpSends.length = 0;
+    dialogEnable.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -192,6 +197,174 @@ describe("BrowserTab", () => {
     expect((tab as unknown as { attachmentWaiters: Set<unknown> }).attachmentWaiters.size).toBe(0);
   });
 
+  it("becomes ready when best-effort dialog initialization never settles", async () => {
+    vi.useFakeTimers();
+    dialogEnable.mockReturnValue(new Promise<void>(() => {}));
+    const { BrowserTab } = await import("./BrowserTab");
+    const tab = new BrowserTab({
+      tabId: "tab-dialog-init-timeout",
+      userAgent: "ua",
+      onUpdate: vi.fn<() => void>(),
+      onAttention: vi.fn<() => void>(),
+      onPopup: vi.fn<() => void>(),
+    });
+
+    tab.attach(createWebContents() as never);
+    const ready = tab.whenAttached();
+    const observed = ready.then(
+      () => "ready" as const,
+      () => "rejected" as const,
+    );
+
+    await vi.advanceTimersByTimeAsync(1_100);
+
+    expect(await Promise.race([observed, Promise.resolve("pending" as const)])).toBe("ready");
+    expect((tab as unknown as { attachmentWaiters: Set<unknown> }).attachmentWaiters.size).toBe(0);
+    await tab.destroy();
+  });
+
+  it("becomes ready when replacement retained-script restoration never settles", async () => {
+    vi.useFakeTimers();
+    const { BrowserTab } = await import("./BrowserTab");
+    const tab = new BrowserTab({
+      tabId: "tab-retained-init-timeout",
+      userAgent: "ua",
+      onUpdate: vi.fn<() => void>(),
+      onAttention: vi.fn<() => void>(),
+      onPopup: vi.fn<() => void>(),
+    });
+    const firstWebContents = createWebContents("https://example.com/first");
+    tab.attach(firstWebContents as never);
+    await tab.whenAttached();
+    await tab.addInitScript("window.__retained = true");
+
+    firstWebContents.emit("destroyed");
+    const secondWebContents = createWebContents("https://example.com/second");
+    tab.attach(secondWebContents as never);
+    cdpSends[1]?.mockImplementation(async (method) => {
+      if (method === "Page.addScriptToEvaluateOnNewDocument") {
+        return await new Promise<never>(() => {});
+      }
+      return {};
+    });
+    const ready = tab.whenAttached();
+    const observed = ready.then(
+      () => "ready" as const,
+      () => "rejected" as const,
+    );
+
+    await vi.advanceTimersByTimeAsync(1_100);
+
+    expect(await Promise.race([observed, Promise.resolve("pending" as const)])).toBe("ready");
+    expect((tab as unknown as { attachmentWaiters: Set<unknown> }).attachmentWaiters.size).toBe(0);
+    await tab.destroy();
+  });
+
+  it("becomes ready when retained-script one-shot application never settles", async () => {
+    vi.useFakeTimers();
+    const { BrowserTab } = await import("./BrowserTab");
+    const tab = new BrowserTab({
+      tabId: "tab-retained-application-timeout",
+      userAgent: "ua",
+      onUpdate: vi.fn<() => void>(),
+      onAttention: vi.fn<() => void>(),
+      onPopup: vi.fn<() => void>(),
+    });
+    const firstWebContents = createWebContents("https://example.com/first");
+    tab.attach(firstWebContents as never);
+    await tab.whenAttached();
+    await tab.addInitScript("window.__retained = true");
+
+    firstWebContents.emit("destroyed");
+    const secondWebContents = createWebContents("https://example.com/second");
+    tab.attach(secondWebContents as never);
+    let scriptNumber = 0;
+    cdpSends[1]?.mockImplementation(async (method) => {
+      if (method === "Page.addScriptToEvaluateOnNewDocument") {
+        scriptNumber += 1;
+        return { identifier: `replacement-script-${scriptNumber}` };
+      }
+      if (method === "Runtime.evaluate") return await new Promise<never>(() => {});
+      return {};
+    });
+    const ready = tab.whenAttached();
+    const observed = ready.then(
+      () => "ready" as const,
+      () => "rejected" as const,
+    );
+
+    await vi.advanceTimersByTimeAsync(1_100);
+
+    expect(await Promise.race([observed, Promise.resolve("pending" as const)])).toBe("ready");
+    expect((tab as unknown as { attachmentWaiters: Set<unknown> }).attachmentWaiters.size).toBe(0);
+    await tab.destroy();
+  });
+
+  it("observes a retained-script rejection when restoration exhausts its deadline", async () => {
+    vi.useFakeTimers();
+    const { BrowserTab } = await import("./BrowserTab");
+    const tab = new BrowserTab({
+      tabId: "tab-retained-deadline-rejection",
+      userAgent: "ua",
+      onUpdate: vi.fn<() => void>(),
+      onAttention: vi.fn<() => void>(),
+      onPopup: vi.fn<() => void>(),
+    });
+    const firstWebContents = createWebContents("https://example.com/first");
+    tab.attach(firstWebContents as never);
+    await tab.whenAttached();
+    await tab.addInitScript("window.__retained = true");
+
+    firstWebContents.emit("destroyed");
+    const secondWebContents = createWebContents("https://example.com/second");
+    tab.attach(secondWebContents as never);
+    const lateFailure = new Error("one-shot failed at the restoration deadline");
+    cdpSends[1]?.mockImplementation(async (method) => {
+      if (method === "Page.addScriptToEvaluateOnNewDocument") {
+        return await new Promise<{ identifier: string }>((resolve) => {
+          setTimeout(() => resolve({ identifier: "replacement-script" }), 999);
+        });
+      }
+      if (method === "Runtime.evaluate") {
+        vi.setSystemTime(Date.now() + 2);
+        throw lateFailure;
+      }
+      return {};
+    });
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+
+    try {
+      const ready = tab.whenAttached();
+      await vi.advanceTimersByTimeAsync(1_100);
+      await ready;
+      await Promise.resolve();
+
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+      await tab.destroy();
+    }
+  });
+
+  it("permanently disables popup routing when a sensitive tab is destroyed", async () => {
+    const { BrowserTab } = await import("./BrowserTab");
+    const tab = new BrowserTab({
+      tabId: "tab-sensitive-destroy",
+      userAgent: "ua",
+      permissionProfile: "sensitive",
+      onUpdate: vi.fn<() => void>(),
+      onAttention: vi.fn<() => void>(),
+      onPopup: vi.fn<() => void>(),
+    });
+    tab.attach(createWebContents("https://accounts.example.test/") as never);
+
+    await tab.destroy();
+
+    expect(removeNavigationGuards).toHaveBeenCalledOnce();
+  });
+
   it("bounds page-controlled title, URL, and console data by UTF-8 bytes", async () => {
     const {
       BrowserTab,
@@ -252,6 +425,29 @@ describe("BrowserTab", () => {
     expect(webContents.setUserAgent).toHaveBeenCalledWith(userAgent);
     expect(installSessionPermissions).toHaveBeenCalledWith(webContents.session);
     expect(installNavigationGuards).toHaveBeenCalled();
+  });
+
+  it("installs only the deny-by-default permission profile for a sensitive session", async () => {
+    const { BrowserTab } = await import("./BrowserTab");
+    const tab = new BrowserTab({
+      tabId: "tab-sensitive",
+      userAgent: "ua",
+      permissionProfile: "sensitive",
+      onUpdate: vi.fn<() => void>(),
+      onAttention: vi.fn<() => void>(),
+      onPopup: vi.fn<() => void>(),
+    });
+    const webContents = createWebContents("https://pipedream.com/connect");
+
+    tab.attach(webContents as never);
+
+    expect(installSensitiveSessionPermissions).toHaveBeenCalledExactlyOnceWith(webContents.session);
+    expect(installSessionPermissions).not.toHaveBeenCalled();
+    expect(installNavigationGuards).toHaveBeenCalledWith(
+      webContents,
+      expect.any(Function),
+      "sensitive",
+    );
   });
 
   it("releases CDP-backed controllers on suspension and rebinds dialogs after remount", async () => {

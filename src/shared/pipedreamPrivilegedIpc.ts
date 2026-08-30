@@ -3,6 +3,7 @@ import type {
   PipedreamBootstrapCredentials,
   PipedreamEnvKey,
 } from "./pipedreamBootstrap";
+import type { PipedreamSnapshot } from "./contracts/pipedream";
 
 export interface PipedreamPrivilegedBootstrapPayload {
   readonly bootstrap: PipedreamBootstrap;
@@ -11,8 +12,11 @@ export interface PipedreamPrivilegedBootstrapPayload {
 
 export interface PipedreamPrivilegedBootstrapMessage {
   readonly kind: "pipedream-privileged-bootstrap";
+  readonly id: string;
   readonly payload: PipedreamPrivilegedBootstrapPayload;
 }
+
+export type PipedreamPrivilegedBootstrapResult = PipedreamSnapshot;
 
 export interface PipedreamPrivilegedConnectLinkRequest {
   readonly kind: "pipedream-privileged-request";
@@ -20,6 +24,8 @@ export interface PipedreamPrivilegedConnectLinkRequest {
   readonly request: {
     readonly type: "create-connect-link";
     readonly appSlug: string;
+    readonly successRedirectUrl: string;
+    readonly errorRedirectUrl: string;
   };
 }
 
@@ -33,7 +39,7 @@ export type PipedreamPrivilegedReply =
       readonly kind: "pipedream-privileged-reply";
       readonly replyTo: string;
       readonly ok: true;
-      readonly data: PipedreamPrivilegedConnectLinkResult;
+      readonly data: PipedreamPrivilegedConnectLinkResult | PipedreamPrivilegedBootstrapResult;
     }
   | {
       readonly kind: "pipedream-privileged-reply";
@@ -47,10 +53,11 @@ export function isPipedreamPrivilegedBootstrapMessage(
 ): value is PipedreamPrivilegedBootstrapMessage {
   if (
     !isRecord(value) ||
-    !hasOnlyKeys(value, ["kind", "payload"]) ||
+    !hasOnlyKeys(value, ["kind", "id", "payload"]) ||
     value.kind !== "pipedream-privileged-bootstrap"
   )
     return false;
+  if (!isBoundedString(value.id, 256)) return false;
   const payload = value.payload;
   if (
     !isRecord(payload) ||
@@ -73,14 +80,36 @@ export function isPipedreamPrivilegedConnectLinkRequest(
   if (
     !isBoundedString(value.id, 256) ||
     !isRecord(value.request) ||
-    !hasOnlyKeys(value.request, ["type", "appSlug"])
+    !hasOnlyKeys(value.request, ["type", "appSlug", "successRedirectUrl", "errorRedirectUrl"])
   )
     return false;
   return (
     value.request.type === "create-connect-link" &&
     typeof value.request.appSlug === "string" &&
-    /^[a-z0-9][a-z0-9_-]{0,127}$/.test(value.request.appSlug)
+    /^[a-z0-9][a-z0-9_-]{0,127}$/.test(value.request.appSlug) &&
+    isLoopbackRedirectCapability(value.request.successRedirectUrl, "success") &&
+    isLoopbackRedirectCapability(value.request.errorRedirectUrl, "error") &&
+    value.request.successRedirectUrl !== value.request.errorRedirectUrl
   );
+}
+
+function isLoopbackRedirectCapability(value: unknown, outcome: "success" | "error"): boolean {
+  if (typeof value !== "string" || value.length > 256) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "http:" &&
+      url.hostname === "127.0.0.1" &&
+      url.port !== "" &&
+      url.username === "" &&
+      url.password === "" &&
+      url.search === "" &&
+      url.hash === "" &&
+      new RegExp(`^/${outcome}/[a-f0-9]{64}$`).test(url.pathname)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isPipedreamBootstrap(value: unknown): value is PipedreamBootstrap {

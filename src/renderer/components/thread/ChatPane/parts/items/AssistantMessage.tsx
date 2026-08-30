@@ -17,7 +17,7 @@ import { ImageCard } from "./ImageCard";
 import { imageViewSourceFromImageBlock } from "./imageViewSource";
 import { SmoothItemMarkdown } from "./ItemMarkdown";
 import {
-  isAppOwnedBrowserEvidenceItem,
+  isAppOwnedBrowserOutcomeItem,
   resolveBrowserVerificationBadge,
   type BrowserVerificationBadgeState,
 } from "./browserVerification";
@@ -264,7 +264,7 @@ function useFinalAnswerStatus(
     for (let i = index + 1; i < ids.length; i += 1) {
       const next = byId[ids[i]!];
       if (!next || next.parentItemId) continue;
-      if (isAppOwnedBrowserEvidenceItem(next)) continue;
+      if (isAppOwnedBrowserOutcomeItem(next)) continue;
       return next.type === "user_message" ? "confirmed" : "none";
     }
     return isTurnActive ? "candidate" : "confirmed";

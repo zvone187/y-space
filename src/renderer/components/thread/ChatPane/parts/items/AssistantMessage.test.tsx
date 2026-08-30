@@ -201,6 +201,58 @@ describe("AssistantMessage", () => {
     expect(screen.getByText("Browser verified · 1 action")).toBeTruthy();
   });
 
+  it("keeps the settled final controls and unverified badge when a Browser failure reports late", () => {
+    const user: RuntimeChatItem = {
+      id: "user_browser_failure_late",
+      type: "user_message",
+      state: "completed",
+      streams: {},
+    };
+    const answer: RuntimeChatItem = {
+      id: "browser_answer_failure_late",
+      type: "assistant_message",
+      state: "completed",
+      streams: { assistant_text: "I verified the website." },
+    };
+    const failure: RuntimeChatItem = {
+      id: "browser_failure_late",
+      type: "mcp_tool_call",
+      state: "completed",
+      streams: {},
+      payload: {
+        name: "snapshot",
+        serverId: "browser",
+        status: "error",
+        browserEvidence: { source: "y-space-browser-mcp", occurredAt: 1 },
+      },
+    };
+    useAppStore.setState({
+      runtimeItemIdsByThread: {
+        "thread-browser-failure-late": [user.id, answer.id, failure.id],
+      },
+      runtimeItemsByIdByThread: {
+        "thread-browser-failure-late": {
+          [user.id]: user,
+          [answer.id]: answer,
+          [failure.id]: failure,
+        },
+      },
+    });
+
+    render(
+      <AppProvider>
+        <AssistantMessage
+          threadId="thread-browser-failure-late"
+          item={answer}
+          isTurnActive={false}
+        />
+      </AppProvider>,
+    );
+
+    expect(screen.getByLabelText("Copy message")).toBeTruthy();
+    expect(screen.getByText("Browser not verified")).toBeTruthy();
+  });
+
   it("labels an unsupported Browser verification claim but ignores a PDF tab claim", () => {
     const unsupported: RuntimeChatItem = {
       id: "unsupported_answer",

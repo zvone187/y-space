@@ -6,17 +6,21 @@ type FetchMock = (url: string | URL | Request, init?: RequestInit) => Promise<Re
 function makeHandlers(
   browserPanelManager: {
     openLink(url: string): Promise<boolean>;
-    createSensitiveIntegrationTab?(payload: {
+    acknowledgeAutomationPresentation?(payload: unknown): void;
+    invalidateAutomationPresentation?(payload: unknown): void;
+    createIsolatedSensitiveIntegrationTab?(payload: {
       url: string;
       activate?: boolean;
       reveal?: boolean;
     }): Promise<{ tabId: string }>;
   } | null = null,
   openSystemUrl?: (url: string) => Promise<void>,
+  isQuitting?: () => boolean,
 ) {
   return createLocalIpcHandlers({
     getMainWindow: () => null,
     getBrowserPanelManager: () => browserPanelManager as never,
+    ...(isQuitting ? { isQuitting } : {}),
     getRemoteAccessServer: () => null,
     setRemoteAccessEnabled: vi.fn<(enabled: boolean) => Promise<{ status: "disabled" }>>(
       async () => ({ status: "disabled" }),
@@ -50,6 +54,7 @@ function makeHandlers(
     updatePowerSaveBlocker: vi.fn<() => void>(),
     autoUpdater: {
       initialize: vi.fn<() => void>(),
+      dispose: vi.fn<() => void>(),
       getStatus: vi.fn<() => null>(() => null),
       checkForUpdate: vi.fn<() => Promise<void>>(async () => {}),
       startUpdateDownload: vi.fn<() => Promise<void>>(async () => {}),
@@ -171,12 +176,12 @@ describe("local remoteHttpRequest handler", () => {
 
 describe("local external-link handlers", () => {
   it("opens an explicitly sensitive OAuth URL through a dedicated embedded-tab handler", async () => {
-    const createSensitiveIntegrationTab = vi.fn<
+    const createIsolatedSensitiveIntegrationTab = vi.fn<
       (payload: { url: string; activate?: boolean; reveal?: boolean }) => Promise<{ tabId: string }>
     >(async () => ({ tabId: "oauth-tab" }));
     const handlers = makeHandlers({
       openLink: vi.fn<(url: string) => Promise<boolean>>(async () => true),
-      createSensitiveIntegrationTab,
+      createIsolatedSensitiveIntegrationTab,
     });
 
     await expect(
@@ -186,7 +191,7 @@ describe("local external-link handlers", () => {
         reveal: true,
       }),
     ).resolves.toMatchObject({ tabId: "oauth-tab" });
-    expect(createSensitiveIntegrationTab).toHaveBeenCalledWith({
+    expect(createIsolatedSensitiveIntegrationTab).toHaveBeenCalledWith({
       url: "https://oauth.example.test/authorize?state=private",
       activate: true,
       reveal: true,
@@ -228,4 +233,74 @@ describe("local external-link handlers", () => {
       expect(openSystemUrl).toHaveBeenCalledWith("mailto:hello@example.test");
     },
   );
+});
+
+describe("local browser presentation lifecycle handlers", () => {
+  it("ignores acknowledgements that arrive after the browser manager is disposed", () => {
+    const handlers = makeHandlers();
+
+    expect(() =>
+      handlers.browserAcknowledgeAutomationPresentation({
+        requestId: "1f112f62-968d-41d5-9baa-a1189624ff73",
+        tabId: "tab-shutdown",
+        surface: "main",
+        presented: true,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      handlers.browserInvalidateAutomationPresentation({
+        requestId: "1f112f62-968d-41d5-9baa-a1189624ff73",
+        tabId: "tab-shutdown",
+        surface: "main",
+        reason: "renderer-unmounted",
+      }),
+    ).not.toThrow();
+
+    // Actual browser commands retain the strict manager requirement.
+    expect(() => handlers.browserGetState({})).toThrow("Browser panel manager is not initialized.");
+  });
+
+  it("returns an empty browser snapshot when hydration races browser teardown during quit", () => {
+    const handlers = makeHandlers(null, undefined, () => true);
+
+    expect(handlers.browserGetState({})).toEqual({ tabs: [], activeTabId: null });
+  });
+
+  it("forwards presentation lifecycle messages while the manager is available", async () => {
+    const acknowledgeAutomationPresentation = vi.fn<(payload: unknown) => void>();
+    const invalidateAutomationPresentation = vi.fn<(payload: unknown) => void>();
+    const handlers = makeHandlers({
+      openLink: vi.fn<(url: string) => Promise<boolean>>(async () => true),
+      acknowledgeAutomationPresentation,
+      invalidateAutomationPresentation,
+    });
+    const acknowledgement = {
+      requestId: "070f7cfb-11c3-4448-a2aa-ee1d8f4346b2",
+      tabId: "tab-live",
+      surface: "main" as const,
+      presented: true,
+    };
+    const invalidation = {
+      requestId: acknowledgement.requestId,
+      tabId: acknowledgement.tabId,
+      surface: acknowledgement.surface,
+      reason: "renderer-unmounted" as const,
+    };
+
+    const senderFrame = { processId: 9, routingId: 11 };
+    const context = { senderWebContentsId: 7, senderFrame };
+    await handlers.browserAcknowledgeAutomationPresentation(acknowledgement, context);
+    await handlers.browserInvalidateAutomationPresentation(invalidation, context);
+
+    expect(acknowledgeAutomationPresentation).toHaveBeenCalledExactlyOnceWith(
+      acknowledgement,
+      7,
+      senderFrame,
+    );
+    expect(invalidateAutomationPresentation).toHaveBeenCalledExactlyOnceWith(
+      invalidation,
+      7,
+      senderFrame,
+    );
+  });
 });

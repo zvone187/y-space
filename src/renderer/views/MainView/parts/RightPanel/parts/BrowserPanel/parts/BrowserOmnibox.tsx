@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { Globe, History, Search } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { readBridge } from "@/renderer/bridge";
+import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNativeViewObstruction";
 import { stripScheme } from "@/shared/url";
 
 const LOCALHOST_PATTERN =
@@ -84,6 +85,7 @@ export function BrowserOmnibox(props: {
   }, [urlInput]);
 
   const open = focused && items.length > 0;
+  const overlayReady = useSensitiveNativeViewOverlayGate(open);
 
   // Freeze the page behind a screenshot while the dropdown is open. The embedded
   // <webview> paints over normal DOM, so the dropdown would otherwise be hidden;
@@ -233,7 +235,7 @@ export function BrowserOmnibox(props: {
         ref={inputRef}
         type="text"
         data-poracode-browser-address=""
-        className="poracode-browser-omnibox h-7 w-full rounded-[10px] border border-border bg-[var(--field-background)] px-2 text-[12px] text-foreground outline-none placeholder:text-[color:var(--field-placeholder)] focus:border-[color:var(--accent)]"
+        className="poracode-browser-omnibox h-7 w-full rounded-full border border-border bg-[var(--field-background)] px-2.5 text-[12px] text-foreground outline-none placeholder:text-[color:var(--field-placeholder)] focus:border-[color:var(--accent)]"
         placeholder={t`Search or enter address`}
         value={urlInput}
         spellCheck={false}
@@ -244,10 +246,10 @@ export function BrowserOmnibox(props: {
         onKeyDown={onKeyDown}
         disabled={props.disabled}
       />
-      {open && rect
+      {open && overlayReady && rect
         ? createPortal(
             <div
-              className="fixed z-[1000] overflow-hidden rounded-md border border-border bg-[var(--content-background)] py-1 shadow-2xl"
+              className="fixed z-[1000] overflow-hidden rounded-xl border border-border bg-[var(--content-background)] py-1 shadow-2xl"
               style={{ left: rect.left, top: rect.top, width: rect.width }}
             >
               {items.map((item, index) => (

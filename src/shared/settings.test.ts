@@ -25,6 +25,24 @@ describe("shared settings defaults", () => {
     expect(normalizeSharedSettings({}).preventSleep).toBe("while-remote-access");
   });
 
+  it("migrates only the unversioned legacy dark factory theme to the Y Space light default", () => {
+    expect(normalizeSharedSettings({ themeMode: "dark", themePreset: "default" })).toMatchObject({
+      themeMode: "light",
+      themeDefaultVersion: 1,
+    });
+    expect(
+      normalizeSharedSettings({
+        themeMode: "dark",
+        themePreset: "default",
+        themeDefaultVersion: 1,
+      }).themeMode,
+    ).toBe("dark");
+    expect(
+      normalizeSharedSettings({ themeMode: "dark", themePreset: "catppuccin-mocha" }).themeMode,
+    ).toBe("dark");
+    expect(normalizeSharedSettings({ themeMode: "system" }).themeMode).toBe("system");
+  });
+
   it("preserves global provider and model effort/Fast preferences", () => {
     expect(
       normalizeSharedSettings({

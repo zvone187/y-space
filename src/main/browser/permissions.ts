@@ -39,6 +39,23 @@ export function isNavigationUrlAllowed(url: string): boolean {
   }
 }
 
+function isSensitiveNavigationUrlAllowed(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:") return true;
+    if (parsed.protocol !== "http:") return false;
+    // Connect terminal redirects are served by a main-owned loopback receiver.
+    // Never let remote OAuth content downgrade to arbitrary cleartext origins.
+    return (
+      parsed.hostname === "localhost" ||
+      parsed.hostname === "127.0.0.1" ||
+      parsed.hostname === "[::1]"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isPermissionAllowed(webContents: WebContents | null, permission: string): boolean {
   if (permission === "media") {
     return webContents?.getType() === "window";
@@ -113,32 +130,52 @@ export function installSessionPermissions(session: Session): void {
   );
 }
 
+/** OAuth/Connect content runs in an exact ephemeral session and receives no
+ * ambient Electron permission grants. User-driven native paste remains
+ * available; remote content cannot read the clipboard or enter fullscreen. */
+export function installSensitiveSessionPermissions(session: Session): void {
+  session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  session.setPermissionCheckHandler(() => false);
+}
+
 export function installNavigationGuards(
   webContents: WebContents,
   onPopup: (url: string) => void,
+  profile: "ordinary" | "sensitive" = "ordinary",
 ): () => void {
+  const isAllowed = (url: string) =>
+    profile === "sensitive" ? isSensitiveNavigationUrlAllowed(url) : isNavigationUrlAllowed(url);
   webContents.setWindowOpenHandler(({ url }) => {
-    if (isNavigationUrlAllowed(url)) {
+    if (isAllowed(url)) {
       onPopup(url);
     }
     return { action: "deny" };
   });
 
   const onWillNavigate = (event: Electron.Event, url: string): void => {
-    if (!isNavigationUrlAllowed(url)) {
+    if (!isAllowed(url)) {
       event.preventDefault();
     }
   };
   const onWillFrameNavigate = (event: Electron.Event & { url: string }): void => {
-    if (!isNavigationUrlAllowed(event.url)) {
+    if (!isAllowed(event.url)) {
       event.preventDefault();
     }
   };
+  const onWillRedirect = (event: Electron.Event, url: string): void => {
+    if (!isAllowed(url)) event.preventDefault();
+  };
   webContents.on("will-navigate", onWillNavigate);
   webContents.on("will-frame-navigate", onWillFrameNavigate);
+  webContents.on("will-redirect", onWillRedirect);
 
   return () => {
+    // setWindowOpenHandler is not an EventEmitter listener. Replacing it is
+    // required so a closing guest cannot invoke the retained callback after
+    // its sensitive ownership has begun teardown.
+    webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     webContents.removeListener("will-navigate", onWillNavigate);
     webContents.removeListener("will-frame-navigate", onWillFrameNavigate);
+    webContents.removeListener("will-redirect", onWillRedirect);
   };
 }
