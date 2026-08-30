@@ -1,10 +1,9 @@
-import type { PipedreamEnvironment } from "@/shared/contracts/pipedream";
+import { parsePipedreamAppSlug, type PipedreamEnvironment } from "@/shared/contracts/pipedream";
 
 export const PIPEDREAM_MCP_V3_URL = "https://remote.mcp.pipedream.net/v3";
 
 const PROJECT_ID_PATTERN = /^proj_[a-zA-Z0-9]+$/;
 const ACCOUNT_ID_PATTERN = /^apn_[a-zA-Z0-9]+$/;
-const APP_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 const FORWARDED_MCP_HEADERS = [
   "accept",
   "content-type",
@@ -28,7 +27,6 @@ export interface BuildPipedreamMcpUpstreamHeadersInput {
   readonly projectId: string;
   readonly environment: PipedreamEnvironment;
   readonly externalUserId: string;
-  readonly appSlug: string;
   readonly accountId?: string;
 }
 
@@ -53,7 +51,6 @@ export function buildPipedreamMcpUpstreamHeaders(
     "x-pd-external-user-id",
     requireBounded(input.externalUserId, 250, "external user id"),
   );
-  headers.set("x-pd-app-slug", requirePattern(input.appSlug, APP_SLUG_PATTERN, "app slug"));
   headers.set("x-pd-registry", "all");
   if (input.accountId !== undefined) {
     headers.set(
@@ -62,6 +59,19 @@ export function buildPipedreamMcpUpstreamHeaders(
     );
   }
   return headers;
+}
+
+/**
+ * Pipedream accepts routing fields as either headers or query parameters.
+ * Keep the Unicode app slug in the URL so Fetch's ByteString header model
+ * cannot reject a valid catalog identifier.
+ */
+export function buildPipedreamMcpUpstreamUrl(appSlug: string): string {
+  const safeAppSlug = parsePipedreamAppSlug(appSlug);
+  if (!safeAppSlug) throw new Error("Invalid Pipedream app slug.");
+  const url = new URL(PIPEDREAM_MCP_V3_URL);
+  url.searchParams.set("app", safeAppSlug);
+  return url.toString();
 }
 
 export interface PipedreamMcpSessionBinding {

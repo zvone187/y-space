@@ -12,6 +12,9 @@ export interface AttemptExecutionState {
   plan: PreparedSubagentRun;
   handle: StructuredSessionHandle | undefined;
   oneShot: OneShotChildHandle | undefined;
+  launchReady: Promise<void> | undefined;
+  launchSettled: boolean;
+  teardownPromise: Promise<void> | undefined;
   cancelRequested: boolean;
   turnStarted: boolean;
   turnDispatched: boolean;
@@ -45,30 +48,62 @@ export class SubagentAttemptRunner {
       return;
     }
     if (execution === "one-shot") {
+      state.launchReady = Promise.resolve();
+      state.launchSettled = true;
       this.runOneShot(state, attemptIndex, attempt, callbacks);
       return;
     }
-    void this.runStructured(state, attempt, callbacks);
+    state.launchSettled = false;
+    let resolveLaunchReady!: () => void;
+    state.launchReady = new Promise<void>((resolve) => {
+      resolveLaunchReady = resolve;
+    });
+    let launchReady = false;
+    const markLaunchReady = () => {
+      if (launchReady) return;
+      launchReady = true;
+      state.launchSettled = true;
+      resolveLaunchReady();
+    };
+    void this.runStructured(state, attempt, callbacks, markLaunchReady);
   }
 
   async teardown(state: AttemptExecutionState): Promise<void> {
-    // Revoke before awaiting process teardown so an in-flight bearer stops
-    // authorizing Browser/App calls as soon as the attempt settles.
-    this.host.releaseParentMcpAccess?.(state.parentThreadId, state.childThreadId);
-    if (state.oneShot) {
-      state.oneShot.cancel();
-      state.oneShot = undefined;
-    }
-    const handle = state.handle;
-    if (!handle) return;
-    state.handle = undefined;
-    await this.disposeHandle(handle);
+    if (state.teardownPromise) return await state.teardownPromise;
+    const parentThreadId = state.parentThreadId;
+    const childThreadId = state.childThreadId;
+    const launchReady = state.launchReady;
+    state.teardownPromise = (async () => {
+      // Fail closed before the first await. The returned cleanup owns only the
+      // detached filter deployment; authorization and relay bearers are gone.
+      const filterCleanup = this.host.revokeParentMcpAccess?.(parentThreadId, childThreadId);
+      try {
+        const firstStructuredHandle = await this.disposeCurrentHandles(state);
+        const needsPostLaunchRedispose = Boolean(firstStructuredHandle && !state.launchSettled);
+        await launchReady;
+        if (needsPostLaunchRedispose && firstStructuredHandle) {
+          // Some SDK handles publish themselves before activation has finished.
+          // Their first dispose can legitimately see no worker/server yet; once
+          // activation unwinds, dispose the same handle again so a late-created
+          // resource cannot outlive the revoked child capability.
+          await this.disposeHandle(firstStructuredHandle);
+        }
+        // A structured launch may have published its handle while teardown was
+        // waiting for creation. Take a second pass before deleting the detached
+        // filter deployment.
+        await this.disposeCurrentHandles(state);
+      } finally {
+        filterCleanup?.();
+      }
+    })();
+    await state.teardownPromise;
   }
 
   private async runStructured(
     state: AttemptExecutionState,
     attempt: ResolvedSpawnAttempt,
     callbacks: AttemptCallbacks,
+    markLaunchReady: () => void,
   ): Promise<void> {
     const { adapter, config } = attempt;
     try {
@@ -79,7 +114,6 @@ export class SubagentAttemptRunner {
         config,
       );
       if (!callbacks.isActive()) {
-        this.host.releaseParentMcpAccess?.(state.parentThreadId, state.childThreadId);
         return;
       }
 
@@ -115,7 +149,6 @@ export class SubagentAttemptRunner {
         },
         onRuntimeEvent: callbacks.onRuntimeEvent,
       });
-
       if (handle.activate) await handle.activate();
       if (!callbacks.isActive() || state.cancelRequested) return;
       if (handle.openThread) await handle.openThread(config);
@@ -132,6 +165,8 @@ export class SubagentAttemptRunner {
         state.cancelRequested ? "cancelled" : "failed",
         error instanceof Error ? error.message : String(error),
       );
+    } finally {
+      markLaunchReady();
     }
   }
 
@@ -195,5 +230,18 @@ export class SubagentAttemptRunner {
     try {
       await handle.dispose();
     } catch {}
+  }
+
+  private async disposeCurrentHandles(
+    state: AttemptExecutionState,
+  ): Promise<StructuredSessionHandle | undefined> {
+    const oneShot = state.oneShot;
+    state.oneShot = undefined;
+    if (oneShot) await oneShot.dispose();
+
+    const handle = state.handle;
+    state.handle = undefined;
+    if (handle) await this.disposeHandle(handle);
+    return handle;
   }
 }

@@ -159,8 +159,8 @@ finishes or expires.
 ### Pipedream connections
 
 Personal Pipedream MCP can be added and signed in directly from **Settings → Connections** without
-developer credentials. For BYO Pipedream Connect, provide these four variables to the Y Space
-process or place them in an ignored `.env.pipedream` file during development:
+developer credentials. For BYO Pipedream Connect, choose **Import credential setup file** in
+**Settings → Connections**. The dedicated file contains these four values:
 
 ```text
 PIPEDREAM_CLIENT_ID=
@@ -169,10 +169,30 @@ PIPEDREAM_PROJECT_ID=
 PIPEDREAM_ENVIRONMENT=development
 ```
 
-For a packaged app launched from a terminal, set `PIPEDREAM_ENV_FILE` to the absolute path of that
-file. Y Space captures the credentials before agents start and removes all five variables from their
-environment. Connected accounts are exposed to agents only through authenticated loopback MCP
-relays.
+Y Space never reads Pipedream developer credentials from its process environment, never auto-reads
+`.env.pipedream` or `PIPEDREAM_ENV_FILE`, and never forwards those values to an agent. A launch that
+still contains those retired environment inputs exits immediately, relaunches without them only to
+show a migration notice, and starts no agent. A setup-file import is a user-confirmed, one-time secure
+move: a packaged macOS release verifies its complete Developer ID–signed app bundle, seals the
+credentials with its real app-isolated Keychain identity, durably removes the dedicated plaintext
+file, and forgets the path. Unsigned/development builds, mock-keychain test launches, Windows, and
+Linux refuse that destructive import and leave the source unchanged because Electron's storage does
+not provide the same app-isolation guarantee there. Personal Pipedream OAuth works for the current
+session on those builds but is persisted only by the same verified macOS release identity; an older
+Personal token is removed before agents can start under a weaker storage policy. Upgrades also forget
+legacy saved paths, so the setup file must be selected again. Connected accounts are exposed to
+agents only through authenticated loopback MCP relays.
+
+If Y Space cannot authenticate an existing Pipedream credential record at startup, it keeps agents
+stopped, preserves the record, and shows a native Quit-only recovery notice. Restore access to the
+operating-system credential store or a known-good Y Space data backup before reopening the app; Y
+Space will not automatically reset or delete an unauthenticated record.
+
+The headless server accepts `PORACODE_SECRET_STORAGE_KEY` as a base64-encoded 32-byte master key.
+New Windows headless installations must supply it from a secret manager because Windows cannot
+durably commit a newly generated key file with the filesystem guarantees Y Space requires. An
+existing valid key file remains usable for the current session; macOS and Linux can continue using
+the file-backed fallback.
 
 ## Contributing
 

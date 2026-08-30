@@ -1,3 +1,7 @@
+import { type ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { fileURLToPath } from "node:url";
+import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type {
   McpProbeEnvironment,
@@ -5,7 +9,11 @@ import type {
   McpServer,
   ProjectLocation,
 } from "@/shared/contracts";
-import { McpProbeService } from "./McpProbeService";
+import {
+  McpProbeService,
+  runWslProbeWorker,
+  type WslProbeWorkerDependencies,
+} from "./McpProbeService";
 
 type HostProbe = (
   server: McpServer,
@@ -154,5 +162,77 @@ describe("McpProbeService", () => {
         },
       }),
     ).resolves.toMatchObject({ status: "unavailable", error: { code: "timeout" } });
+  });
+
+  it("cleans the private WSL probe deployment only after its child closes", async () => {
+    const cleanup = vi.fn<() => void>();
+    const child = Object.assign(new EventEmitter(), {
+      pid: 123,
+      stdin: new PassThrough(),
+      stdout: new PassThrough(),
+    }) as unknown as ChildProcess;
+    const spawn = vi.fn<NonNullable<WslProbeWorkerDependencies["spawn"]>>(() => child);
+    const location: Extract<ProjectLocation, { kind: "wsl" }> = {
+      kind: "wsl",
+      distro: "Ubuntu",
+      linuxPath: "/home/demo/workspace",
+      uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\workspace",
+    };
+    const environment: McpProbeEnvironment = { runtime: "wsl", projectScoped: true };
+    const pending = runWslProbeWorker(server, location, environment, new AbortController().signal, {
+      workerSource: fileURLToPath(import.meta.url),
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "24.10.0",
+        source: "user-installed",
+      }),
+      deploy: () => ({
+        linuxBaseDir: "/tmp/poracode-mcp-probe-123-12345678-1234-4234-9234-123456789abc",
+        cleanup,
+      }),
+      spawn,
+    });
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledOnce());
+    expect(cleanup).not.toHaveBeenCalled();
+    child.stdout?.emit("data", Buffer.from(JSON.stringify(available("wsl", true))));
+    child.emit("close", 0, null);
+
+    await expect(pending).resolves.toEqual(available("wsl", true));
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("cleans a WSL probe deployment when cancellation wins before spawn", async () => {
+    const abort = new AbortController();
+    const cleanup = vi.fn<() => void>();
+    const spawn = vi.fn<NonNullable<WslProbeWorkerDependencies["spawn"]>>();
+    const pending = runWslProbeWorker(
+      server,
+      {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/workspace",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\workspace",
+      },
+      { runtime: "wsl", projectScoped: true },
+      abort.signal,
+      {
+        workerSource: fileURLToPath(import.meta.url),
+        resolveNode: async () => ({
+          nodePath: "/usr/bin/node",
+          nodeVersion: "24.10.0",
+          source: "user-installed",
+        }),
+        deploy: () => {
+          abort.abort(new Error("cancelled"));
+          return { linuxBaseDir: "/tmp/private-probe", cleanup };
+        },
+        spawn,
+      },
+    );
+
+    await expect(pending).rejects.toThrow("cancelled");
+    expect(spawn).not.toHaveBeenCalled();
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 });

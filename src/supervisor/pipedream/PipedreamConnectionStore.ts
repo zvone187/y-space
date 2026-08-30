@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type { PipedreamAccountSummary } from "@/shared/contracts/pipedream";
 import { pipedreamAccountSummarySchema } from "@/shared/contracts/pipedream";
 import { writeFileAtomic } from "@/shared/atomicFile";
+import { durableFileSystem, type FileDurability } from "@/shared/fileDurability";
 import { z } from "zod";
 
 const storedAccountSchema = pipedreamAccountSummarySchema
@@ -30,6 +31,7 @@ const legacyStoreFileSchema = z
 export interface PipedreamConnectionStoreOptions {
   readonly filePath: string;
   readonly writeFile?: typeof writeFileAtomic;
+  readonly durability?: FileDurability;
 }
 
 type RemoteAccount = Omit<PipedreamAccountSummary, "agentAccess">;
@@ -50,12 +52,14 @@ interface StoredState {
 export class PipedreamConnectionStore {
   readonly #filePath: string;
   readonly #writeFile: typeof writeFileAtomic;
+  readonly #durability: FileDurability;
   #scopeHash: string | undefined;
   #accounts: StoredAccount[];
 
   constructor(options: PipedreamConnectionStoreOptions) {
     this.#filePath = options.filePath;
     this.#writeFile = options.writeFile ?? writeFileAtomic;
+    this.#durability = options.durability ?? durableFileSystem;
     const stored = this.#read();
     this.#scopeHash = stored.scopeHash;
     this.#accounts = stored.accounts;
@@ -202,6 +206,7 @@ export class PipedreamConnectionStore {
     this.#writeFile(this.#filePath, `${JSON.stringify(payload, null, 2)}\n`, {
       encoding: "utf8",
       mode: 0o600,
+      durability: this.#durability,
     });
     this.#scopeHash = payload.scopeHash;
     this.#accounts = payload.accounts;

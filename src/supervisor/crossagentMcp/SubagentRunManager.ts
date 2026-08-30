@@ -139,6 +139,9 @@ function parseNamespacedRequestId(
 export class SubagentRunManager {
   private readonly runs = new Map<string, RunRecord>();
   private readonly attemptRunner: SubagentAttemptRunner;
+  private readonly pendingTeardowns = new Set<Promise<void>>();
+  private disposal: Promise<void> | undefined;
+  private disposed = false;
 
   constructor(private readonly deps: SubagentRunManagerDeps) {
     this.attemptRunner = new SubagentAttemptRunner(deps.host);
@@ -157,6 +160,7 @@ export class SubagentRunManager {
     parentThreadId: string,
     requests: readonly SpawnAgentRequest[],
   ): Array<{ runId: string }> {
+    if (this.disposed) throw new SubagentSpawnError("Subagent manager is shutting down");
     if (requests.length === 0) throw new SubagentSpawnError("tasks must not be empty");
     const parent = this.requireParent(parentThreadId);
     const active = this.activeCountForParent(parentThreadId);
@@ -194,6 +198,9 @@ export class SubagentRunManager {
       stepCount: 0,
       handle: undefined,
       oneShot: undefined,
+      launchReady: undefined,
+      launchSettled: false,
+      teardownPromise: undefined,
       pendingRequestIds: new Set<string>(),
       forwardedRuntimeItems: new ForwardedRuntimeItemTracker(),
       cancelRequested: false,
@@ -296,7 +303,7 @@ export class SubagentRunManager {
     if (!record) return;
     record.cancelRequested = true;
     this.settle(record, "cancelled", undefined, { teardown: false });
-    await this.attemptRunner.teardown(record);
+    await this.teardown(record);
   }
 
   /**
@@ -328,7 +335,7 @@ export class SubagentRunManager {
       if (record.parentThreadId !== parentThreadId) continue;
       record.cancelRequested = true;
       this.settle(record, "cancelled", undefined, { teardown: false });
-      teardowns.push(this.attemptRunner.teardown(record));
+      teardowns.push(this.teardown(record));
       this.runs.delete(record.runId);
     }
     return Promise.allSettled(teardowns).then(() => undefined);
@@ -406,6 +413,9 @@ export class SubagentRunManager {
     record.turnDispatched = false;
     record.handle = undefined;
     record.oneShot = undefined;
+    record.launchReady = undefined;
+    record.launchSettled = false;
+    record.teardownPromise = undefined;
 
     if (attemptIndex > 0) {
       this.deps.host.appendRuntimeEvent(record.parentThreadId, {
@@ -583,7 +593,7 @@ export class SubagentRunManager {
       nextAttemptIndex < record.plan.attempts.length &&
       (record.plan.retryMode === "any-failure" || !record.turnDispatched);
     if (mayRetry) {
-      void this.attemptRunner.teardown(record).then(() => {
+      void this.teardown(record).then(() => {
         if (record.cancelRequested || record.settled) {
           this.settle(record, "cancelled");
           return;
@@ -643,7 +653,7 @@ export class SubagentRunManager {
       }
     }
 
-    if (options?.teardown !== false) void this.attemptRunner.teardown(record);
+    if (options?.teardown !== false) void this.teardown(record);
 
     const text = errorMessage ? `${record.output}\n${errorMessage}`.trim() : record.output;
     if (errorMessage) {
@@ -672,6 +682,42 @@ export class SubagentRunManager {
 
     record.resolveSettled();
     this.pruneSettledRuns(record.parentThreadId);
+  }
+
+  /**
+   * Stop admission, cancel every retained live child, and wait until all
+   * structured sessions and one-shot processes have actually torn down.
+   */
+  dispose(): Promise<void> {
+    if (this.disposal) return this.disposal;
+    this.disposed = true;
+    this.disposal = this.disposeRuns();
+    return this.disposal;
+  }
+
+  private async disposeRuns(): Promise<void> {
+    const records = [...this.runs.values()];
+    for (const record of records) {
+      if (!record.settled) {
+        record.cancelRequested = true;
+        this.settle(record, "cancelled", undefined, { teardown: false });
+      }
+    }
+    await Promise.allSettled(records.map((record) => this.teardown(record)));
+    while (this.pendingTeardowns.size > 0) {
+      await Promise.allSettled([...this.pendingTeardowns]);
+    }
+    this.runs.clear();
+  }
+
+  private teardown(record: RunRecord): Promise<void> {
+    const teardown = this.attemptRunner.teardown(record);
+    this.pendingTeardowns.add(teardown);
+    void teardown.then(
+      () => this.pendingTeardowns.delete(teardown),
+      () => this.pendingTeardowns.delete(teardown),
+    );
+    return teardown;
   }
 
   /**

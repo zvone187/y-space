@@ -331,8 +331,8 @@ msgstr "{0}には入力が必要です。"
 #. placeholder {0}: props.catalog.apps.length
 #. placeholder {1}: props.catalog.totalCount
 #: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
-msgid "{0} of {1} integrations shown"
-msgstr "{0} / {1} 件の連携を表示"
+#~ msgid "{0} of {1} integrations shown"
+#~ msgstr "{0} / {1} 件の連携を表示"
 
 #. placeholder {0}: job.steps.filter((step) => step.status === "completed").length
 #. placeholder {1}: job.steps.length
@@ -2483,6 +2483,10 @@ msgstr "Cookie をプレビューする前に、接続済みのブラウザプ�
 #: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "Choose a cookie export"
 msgstr "Cookie のエクスポートを選択"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Choose a dedicated file that contains only Pipedream credentials."
+msgstr "Pipedreamの認証情報のみを含む専用ファイルを選択してください。"
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -6708,6 +6712,7 @@ msgid "Integration access changed. Restart running agents to apply the update."
 msgstr "統合へのアクセスが変更されました。更新を適用するには、実行中のエージェントを再起動してください。"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 #: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "Integrations"
 msgstr "連携"
@@ -8073,6 +8078,10 @@ msgstr "新しいワークスペース"
 msgid "New worktree"
 msgstr "新しいワークツリー"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Next"
+msgstr "次へ"
+
 #: src/renderer/commands/registry.ts
 msgid "Next chat"
 msgstr "次のチャット"
@@ -8080,6 +8089,10 @@ msgstr "次のチャット"
 #: src/renderer/components/composer/ImageLightbox.tsx
 msgid "Next image"
 msgstr "次の画像"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Next integrations"
+msgstr "次の連携"
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "Next match"
@@ -9688,6 +9701,10 @@ msgstr "拡張機能の Cookie をプレビュー"
 msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
 msgstr "プレビューにはドメイン単位の件数のみが表示されます。最終的な選択を確定するまで何もコピーされません。Firefox と Safari からのエクスポートには、Cookie-Editor JSON または Netscape cookies.txt を使用できます。"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Previous"
+msgstr "前へ"
+
 #: src/renderer/commands/registry.ts
 msgid "Previous chat"
 msgstr "前のチャット"
@@ -9695,6 +9712,10 @@ msgstr "前のチャット"
 #: src/renderer/components/composer/ImageLightbox.tsx
 msgid "Previous image"
 msgstr "前の画像"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Previous integrations"
+msgstr "前の連携"
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "Previous match"
@@ -11416,6 +11437,10 @@ msgstr "検索中..."
 msgid "Searching…"
 msgstr "検索中…"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Secure credential storage is unavailable on this computer, so the setup file was not changed."
+msgstr "このコンピュータでは認証情報の安全な保存を利用できないため、セットアップファイルは変更されませんでした。"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #~ msgid "Security-focused directory with verified skill metadata."
 #~ msgstr "検証済みのスキルメタデータを備えたセキュリティ重視のディレクトリ。"
@@ -11811,6 +11836,13 @@ msgstr "音声入力ボタンを表示"
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Showing {0, plural, one {# skill} other {# skills}}"
 msgstr "{0, plural, other {# 件のスキル}}を表示中"
+
+#. placeholder {0}: visibleApps.length === 0 ? 0 : visibleStartIndex + 1
+#. placeholder {1}: props.catalog.apps.length
+#. placeholder {2}: props.catalog.totalCount
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Showing {0}–{visibleEndIndex} of {1} loaded integrations · {2} total"
+msgstr "読み込み済み連携{1}件のうち{0}～{visibleEndIndex}件を表示 · 全{2}件"
 
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteHostFolderPicker.tsx
@@ -12901,6 +12933,10 @@ msgid "The selected configuration is incomplete."
 msgstr "選択した設定が不完全です。"
 
 #: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "The selected file contains invalid Pipedream values."
+msgstr "選択したファイルに無効なPipedream値が含まれています。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file could not be read."
 msgstr "選択したファイルを読み取れませんでした。"
 
@@ -12911,6 +12947,10 @@ msgstr "選択したファイルに Pipedream 認証情報が含まれていま�
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "選択したファイルに有効なMCPサーバー設定が含まれていません。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "The selected file is missing one or more required Pipedream values."
+msgstr "選択したファイルに、1つ以上の必須Pipedream値がありません。"
 
 #: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file is too large."

@@ -331,8 +331,8 @@ msgstr "{0} needs input."
 #. placeholder {0}: props.catalog.apps.length
 #. placeholder {1}: props.catalog.totalCount
 #: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
-msgid "{0} of {1} integrations shown"
-msgstr "{0} of {1} integrations shown"
+#~ msgid "{0} of {1} integrations shown"
+#~ msgstr "{0} of {1} integrations shown"
 
 #. placeholder {0}: job.steps.filter((step) => step.status === "completed").length
 #. placeholder {1}: job.steps.length
@@ -2484,6 +2484,10 @@ msgstr "Choose a connected browser profile before previewing cookies."
 #: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "Choose a cookie export"
 msgstr "Choose a cookie export"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Choose a dedicated file that contains only Pipedream credentials."
+msgstr "Choose a dedicated file that contains only Pipedream credentials."
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -6709,6 +6713,7 @@ msgid "Integration access changed. Restart running agents to apply the update."
 msgstr "Integration access changed. Restart running agents to apply the update."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 #: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "Integrations"
 msgstr "Integrations"
@@ -8075,6 +8080,10 @@ msgstr "New workspace"
 msgid "New worktree"
 msgstr "New worktree"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Next"
+msgstr "Next"
+
 #: src/renderer/commands/registry.ts
 msgid "Next chat"
 msgstr "Next chat"
@@ -8082,6 +8091,10 @@ msgstr "Next chat"
 #: src/renderer/components/composer/ImageLightbox.tsx
 msgid "Next image"
 msgstr "Next image"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Next integrations"
+msgstr "Next integrations"
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "Next match"
@@ -9690,6 +9703,10 @@ msgstr "Preview extension cookies"
 msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
 msgstr "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Previous"
+msgstr "Previous"
+
 #: src/renderer/commands/registry.ts
 msgid "Previous chat"
 msgstr "Previous chat"
@@ -9697,6 +9714,10 @@ msgstr "Previous chat"
 #: src/renderer/components/composer/ImageLightbox.tsx
 msgid "Previous image"
 msgstr "Previous image"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Previous integrations"
+msgstr "Previous integrations"
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "Previous match"
@@ -11418,6 +11439,10 @@ msgstr "Searching..."
 msgid "Searching…"
 msgstr "Searching…"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Secure credential storage is unavailable on this computer, so the setup file was not changed."
+msgstr "Secure credential storage is unavailable on this computer, so the setup file was not changed."
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #~ msgid "Security-focused directory with verified skill metadata."
 #~ msgstr "Security-focused directory with verified skill metadata."
@@ -11813,6 +11838,13 @@ msgstr "Show voice input button"
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Showing {0, plural, one {# skill} other {# skills}}"
 msgstr "Showing {0, plural, one {# skill} other {# skills}}"
+
+#. placeholder {0}: visibleApps.length === 0 ? 0 : visibleStartIndex + 1
+#. placeholder {1}: props.catalog.apps.length
+#. placeholder {2}: props.catalog.totalCount
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Showing {0}–{visibleEndIndex} of {1} loaded integrations · {2} total"
+msgstr "Showing {0}–{visibleEndIndex} of {1} loaded integrations · {2} total"
 
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteHostFolderPicker.tsx
@@ -12903,6 +12935,10 @@ msgid "The selected configuration is incomplete."
 msgstr "The selected configuration is incomplete."
 
 #: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "The selected file contains invalid Pipedream values."
+msgstr "The selected file contains invalid Pipedream values."
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file could not be read."
 msgstr "The selected file could not be read."
 
@@ -12913,6 +12949,10 @@ msgstr "The selected file does not contain Pipedream credentials."
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "The selected file does not contain valid MCP server configurations."
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "The selected file is missing one or more required Pipedream values."
+msgstr "The selected file is missing one or more required Pipedream values."
 
 #: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file is too large."

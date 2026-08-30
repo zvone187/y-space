@@ -25,6 +25,26 @@ describe("Pipedream privileged IPC", () => {
         },
       }),
     ).toBe(true);
+
+    expect(
+      isPipedreamPrivilegedBootstrapMessage({
+        kind: "pipedream-privileged-bootstrap",
+        id: "bootstrap-secure",
+        payload: {
+          externalUserId: "y-space-install-private-id",
+          bootstrap: {
+            state: "ready",
+            source: "secure-storage",
+            credentials: {
+              clientId: "client-id-private",
+              clientSecret: "client-secret-private",
+              projectId: "proj_Test123",
+              environment: "production",
+            },
+          },
+        },
+      }),
+    ).toBe(true);
   });
 
   it("rejects smuggled credentials on absent or partial bootstrap states", () => {
@@ -44,6 +64,28 @@ describe("Pipedream privileged IPC", () => {
         }),
       ).toBe(false);
     }
+  });
+
+  it("rejects an oversized project id on the private bootstrap channel", () => {
+    expect(
+      isPipedreamPrivilegedBootstrapMessage({
+        kind: "pipedream-privileged-bootstrap",
+        id: "bootstrap-oversized-project",
+        payload: {
+          externalUserId: "y-space-install-private-id",
+          bootstrap: {
+            state: "ready",
+            source: "secure-storage",
+            credentials: {
+              clientId: "client-id-private",
+              clientSecret: "client-secret-private",
+              projectId: `proj_${"a".repeat(129)}`,
+              environment: "development",
+            },
+          },
+        },
+      }),
+    ).toBe(false);
   });
 
   it("requires a bounded reply id for privileged bootstrap acknowledgements", () => {

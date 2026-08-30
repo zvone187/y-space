@@ -13,6 +13,10 @@ import {
   type SpawnPipeline,
 } from "./spawnPipeline";
 import type { ThreadOutputPipeline } from "../threadOutputPipeline";
+import {
+  combineMcpToolFilterCleanups,
+  getMcpToolFilterCleanup,
+} from "../../mcp/McpToolFilterService";
 
 type RecoverySpawnPipeline = Pick<
   SpawnPipeline,
@@ -98,6 +102,8 @@ export class InvalidSessionRecoveryCoordinator {
       mcpLaunchConfigurationEpoch,
     });
 
+    let newMcpToolFilterCleanup: (() => void) | undefined;
+    let mcpToolFilterCleanupTransferred = false;
     try {
       session.ignoreExit = true;
       context.outputPipeline.clearSessionTimers(session);
@@ -121,6 +127,7 @@ export class InvalidSessionRecoveryCoordinator {
         crossagentThreadId: session.threadId,
         adapter: session.adapter,
       });
+      newMcpToolFilterCleanup = getMcpToolFilterCleanup(resolvedMcpServers);
       const cliHookExtras = await context.cliHookPlugin.resolveCliHookPluginExtras(
         session.threadId,
         session.agentKind,
@@ -163,6 +170,10 @@ export class InvalidSessionRecoveryCoordinator {
           return;
         }
         const command = context.resolveLaunchSpec(session.projectLocation, argv);
+        const mcpToolFilterCleanup = combineMcpToolFilterCleanups(
+          session.mcpToolFilterCleanup,
+          newMcpToolFilterCleanup,
+        );
 
         context.spawnPipeline.spawnThread({
           threadId: session.threadId,
@@ -176,14 +187,18 @@ export class InvalidSessionRecoveryCoordinator {
           mcpLaunchSnapshot,
           launchConfig,
           mcpIdentity,
+          ...(mcpToolFilterCleanup ? { mcpToolFilterCleanup } : {}),
           ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
           ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
         });
         argvTransferred = true;
+        session.mcpToolFilterCleanup = undefined;
+        mcpToolFilterCleanupTransferred = true;
       } finally {
         if (!argvTransferred) cleanupArgv?.();
       }
     } finally {
+      if (!mcpToolFilterCleanupTransferred) newMcpToolFilterCleanup?.();
       context.revokeMcpLaunchAuthorization(mcpIdentity);
     }
   }

@@ -90,6 +90,66 @@ describe("resolveThreadStatusSource", () => {
 });
 
 describe("ThreadOutputPipeline / CLI hook disables L2", () => {
+  it("releases terminal-turn resources only when an active turn settles", () => {
+    const onTerminalTurnSettled = vi.fn<(session: SessionRuntime) => void>();
+    const p = new ThreadOutputPipeline({
+      emit: vi.fn<() => void>(),
+      isDev: false,
+      logWriter: { append: vi.fn<() => void>() } as never,
+      resolveLogPath: () => "",
+      resolveHintLogPath: () => "",
+      readDisableCliHookPlugin: () => false,
+      onRecoverInvalidSessionRef: vi.fn<() => void>(),
+      onStartQueuedLaunchPrompt: vi.fn<() => void>(),
+      onStartSessionRefDiscovery: vi.fn<() => void>(),
+      onTerminalTurnSettled,
+    });
+    const session = {
+      threadId: "terminal-owner",
+      status: "working",
+      attention: "working",
+      config: {},
+      canResumeWithConfig: false,
+      adapter: { capabilities: { presentationMode: "terminal" } },
+    } as unknown as SessionRuntime;
+
+    p.updateState(session, "idle", "none");
+    expect(onTerminalTurnSettled).toHaveBeenCalledExactlyOnceWith(session);
+
+    session.status = "launching";
+    p.updateState(session, "idle", "none");
+    expect(onTerminalTurnSettled).toHaveBeenCalledTimes(1);
+
+    session.activeTerminalSkillLeaseIds = ["launch-turn"];
+    session.pendingTerminalPrompt = "/deferred-skill";
+    session.pendingTerminalSegments = [{ kind: "text", content: "deferred" }];
+    session.status = "launching";
+    p.updateState(session, "idle", "none");
+    expect(onTerminalTurnSettled).toHaveBeenCalledTimes(1);
+
+    session.pendingTerminalPrompt = undefined;
+    session.pendingTerminalSegments = undefined;
+    session.pendingTerminalPreInputs = [["configure"]];
+    session.status = "launching";
+    p.updateState(session, "idle", "none");
+    expect(onTerminalTurnSettled).toHaveBeenCalledTimes(1);
+
+    session.pendingTerminalPreInputs = undefined;
+    session.pendingTerminalWriteInFlight = true;
+    session.status = "launching";
+    p.updateState(session, "idle", "none");
+    expect(onTerminalTurnSettled).toHaveBeenCalledTimes(1);
+
+    session.pendingTerminalWriteInFlight = false;
+    session.status = "launching";
+    p.updateState(session, "idle", "none");
+    expect(onTerminalTurnSettled).toHaveBeenCalledTimes(2);
+
+    session.status = "launching";
+    p.updateState(session, "inactive", "none");
+    expect(onTerminalTurnSettled).toHaveBeenCalledTimes(3);
+  });
+
   it("getLatestTerminalStatusHint returns null without calling detectTerminalStatus when hook is active", () => {
     const p = pipeline();
     const detectTerminalStatus = vi.fn<

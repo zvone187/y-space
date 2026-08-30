@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 export const PIPEDREAM_ENV_KEYS = [
   "PIPEDREAM_CLIENT_ID",
   "PIPEDREAM_CLIENT_SECRET",
@@ -7,7 +5,13 @@ export const PIPEDREAM_ENV_KEYS = [
   "PIPEDREAM_ENVIRONMENT",
 ] as const;
 
+export const PIPEDREAM_DEPRECATED_EXEC_ENV_KEYS = [
+  ...PIPEDREAM_ENV_KEYS,
+  "PIPEDREAM_ENV_FILE",
+] as const;
+
 export const PIPEDREAM_ENV_FILE_MAX_BYTES = 1024 * 1024;
+export const PIPEDREAM_PROJECT_ID_MAX_LENGTH = 128;
 
 export type PipedreamEnvKey = (typeof PIPEDREAM_ENV_KEYS)[number];
 export type PipedreamEnvironment = "development" | "production";
@@ -24,9 +28,23 @@ export type PipedreamBootstrap =
   | { readonly state: "partial"; readonly missingKeys: readonly PipedreamEnvKey[] }
   | {
       readonly state: "ready";
-      readonly source: "environment";
+      readonly source: "environment" | "secure-storage";
       readonly credentials: PipedreamBootstrapCredentials;
     };
+
+/**
+ * Detects deprecated exec-time Pipedream inputs and removes their JavaScript
+ * aliases. The caller must terminate the process when this returns true:
+ * operating-system process listings can retain the original exec environment
+ * even after `process.env` is scrubbed.
+ */
+export function scrubDeprecatedPipedreamExecEnvironment(env: NodeJS.ProcessEnv): boolean {
+  const detected =
+    normalizeEnvValue(env.PIPEDREAM_ENV_FILE) !== undefined ||
+    PIPEDREAM_ENV_KEYS.some((key) => normalizeEnvValue(env[key]) !== undefined);
+  for (const key of PIPEDREAM_DEPRECATED_EXEC_ENV_KEYS) delete env[key];
+  return detected;
+}
 
 /**
  * Takes a one-time copy of Pipedream's developer credentials and immediately
@@ -38,9 +56,11 @@ export type PipedreamBootstrap =
  * environment value is treated as a missing environment, which keeps startup
  * recoverable while preserving the all-or-nothing boundary.
  */
-export function capturePipedreamBootstrapEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): PipedreamBootstrap {
+export function capturePipedreamBootstrapEnv(env: NodeJS.ProcessEnv): PipedreamBootstrap {
+  if (env === process.env) {
+    scrubDeprecatedPipedreamExecEnvironment(env);
+    return { state: "absent" };
+  }
   const captured: Record<PipedreamEnvKey, string | undefined> = {
     PIPEDREAM_CLIENT_ID: env.PIPEDREAM_CLIENT_ID,
     PIPEDREAM_CLIENT_SECRET: env.PIPEDREAM_CLIENT_SECRET,
@@ -74,29 +94,6 @@ export function capturePipedreamBootstrapEnv(
     source: "environment",
     credentials: { clientId, clientSecret, projectId, environment },
   };
-}
-
-/**
- * Reads only the four supported keys from a dedicated local file and captures
- * them without ever installing them into `process.env`. Existing environment
- * values take precedence, then every Pipedream key is scrubbed from `env`.
- */
-export function capturePipedreamBootstrapEnvFile(
-  filePath: string,
-  env: NodeJS.ProcessEnv = process.env,
-): PipedreamBootstrap {
-  let fileValues: Partial<Record<PipedreamEnvKey, string>> = {};
-  try {
-    fileValues = parsePipedreamEnvFile(readFileSync(filePath, "utf8"));
-  } catch {
-    // Missing / unreadable is equivalent to an absent file; environment values
-    // still work and are scrubbed by the canonical capture path below.
-  }
-  const isolated: NodeJS.ProcessEnv = {};
-  for (const key of PIPEDREAM_ENV_KEYS) isolated[key] = env[key] ?? fileValues[key];
-  const captured = capturePipedreamBootstrapEnv(isolated);
-  for (const key of PIPEDREAM_ENV_KEYS) delete env[key];
-  return captured;
 }
 
 /** Captures supported values from already-read text without touching process.env by default. */

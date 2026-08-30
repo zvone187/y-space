@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
-  cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -116,6 +116,33 @@ function hashDirectory(root: string): string {
   };
   visit(root, "");
   return hash.digest("hex");
+}
+
+/**
+ * Electron cannot recursively `cpSync` an ASAR virtual directory. Walk the
+ * integrity-checked source explicitly and write the exact bytes into the SSH
+ * staging tree, rejecting links and special files at the trust boundary.
+ */
+function copyRuntimeTree(source: string, destination: string): void {
+  const sourceStat = lstatSync(source);
+  if (sourceStat.isSymbolicLink()) {
+    throw new Error(`Y Space SSH runtime asset cannot be a symbolic link: ${source}`);
+  }
+  if (sourceStat.isDirectory()) {
+    mkdirSync(destination, { recursive: false, mode: 0o700 });
+    for (const entry of readdirSync(source).sort()) {
+      copyRuntimeTree(join(source, entry), join(destination, entry));
+    }
+    return;
+  }
+  if (!sourceStat.isFile()) {
+    throw new Error(`Y Space SSH runtime asset must be a regular file: ${source}`);
+  }
+  mkdirSync(dirname(destination), { recursive: true });
+  writeFileSync(destination, readFileSync(source), {
+    flag: "wx",
+    mode: (sourceStat.mode & 0o111) !== 0 ? 0o500 : 0o400,
+  });
 }
 
 /**
@@ -251,21 +278,21 @@ export function ensureSshRuntimeBundle(options: SshRuntimeBundleOptions): SshRun
     for (const file of buildManifest.files) {
       const destination = join(stage, file);
       mkdirSync(dirname(destination), { recursive: true });
-      cpSync(join(options.mainBundleDir, file), destination);
+      copyRuntimeTree(join(options.mainBundleDir, file), destination);
     }
-    cpSync(options.agentPluginsDir, join(stage, "agent-plugins"), { recursive: true });
+    copyRuntimeTree(options.agentPluginsDir, join(stage, "agent-plugins"));
     if (existsSync(options.wslHelpersDir)) {
-      cpSync(options.wslHelpersDir, join(stage, "wsl-helpers"), { recursive: true });
+      copyRuntimeTree(options.wslHelpersDir, join(stage, "wsl-helpers"));
     } else {
       mkdirSync(join(stage, "wsl-helpers"));
     }
     if (options.bundledSkillsDir && existsSync(options.bundledSkillsDir)) {
-      cpSync(options.bundledSkillsDir, join(stage, "skills"), { recursive: true });
+      copyRuntimeTree(options.bundledSkillsDir, join(stage, "skills"));
     } else {
       mkdirSync(join(stage, "skills"));
     }
     if (options.bundledPluginsDir && existsSync(options.bundledPluginsDir)) {
-      cpSync(options.bundledPluginsDir, join(stage, "plugins"), { recursive: true });
+      copyRuntimeTree(options.bundledPluginsDir, join(stage, "plugins"));
     } else {
       mkdirSync(join(stage, "plugins"));
     }

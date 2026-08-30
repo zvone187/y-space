@@ -1,26 +1,36 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
+import type { FileDurability } from "./fileDurability";
 
 /**
  * Write a file atomically: serialize to a sibling temp file, then `rename` it
- * into place. A same-volume rename is atomic on POSIX and NTFS, so a crash or
- * power loss mid-write leaves either the old file or the new one intact —
- * never a truncated/partial file. Use for any file whose corruption would lose
- * user data or silently fall back to defaults (settings, registries, keys).
+ * into place. A same-volume rename prevents readers and ordinary process
+ * crashes from observing a truncated/partial file. Callers that require
+ * power-loss ordering must supply `durability`; the temp inode is then flushed
+ * before rename and the parent directory is flushed afterward. A durability
+ * backend that cannot commit directory entries must reject the operation before
+ * the target namespace is changed.
  *
- * The temp name includes the pid so concurrent writers in different processes
- * don't clobber each other's temp file.
+ * The temp name is unguessable and opened exclusively so an untrusted sibling
+ * process cannot preplant a symlink/hardlink target before a credential write.
  */
 export function writeFileAtomic(
   filePath: string,
   data: string | NodeJS.ArrayBufferView,
-  options?: { encoding?: BufferEncoding; mode?: number },
+  options?: { encoding?: BufferEncoding; mode?: number; durability?: FileDurability },
 ): void {
-  mkdirSync(dirname(filePath), { recursive: true });
-  const tmp = `${filePath}.${process.pid}.tmp`;
+  const { durability, ...writeOptions } = options ?? {};
+  const directoryPath = dirname(filePath);
+  durability?.assertDirectorySyncSupported?.(directoryPath);
+  mkdirSync(directoryPath, { recursive: true });
+  const tmp = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    writeFileSync(tmp, data, options);
+    writeFileSync(tmp, data, { ...writeOptions, flag: "wx" });
+    durability?.syncFile(tmp);
     renameAtomic(filePath, tmp);
+    durability?.syncRenamedFile?.(filePath);
+    durability?.syncDirectory(directoryPath);
   } catch (error) {
     // Best-effort cleanup of the temp file; ignore if it never got created.
     try {

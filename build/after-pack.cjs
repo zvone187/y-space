@@ -128,15 +128,11 @@ function injectBetterSqliteBinary(context, resourcesDir, archName) {
   console.log(`[afterPack] injected ${archName} better_sqlite3.node`);
 }
 
-// Fail-fast guard: a packaged app is only shippable if its native modules can
-// actually load at runtime. better-sqlite3's compiled binary must be present
-// AND the module must be asar-UNPACKED (electron resolves an unpacked module's
-// __dirname into app.asar.unpacked; if the module is packed inside app.asar,
-// `bindings` searches inside the archive and the app crashes on launch with
-// "Could not locate the bindings file"). node-pty must have a loadable binary
-// for the target arch (it loads build/Release/pty.node OR a prebuild). If any
-// invariant is violated we THROW so electron-builder aborts before producing or
-// publishing a broken installer.
+// Fail-fast guard: native binaries must remain ordinary files while every JS
+// loader stays inside the integrity-checked ASAR. Electron redirects native
+// entries marked `unpacked` to app.asar.unpacked while resolving their packed
+// JavaScript callers normally. If any invariant is violated we THROW so a
+// mutable unpacked script can never execute inside main or supervisor.
 function assertNativeBinaries(resourcesDir, electronPlatformName, arch) {
   const archName = ARCH_NAME[arch];
   if (!archName) {
@@ -160,10 +156,9 @@ function assertNativeBinaries(resourcesDir, electronPlatformName, arch) {
     );
   }
 
-  // 2. better-sqlite3 must be asar-UNPACKED, not packed inside app.asar. Inspect
-  //    the asar header: an unpacked file carries `unpacked: true`; a packed file
-  //    carries an `offset`. If its JS sits inside the archive, the runtime
-  //    bindings search resolves inside app.asar and the app crashes on launch.
+  // 2. Inspect the ASAR header: native code must be marked unpacked, while all
+  //    JavaScript/MJS entrypoints that execute in trusted processes must carry
+  //    packed offsets and must never be shadowed as unpacked entries.
   const asarPath = join(resourcesDir, "app.asar");
   if (existsSync(asarPath)) {
     let asar;
@@ -175,17 +170,37 @@ function assertNativeBinaries(resourcesDir, electronPlatformName, arch) {
     }
     if (asar) {
       const { header } = asar.getRawHeader(asarPath);
-      const dbEntry = lookupAsarEntry(header, [
+      const packedTrustedEntries = [
+        ["node_modules", "better-sqlite3", "lib", "database.js"],
+        ["node_modules", "node-pty", "lib", "index.js"],
+        ["node_modules", "@anthropic-ai", "claude-agent-sdk", "sdk.mjs"],
+        ["dist", "main", "claudeSdkProbeWorker.mjs"],
+        ["dist", "main", "cursorSdkWorker.mjs"],
+        ["dist", "main", "mcpProbeWorker.mjs"],
+        ["dist", "main", "mcpToolFilterWorker.mjs"],
+        ["resources", "wsl-helpers", "bridge.mjs"],
+        ["resources", "agent-plugins", "_runtime", "poracode-hook-runtime.mjs"],
+        ["resources", "skills", "y-space-browser", "SKILL.md"],
+        ["resources", "plugins", "outlook", "mcp.json"],
+      ];
+      for (const segments of packedTrustedEntries) {
+        const entry = lookupAsarEntry(header, segments);
+        if (!entry || entry.unpacked === true || entry.offset === undefined) {
+          throw new Error(
+            `[afterPack] FATAL: trusted resource must be packed in app.asar: ${segments.join("/")}`,
+          );
+        }
+      }
+      const nativeEntry = lookupAsarEntry(header, [
         "node_modules",
         "better-sqlite3",
-        "lib",
-        "database.js",
+        "build",
+        "Release",
+        "better_sqlite3.node",
       ]);
-      if (dbEntry && dbEntry.unpacked !== true && dbEntry.offset !== undefined) {
+      if (!nativeEntry || nativeEntry.unpacked !== true) {
         throw new Error(
-          "[afterPack] FATAL: better-sqlite3 is packed INSIDE app.asar (not unpacked); " +
-            "its native bindings would resolve inside the archive and crash on launch. " +
-            "Refusing to publish.",
+          "[afterPack] FATAL: better-sqlite3 native binding is not marked unpacked in app.asar.",
         );
       }
     }
@@ -205,8 +220,29 @@ function assertNativeBinaries(resourcesDir, electronPlatformName, arch) {
   }
 
   console.log(
-    `[afterPack] verified native binaries for ${platTag}-${archName}: better-sqlite3 (unpacked) + node-pty`,
+    `[afterPack] verified packed JavaScript and native binaries for ${platTag}-${archName}`,
   );
+}
+
+function assertNoUnpackedJavaScript(resourcesDir) {
+  const pending = ["app.asar.unpacked", "wsl-helpers", "agent-plugins", "skills", "plugins"]
+    .map((name) => join(resourcesDir, name))
+    .filter((path) => existsSync(path));
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        pending.push(path);
+        continue;
+      }
+      if (/\.(?:cjs|js|mjs)$/iu.test(entry.name)) {
+        throw new Error(
+          `[afterPack] FATAL: executable JavaScript escaped the integrity-checked ASAR: ${path}`,
+        );
+      }
+    }
+  }
 }
 
 function chmodNodePtyHelpers(resourcesDir) {
@@ -244,6 +280,7 @@ module.exports = async function afterPack(context) {
   // Throws if a required native binary is missing or mis-packed, so a broken
   // app can never be packaged or published.
   assertNativeBinaries(resourcesDir, context.electronPlatformName, context.arch);
+  assertNoUnpackedJavaScript(resourcesDir);
   const fixed = chmodNodePtyHelpers(resourcesDir);
   for (const path of fixed) {
     console.log(`[afterPack] chmod +x ${path}`);

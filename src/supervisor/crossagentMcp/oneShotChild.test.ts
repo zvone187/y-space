@@ -1,5 +1,9 @@
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectLocation } from "@/shared/contracts";
+import { terminateProcessTree } from "@/shared/processTree";
 import type { AgentAdapter, OneShotChildCommand } from "@/supervisor/agents/base";
 
 // Pass the built command through unchanged so the driver spawns exactly what the
@@ -99,5 +103,108 @@ describe("runOneShotChild", () => {
     });
     // A killed process never exits 0 → the driver reports a non-completed settle.
     expect(await settled).toBe("failed");
+  });
+
+  it("force-kills a child that ignores SIGTERM before dispose settles", async () => {
+    const adapter = nodeAdapter(() => ({
+      command: process.execPath,
+      args: [
+        "-e",
+        [
+          "process.on('SIGTERM', () => {})",
+          "process.stdout.write('ready')",
+          // Bound the fail-first case so a broken force-kill path cannot
+          // leave a child behind after the test finishes.
+          "setTimeout(() => process.exit(0), 6500)",
+        ].join(";"),
+      ],
+      stdin: "",
+    }));
+    let markReady!: () => void;
+    const ready = new Promise<void>((resolve) => {
+      markReady = resolve;
+    });
+    let terminalStatus: "completed" | "failed" | undefined;
+    const handle = runOneShotChild({
+      adapter,
+      projectLocation: PROJECT,
+      model: "m",
+      effort: undefined,
+      prompt: "hi",
+      onTextDelta: (delta) => {
+        if (delta.includes("ready")) markReady();
+      },
+      onSettle: ({ status }) => {
+        terminalStatus = status;
+      },
+    });
+    await ready;
+
+    const startedAt = Date.now();
+    await handle.dispose();
+
+    expect(Date.now() - startedAt).toBeLessThan(5_000);
+    expect(terminalStatus).toBe("failed");
+  }, 10_000);
+
+  it("stops a one-shot leader and its heartbeat descendant before dispose settles", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "y-space-one-shot-tree-"));
+    const heartbeatPath = join(directory, "heartbeat.txt");
+    let descendantPid: number | undefined;
+    try {
+      const descendantSource = [
+        "const { writeFileSync } = require('node:fs')",
+        "const heartbeatPath = process.argv[1]",
+        "let heartbeat = 0",
+        "const pulse = () => writeFileSync(heartbeatPath, String(++heartbeat))",
+        // The leader accepts SIGTERM, but this descendant deliberately does
+        // not: leader exit must trigger exact-group reaping before dispose ends.
+        "process.on('SIGTERM', () => {})",
+        "pulse()",
+        "process.stdout.write('ready')",
+        "setInterval(pulse, 20)",
+        // Keep a fail-first run bounded even if cleanup itself regresses.
+        "setTimeout(() => process.exit(0), 10000)",
+      ].join(";");
+      const leaderSource = [
+        "const { spawn } = require('node:child_process')",
+        `const child = spawn(process.execPath, ['-e', ${JSON.stringify(descendantSource)}, ${JSON.stringify(heartbeatPath)}], { stdio: ['ignore', 'pipe', 'ignore'] })`,
+        "child.stdout.once('data', () => process.stdout.write('ready:' + child.pid))",
+        "setInterval(() => {}, 1000)",
+      ].join(";");
+      const adapter = nodeAdapter(() => ({
+        command: process.execPath,
+        args: ["-e", leaderSource],
+        stdin: "",
+      }));
+      let output = "";
+      let markReady!: (pid: number) => void;
+      const ready = new Promise<number>((resolve) => {
+        markReady = resolve;
+      });
+      const handle = runOneShotChild({
+        adapter,
+        projectLocation: PROJECT,
+        model: "m",
+        effort: undefined,
+        prompt: "hi",
+        onTextDelta: (delta) => {
+          output += delta;
+          const match = /ready:(\d+)/u.exec(output);
+          if (match?.[1]) markReady(Number(match[1]));
+        },
+        onSettle: () => {},
+      });
+      descendantPid = await ready;
+
+      await handle.dispose();
+      const heartbeatAfterDispose = readFileSync(heartbeatPath, "utf8");
+      await new Promise((resolve) => setTimeout(resolve, 125));
+
+      expect(readFileSync(heartbeatPath, "utf8")).toBe(heartbeatAfterDispose);
+    } finally {
+      if (descendantPid) terminateProcessTree(descendantPid, { signal: "SIGKILL" });
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

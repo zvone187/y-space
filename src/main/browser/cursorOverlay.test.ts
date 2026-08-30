@@ -122,9 +122,13 @@ interface SecureTargetCdpOptions {
   rejectKeyUpAttempts?: number;
   rejectReleaseAttempts?: number;
   focusApplies?: boolean;
+  focusAfterSelection?: boolean;
   editable?: boolean;
   textLengthBefore?: number;
+  textLengthAfterClear?: number;
   textMatches?: boolean;
+  textSelectionMatches?: boolean;
+  textSelectionObservable?: boolean;
   checkedBefore?: boolean;
   checkedAfter?: boolean;
   toggleType?: "checkbox" | "radio";
@@ -173,6 +177,8 @@ function createSecureTargetCdp(options: SecureTargetCdpOptions = {}): {
   let rejectedKeyUps = 0;
   let rejectedReleases = 0;
   let checkedReads = 0;
+  let activeReads = 0;
+  let editableReads = 0;
   let firstClickReleased = false;
   let selectPopupOpen = false;
   let selectPopupNavigationSteps = 0;
@@ -223,6 +229,18 @@ function createSecureTargetCdp(options: SecureTargetCdpOptions = {}): {
     if (method === "Runtime.callFunctionOn") {
       const functionDeclaration = String(params?.functionDeclaration ?? "");
       const args = Array.isArray(params?.arguments) ? params.arguments : [];
+      if (functionDeclaration.includes("selectionStart")) {
+        return {
+          result: {
+            type: "object",
+            value: {
+              kind: "value",
+              observable: options.textSelectionObservable !== false,
+              selected: options.textSelectionMatches !== false,
+            },
+          },
+        };
+      }
       if (functionDeclaration.includes("elementFromPoint")) {
         if (options.stallPointHitRelation) {
           return await new Promise<Record<string, unknown>>(() => {});
@@ -239,13 +257,18 @@ function createSecureTargetCdp(options: SecureTargetCdpOptions = {}): {
         if (functionDeclaration.includes("endsWith")) {
           return { result: { type: "boolean", value: options.textMatches !== false } };
         }
+        const length =
+          editableReads >= 2
+            ? (options.textLengthAfterClear ?? 0)
+            : (options.textLengthBefore ?? 0);
+        editableReads += 1;
         return {
           result: {
             type: "object",
             value: {
               active: options.focusApplies !== false,
               editable: options.editable !== false,
-              length: options.textLengthBefore ?? 0,
+              length,
             },
           },
         };
@@ -296,7 +319,11 @@ function createSecureTargetCdp(options: SecureTargetCdpOptions = {}): {
         };
       }
       if (functionDeclaration.includes("activeElement")) {
-        return { result: { type: "boolean", value: options.focusApplies !== false } };
+        const active =
+          options.focusApplies !== false &&
+          !(options.focusAfterSelection === false && activeReads > 0);
+        activeReads += 1;
+        return { result: { type: "boolean", value: active } };
       }
       if (args.length > 0) {
         return {
@@ -1174,6 +1201,9 @@ describe("Y Space agent cursor contract", () => {
     expect(expression).toContain("#ff5a1f");
     expect(expression).toContain("#ffffff");
     expect(expression).toContain('attachShadow.call(host,{mode:"closed"})');
+    expect(expression).toContain(
+      ":host::backdrop{background:transparent!important;pointer-events:none!important}",
+    );
     expect(expression).toContain("adoptedStyleSheets");
     expect(expression).toContain("createElementNS");
     expect(expression).not.toContain("pointer.innerHTML");
@@ -2184,6 +2214,78 @@ describe("Y Space agent cursor contract", () => {
         submit: false,
       }),
     ).resolves.toEqual({ status: "ambiguous", reason: "text-did-not-commit" });
+  });
+
+  it("does not clear or insert when full-value selection did not apply", async () => {
+    const { cdp, send } = createSecureTargetCdp({ textSelectionMatches: false });
+
+    await expect(
+      dispatchNativeText(cdp, "#field", secureElementTarget(), "hello", {
+        replace: true,
+        submit: false,
+      }),
+    ).resolves.toEqual({ status: "ambiguous", reason: "text-selection-did-not-apply" });
+    expect(
+      send.mock.calls.some(
+        ([method, params]) =>
+          method === "Input.dispatchKeyEvent" &&
+          (params?.type === "keyDown" || params?.type === "rawKeyDown") &&
+          params?.key === "Backspace",
+      ),
+    ).toBe(false);
+    expect(send).not.toHaveBeenCalledWith("Input.insertText", { text: "hello" });
+  });
+
+  it("does not clear or insert when the exact target loses focus after select-all", async () => {
+    const { cdp, send } = createSecureTargetCdp({ focusAfterSelection: false });
+
+    await expect(
+      dispatchNativeText(cdp, "#field", secureElementTarget(), "hello", {
+        replace: true,
+        submit: false,
+      }),
+    ).resolves.toEqual({ status: "ambiguous", reason: "focus-did-not-apply" });
+    expect(
+      send.mock.calls.some(
+        ([method, params]) =>
+          method === "Input.dispatchKeyEvent" &&
+          (params?.type === "keyDown" || params?.type === "rawKeyDown") &&
+          params?.key === "Backspace",
+      ),
+    ).toBe(false);
+    expect(send).not.toHaveBeenCalledWith("Input.insertText", { text: "hello" });
+  });
+
+  it("fills a value control without selection ranges after verifying it cleared", async () => {
+    const { cdp, send } = createSecureTargetCdp({
+      textLengthBefore: 16,
+      textLengthAfterClear: 0,
+      textSelectionObservable: false,
+    });
+
+    await expect(
+      dispatchNativeText(cdp, "#email", secureElementTarget(), "hello@example.com", {
+        replace: true,
+        submit: false,
+      }),
+    ).resolves.toEqual({ status: "completed" });
+    expect(send).toHaveBeenCalledWith("Input.insertText", { text: "hello@example.com" });
+  });
+
+  it("does not insert when an unobservable value control failed to clear", async () => {
+    const { cdp, send } = createSecureTargetCdp({
+      textLengthBefore: 16,
+      textLengthAfterClear: 15,
+      textSelectionObservable: false,
+    });
+
+    await expect(
+      dispatchNativeText(cdp, "#email", secureElementTarget(), "hello@example.com", {
+        replace: true,
+        submit: false,
+      }),
+    ).resolves.toEqual({ status: "ambiguous", reason: "text-clear-did-not-commit" });
+    expect(send).not.toHaveBeenCalledWith("Input.insertText", { text: "hello@example.com" });
   });
 
   it("reports ambiguity when authorization is revoked after a post-click cleanup key-up", async () => {

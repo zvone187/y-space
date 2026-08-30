@@ -78,10 +78,14 @@ function createRuntimeFixture(): {
   writeFileSync(join(mainBundleDir, "supervisor.cjs"), "supervisor", "utf8");
   writeFileSync(join(mainBundleDir, "claudeSdkProbeWorker.mjs"), "worker", "utf8");
   writeFileSync(join(mainBundleDir, "cursorSdkWorker.mjs"), "worker", "utf8");
+  writeFileSync(join(mainBundleDir, "mcpProbeWorker.mjs"), "worker", "utf8");
+  writeFileSync(join(mainBundleDir, "mcpToolFilterWorker.mjs"), "worker", "utf8");
   writeRuntimeManifest(mainBundleDir, "server", ["server.cjs"]);
   writeRuntimeManifest(mainBundleDir, "supervisor", ["supervisor.cjs"]);
   writeRuntimeManifest(mainBundleDir, "claudeSdkProbeWorker", ["claudeSdkProbeWorker.mjs"]);
   writeRuntimeManifest(mainBundleDir, "cursorSdkWorker", ["cursorSdkWorker.mjs"]);
+  writeRuntimeManifest(mainBundleDir, "mcpProbeWorker", ["mcpProbeWorker.mjs"]);
+  writeRuntimeManifest(mainBundleDir, "mcpToolFilterWorker", ["mcpToolFilterWorker.mjs"]);
   writeFileSync(join(agentPluginsDir, "plugin.json"), "{}", "utf8");
   writeFileSync(join(wslHelpersDir, "bridge.mjs"), "", "utf8");
   return { mainBundleDir, agentPluginsDir, wslHelpersDir, cacheDir };

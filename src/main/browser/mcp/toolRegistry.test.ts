@@ -96,6 +96,7 @@ function createDispatchContext(send: ReturnType<typeof vi.fn>): ToolContext {
       isFocused: vi.fn<() => boolean>().mockReturnValue(true),
       isDestroyed: vi.fn<() => boolean>().mockReturnValue(false),
       sendInputEvent: vi.fn<(event: Electron.KeyboardInputEvent) => void>(),
+      selectAll: vi.fn<() => void>(),
       insertText: vi.fn<(text: string) => Promise<void>>().mockResolvedValue(undefined),
       executeJavaScript: vi
         .fn<(script: string, userGesture?: boolean) => Promise<unknown>>()
@@ -635,6 +636,7 @@ describe("browser MCP tool registry", () => {
         executeJavaScript: ReturnType<typeof vi.fn>;
         focus: ReturnType<typeof vi.fn>;
         insertText: ReturnType<typeof vi.fn>;
+        selectAll: ReturnType<typeof vi.fn>;
         sendInputEvent: ReturnType<typeof vi.fn>;
       };
       cdp: { attach: ReturnType<typeof vi.fn> };
@@ -645,6 +647,8 @@ describe("browser MCP tool registry", () => {
     expect(send).toHaveBeenCalledWith("DOM.focus", { backendNodeId: 700 });
     const nativeEvents = activeTab.webContents.sendInputEvent.mock.calls.map(([event]) => event);
     expect(nativeEvents.length).toBeGreaterThan(0);
+    expect(activeTab.webContents.selectAll).toHaveBeenCalledOnce();
+    expect(nativeEvents.some((event) => event.keyCode === "A")).toBe(false);
     expect(nativeEvents.some((event) => event.type === "char" && event.keyCode === "p")).toBe(
       process.platform === "darwin",
     );

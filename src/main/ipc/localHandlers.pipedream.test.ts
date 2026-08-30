@@ -8,12 +8,16 @@ const showOpenDialogMock = vi.hoisted(() =>
     ) => Promise<{ canceled: boolean; filePaths: readonly string[] }>
   >(),
 );
+const showMessageBoxMock = vi.hoisted(() =>
+  vi.fn<() => Promise<{ response: number }>>(async () => ({ response: 1 })),
+);
 
 vi.mock("electron", () => ({
   app: { getPath: () => "/tmp", isPackaged: false },
   clipboard: { writeImage: vi.fn<(image: unknown) => void>() },
   dialog: {
     showOpenDialog: showOpenDialogMock,
+    showMessageBox: showMessageBoxMock,
     showSaveDialog: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   },
   nativeImage: {
@@ -91,7 +95,10 @@ function makeHandlers(
 }
 
 describe("local Pipedream env-file IPC handler", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    showMessageBoxMock.mockResolvedValue({ response: 1 });
+  });
 
   it("keeps the selected path in main and returns only the safe import result", async () => {
     const safeResult = {
@@ -118,6 +125,10 @@ describe("local Pipedream env-file IPC handler", () => {
       expect.anything(),
       expect.objectContaining({ properties: ["openFile", "showHiddenFiles"] }),
     );
+    expect(showMessageBoxMock).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      expect.objectContaining({ type: "warning", defaultId: 0, cancelId: 0 }),
+    );
     const dialogOptions = showOpenDialogMock.mock.calls[0]?.[1];
     expect(dialogOptions).not.toHaveProperty("filters");
     expect(result).toEqual(safeResult);
@@ -136,7 +147,25 @@ describe("local Pipedream env-file IPC handler", () => {
     expect(importEnvironmentFile).not.toHaveBeenCalled();
   });
 
-  it("clears path metadata through a main-only service call", async () => {
+  it("does not import or delete the selected source until the user confirms secure removal", async () => {
+    const importEnvironmentFile = vi.fn<(filePath: string) => Promise<unknown>>();
+    showOpenDialogMock.mockResolvedValue({
+      canceled: false,
+      filePaths: ["/private/config/.env.pipedream"],
+    });
+    showMessageBoxMock.mockResolvedValue({ response: 0 });
+
+    await expect(
+      makeHandlers(importEnvironmentFile).pipedreamChooseEnvFile({
+        dialogTitle: "Choose Pipedream environment file",
+      }),
+    ).resolves.toBeNull();
+
+    expect(showMessageBoxMock).toHaveBeenCalledOnce();
+    expect(importEnvironmentFile).not.toHaveBeenCalled();
+  });
+
+  it("clears sealed credentials through a main-only service call", async () => {
     const clearEnvironmentFile = vi.fn<() => Promise<unknown>>(async () => ({
       personalMcp: { enabled: false, authenticated: false, serverName: "pd" as const },
       connect: { state: "absent" as const },

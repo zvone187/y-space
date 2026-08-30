@@ -1,11 +1,11 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { isIP, type AddressInfo, type Socket } from "node:net";
-import type { PipedreamEnvironment } from "@/shared/contracts/pipedream";
+import { parsePipedreamAppSlug, type PipedreamEnvironment } from "@/shared/contracts/pipedream";
 import {
-  PIPEDREAM_MCP_V3_URL,
   PipedreamMcpSessionRegistry,
   buildPipedreamMcpUpstreamHeaders,
+  buildPipedreamMcpUpstreamUrl,
   shouldRetryAfterPipedreamUnauthorized,
 } from "./PipedreamMcpRelay";
 
@@ -134,7 +134,7 @@ export class PipedreamLoopbackRelay {
       token: randomBytes(32).toString("base64url"),
       threadId: requireBounded(input.threadId, 256, "thread id"),
       providerBindingId: requireBounded(input.providerBindingId, 512, "provider binding id"),
-      appSlug: requirePattern(input.appSlug, /^[a-z0-9][a-z0-9_-]*$/, "app slug"),
+      appSlug: requireAppSlug(input.appSlug),
       accountId: requirePattern(input.accountId, /^apn_[a-zA-Z0-9]+$/, "account id"),
       allowedHosts: new Set([
         "127.0.0.1",
@@ -390,11 +390,10 @@ export class PipedreamLoopbackRelay {
         projectId: this.#options.projectId,
         environment: this.#options.environment,
         externalUserId: this.#options.externalUserId,
-        appSlug: binding.appSlug,
         accountId: binding.accountId,
       });
       return abortable(
-        (this.#options.fetch ?? globalThis.fetch)(PIPEDREAM_MCP_V3_URL, {
+        (this.#options.fetch ?? globalThis.fetch)(buildPipedreamMcpUpstreamUrl(binding.appSlug), {
           method: request.method ?? "POST",
           headers,
           signal,
@@ -718,6 +717,12 @@ function requirePattern(value: string, pattern: RegExp, label: string): string {
   const normalized = value.trim();
   if (!pattern.test(normalized)) throw new Error(`Invalid Pipedream ${label}.`);
   return normalized;
+}
+
+function requireAppSlug(value: string): string {
+  const slug = parsePipedreamAppSlug(value);
+  if (!slug) throw new Error("Invalid Pipedream app slug.");
+  return slug;
 }
 
 function requireBounded(value: string, max: number, label: string): string {

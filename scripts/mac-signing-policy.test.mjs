@@ -39,16 +39,16 @@ void test("preserves configured certificate signing", () => {
   );
 });
 
-void test("leaves normal keychain auto-discovery unchanged", () => {
-  assert.equal(resolveMacSigningIdentity({}), undefined);
-  assert.equal(resolveMacSigningIdentity({ CSC_IDENTITY_AUTO_DISCOVERY: "true" }), undefined);
+void test("pins every credential-free local build to a final ad-hoc signing pass", () => {
+  assert.equal(resolveMacSigningIdentity({}), "-");
+  assert.equal(resolveMacSigningIdentity({ CSC_IDENTITY_AUTO_DISCOVERY: "true" }), "-");
 });
 
 void test("allows ad-hoc fallback only for unpublished builds without explicit credentials", () => {
   assert.deepEqual(resolveMacSigningPolicy({}, "never"), {
     allowAdhocFallback: true,
     forceCodeSigning: false,
-    identity: undefined,
+    identity: "-",
     notarize: false,
     requireCertificate: false,
   });
@@ -107,7 +107,7 @@ void test("blank certificate-intent variables do not disable local ad-hoc fallba
     {
       allowAdhocFallback: true,
       forceCodeSigning: false,
-      identity: undefined,
+      identity: "-",
       notarize: false,
       requireCertificate: false,
     },

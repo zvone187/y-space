@@ -1,13 +1,16 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ChildProcess } from "node:child_process";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { type AgentEventEnvelope, agentEventEnvelopeSchema } from "@/shared/contracts/agentEvent";
 import { isPoracodeHookDebug } from "../../runtime/hookDebug";
 import {
+  buildVerifiedWslEsmArgv,
   deployFilesToWslTempBase,
   readBundledHelperVersion,
   resolveWslHelpersDir,
+  type WslBaseDeployResult,
+  type WslDeployFile,
 } from "../wslDeploy";
 import { resolveNodeForDistro, type ResolvedNode } from "../runtime";
 import { attachLineSplitter, spawnWslLineChild, type WslLineChildOpts } from "../wslChild";
@@ -42,10 +45,7 @@ export interface WslBridgeServerOptions {
   /**
    * Test seam: replace the deploy step. Defaults to `deployFilesToWslTempBase`.
    */
-  deploy?: (
-    distro: string,
-    files: { src: string; relDest: string }[],
-  ) => { linuxBaseDir: string } | null;
+  deploy?: (distro: string, files: WslDeployFile[]) => WslBaseDeployResult | null;
   /** Optional override for the resources dir (defaults to `resolveWslHelpersDir`). */
   helpersDir?: string;
   /**
@@ -89,7 +89,7 @@ export interface WatchEvent {
 
 /**
  * Owns one in-WSL bridge per distro. The bridge is `node bridge.mjs`
- * staged under `~/.poracode/bridge/bridge.mjs` and spawned via `wsl.exe`.
+ * staged under a private UUID directory in `/tmp` and spawned via `wsl.exe`.
  * Its stdout JSONL stream is parsed here:
  *
  *   {"type":"boot","port":<n>,...}        → resolves the per-distro `ready`
@@ -254,6 +254,14 @@ export class WslBridgeServer {
       }
       return undefined;
     }
+    let bridgeContent: Buffer;
+    try {
+      // Packaged desktop reads are validated by Electron's ASAR integrity
+      // layer before the helper crosses into WSL.
+      bridgeContent = readFileSync(bridgeSrc);
+    } catch {
+      return undefined;
+    }
 
     const resolveNode = this.options.resolveNode ?? defaultResolveNode;
     const resolved = await resolveNode(distro).catch((error) => {
@@ -279,13 +287,9 @@ export class WslBridgeServer {
       this.options.deploy ??
       ((targetDistro, files) =>
         deployFilesToWslTempBase(targetDistro, `poracode-bridge-${process.pid}`, files));
-    const watcherBinding = join(helpersDir, "watcher.node");
-    const deployedFiles: { src: string; relDest: string }[] = [
-      { src: bridgeSrc, relDest: "bridge/bridge.mjs" },
+    const deployedFiles: WslDeployFile[] = [
+      { content: bridgeContent, relDest: "bridge/bridge.mjs" },
     ];
-    if (existsSync(watcherBinding)) {
-      deployedFiles.push({ src: watcherBinding, relDest: "bridge/watcher.node" });
-    }
     const result = deploy(distro, deployedFiles);
     if (!result) {
       if (isPoracodeHookDebug()) {
@@ -385,7 +389,7 @@ export class WslBridgeServer {
     const browserMcpUrl = readPrivilegedMcpEnvironment("browser")?.url;
     const childOpts: WslLineChildOpts = {
       distro,
-      argv: [resolved.nodePath, linuxScriptPath],
+      argv: [resolved.nodePath, ...buildVerifiedWslEsmArgv(linuxScriptPath, bridgeContent)],
       env: {
         PORACODE_HOOK_SECRET: this.options.secret,
         PORACODE_HOOK_PROTOCOL_VERSION: String(this.options.protocolVersion),
@@ -402,7 +406,13 @@ export class WslBridgeServer {
     };
 
     const spawnFn = this.options.spawn ?? spawnWslLineChild;
-    const child = spawnFn(childOpts);
+    let child: ChildProcess;
+    try {
+      child = spawnFn(childOpts);
+    } catch (error) {
+      result.cleanup();
+      throw error;
+    }
 
     // For test stubs that don't wire stdout via spawnWslLineChild, attach
     // the splitter ourselves. Real `spawnWslLineChild` already attaches it
@@ -414,7 +424,19 @@ export class WslBridgeServer {
       attachLineSplitter(child, splitterOpts);
     }
 
+    let deploymentCleaned = false;
+    const cleanupDeployment = (): void => {
+      if (deploymentCleaned) return;
+      deploymentCleaned = true;
+      try {
+        result.cleanup();
+      } catch {
+        // Deployment cleanup is best effort and must not break bridge teardown.
+      }
+    };
+
     const onExit = (): void => {
+      cleanupDeployment();
       const state = this.bridges.get(distro);
       if (state && state.child === child) {
         this.bridges.delete(distro);
@@ -435,6 +457,8 @@ export class WslBridgeServer {
       }
     };
     child.once("exit", onExit);
+    // A failed spawn emits `error` + `close` without an `exit` event.
+    child.once("close", cleanupDeployment);
 
     const timeout = setTimeout(() => {
       if (!booted) {
@@ -479,7 +503,7 @@ export class WslBridgeServer {
           actual: reportedVersion,
         });
       }
-      child.off("exit", onExit);
+      this.disposed.add(child);
       try {
         terminateChildProcessTree(child);
       } catch {

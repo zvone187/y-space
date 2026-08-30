@@ -1,4 +1,8 @@
-import type { PipedreamAppSummary, PipedreamEnvironment } from "@/shared/contracts/pipedream";
+import {
+  parsePipedreamAppSlug,
+  type PipedreamAppSummary,
+  type PipedreamEnvironment,
+} from "@/shared/contracts/pipedream";
 
 export const PIPEDREAM_API_BASE_URL = "https://api.pipedream.com/v1";
 export const PIPEDREAM_API_OPERATION_TIMEOUT_MS = 30_000;
@@ -7,7 +11,6 @@ export const PIPEDREAM_CONNECT_TOKEN_TTL_SECONDS = 600;
 
 const PROJECT_ID_PATTERN = /^proj_[a-zA-Z0-9]+$/;
 const ACCOUNT_ID_PATTERN = /^apn_[a-zA-Z0-9]+$/;
-const APP_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
 export interface PipedreamApiClientOptions {
   readonly projectId: string;
@@ -103,7 +106,7 @@ export class PipedreamApiClient {
     url.searchParams.set("external_user_id", this.#externalUserId);
     url.searchParams.set("include_credentials", "false");
     if (input.appSlug !== undefined) {
-      url.searchParams.set("app", requirePattern(input.appSlug, APP_SLUG_PATTERN, "app slug"));
+      url.searchParams.set("app", requireAppSlug(input.appSlug));
     }
     if (input.cursor !== undefined) url.searchParams.set("after", requireCursor(input.cursor));
     if (input.limit !== undefined) url.searchParams.set("limit", String(requireLimit(input.limit)));
@@ -235,7 +238,7 @@ export class PipedreamApiClient {
 function mapAppSummary(value: unknown): PipedreamAppSummary | undefined {
   if (!isRecord(value)) return undefined;
   const id = readPattern(value.id, /^app_[a-zA-Z0-9]+$/);
-  const slug = readPattern(value.name_slug, APP_SLUG_PATTERN);
+  const slug = parsePipedreamAppSlug(value.name_slug);
   const name = readNonEmptyString(value.name, 200);
   if (!id || !slug || !name) return undefined;
   const iconUrl = readHttpsUrl(value.img_src);
@@ -312,6 +315,12 @@ function requirePattern(value: string, pattern: RegExp, label: string): string {
   const normalized = value.trim();
   if (!pattern.test(normalized)) throw new Error(`Invalid Pipedream ${label}.`);
   return normalized;
+}
+
+function requireAppSlug(value: string): string {
+  const slug = parsePipedreamAppSlug(value);
+  if (!slug) throw new Error("Invalid Pipedream app slug.");
+  return slug;
 }
 
 function requireExternalUserId(value: string): string {

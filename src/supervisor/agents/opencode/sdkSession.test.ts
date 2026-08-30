@@ -93,6 +93,14 @@ function emptyEventClient() {
   };
 }
 
+function deferred<Value>() {
+  let resolve!: (value: Value | PromiseLike<Value>) => void;
+  const promise = new Promise<Value>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe("OpencodeSdkSession", () => {
   const projectLocation: ProjectLocation = { kind: "posix", path: "/repo" };
   const config: ThreadConfig = { model: "opencode/big-pickle" };
@@ -167,6 +175,38 @@ describe("OpencodeSdkSession", () => {
 
     await session.dispose();
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("disposes a server acquired after activation was disposed", async () => {
+    const pendingServer = deferred<{
+      eventClient: ReturnType<typeof emptyEventClient>;
+      client: object;
+      baseUrl: string;
+      handle: object;
+      dispose: () => Promise<void>;
+    }>();
+    const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    mocks.acquireOpenCodeServer.mockReturnValue(pendingServer.promise);
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode-late-activation",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+    });
+
+    const activation = session.activate();
+    await vi.waitFor(() => expect(mocks.acquireOpenCodeServer).toHaveBeenCalledOnce());
+    await session.dispose();
+    pendingServer.resolve({
+      eventClient: emptyEventClient(),
+      client: {},
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose,
+    });
+
+    await expect(activation).rejects.toThrow("disposed before activation");
+    expect(dispose).toHaveBeenCalledOnce();
   });
 
   it("shares one server event stream across GUI sessions", async () => {

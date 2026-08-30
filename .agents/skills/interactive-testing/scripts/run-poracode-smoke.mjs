@@ -154,15 +154,15 @@ try {
       `${launchOnly ? "Debug" : "Smoke"} ports: CDP ${port}, dev server ${vitePort}. Session: ${sessionFile}`,
     );
 
-    // Mock mode sandboxes the OS identity (HOME/APPDATA + a mock keychain) so
-    // nothing touches the real user profile. Real mode intentionally keeps the
-    // real home so provider credentials that live under it (e.g. ~/.kimi-code)
-    // resolve — only Poracode's own state stays isolated via PORACODE_BASE_DIR.
+    // Mock mode sandboxes HOME/APPDATA so nothing touches the real user profile.
+    // Real mode intentionally keeps the real home so provider credentials that
+    // live under it (e.g. ~/.kimi-code) resolve. Both modes still request the
+    // test-only mock keychain on macOS below, and Poracode's own state always
+    // stays isolated via PORACODE_BASE_DIR.
     const identityEnv =
       mode === "real"
         ? {}
         : {
-            ...(process.platform === "darwin" ? { PORACODE_USE_MOCK_KEYCHAIN: "1" } : {}),
             HOME: homeDir,
             USERPROFILE: homeDir,
             LOCALAPPDATA: localAppDataDir,
@@ -179,6 +179,7 @@ try {
         PORACODE_DEV_APP_URL: appUrl,
         PORACODE_CDP_PORT: String(port),
         PORACODE_BASE_DIR: dataDir,
+        ...(process.platform === "darwin" ? { PORACODE_USE_MOCK_KEYCHAIN: "1" } : {}),
         PORACODE_CDP_USER_DATA_DIR: join(dataDir, "userData"),
         PORACODE_SMOKE_OUT_DIR: outDir,
         PORACODE_DEV_SERVER_REQUIRE_FREE: "1",

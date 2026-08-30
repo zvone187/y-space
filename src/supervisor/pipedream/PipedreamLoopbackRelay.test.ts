@@ -111,12 +111,12 @@ describe("PipedreamLoopbackRelay", () => {
     expect(response.status).toBe(200);
 
     const [input, init] = upstreamFetch.mock.calls[0]!;
-    expect(String(input)).toBe("https://remote.mcp.pipedream.net/v3");
+    expect(String(input)).toBe("https://remote.mcp.pipedream.net/v3?app=slack");
     const headers = new Headers(init?.headers);
     expect(headers.get("authorization")).toBe("Bearer developer-token-private");
     expect(headers.get("x-pd-project-id")).toBe("proj_Test123");
     expect(headers.get("x-pd-external-user-id")).toBe("y-space-install-private-id");
-    expect(headers.get("x-pd-app-slug")).toBe("slack");
+    expect(headers.has("x-pd-app-slug")).toBe(false);
     expect(headers.get("x-pd-account-id")).toBe("apn_Account123");
     expect(headers.has("cookie")).toBe(false);
   });

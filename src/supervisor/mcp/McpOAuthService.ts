@@ -1,12 +1,15 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { dirname, join } from "node:path";
 import { auth, type OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import type {
-  OAuthClientInformationMixed,
-  OAuthClientMetadata,
-  OAuthTokens,
+import {
+  OAuthClientInformationFullSchema,
+  OAuthClientInformationSchema,
+  OAuthTokensSchema,
+  type OAuthClientInformationMixed,
+  type OAuthClientMetadata,
+  type OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import {
   isPipedreamPersonalMcpUrl,
@@ -20,7 +23,13 @@ import {
   type McpServer,
   type ResolvedMcpServer,
 } from "@/shared/contracts";
-import { decryptSecret, encryptSecret } from "@/shared/secretStorage";
+import { decryptSecret, encryptSecret, isEncryptedSecret } from "@/shared/secretStorage";
+import { writeFileAtomic } from "@/shared/atomicFile";
+import {
+  durableFileSystem,
+  FileDurabilityUnavailableError,
+  type FileDurability,
+} from "@/shared/fileDurability";
 import {
   PersonalMcpLoopbackRelay,
   type PersonalMcpRelayBindingInfo,
@@ -48,6 +57,52 @@ interface StoredEntry {
 
 interface StoreFile {
   servers: Record<string, StoredEntry>;
+}
+
+function parseStoreFile(value: unknown): StoreFile {
+  if (!isPlainRecord(value) || !hasExactKeys(value, ["servers"]) || !isPlainRecord(value.servers)) {
+    throw new Error("Invalid OAuth credential store structure.");
+  }
+  const servers: Record<string, StoredEntry> = {};
+  for (const [serverUrl, entry] of Object.entries(value.servers)) {
+    if (
+      !isPlainRecord(entry) ||
+      !hasExactKeys(entry, ["clientInformation", "tokens", "tokensSavedAt"], true)
+    ) {
+      throw new Error("Invalid OAuth credential store entry.");
+    }
+    if (
+      (entry.clientInformation !== undefined &&
+        (typeof entry.clientInformation !== "string" ||
+          !isEncryptedSecret(entry.clientInformation))) ||
+      (entry.tokens !== undefined &&
+        (typeof entry.tokens !== "string" || !isEncryptedSecret(entry.tokens))) ||
+      (entry.tokensSavedAt !== undefined &&
+        (typeof entry.tokensSavedAt !== "number" ||
+          !Number.isSafeInteger(entry.tokensSavedAt) ||
+          entry.tokensSavedAt < 0))
+    ) {
+      throw new Error("Invalid OAuth credential store entry.");
+    }
+    servers[serverUrl] = entry as StoredEntry;
+  }
+  return { servers };
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasExactKeys(
+  record: Record<string, unknown>,
+  allowedKeys: readonly string[],
+  allowSubset = false,
+): boolean {
+  const keys = Object.keys(record);
+  return (
+    keys.every((key) => allowedKeys.includes(key)) &&
+    (allowSubset || keys.length === allowedKeys.length)
+  );
 }
 
 interface ActiveFlow {
@@ -173,6 +228,23 @@ export interface McpOAuthServiceOptions {
   fetch?: typeof globalThis.fetch;
   /** Test/deployment override. Windows defaults to all interfaces for WSL. */
   personalRelayBindHost?: "127.0.0.1" | "0.0.0.0";
+  /** Controls which server credentials may be written to the durable store. */
+  persistCredentialsForServer?: (serverUrl: string) => boolean;
+  /**
+   * Explicitly proves that every Personal Pipedream alias is session-only.
+   * Required for strict sign-out to rely on verified durable absence without
+   * rewriting unrelated generic OAuth changes.
+   */
+  persistPersonalCredentials?: boolean;
+  /**
+   * Refuses startup when an existing credential store cannot be read. Use
+   * this whenever a restrictive persistence policy must be enforced before
+   * agents start, because an unreadable legacy store may still contain
+   * credentials that the current launch is not permitted to retain.
+   */
+  failClosedOnStoreLoadError?: boolean;
+  /** Test seam for durable file and directory flush ordering/failures. */
+  durability?: FileDurability;
 }
 
 /**
@@ -199,15 +271,32 @@ export class McpOAuthService {
   private storeCache: StoreFile | undefined;
   private storeLoadError: unknown;
   private storePersistencePending = false;
+  /** Last store projection whose exact on-disk state was verified in this process. */
+  private lastVerifiedPersistentStore: StoreFile | undefined;
+  private readonly persistCredentialsForServer: (serverUrl: string) => boolean;
+  private readonly personalCredentialsAreSessionOnly: boolean;
+  private readonly failClosedOnStoreLoadError: boolean;
+  private readonly durability: FileDurability;
 
   constructor(options: McpOAuthServiceOptions) {
     this.baseDir = options.baseDir;
     this.storePath = options.storePath ?? join(options.baseDir, STORE_FILE_NAME);
+    const configuredPersistence = options.persistCredentialsForServer ?? (() => true);
+    this.personalCredentialsAreSessionOnly = options.persistPersonalCredentials === false;
+    this.persistCredentialsForServer = this.personalCredentialsAreSessionOnly
+      ? (serverUrl) => !isPipedreamPersonalMcpUrl(serverUrl) && configuredPersistence(serverUrl)
+      : configuredPersistence;
+    this.failClosedOnStoreLoadError = options.failClosedOnStoreLoadError ?? false;
+    this.durability = options.durability ?? durableFileSystem;
     this.personalRelay = new PersonalMcpLoopbackRelay({
       getAccessToken: async (serverUrl) => (await this.accessToken(serverUrl))?.accessToken,
       ...(options.fetch ? { fetch: options.fetch } : {}),
       ...(options.personalRelayBindHost ? { bindHost: options.personalRelayBindHost } : {}),
     });
+    // Enforce the persistence policy before any agent can use this service.
+    // In particular, a weak-platform launch must synchronously erase Personal
+    // Pipedream credentials left by an older build or refuse supervisor startup.
+    this.readStore();
   }
 
   async begin(input: McpOauthBeginPayload): Promise<McpOauthBeginResult> {
@@ -331,6 +420,26 @@ export class McpOAuthService {
       if (!isPipedreamPersonalMcpUrl(url)) continue;
       delete store.servers[url];
       changed = true;
+    }
+    if (
+      options.strictPersistence &&
+      this.personalCredentialsAreSessionOnly &&
+      this.lastVerifiedPersistentStore &&
+      !Object.keys(this.lastVerifiedPersistentStore.servers).some((url) =>
+        isPipedreamPersonalMcpUrl(url),
+      )
+    ) {
+      // Strict Personal sign-out needs proof that Personal credentials are
+      // absent durably; unrelated generic OAuth changes may legitimately be
+      // session-only on a weak platform. Preserve that dirty generic cache and
+      // its pending flag without turning an impossible namespace rewrite into
+      // a false Personal sign-out failure.
+      this.storeCache = store;
+      this.storePersistencePending = !storesAreEquivalent(
+        this.projectPersistentStore(store),
+        this.lastVerifiedPersistentStore,
+      );
+      return;
     }
     if (changed || this.storePersistencePending) this.writeStore(store, options);
   }
@@ -894,7 +1003,11 @@ export class McpOAuthService {
     const sealed = this.readStore().servers[serverUrl]?.clientInformation;
     if (!sealed) return undefined;
     try {
-      return JSON.parse(decryptSecret(this.baseDir, sealed)) as OAuthClientInformationMixed;
+      const value = JSON.parse(decryptSecret(this.baseDir, sealed)) as unknown;
+      const full = OAuthClientInformationFullSchema.safeParse(value);
+      if (full.success) return full.data;
+      const basic = OAuthClientInformationSchema.safeParse(value);
+      return basic.success ? basic.data : undefined;
     } catch {
       return undefined;
     }
@@ -904,7 +1017,10 @@ export class McpOAuthService {
     const sealed = this.readStore().servers[serverUrl]?.tokens;
     if (!sealed) return undefined;
     try {
-      return JSON.parse(decryptSecret(this.baseDir, sealed)) as OAuthTokens;
+      const parsed = OAuthTokensSchema.safeParse(
+        JSON.parse(decryptSecret(this.baseDir, sealed)) as unknown,
+      );
+      return parsed.success ? parsed.data : undefined;
     } catch {
       return undefined;
     }
@@ -927,54 +1043,162 @@ export class McpOAuthService {
   private readStore(): StoreFile {
     if (this.storeCache) return this.storeCache;
     try {
-      const parsed = JSON.parse(readFileSync(this.storePath, "utf8")) as unknown;
-      const servers =
-        parsed && typeof parsed === "object" && !Array.isArray(parsed)
-          ? ((parsed as { servers?: unknown }).servers ?? {})
-          : {};
-      this.storeCache = {
-        servers:
-          servers && typeof servers === "object" && !Array.isArray(servers)
-            ? (servers as Record<string, StoredEntry>)
-            : {},
-      };
+      const serialized = readFileSync(this.storePath, "utf8");
+      // Repair a previous post-rename fsync failure before a persistence-capable
+      // launch trusts the visible credential namespace. Restrictive parsing
+      // still controls whether malformed OAuth blocks startup on a platform
+      // that can only use an existing store for the current session.
+      let namespaceDurabilityAvailable = true;
+      try {
+        this.durability.assertDirectorySyncSupported?.(dirname(this.storePath));
+        this.durability.syncRenamedFile?.(this.storePath);
+        this.durability.syncDirectory(dirname(this.storePath));
+      } catch (cause) {
+        if (cause instanceof FileDurabilityUnavailableError) {
+          // Windows' built-in Node filesystem layer cannot certify a directory
+          // entry flush. A valid, authenticated store can still be read for
+          // this session; later writes preflight and remain memory-only. Never
+          // rewrite or delete the existing namespace while that barrier is
+          // unavailable.
+          namespaceDurabilityAvailable = false;
+        } else {
+          throw new McpOAuthCredentialStoreUnavailableError();
+        }
+      }
+      const parsedStore = parseStoreFile(JSON.parse(serialized) as unknown);
+      const projectedStore = this.projectPersistentStore(parsedStore);
+      const requiresPolicyRewrite =
+        Object.keys(projectedStore.servers).length !== Object.keys(parsedStore.servers).length;
+      if (requiresPolicyRewrite && !namespaceDurabilityAvailable) {
+        // A restrictive launch may read an allowed legacy entry for this
+        // session, but it must never start while a forbidden credential remains
+        // durably present. Preserve the existing file for explicit recovery and
+        // block the supervisor before any agent can launch.
+        throw new McpOAuthCredentialStoreUnavailableError();
+      }
+      this.storeCache = projectedStore;
       this.storeLoadError = undefined;
       this.storePersistencePending = false;
+      if (requiresPolicyRewrite) {
+        // Remove credentials that were persisted by an older/less restrictive
+        // build only when the platform can commit that namespace replacement.
+        this.writeStore(this.storeCache, { strictPersistence: true });
+      } else {
+        this.lastVerifiedPersistentStore = projectedStore;
+      }
     } catch (error) {
+      if (error instanceof McpOAuthCredentialStoreUnavailableError) throw error;
+      if (
+        error instanceof Error &&
+        error.message === "Could not persist the OAuth credential change."
+      ) {
+        throw new McpOAuthCredentialStoreUnavailableError();
+      }
       const missing =
         error instanceof Error &&
         "code" in error &&
         (error as NodeJS.ErrnoException).code === "ENOENT";
+      if (missing) {
+        try {
+          // Absence may follow a prior unlink whose directory fsync failed.
+          // Confirm/repair it before allowing agents to start credential-free.
+          this.durability.syncDirectory(dirname(this.storePath));
+        } catch (cause) {
+          // A platform with no namespace barrier cannot certify durable
+          // absence. It may still start from an observed-missing store because
+          // all later durable writes fail before rename and remain in memory.
+          if (cause instanceof FileDurabilityUnavailableError) {
+            this.storeCache = { servers: {} };
+            this.storeLoadError = undefined;
+            this.storePersistencePending = false;
+            this.lastVerifiedPersistentStore = this.storeCache;
+            return this.storeCache;
+          }
+          throw new McpOAuthCredentialStoreUnavailableError();
+        }
+      }
+      if (!missing && this.failClosedOnStoreLoadError) {
+        throw new McpOAuthCredentialStoreUnavailableError();
+      }
       this.storeLoadError = missing ? undefined : error;
       this.storeCache = { servers: {} };
       this.storePersistencePending = false;
+      this.lastVerifiedPersistentStore = missing ? this.storeCache : undefined;
     }
     return this.storeCache;
   }
 
   private writeStore(store: StoreFile, options: ClearCredentialsOptions = {}): void {
     this.storeCache = store;
-    this.storePersistencePending = true;
-    const temporaryPath = `${this.storePath}.${randomUUID()}.tmp`;
-    try {
-      mkdirSync(dirname(this.storePath), { recursive: true });
-      writeFileSync(temporaryPath, `${JSON.stringify(store, null, 2)}\n`, {
-        flag: "wx",
-        mode: 0o600,
-      });
-      renameSync(temporaryPath, this.storePath);
+    const persistentStore = this.projectPersistentStore(store);
+    if (
+      options.strictPersistence &&
+      this.personalCredentialsAreSessionOnly &&
+      this.lastVerifiedPersistentStore &&
+      storesAreEquivalent(persistentStore, this.lastVerifiedPersistentStore)
+    ) {
+      // A weak-storage launch may hold a Personal token only in memory. Once
+      // sign-out removes it, no namespace mutation is required when the
+      // allowed persistent projection is exactly the store already verified
+      // on disk (or verified absent). Treat that as a completed strict clear
+      // without retrying an impossible Windows directory-fsync barrier.
       this.storeLoadError = undefined;
       this.storePersistencePending = false;
+      return;
+    }
+    this.storePersistencePending = true;
+    try {
+      writeFileAtomic(this.storePath, `${JSON.stringify(persistentStore, null, 2)}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+        durability: this.durability,
+      });
+      this.storeLoadError = undefined;
+      this.storePersistencePending = false;
+      this.lastVerifiedPersistentStore = persistentStore;
     } catch (cause) {
-      try {
-        rmSync(temporaryPath, { force: true });
-      } catch {
-        // Preserve the sanitized persistence error below.
-      }
       if (options.strictPersistence) {
         throw new Error("Could not persist the OAuth credential change.", { cause });
       }
       // Persisting is best-effort; in-memory credentials still work for the session.
     }
+  }
+
+  private projectPersistentStore(store: StoreFile): StoreFile {
+    return {
+      servers: Object.fromEntries(
+        Object.entries(store.servers).filter(([serverUrl]) =>
+          this.persistCredentialsForServer(serverUrl),
+        ),
+      ),
+    };
+  }
+}
+
+function storesAreEquivalent(left: StoreFile, right: StoreFile): boolean {
+  const leftKeys = Object.keys(left.servers).sort();
+  const rightKeys = Object.keys(right.servers).sort();
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (let index = 0; index < leftKeys.length; index += 1) {
+    const key = leftKeys[index];
+    if (!key || key !== rightKeys[index]) return false;
+    const leftEntry = left.servers[key];
+    const rightEntry = right.servers[key];
+    if (!leftEntry || !rightEntry) return false;
+    if (
+      leftEntry.clientInformation !== rightEntry.clientInformation ||
+      leftEntry.tokens !== rightEntry.tokens ||
+      leftEntry.tokensSavedAt !== rightEntry.tokensSavedAt
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export class McpOAuthCredentialStoreUnavailableError extends Error {
+  constructor() {
+    super("The OAuth credential store could not be verified safely.");
+    this.name = "McpOAuthCredentialStoreUnavailableError";
   }
 }

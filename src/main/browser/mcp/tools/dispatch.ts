@@ -486,6 +486,25 @@ function createNativeKeyboardDispatcher(
 
   return {
     async key(key, options = {}) {
+      if (options.commands?.includes("selectAll")) {
+        const before = await guardReason();
+        if (before) return { status: "failed", reason: before };
+        try {
+          // Electron's edit command is bound to this exact WebContents. A
+          // synthetic Command/Ctrl+A can leave the caret untouched on some
+          // controlled inputs, causing the following Backspace to delete only
+          // one character before insertText appends the replacement.
+          presentedWebContents.selectAll();
+        } catch {
+          return { status: "failed", reason: "native-select-all-rejected" };
+        }
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, NATIVE_KEYBOARD_SETTLE_MS);
+        });
+        const after = await guardReason();
+        if (after) return { status: "ambiguous", reason: after };
+        return { status: "completed" };
+      }
       const keyCode = electronKeyCode(key);
       if (!keyCode) return { status: "failed", reason: "native-key-unsupported" };
       const modifiers = electronKeyboardModifiers(options);

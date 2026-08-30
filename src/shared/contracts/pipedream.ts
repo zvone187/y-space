@@ -20,11 +20,17 @@ export function isPipedreamPersonalMcpUrl(value: string): boolean {
   }
 }
 
-const pipedreamAppSlugSchema = z
+export const pipedreamAppSlugSchema = z
   .string()
   .min(1)
   .max(128)
-  .regex(/^[a-z0-9][a-z0-9_-]*$/);
+  .regex(/^[\p{L}\p{N}_][\p{L}\p{N}\p{M}._-]*$/u);
+
+/** Parses the public Pipedream name slug without exposing Zod errors to transport callers. */
+export function parsePipedreamAppSlug(value: unknown): string | undefined {
+  const parsed = pipedreamAppSlugSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
 const pipedreamAccountIdSchema = z
   .string()
   .min(1)
@@ -131,6 +137,10 @@ export const pipedreamEnvFileInvalidReasonSchema = z.enum([
   "unreadable",
   "too-large",
   "no-supported-values",
+  "incomplete-values",
+  "invalid-values",
+  "not-dedicated",
+  "secure-storage-unavailable",
 ]);
 export type PipedreamEnvFileInvalidReason = z.infer<typeof pipedreamEnvFileInvalidReasonSchema>;
 

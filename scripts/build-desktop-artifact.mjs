@@ -263,11 +263,11 @@ function pruneStageBinaries(stageRoot) {
 // is ["binding.gyp","src/**/*.[ch]pp","lib/**","deps/**"] -- it OMITS build/,
 // the directory where electron-rebuild writes the compiled better_sqlite3.node.
 // So the collector drops the native binary and packs better-sqlite3 source-only
-// INTO app.asar (asarUnpack cannot unpack a file that was never collected),
+// into app.asar (asarUnpack cannot unpack a file that was never collected),
 // which crashes the app at launch with "Could not locate the bindings file".
-// Widen the staged package's allowlist to include its build output so the whole
-// module (binary included) is collected and the existing asarUnpack glob moves
-// it to app.asar.unpacked. node-pty is unaffected: its binaries live under
+// Widen the staged package's allowlist to include its build output. Packaging
+// then unpacks only the native binary; every JavaScript loader stays inside the
+// integrity-checked ASAR. node-pty is unaffected: its binaries live under
 // prebuilds/, which is already in node-pty's "files" allowlist.
 function ensureNativeBuildCollected(stageRoot) {
   const pkgLink = join(stageRoot, "node_modules", "better-sqlite3", "package.json");
@@ -539,8 +539,10 @@ function buildElectronBuilderConfig(
   const runtimeIconSuffix = channel === "nightly" ? "-nightly-mac" : "-mac";
   const macExecutableName = channelTable.macExecutableNameFor(channel, macArtifactKind);
   const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
-  const macEntitlements = "build/entitlements.mac.plist";
-  const macEntitlementsInherit = "build/entitlements.mac.plist";
+  const macEntitlements = macSigningPolicy.requireCertificate
+    ? "build/entitlements.mac.plist"
+    : "build/entitlements.mac.local.plist";
+  const macEntitlementsInherit = macEntitlements;
   const macSigningIdentity = macSigningPolicy.identity;
   const macIdentityLine = macSigningIdentity ? `\n  identity: "${macSigningIdentity}"` : "";
   const packagedDistFilesYaml = PACKAGED_DIST_FILES.map((glob) =>
@@ -559,6 +561,10 @@ files:
 ${packagedDistFilesYaml}
   - package.json
   - node_modules/**/*
+  - resources/wsl-helpers/bridge.mjs
+  - resources/agent-plugins/**/*
+  - resources/skills/**/*
+  - resources/plugins/**/*
   # The SDK's optionalDependencies include a 200+MB precompiled \`claude\` SEA
   # binary per platform. We ship without it; users provide \`claude\` via PATH.
   - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**/*"
@@ -566,22 +572,6 @@ ${packagedDistFilesYaml}
 extraResources:
   - from: chrome-extension
     to: chrome-extension
-    filter:
-      - "**/*"
-  - from: resources/wsl-helpers
-    to: wsl-helpers
-    filter:
-      - "**/*"
-  - from: resources/agent-plugins
-    to: agent-plugins
-    filter:
-      - "**/*"
-  - from: resources/skills
-    to: skills
-    filter:
-      - "**/*"
-  - from: resources/plugins
-    to: plugins
     filter:
       - "**/*"
   - from: build/icon${runtimeIconSuffix}.png
@@ -598,13 +588,24 @@ extraResources:
 extraMetadata:
   main: dist/main/main.cjs
 
-asar: true
+# electron-builder's default smart unpack detects native packages and unpacks
+# their entire directory, including trusted JavaScript loaders. Keep detection
+# off and unpack only the native files enumerated below.
+asar:
+  smartUnpack: false
 asarUnpack:
-  - node_modules/node-pty/**/*
-  - node_modules/better-sqlite3/**/*
-  - dist/main/claudeSdkProbeWorker.mjs
-  - dist/main/cursorSdkWorker.mjs
-  - node_modules/@anthropic-ai/claude-agent-sdk/**/*
+  - node_modules/node-pty/**/*.node
+  - node_modules/node-pty/**/spawn-helper
+  - node_modules/node-pty/**/*.exe
+  - node_modules/node-pty/**/*.dll
+  - node_modules/better-sqlite3/**/*.node
+
+electronFuses:
+  runAsNode: true
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
 
 afterPack: build/after-pack.cjs
 

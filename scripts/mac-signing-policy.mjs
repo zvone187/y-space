@@ -13,8 +13,11 @@ function isPublishingBuild(publish) {
 }
 
 export function resolveMacSigningIdentity(env) {
-  const autoDiscoveryDisabled = env.CSC_IDENTITY_AUTO_DISCOVERY?.trim().toLowerCase() === "false";
-  return autoDiscoveryDisabled && !hasExplicitSigningCredentials(env) ? "-" : undefined;
+  // Pin every fallback build to electron-builder's ad-hoc identity so its
+  // post-fuse signing pass always runs. Relying on keychain auto-discovery here
+  // lets electron-builder skip signing when no certificate is installed,
+  // leaving the earlier signature invalid after it mutates Electron's fuses.
+  return hasExplicitSigningCredentials(env) ? undefined : "-";
 }
 
 export function resolveMacSigningPolicy(env, publish) {

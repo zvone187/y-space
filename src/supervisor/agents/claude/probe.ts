@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentCapability, AgentTerminalAuthMethod } from "@/shared/contracts";
@@ -14,6 +15,7 @@ import { resolveFastAvailability } from "./fastModeProbe";
 import { claudeCapabilitiesFromCliVersion, claudeCapabilitiesFromSdkModels } from "./models";
 import { AsyncPromptQueue } from "./promptQueue";
 import { spawnClaudeProbeProcess } from "./sdkProbeProcess";
+import { buildVerifiedWslEsmArgv, deployFilesToWslTempBase } from "../../wsl/wslDeploy";
 
 export { claudeCapabilitiesFromCliVersion } from "./models";
 
@@ -94,19 +96,11 @@ function probeDir(): string {
   return typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
 }
 
-/**
- * In packaged builds the worker lives at `…/app.asar/dist/main/…`, but WSL's
- * `node` cannot read inside an asar archive — only Electron's patched fs hooks
- * can. The corresponding electron-builder `asarUnpack` rule mirrors the file to
- * `…/app.asar.unpacked/dist/main/…`; rewrite the path so the external
- * interpreter sees a regular on-disk file.
- */
-function unpackedAsarPath(p: string): string {
-  return p.replace(/([\\/])app\.asar([\\/])/, "$1app.asar.unpacked$2");
-}
-
 function getSdkWorkerPath(): string {
-  return join(unpackedAsarPath(probeDir()), "claudeSdkProbeWorker.mjs");
+  const adjacent = join(probeDir(), "claudeSdkProbeWorker.mjs");
+  return existsSync(adjacent)
+    ? adjacent
+    : join(process.cwd(), "dist", "main", "claudeSdkProbeWorker.mjs");
 }
 
 /**
@@ -199,8 +193,22 @@ async function probeClaudeSdkPartialWsl(
   if (ctx.location.kind !== "wsl" || !ctx.executablePath) return undefined;
 
   const workerHostPath = getSdkWorkerPath();
-  const workerWslPath =
-    process.platform === "win32" ? win32PathToWslMount(workerHostPath) : workerHostPath;
+  let workerContent: Buffer;
+  try {
+    // Electron validates this read against ASAR integrity. Only the resulting
+    // non-secret bytes cross into WSL; no mutable JavaScript is loaded into the
+    // key-holding supervisor from app.asar.unpacked.
+    workerContent = readFileSync(workerHostPath);
+  } catch {
+    return undefined;
+  }
+  const deployed = deployFilesToWslTempBase(
+    ctx.location.distro,
+    `y-space-claude-sdk-${process.pid}`,
+    [{ content: workerContent, relDest: "claude-sdk/claude-sdk-probe-worker.mjs" }],
+  );
+  if (!deployed) return undefined;
+  const workerWslPath = `${deployed.linuxBaseDir}/claude-sdk/claude-sdk-probe-worker.mjs`;
   // The worker runs in-distro, so hand it the fast-mode cache as a `/mnt/c/...`
   // mount; it reads/writes the same file the native path uses (keyed by account
   // hash), so the billed turn runs at most once per account.
@@ -208,54 +216,62 @@ async function probeClaudeSdkPartialWsl(
   const cacheWslPath =
     process.platform === "win32" ? win32PathToWslMount(cacheHostPath) : cacheHostPath;
 
-  const result = await readWslLoginShellCommandOutputAsync(
-    ctx.location.distro,
-    "/tmp",
-    "node",
-    [workerWslPath, ctx.executablePath, String(timeoutMs), cacheWslPath],
-    {
-      timeout: timeoutMs + 3000,
-      ...(envOverrides ? { env: envOverrides } : {}),
-      ...(ctx.signal ? { signal: ctx.signal } : {}),
-    },
-  );
-
-  if (!result.ok) {
-    console.log(
-      "[claude-probe] wsl worker:",
-      (result.stderr || result.stdout || "(empty)").slice(0, 500),
-    );
-    return undefined;
-  }
-
   try {
-    const parsed = JSON.parse(result.stdout) as {
-      slashCommands?: AgentCapability["slashCommands"];
-      modelEfforts?: AgentCapability["modelEfforts"];
-      fastModels?: AgentCapability["fastModels"];
-      fastAvailable?: boolean;
-      error?: string;
-    };
-    if (parsed.error) {
-      console.log("[claude-probe] wsl worker error field:", parsed.error);
+    const result = await readWslLoginShellCommandOutputAsync(
+      ctx.location.distro,
+      "/tmp",
+      "node",
+      buildVerifiedWslEsmArgv(workerWslPath, workerContent, [
+        ctx.executablePath,
+        String(timeoutMs),
+        cacheWslPath,
+      ]),
+      {
+        timeout: timeoutMs + 3000,
+        ...(envOverrides ? { env: envOverrides } : {}),
+        ...(ctx.signal ? { signal: ctx.signal } : {}),
+      },
+    );
+
+    if (!result.ok) {
+      console.log(
+        "[claude-probe] wsl worker:",
+        (result.stderr || result.stdout || "(empty)").slice(0, 500),
+      );
       return undefined;
     }
-    const fastDisabledReason =
-      parsed.fastAvailable === false ? CLAUDE_FAST_MODE_DISABLED_MESSAGE : undefined;
-    const hasModelCapabilities =
-      parsed.modelEfforts !== undefined || parsed.fastModels !== undefined;
-    if (!parsed.slashCommands?.length && !fastDisabledReason && !hasModelCapabilities) {
+
+    try {
+      const parsed = JSON.parse(result.stdout) as {
+        slashCommands?: AgentCapability["slashCommands"];
+        modelEfforts?: AgentCapability["modelEfforts"];
+        fastModels?: AgentCapability["fastModels"];
+        fastAvailable?: boolean;
+        error?: string;
+      };
+      if (parsed.error) {
+        console.log("[claude-probe] wsl worker error field:", parsed.error);
+        return undefined;
+      }
+      const fastDisabledReason =
+        parsed.fastAvailable === false ? CLAUDE_FAST_MODE_DISABLED_MESSAGE : undefined;
+      const hasModelCapabilities =
+        parsed.modelEfforts !== undefined || parsed.fastModels !== undefined;
+      if (!parsed.slashCommands?.length && !fastDisabledReason && !hasModelCapabilities) {
+        return undefined;
+      }
+      return {
+        ...(parsed.modelEfforts ? { modelEfforts: parsed.modelEfforts } : {}),
+        ...(parsed.fastModels ? { fastModels: parsed.fastModels } : {}),
+        ...(parsed.slashCommands?.length ? { slashCommands: parsed.slashCommands } : {}),
+        ...(fastDisabledReason ? { fastDisabledReason } : {}),
+      };
+    } catch {
+      console.log("[claude-probe] wsl worker: invalid json stdout");
       return undefined;
     }
-    return {
-      ...(parsed.modelEfforts ? { modelEfforts: parsed.modelEfforts } : {}),
-      ...(parsed.fastModels ? { fastModels: parsed.fastModels } : {}),
-      ...(parsed.slashCommands?.length ? { slashCommands: parsed.slashCommands } : {}),
-      ...(fastDisabledReason ? { fastDisabledReason } : {}),
-    };
-  } catch {
-    console.log("[claude-probe] wsl worker: invalid json stdout");
-    return undefined;
+  } finally {
+    deployed.cleanup();
   }
 }
 

@@ -119,7 +119,7 @@ function prepareMacAppBundleForPackaging(context, env = process.env) {
     resolve(context.appOutDir, "..", "..");
   const result = verifyMacAppBundle(apps[0], {
     allowAdhocFallback: true,
-    entitlementsPath: join(projectDir, "build", "entitlements.mac.plist"),
+    entitlementsPath: join(projectDir, "build", "entitlements.mac.local.plist"),
   });
   if (result.usedAdhocFallback) {
     console.log(`[mac-signing] applied local ad-hoc signature to ${apps[0]}`);

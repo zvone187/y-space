@@ -26,6 +26,45 @@ describe("writeSubmittedPrompt", () => {
     expect(write).toHaveBeenNthCalledWith(3, "\r");
   });
 
+  it("stops before a later chunk when its lifecycle guard closes during the delay", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn<(data: string) => void>();
+    let isCurrent = true;
+
+    const pending = writeSubmittedPrompt(
+      { write },
+      ["prompt", "\r"],
+      { kind: "posix", path: "/tmp/project" },
+      () => isCurrent,
+    );
+
+    expect(write).toHaveBeenCalledExactlyOnceWith("prompt");
+    isCurrent = false;
+    await vi.advanceTimersByTimeAsync(8);
+
+    await expect(pending).resolves.toBe(false);
+    expect(write).toHaveBeenCalledExactlyOnceWith("prompt");
+  });
+
+  it("rechecks its lifecycle guard after an explicit wait chunk", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn<(data: string) => void>();
+    let isCurrent = true;
+
+    const pending = writeSubmittedPrompt(
+      { write },
+      ["@wait:50", "late"],
+      { kind: "posix", path: "/tmp/project" },
+      () => isCurrent,
+    );
+
+    isCurrent = false;
+    await vi.advanceTimersByTimeAsync(50);
+
+    await expect(pending).resolves.toBe(false);
+    expect(write).not.toHaveBeenCalled();
+  });
+
   it("preserves inner newlines on posix so the prompt is not submitted mid-stream", async () => {
     vi.useFakeTimers();
     const write = vi.fn<(data: string) => void>();

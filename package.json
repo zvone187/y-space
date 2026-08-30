@@ -67,7 +67,7 @@
     "lint:fix": "oxlint --fix . && oxlint --type-aware --fix -c .oxlintrc.type-aware.json .",
     "fmt": "oxfmt --write .",
     "fmt:check": "oxfmt --check .",
-    "test": "vitest run --configLoader runner",
+    "test": "cross-env NODE_OPTIONS=--no-experimental-webstorage vitest run --configLoader runner",
     "test:perf:cli-hook": "vitest run --configLoader runner src/supervisor/runtime/cliHookEventChain.perf.test.ts",
     "test:perf:remote": "vitest run --configLoader runner src/mobile/remoteProtocol.perf.test.ts",
     "test:integration:providers": "vitest run --configLoader runner --config vitest.integration.config.ts",

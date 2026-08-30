@@ -172,6 +172,56 @@ describe("PipedreamApiClient", () => {
     expect(new Headers(init?.headers).get("authorization")).toBe(`Bearer ${DEVELOPER_TOKEN}`);
   });
 
+  it("keeps underscore-prefixed and Unicode app slugs and safely encodes account filters", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/connect/apps")) {
+        return jsonResponse({
+          data: [
+            {
+              id: "app_ZeroCodeKit123",
+              name_slug: "_0codekit",
+              name: "0CodeKit",
+              img_src: "https://assets.pipedream.net/zero-code-kit.png",
+            },
+            {
+              id: "app_Unicode123",
+              name_slug: "µ-torrent",
+              name: "µTorrent",
+              img_src: "https://assets.pipedream.net/unicode.png",
+            },
+          ],
+          page_info: { count: 2, total_count: 2 },
+        });
+      }
+      return jsonResponse({ data: [], page_info: { count: 0, total_count: 0 } });
+    });
+    const client = makeClient(fetchMock);
+
+    await expect(client.listApps()).resolves.toEqual({
+      apps: [
+        {
+          id: "app_ZeroCodeKit123",
+          slug: "_0codekit",
+          name: "0CodeKit",
+          iconUrl: "https://assets.pipedream.net/zero-code-kit.png",
+        },
+        {
+          id: "app_Unicode123",
+          slug: "µ-torrent",
+          name: "µTorrent",
+          iconUrl: "https://assets.pipedream.net/unicode.png",
+        },
+      ],
+      totalCount: 2,
+    });
+    await client.listAccounts({ appSlug: "µ-torrent" });
+
+    const accountUrl = new URL(String(fetchMock.mock.calls[1]?.[0]));
+    expect(accountUrl.searchParams.get("app")).toBe("µ-torrent");
+    expect(accountUrl.toString()).toContain("app=%C2%B5-torrent");
+  });
+
   it("pins account identity and explicitly refuses credential retrieval", async () => {
     const accountCredential = "oauth-access-token-that-must-not-leak";
     const externalAccountId = "provider-private-account-id";

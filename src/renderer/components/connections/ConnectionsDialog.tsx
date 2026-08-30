@@ -12,6 +12,7 @@ import { useSensitiveNativeViewOverlayGate } from "@/renderer/state/sensitiveNat
 import type {
   PipedreamAccountSummary,
   PipedreamAppSummary,
+  PipedreamEnvFileInvalidReason,
   PipedreamSnapshot,
 } from "@/shared/contracts";
 import { ConnectedAccountsPanel } from "./ConnectedAccountsPanel";
@@ -48,8 +49,10 @@ interface CatalogRequestCycle {
 export function ConnectionsDialogHost() {
   const { t } = useLingui();
   const titleId = useId();
+  const dialogRef = useRef<HTMLElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const initialFocusPendingRef = useRef(false);
   const catalogRequestRef = useRef(0);
   const catalogRequestCycleRef = useRef<CatalogRequestCycle | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -181,11 +184,18 @@ export function ConnectionsDialogHost() {
         // Ready surface (including its Refresh action) available for retry.
         publishSnapshot(next);
         if (next.connect.state === "ready") {
-          next = await readBridge().pipedreamRefreshAccounts();
+          // Catalog discovery and account reconciliation are independent
+          // remote reads. Start the catalog immediately so a transient account
+          // outage cannot strand a configured popup in a false empty state.
+          const catalogRequest = loadCatalog(query.trim());
+          try {
+            next = await readBridge().pipedreamRefreshAccounts();
+            if (active) publishSnapshot(next);
+          } catch {
+            if (active) setError(t`Could not refresh connected accounts. Try again.`);
+          }
+          await catalogRequest;
         }
-        if (!active) return;
-        publishSnapshot(next);
-        if (next.connect.state === "ready") await loadCatalog(query.trim());
       } catch {
         if (!active) return;
         setError(t`Could not load integrations. Try again.`);
@@ -202,10 +212,28 @@ export function ConnectionsDialogHost() {
   }, [isOpen, loadCatalog, publishSnapshot, t]);
 
   useEffect(() => {
-    if (!dialogRequested || !overlayReady) return;
-    const frame = requestAnimationFrame(() => searchRef.current?.focus());
+    if (dialogRequested) initialFocusPendingRef.current = true;
+    else if (!isOpen) initialFocusPendingRef.current = false;
+  }, [dialogRequested, isOpen]);
+
+  useEffect(() => {
+    if (!dialogRequested || !overlayReady || !initialFocusPendingRef.current) return;
+    const frame = requestAnimationFrame(() => {
+      if (!initialFocusPendingRef.current) return;
+      const search = searchRef.current;
+      const dialog = dialogRef.current;
+      const activeElement = document.activeElement;
+      if (dialog && activeElement && dialog.contains(activeElement) && activeElement !== dialog) {
+        initialFocusPendingRef.current = false;
+        return;
+      }
+      (search ?? dialog)?.focus();
+      // Keep the handoff pending while only the loading shell exists. The
+      // ready search surface mounts after asynchronous snapshot hydration.
+      if (search) initialFocusPendingRef.current = false;
+    });
     return () => cancelAnimationFrame(frame);
-  }, [dialogRequested, overlayReady]);
+  }, [dialogRequested, loadingSnapshot, overlayReady, snapshot?.connect.state]);
 
   useEffect(
     () => () => {
@@ -404,13 +432,16 @@ export function ConnectionsDialogHost() {
       });
       if (!result) return;
       if (result.status === "invalid") {
-        setError(
-          result.reason === "too-large"
-            ? t`The selected file is too large.`
-            : result.reason === "unreadable"
-              ? t`The selected file could not be read.`
-              : t`The selected file does not contain Pipedream credentials.`,
-        );
+        const invalidMessages = {
+          "incomplete-values": t`The selected file is missing one or more required Pipedream values.`,
+          "invalid-values": t`The selected file contains invalid Pipedream values.`,
+          "no-supported-values": t`The selected file does not contain Pipedream credentials.`,
+          "not-dedicated": t`Choose a dedicated file that contains only Pipedream credentials.`,
+          "secure-storage-unavailable": t`Secure credential storage is unavailable on this computer, so the setup file was not changed.`,
+          "too-large": t`The selected file is too large.`,
+          unreadable: t`The selected file could not be read.`,
+        } satisfies Record<PipedreamEnvFileInvalidReason, string>;
+        setError(invalidMessages[result.reason]);
         return;
       }
       const hasReloadNotice = publishSnapshot(result.snapshot);
@@ -509,9 +540,11 @@ export function ConnectionsDialogHost() {
   return (
     <div className="pointer-events-none fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6">
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="false"
         aria-labelledby={titleId}
+        tabIndex={-1}
         className={`poracode-connections-dialog poracode-glass-chrome pointer-events-auto flex max-h-[min(760px,calc(100vh-32px))] flex-col overflow-hidden transition-[width] ${
           waiting ? "w-[min(420px,calc(100vw-24px))]" : "w-[min(760px,calc(100vw-24px))]"
         }`}

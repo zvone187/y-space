@@ -1,7 +1,9 @@
 import type { ToolCallPayload } from "@/shared/contracts";
 import {
+  BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL,
   Y_SPACE_BROWSER_EVIDENCE_SOURCE,
   browserEvidenceActionKind,
+  isBrowserEvidenceStateBoundary,
   type BrowserEvidenceActionKind,
 } from "@/shared/browserMcpEvidence";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
@@ -11,8 +13,10 @@ export type BrowserVerificationBadgeState =
   | { kind: "unverified" }
   | null;
 
+type BrowserClaimFacet = BrowserEvidenceActionKind | "page_metadata";
+
 interface BrowserClaimRequirement {
-  actionKind: BrowserEvidenceActionKind;
+  actionFacets: readonly BrowserClaimFacet[];
   tabIds: readonly string[];
   origins: readonly string[];
 }
@@ -21,6 +25,15 @@ interface AppOwnedBrowserEvidence {
   actionKind: BrowserEvidenceActionKind;
   tabId?: string;
   origin?: string;
+}
+
+interface PositionedBrowserEvidence extends AppOwnedBrowserEvidence {
+  position: number;
+}
+
+interface BrowserFailure {
+  actionKind: BrowserEvidenceActionKind;
+  position: number;
 }
 
 /**
@@ -65,24 +78,72 @@ export function resolveBrowserVerificationBadge(
     }
   }
 
-  const evidence: AppOwnedBrowserEvidence[] = [];
-  let hasSubstantiveFailure = false;
+  const evidence: PositionedBrowserEvidence[] = [];
+  const failures: BrowserFailure[] = [];
+  const tabStateBoundaryPositions: number[] = [];
+  const globalInvalidationPositions: number[] = [];
   for (let index = turnStart; index < turnEnd; index += 1) {
     const item = items[itemIds[index]!];
     if (!item || item.parentItemId) continue;
     const action = appOwnedBrowserEvidence(item);
-    if (action) evidence.push(action);
-    if (isAppOwnedBrowserFailureItem(item)) hasSubstantiveFailure = true;
+    if (action) evidence.push({ ...action, position: index });
+    const failureKind = appOwnedBrowserFailureKind(item);
+    if (failureKind) failures.push({ actionKind: failureKind, position: index });
+    if (isAppOwnedBrowserStateBoundaryItem(item)) tabStateBoundaryPositions.push(index);
+    if (isAppOwnedBrowserGlobalInvalidationItem(item)) globalInvalidationPositions.push(index);
   }
-  // One later failed or ambiguous action invalidates an otherwise-successful
-  // turn. This prevents a prior success row from certifying a mixed outcome.
-  if (hasSubstantiveFailure && (evidence.length > 0 || claimRequirement)) {
-    return { kind: "unverified" };
+
+  if (!claimRequirement) {
+    const lastInvalidationPosition = Math.max(
+      failures.at(-1)?.position ?? -1,
+      tabStateBoundaryPositions.at(-1) ?? -1,
+      globalInvalidationPositions.at(-1) ?? -1,
+    );
+    const suffix = evidence.filter((entry) => entry.position > lastInvalidationPosition);
+    if (lastInvalidationPosition >= 0 && evidence.length > 0 && suffix.length === 0) {
+      return { kind: "unverified" };
+    }
+    return suffix.length > 0 ? { kind: "verified", actionCount: suffix.length } : null;
   }
-  if (evidence.length === 0) return claimRequirement ? { kind: "unverified" } : null;
-  if (claimRequirement) {
-    const matchingActions = evidence.filter((entry) =>
-      satisfiesClaim(entry.actionKind, claimRequirement.actionKind),
+
+  const proof = new Set<PositionedBrowserEvidence>();
+  for (const requiredFacet of claimRequirement.actionFacets) {
+    const lastRelevantFailurePosition = failures.reduce(
+      (latest, failure) =>
+        failureIsRelevantToFacet(failure.actionKind, requiredFacet)
+          ? Math.max(latest, failure.position)
+          : latest,
+      -1,
+    );
+    const lastGlobalInvalidationPosition = globalInvalidationPositions.at(-1) ?? -1;
+    const lastPageChangingOutcomePosition =
+      requiredFacet === "page_metadata"
+        ? Math.max(
+            evidence.reduce(
+              (latest, entry) =>
+                entry.actionKind === "navigation" || entry.actionKind === "interaction"
+                  ? Math.max(latest, entry.position)
+                  : latest,
+              -1,
+            ),
+            failures.reduce(
+              (latest, failure) =>
+                failure.actionKind === "navigation" || failure.actionKind === "interaction"
+                  ? Math.max(latest, failure.position)
+                  : latest,
+              -1,
+            ),
+            tabStateBoundaryPositions.at(-1) ?? -1,
+          )
+        : -1;
+    const proofBoundary = Math.max(
+      lastRelevantFailurePosition,
+      lastPageChangingOutcomePosition,
+      lastGlobalInvalidationPosition,
+    );
+    const matchingActions = evidence.filter(
+      (entry) =>
+        entry.position > proofBoundary && evidenceSatisfiesFacet(entry.actionKind, requiredFacet),
     );
     if (
       matchingActions.length === 0 ||
@@ -90,8 +151,9 @@ export function resolveBrowserVerificationBadge(
     ) {
       return { kind: "unverified" };
     }
+    for (const action of matchingActions) proof.add(action);
   }
-  return { kind: "verified", actionCount: evidence.length };
+  return { kind: "verified", actionCount: proof.size };
 }
 
 export function claimsBrowserVerification(text: string): boolean {
@@ -123,34 +185,51 @@ function browserClaimRequirement(text: string): BrowserClaimRequirement | null {
     "(?:verif(?:y|ies|ied|ying|ication(?:s)?)|test(?:s|ed|ing)?|check(?:s|ed|ing)?|confirm(?:s|ed|ing|ation(?:s)?)|inspect(?:s|ed|ing|ion(?:s)?))";
   const navigation =
     "(?:open(?:s|ed|ing)?|navigat(?:e|es|ed|ing|ion(?:s)?)|visit(?:s|ed|ing)?|load(?:s|ed|ing)?)";
-  let actionKind: BrowserEvidenceActionKind | null = null;
+  const actionFacets = new Set<BrowserClaimFacet>();
   if (
     matches(interaction) ||
     mentionsReferencedAction(interaction) ||
     matches(controlToggle) ||
     mentionsReferencedAction(controlToggle)
   ) {
-    actionKind = "interaction";
-  } else if (matches(inspection) || mentionsReferencedAction(inspection)) actionKind = "inspection";
+    actionFacets.add("interaction");
+  }
+  if (matches(inspection) || mentionsReferencedAction(inspection)) actionFacets.add("inspection");
   // A concise provider final can refer back to Browser work simply as
   // "Verification succeeded." Treat that success assertion as an inspection
   // claim so it cannot evade the unverified badge by using a noun form.
-  else if (
+  if (
     /\bverification\b[\s\S]{0,48}\b(?:succeed(?:s|ed|ing)?|successful|passed|complet(?:e|ed))\b/iu.test(
       text,
     )
   ) {
-    actionKind = "inspection";
+    actionFacets.add("inspection");
   }
-  if (!actionKind && (matches(navigation) || mentionsReferencedAction(navigation))) {
-    actionKind = "navigation";
+  if (matches(navigation) || mentionsReferencedAction(navigation)) {
+    actionFacets.add("navigation");
   }
-  if (!actionKind && tabIds.length === 0 && origins.length === 0) return null;
+  // A provider that reports final/current page metadata is asserting a read of
+  // the post-action Browser state, not merely that some earlier action ran.
+  // Keep this as a separate facet so a failed wait must be recovered by an
+  // authoritative get_url/get_title/snapshot-style inspection.
+  const pageMetadataClaim =
+    /(?:\b(?:final|current)\s+(?:browser\s+)?(?:url|title)\b|\b(?:browser\s+)?(?:url|title)\s*:)/iu.test(
+      text,
+    );
+  const explicitlyBrowserMetadata =
+    /(?:\b(?:final|current)\s+browser\s+(?:url|title)\b|\bbrowser\s+(?:url|title)\s*:)/iu.test(
+      text,
+    );
+  if (pageMetadataClaim && (hasReferences || actionFacets.size > 0 || explicitlyBrowserMetadata)) {
+    actionFacets.add("page_metadata");
+  }
+  if (actionFacets.size === 0 && hasReferences) actionFacets.add("navigation");
+  if (actionFacets.size === 0) return null;
   return {
     // Reporting a URL or Browser tab is itself a Browser result claim. Any
     // substantive Browser action may support it, but setup/control calls may
     // not because they never enter the evidence list above.
-    actionKind: actionKind ?? "navigation",
+    actionFacets: [...actionFacets],
     tabIds,
     origins,
   };
@@ -176,10 +255,23 @@ export function isAppOwnedBrowserOutcomeItem(
   );
 }
 
-function isAppOwnedBrowserFailureItem(item: RuntimeChatItem | undefined): boolean {
-  if (!isAppOwnedBrowserOutcomeItem(item)) return false;
+function isAppOwnedBrowserStateBoundaryItem(item: RuntimeChatItem | undefined): boolean {
+  return isAppOwnedBrowserOutcomeItem(item) && isBrowserEvidenceStateBoundary(item.payload.name);
+}
+
+function isAppOwnedBrowserGlobalInvalidationItem(item: RuntimeChatItem | undefined): boolean {
+  return (
+    isAppOwnedBrowserOutcomeItem(item) &&
+    item.payload.name === BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL
+  );
+}
+
+function appOwnedBrowserFailureKind(
+  item: RuntimeChatItem | undefined,
+): BrowserEvidenceActionKind | null {
+  if (!isAppOwnedBrowserOutcomeItem(item)) return null;
   const payload = item.payload;
-  return payload.status === "error" && browserEvidenceActionKind(payload.name) !== null;
+  return payload.status === "error" ? browserEvidenceActionKind(payload.name) : null;
 }
 
 function appOwnedBrowserEvidence(item: RuntimeChatItem): AppOwnedBrowserEvidence | null {
@@ -203,6 +295,24 @@ function satisfiesClaim(
   if (requirement === "navigation") return true;
   if (requirement === "inspection") return actionKind !== "navigation";
   return actionKind === "interaction";
+}
+
+function evidenceSatisfiesFacet(
+  actionKind: BrowserEvidenceActionKind,
+  facet: BrowserClaimFacet,
+): boolean {
+  return facet === "page_metadata"
+    ? actionKind === "inspection"
+    : satisfiesClaim(actionKind, facet);
+}
+
+function failureIsRelevantToFacet(
+  actionKind: BrowserEvidenceActionKind,
+  facet: BrowserClaimFacet,
+): boolean {
+  return facet === "page_metadata"
+    ? actionKind === "inspection"
+    : satisfiesClaim(actionKind, facet);
 }
 
 function evidenceMatchesClaimReferences(

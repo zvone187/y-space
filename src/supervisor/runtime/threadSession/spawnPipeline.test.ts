@@ -980,11 +980,7 @@ describe("launch-resource cleanup", () => {
       }),
     ).rejects.toBe(stopBeforeLaunch);
 
-    expect(prepareMcpToolFilters).toHaveBeenCalledExactlyOnceWith(
-      [],
-      { kind: "windows", path: "C:\\repo" },
-      true,
-    );
+    expect(prepareMcpToolFilters).not.toHaveBeenCalled();
   });
 
   it("cleans argv-owned resources when hook-extra resolution rejects before spawn", async () => {

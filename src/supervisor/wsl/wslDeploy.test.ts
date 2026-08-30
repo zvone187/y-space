@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { readBundledHelperVersion, resolveWslHelpersDir } from "./wslDeploy";
+import {
+  createWslPrivateTempBaseName,
+  readBundledHelperVersion,
+  resolveWslHelpersDir,
+} from "./wslDeploy";
 
 /**
  * Direct unit tests for `resolveWslHelpersDir` (env-var fallback) and the
@@ -51,6 +55,18 @@ describe("resolveWslHelpersDir", () => {
 });
 
 describe("deployment file freshness", () => {
+  it("builds an unpredictable sanitized private temp base for every deployment", () => {
+    expect(
+      createWslPrivateTempBaseName(
+        "bridge/../../unsafe",
+        () => "12345678-1234-4234-9234-123456789abc",
+      ),
+    ).toBe("bridge-..-..-unsafe-12345678-1234-4234-9234-123456789abc");
+    expect(createWslPrivateTempBaseName("bridge", () => "first")).not.toBe(
+      createWslPrivateTempBaseName("bridge", () => "second"),
+    );
+  });
+
   // We don't exercise deployFilesToWslHome directly because it requires WSL
   // and a UNC path to be writable; instead we mirror its idempotency check
   // here so the size + mtime contract stays under test.

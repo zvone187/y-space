@@ -1,6 +1,7 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   mcpProbePayloadSchema,
   mcpProbeResultSchema,
@@ -13,7 +14,12 @@ import {
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { getWslCommand } from "../agents/base";
 import { resolveNodeForDistro } from "../wsl/runtime";
-import { deployFilesToWslTempBase, resolveWslHelpersDir } from "../wsl/wslDeploy";
+import {
+  buildVerifiedWslEsmArgv,
+  deployFilesToWslTempBase,
+  type WslBaseDeployResult,
+  type WslDeployFile,
+} from "../wsl/wslDeploy";
 import { probeMcpServer, unavailableMcpProbeResult } from "./probeMcpServer";
 
 const WORKER_OUTPUT_MAX_BYTES = 64 * 1024;
@@ -30,6 +36,19 @@ type WslProbe = (
   environment: McpProbeEnvironment,
   signal: AbortSignal,
 ) => Promise<McpProbeResult>;
+
+export interface WslProbeWorkerDependencies {
+  workerSource?: string;
+  resolveNode?: typeof resolveNodeForDistro;
+  deploy?: (
+    distro: string,
+    baseName: string,
+    files: readonly WslDeployFile[],
+  ) => WslBaseDeployResult | null;
+  spawn?: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess;
+  terminateChild?: (child: ChildProcess) => void;
+  getWslCommand?: () => string;
+}
 
 export interface McpProbeServiceOptions {
   probeHost?: HostProbe;
@@ -57,35 +76,56 @@ function abortPromise(signal: AbortSignal): Promise<never> {
   });
 }
 
-async function runWslProbeWorker(
+export async function runWslProbeWorker(
   server: McpServer,
   location: WslLocation,
   environment: McpProbeEnvironment,
   signal: AbortSignal,
+  dependencies: WslProbeWorkerDependencies = {},
 ): Promise<McpProbeResult> {
-  const helpersDir = resolveWslHelpersDir();
-  const workerSource = helpersDir ? join(helpersDir, "mcp-probe.mjs") : "";
-  if (!workerSource || !existsSync(workerSource)) {
+  const workerSource = dependencies.workerSource ?? bundledWorkerPath();
+  if (!existsSync(workerSource)) {
+    return unavailableMcpProbeResult("probe-unavailable", environment);
+  }
+  let workerContent: Buffer;
+  try {
+    // Read through Electron's ASAR layer before crossing the WSL trust boundary.
+    workerContent = readFileSync(workerSource);
+  } catch {
     return unavailableMcpProbeResult("probe-unavailable", environment);
   }
 
   const resolvedNode = await Promise.race([
-    resolveNodeForDistro(location.distro),
+    (dependencies.resolveNode ?? resolveNodeForDistro)(location.distro),
     abortPromise(signal),
   ]);
   if (signal.aborted) throw signal.reason;
 
-  const deployed = deployFilesToWslTempBase(location.distro, `poracode-mcp-probe-${process.pid}`, [
-    { src: workerSource, relDest: "mcp-probe/mcp-probe.mjs" },
+  const deploy = dependencies.deploy ?? deployFilesToWslTempBase;
+  const deployed = deploy(location.distro, `poracode-mcp-probe-${process.pid}`, [
+    { content: workerContent, relDest: "mcp-probe/mcp-probe.mjs" },
   ]);
   if (!deployed) return unavailableMcpProbeResult("probe-unavailable", environment);
-  if (signal.aborted) throw signal.reason;
+  if (signal.aborted) {
+    deployed.cleanup();
+    throw signal.reason;
+  }
   const workerPath = `${deployed.linuxBaseDir}/mcp-probe/mcp-probe.mjs`;
 
   return new Promise<McpProbeResult>((resolve) => {
     let child: ChildProcess | undefined;
     let output = "";
     let settled = false;
+    let deploymentCleaned = false;
+    const cleanupDeployment = (): void => {
+      if (deploymentCleaned) return;
+      deploymentCleaned = true;
+      try {
+        deployed.cleanup();
+      } catch {
+        // Deployment cleanup is best effort and must not mask probe results.
+      }
+    };
     const finish = (result: McpProbeResult): void => {
       if (settled) return;
       settled = true;
@@ -93,7 +133,8 @@ async function runWslProbeWorker(
       resolve(result);
     };
     const onAbort = (): void => {
-      if (child) terminateChildProcessTree(child);
+      if (child) (dependencies.terminateChild ?? terminateChildProcessTree)(child);
+      else cleanupDeployment();
       finish(unavailableMcpProbeResult("timeout", environment, "Connection timed out."));
     };
     if (signal.aborted) {
@@ -103,8 +144,9 @@ async function runWslProbeWorker(
     signal.addEventListener("abort", onAbort, { once: true });
 
     try {
-      child = spawn(
-        getWslCommand(),
+      const spawnProcess = dependencies.spawn ?? spawn;
+      child = spawnProcess(
+        (dependencies.getWslCommand ?? getWslCommand)(),
         [
           "-d",
           location.distro,
@@ -112,7 +154,7 @@ async function runWslProbeWorker(
           location.linuxPath,
           "--",
           resolvedNode.nodePath,
-          workerPath,
+          ...buildVerifiedWslEsmArgv(workerPath, workerContent),
         ],
         {
           stdio: ["pipe", "pipe", "ignore"],
@@ -120,23 +162,27 @@ async function runWslProbeWorker(
         },
       );
     } catch {
+      cleanupDeployment();
       finish(unavailableMcpProbeResult("probe-unavailable", environment));
       return;
     }
 
+    // `close` runs only after the process and its stdio are finished. Keep the
+    // authenticated helper in place until then, including timeout/kill paths.
+    child.once("close", cleanupDeployment);
     child.on("error", () => finish(unavailableMcpProbeResult("probe-unavailable", environment)));
     child.stdin?.on("error", () => {
-      if (child) terminateChildProcessTree(child);
+      if (child) (dependencies.terminateChild ?? terminateChildProcessTree)(child);
       finish(unavailableMcpProbeResult("probe-unavailable", environment));
     });
     child.stdout?.on("error", () => {
-      if (child) terminateChildProcessTree(child);
+      if (child) (dependencies.terminateChild ?? terminateChildProcessTree)(child);
       finish(unavailableMcpProbeResult("probe-unavailable", environment));
     });
     child.stdout?.on("data", (chunk: Buffer | string) => {
       output += typeof chunk === "string" ? chunk : chunk.toString("utf8");
       if (Buffer.byteLength(output, "utf8") > WORKER_OUTPUT_MAX_BYTES && child) {
-        terminateChildProcessTree(child);
+        (dependencies.terminateChild ?? terminateChildProcessTree)(child);
         finish(unavailableMcpProbeResult("protocol-error", environment));
       }
     });
@@ -152,6 +198,14 @@ async function runWslProbeWorker(
 
     child.stdin?.end(JSON.stringify({ server, environment }));
   });
+}
+
+function moduleDirectory(): string {
+  return typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
+}
+
+function bundledWorkerPath(): string {
+  return join(moduleDirectory(), "mcpProbeWorker.mjs");
 }
 
 export class McpProbeService {

@@ -688,6 +688,35 @@ describe("BrowserPanel", () => {
     });
   });
 
+  it("eagerly attaches a hidden resident webview after its one-shot dom-ready was missed", async () => {
+    setBrowserTabs(
+      [
+        {
+          tabId: "tab-1",
+          url: "https://example.com/",
+          title: "Example",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      "tab-1",
+    );
+    const { container } = render(<BrowserPanel visible={false} />);
+    const webview = container.querySelector("webview") as HTMLElement & {
+      getWebContentsId(): number;
+    };
+    webview.getWebContentsId = vi.fn<() => number>().mockReturnValue(42);
+    bridge.browserAttachWebContents.mockClear();
+
+    await waitFor(() => expect(webview.getWebContentsId).toHaveBeenCalled());
+    await waitFor(() => expect(bridge.browserAttachWebContents).toHaveBeenCalledOnce());
+    expect(bridge.browserAttachWebContents).toHaveBeenLastCalledWith({
+      tabId: "tab-1",
+      webContentsId: 42,
+    });
+  });
+
   it("retries when the visible webview id is not readable during its first mount", async () => {
     setBrowserTabs(
       [

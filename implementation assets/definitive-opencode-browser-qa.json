@@ -1,0 +1,88 @@
+{
+  "testedOn": "2026-08-30",
+  "package": {
+    "app": "/tmp/y-space-pipedream-final-3x1rp5/mac-arm64/Y Space.app",
+    "architecture": "arm64",
+    "diskBytes": 456638464,
+    "appAsarSha256": "acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71",
+    "executableSha256": "6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86",
+    "codesign": "deep/strict verified; ad-hoc hardened runtime; no Team ID"
+  },
+  "persistentLaunch": {
+    "pid": 3806,
+    "baseDirectory": "/tmp/y-space-pipedream-definitive-qa.qptzx8",
+    "arguments": ["--use-mock-keychain"],
+    "leftOpenForUserTesting": true,
+    "normalReleaseMockKeychain": false
+  },
+  "verification": {
+    "nodeVersion": "26.8.1",
+    "fullSuite": {
+      "passedFiles": 937,
+      "skippedFiles": 6,
+      "passedTests": 11105,
+      "skippedTests": 86,
+      "durationSeconds": 85.74
+    },
+    "focusedTimeoutStress": {
+      "passed": 10,
+      "attempted": 10
+    }
+  },
+  "openCodeRun": {
+    "threadId": "2584095a-c07a-48ed-9b88-992baca340d8",
+    "provider": "OpenCode",
+    "model": "Zai GLM-5.3-Flash",
+    "tabId": "tab-d4b752ca-8d88-4e5a-8400-61ef0f626174",
+    "finalTitle": "Definitive Y Space OpenCode browser test at DuckDuckGo",
+    "finalUrl": "https://duckduckgo.com/?ia=web&origin=funnel_home_website&t=h_&q=Definitive+Y+Space+OpenCode+browser+test&chip-select=search",
+    "workedSteps": 19,
+    "browserVerifiedActions": 5,
+    "toolCounts": {
+      "browser_click": 1,
+      "browser_fill": 1,
+      "browser_hover": 1,
+      "browser_type": 0,
+      "shell": 0,
+      "file": 0,
+      "script": 0
+    },
+    "canonicalBrowserSequence": [
+      "open_or_focus_tab:success",
+      "snapshot:success",
+      "hover:success",
+      "click:success",
+      "fill:success",
+      "wait_for_url:error-pattern-mismatch",
+      "get_url:success",
+      "get_title:success"
+    ],
+    "result": "pass"
+  },
+  "visibleCursorRun": {
+    "threadId": "b6b612ed-0a32-48c7-9315-30e5459affe8",
+    "sequence": ["snapshot", "hover", "wait", "click", "wait", "hover", "wait"],
+    "browserVerifiedActions": 4,
+    "typedOrSubmitted": false,
+    "result": "pass"
+  },
+  "screenshots": [
+    {
+      "path": "implementation assets/qa-screenshots/final-opencode-visible-agent-cursor-hover.jpeg",
+      "sha256": "e421f4085211833710748862411409670ca3aab23b8570508c6becadeb228e21"
+    },
+    {
+      "path": "implementation assets/qa-screenshots/final-opencode-visible-agent-cursor-click.jpeg",
+      "sha256": "9562ea7bfcba5f3c78d8dbf50c72ad864f6d7a418cb3adea60686ef380b3c868"
+    },
+    {
+      "path": "implementation assets/qa-screenshots/final-opencode-browser-verified.jpeg",
+      "sha256": "f011c52fb4c9a21577568051dacce0453478965586341911bc653470e8bab5ac"
+    }
+  ],
+  "externalGates": {
+    "gmailOAuthGrant": "not created; explicit user authorization required",
+    "gmailReadAndDisconnect": "not run; requires a connected account and confirmation",
+    "claudeInference": "not run; installed Claude CLI is logged out"
+  }
+}

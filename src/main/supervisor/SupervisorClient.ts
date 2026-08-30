@@ -16,7 +16,8 @@ import type {
   SupervisorReply,
   SupervisorRequest,
 } from "@/shared/ipc";
-import { PIPEDREAM_ENV_KEYS } from "@/shared/pipedreamBootstrap";
+import { PIPEDREAM_DEPRECATED_EXEC_ENV_KEYS } from "@/shared/pipedreamBootstrap";
+import { sanitizePrivilegedChildEnvironment } from "@/supervisor/privilegedChildEnvironment";
 import type {
   PipedreamPrivilegedBootstrapPayload,
   PipedreamPrivilegedConnectLinkResult,
@@ -26,10 +27,19 @@ import {
   isPipedreamPrivilegedBootstrapMessage,
   isPipedreamPrivilegedConnectLinkRequest,
 } from "@/shared/pipedreamPrivilegedIpc";
+import {
+  isSupervisorSecretBootstrapFailure,
+  isSupervisorSecretBootstrapAck,
+  isSupervisorSecretBootstrapMessage,
+  SUPERVISOR_BOOTSTRAP_FAILURE_CODE,
+  SUPERVISOR_SECRET_BOOTSTRAP_PROTOCOL_VERSION,
+  type SupervisorBootstrapFailureCode,
+  type SupervisorSecretBootstrapReply,
+} from "@/shared/supervisorSecretBootstrap";
 
 function isSupervisorReply(
   message: unknown,
-): message is SupervisorReply | PipedreamPrivilegedReply {
+): message is SupervisorReply | PipedreamPrivilegedReply | SupervisorSecretBootstrapReply {
   return (
     typeof message === "object" &&
     message !== null &&
@@ -48,6 +58,42 @@ function isSupervisorReply(
  * common connection-loss case is already handled by the `exit`/EPIPE paths.
  */
 const REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+const STARTUP_TIMEOUT_MS = 30_000;
+
+interface ChildReadiness {
+  readonly child: ChildProcess;
+  readonly promise: Promise<void>;
+  resolve(): void;
+  reject(error: Error): void;
+}
+
+function createChildReadiness(child: ChildProcess): ChildReadiness {
+  let settled = false;
+  let resolvePromise!: () => void;
+  let rejectPromise!: (error: Error) => void;
+  const promise = new Promise<void>((resolve, reject) => {
+    resolvePromise = resolve;
+    rejectPromise = reject;
+  });
+  // A startup failure can happen before any caller awaits readiness. Keep the
+  // original promise rejectable for callers while preventing an unhandled
+  // rejection in the no-caller case.
+  void promise.catch(() => undefined);
+  return {
+    child,
+    promise,
+    resolve: () => {
+      if (settled) return;
+      settled = true;
+      resolvePromise();
+    },
+    reject: (error) => {
+      if (settled) return;
+      settled = true;
+      rejectPromise(error);
+    },
+  };
+}
 
 /**
  * Electron / Windows: a forked supervisor with stdio "inherit" often does
@@ -72,7 +118,7 @@ export interface SupervisorClientOptions {
   supervisorPath: string;
   /**
    * Directory containing the in-WSL helpers shipped with the app
-   * (`watcher.node`, `bridge.mjs`). Forwarded to the supervisor via
+   * (`bridge.mjs`). Forwarded to the supervisor via
    * `PORACODE_WSL_HELPERS_DIR` so the bridge server can stage assets
    * into running distros.
    */
@@ -90,6 +136,8 @@ export interface SupervisorClientOptions {
    */
   bundledPluginsDir?: string;
   secretStorageKey: string;
+  /** True only for the verified signed macOS release identity and real Keychain. */
+  allowPipedreamOauthPersistence: boolean;
   /**
    * Optional resolver invoked at every supervisor spawn, returning extra env
    * vars to merge into the child env. Used by the in-app browser MCP wiring
@@ -105,6 +153,12 @@ export interface SupervisorClientOptions {
   onEvent(event: SupervisorEvent): void;
   onReset(): void;
   /**
+   * Native, user-confirmed recovery for a typed startup failure. Ordinary
+   * crashes never enter this path, and the client remains blocked until the
+   * callback explicitly returns `retry`.
+   */
+  recoverStartupFailure?(failureCode: SupervisorBootstrapFailureCode): Promise<"retry" | "stop">;
+  /**
    * Invoked after every (re)spawn of the supervisor process — including
    * crash-restarts — once requests can be sent. Used to push state the
    * supervisor cannot recover on its own (e.g. persisted orchestrator
@@ -117,6 +171,8 @@ export class SupervisorClient {
   private child: ChildProcess | null = null;
   private baseDir: string | null = null;
   private disposed = false;
+  private childReadiness: ChildReadiness | null = null;
+  private startupBlocked = false;
   private readonly startedGate: Promise<void>;
   private resolveStartedGate!: () => void;
   private readonly pendingRequests = new Map<
@@ -146,18 +202,19 @@ export class SupervisorClient {
   }
 
   start(baseDir: string): void {
-    if (this.disposed) return;
+    if (this.disposed || this.startupBlocked) return;
     this.baseDir = baseDir;
     this.resolveStartedGate();
     this.stop(new Error("Supervisor restarting"));
 
     const extraEnv = this.options.resolveExtraEnv?.() ?? {};
     const childEnv: NodeJS.ProcessEnv = {
-      ...process.env,
+      // Never inherit stale control-plane credentials. The main process adds
+      // only its current, canonical MCP endpoints below.
+      ...sanitizePrivilegedChildEnvironment(process.env),
       PORACODE_APP_VERSION: this.options.appVersion,
       PORACODE_IS_DEV: this.options.isDev ? "1" : "0",
       PORACODE_DATA_DIR: baseDir,
-      PORACODE_SECRET_STORAGE_KEY: this.options.secretStorageKey,
       PORACODE_WSL_HELPERS_DIR: this.options.wslHelpersDir,
       // Back-compat for one release; older supervisor builds still read
       // the legacy var. Safe to drop once min supported supervisor knows
@@ -171,7 +228,14 @@ export class SupervisorClient {
         : {}),
       ...extraEnv,
     };
-    for (const key of PIPEDREAM_ENV_KEYS) delete childEnv[key];
+    const supervisorExecDeniedKeys = new Set(
+      ["PORACODE_SECRET_STORAGE_KEY", ...PIPEDREAM_DEPRECATED_EXEC_ENV_KEYS].map((key) =>
+        key.toUpperCase(),
+      ),
+    );
+    for (const key of Object.keys(childEnv)) {
+      if (supervisorExecDeniedKeys.has(key.toUpperCase())) delete childEnv[key];
+    }
     const child = fork(this.options.supervisorPath, [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
       env: childEnv,
@@ -180,6 +244,8 @@ export class SupervisorClient {
     pipeSupervisorStreamsToParent(child);
 
     this.child = child;
+    const readiness = createChildReadiness(child);
+    this.childReadiness = readiness;
     if (typeof child.pid === "number") {
       void this.options.assignPid?.(child.pid).catch((error) => {
         console.error(
@@ -200,7 +266,11 @@ export class SupervisorClient {
         if (message.ok) {
           pending.resolve(message.data);
         } else {
-          pending.reject(new Error(message.error));
+          pending.reject(
+            isSupervisorSecretBootstrapFailure(message)
+              ? new SupervisorBootstrapFailureError(message.failureCode)
+              : new Error(message.error),
+          );
         }
         return;
       }
@@ -208,36 +278,31 @@ export class SupervisorClient {
       this.options.onEvent(message as SupervisorEvent);
     });
 
-    const privilegedBootstrap = this.options.resolvePipedreamPrivilegedBootstrap?.();
-    if (privilegedBootstrap) {
-      void this.requestPipedreamConfiguration(child, privilegedBootstrap).catch(() => {
-        console.error("[poracode] failed to initialize Pipedream supervisor service");
-      });
-    }
-
-    this.options.onStarted?.();
-
     child.on("exit", (code) => {
       if (this.child !== child) {
         return;
       }
+      const error = new Error("Supervisor exited");
+      readiness.reject(error);
+      if (this.childReadiness === readiness) this.childReadiness = null;
       this.child = null;
-      this.reset(new Error("Supervisor exited"));
+      this.reset(error);
       if (!this.disposed && code !== 0 && this.baseDir) {
-        const error = new Error(`Supervisor exited with code ${code ?? "unknown"}`);
-        console.error(`[poracode] ${error.message}, restarting…`);
-        this.options.reportError?.(error, { "poracode.feature_area": "supervisor" });
-        setTimeout(() => {
-          if (!this.disposed && !this.child && this.baseDir) {
-            this.start(this.baseDir);
-          }
-        }, 1000);
+        const exitError = new Error(`Supervisor exited with code ${code ?? "unknown"}`);
+        console.error(`[poracode] ${exitError.message}, restarting…`);
+        this.options.reportError?.(exitError, { "poracode.feature_area": "supervisor" });
+        this.scheduleRestart();
       }
     });
+
+    void this.initializeChild(child, readiness);
   }
 
   stop(error: Error): void {
     const child = this.child;
+    const readiness = this.childReadiness;
+    readiness?.reject(error);
+    this.childReadiness = null;
     if (!child) {
       return;
     }
@@ -256,11 +321,7 @@ export class SupervisorClient {
     type: Name,
     payload: IpcProcedurePayload<Name>,
   ): Promise<IpcProcedureResult<Name>> {
-    await this.startedGate;
-    const child = this.child;
-    if (!child || !child.connected) {
-      return Promise.reject(new Error("Supervisor is not running."));
-    }
+    const child = await this.requireReadyChild();
 
     const id = randomUUID();
     const requestPayload =
@@ -323,9 +384,7 @@ export class SupervisorClient {
     appSlug: string,
     redirects: { readonly successRedirectUrl: string; readonly errorRedirectUrl: string },
   ): Promise<PipedreamPrivilegedConnectLinkResult> {
-    await this.startedGate;
-    const child = this.child;
-    if (!child || !child.connected) throw new Error("Supervisor is not running.");
+    const child = await this.requireReadyChild();
     const id = randomUUID();
     const message = {
       kind: "pipedream-privileged-request" as const,
@@ -375,10 +434,146 @@ export class SupervisorClient {
   async configurePipedream(
     payload: PipedreamPrivilegedBootstrapPayload,
   ): Promise<PipedreamSnapshot> {
-    await this.startedGate;
-    const child = this.child;
-    if (!child || !child.connected) throw new Error("Supervisor is not running.");
+    const child = await this.requireReadyChild();
     return this.requestPipedreamConfiguration(child, payload);
+  }
+
+  /** Resolve only after the current supervisor has completed its private bootstrap. */
+  async waitUntilReady(): Promise<void> {
+    await this.requireReadyChild();
+  }
+
+  private async requireReadyChild(): Promise<ChildProcess> {
+    await this.startedGate;
+    const readiness = this.childReadiness;
+    if (!readiness) throw new Error("Supervisor is not running.");
+    await readiness.promise;
+    if (
+      this.child !== readiness.child ||
+      this.childReadiness !== readiness ||
+      !readiness.child.connected
+    ) {
+      throw new Error("Supervisor is not running.");
+    }
+    return readiness.child;
+  }
+
+  private async initializeChild(child: ChildProcess, readiness: ChildReadiness): Promise<void> {
+    try {
+      await this.requestSupervisorSecretBootstrap(child);
+      if (this.child !== child || this.childReadiness !== readiness || !child.connected) return;
+
+      // Preserve ordering: the key handshake is always the first private IPC
+      // request, then Pipedream configuration is enqueued, and only then are
+      // ordinary supervisor calls released.
+      const privilegedBootstrap = this.options.resolvePipedreamPrivilegedBootstrap?.();
+      if (privilegedBootstrap) {
+        await this.requestPipedreamConfiguration(child, privilegedBootstrap);
+        if (this.child !== child || this.childReadiness !== readiness || !child.connected) return;
+      }
+      readiness.resolve();
+      try {
+        this.options.onStarted?.();
+      } catch (error) {
+        console.error("[poracode] supervisor started callback failed");
+        this.options.reportError?.(error, { "poracode.feature_area": "supervisor" });
+      }
+    } catch (error) {
+      this.failChildStartup(child, readiness, error);
+    }
+  }
+
+  private failChildStartup(child: ChildProcess, readiness: ChildReadiness, cause: unknown): void {
+    if (this.child !== child || this.childReadiness !== readiness) return;
+    const error = new Error("Supervisor security bootstrap failed.");
+    readiness.reject(error);
+    this.childReadiness = null;
+    this.child = null;
+    this.reset(error);
+    terminateChildProcessTree(child);
+    if (
+      cause instanceof SupervisorBootstrapFailureError &&
+      cause.failureCode === SUPERVISOR_BOOTSTRAP_FAILURE_CODE.MCP_OAUTH_STORE_UNAVAILABLE
+    ) {
+      this.startupBlocked = true;
+      void this.recoverBlockedStartup(cause.failureCode);
+      return;
+    }
+    console.error("[poracode] supervisor security bootstrap failed, restarting…");
+    this.options.reportError?.(error, { "poracode.feature_area": "supervisor" });
+    this.scheduleRestart();
+  }
+
+  private async recoverBlockedStartup(failureCode: SupervisorBootstrapFailureCode): Promise<void> {
+    let outcome: "retry" | "stop" = "stop";
+    try {
+      outcome = (await this.options.recoverStartupFailure?.(failureCode)) ?? "stop";
+    } catch (error) {
+      this.options.reportError?.(error, { "poracode.feature_area": "supervisor" });
+    }
+    if (outcome !== "retry" || this.disposed || this.child || !this.baseDir) return;
+    this.startupBlocked = false;
+    this.start(this.baseDir);
+  }
+
+  private scheduleRestart(): void {
+    setTimeout(() => {
+      if (!this.disposed && !this.child && this.baseDir) {
+        this.start(this.baseDir);
+      }
+    }, 1000);
+  }
+
+  private requestSupervisorSecretBootstrap(child: ChildProcess): Promise<void> {
+    if (!child.connected) return Promise.reject(new Error("Supervisor is not running."));
+    const id = randomUUID();
+    const message = {
+      kind: "supervisor-secret-bootstrap" as const,
+      version: SUPERVISOR_SECRET_BOOTSTRAP_PROTOCOL_VERSION,
+      id,
+      secretStorageKey: this.options.secretStorageKey,
+      allowPipedreamOauthPersistence: this.options.allowPipedreamOauthPersistence,
+    };
+    if (!isSupervisorSecretBootstrapMessage(message)) {
+      return Promise.reject(new Error("Supervisor security bootstrap is invalid."));
+    }
+
+    return new Promise<unknown>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (this.pendingRequests.delete(id)) {
+          reject(new Error("Supervisor security bootstrap timed out."));
+        }
+      }, STARTUP_TIMEOUT_MS);
+      timeout.unref?.();
+      this.pendingRequests.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (reason) => {
+          clearTimeout(timeout);
+          reject(reason);
+        },
+      });
+
+      const fail = (error: unknown): void => {
+        const pending = this.pendingRequests.get(id);
+        if (!pending) return;
+        this.pendingRequests.delete(id);
+        pending.reject(error);
+      };
+      try {
+        child.send(message, (error) => {
+          if (error) fail(error);
+        });
+      } catch (error) {
+        fail(error);
+      }
+    }).then((value) => {
+      if (!isSupervisorSecretBootstrapAck(value)) {
+        throw new Error("Supervisor security bootstrap acknowledgement is invalid.");
+      }
+    });
   }
 
   private requestPipedreamConfiguration(
@@ -424,5 +619,12 @@ export class SupervisorClient {
         fail(error);
       }
     }).then((value) => pipedreamSnapshotSchema.parse(value));
+  }
+}
+
+class SupervisorBootstrapFailureError extends Error {
+  constructor(readonly failureCode: SupervisorBootstrapFailureCode) {
+    super("Supervisor security bootstrap failed.");
+    this.name = "SupervisorBootstrapFailureError";
   }
 }

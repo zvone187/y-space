@@ -294,6 +294,18 @@ export function createLocalIpcHandlers(
       });
       const filePath = result.filePaths[0];
       if (result.canceled || !filePath) return null;
+      const confirmation = await dialog.showMessageBox(options.getMainWindow()!, {
+        type: "warning",
+        buttons: ["Cancel", "Import and remove file"],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+        title: "Securely import Pipedream credentials?",
+        message: "Y Space will encrypt these credentials and permanently remove the selected file.",
+        detail:
+          "This prevents Codex, Claude Code, OpenCode, and other agents from reading the developer credentials directly. This cannot be undone.",
+      });
+      if (confirmation.response !== 1) return null;
       return options.pipedreamMainService.importEnvironmentFile(filePath);
     },
     pipedreamClearEnvFile: () => options.pipedreamMainService.clearEnvironmentFile(),

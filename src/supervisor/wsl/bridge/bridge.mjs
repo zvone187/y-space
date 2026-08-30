@@ -49,32 +49,9 @@ import {
 // We always run on Linux inside a distro, so force POSIX semantics — this
 // also keeps the unit tests path-agnostic when executed on a Windows host.
 import { isAbsolute, normalize, relative, resolve as resolvePath } from "node:path/posix";
-import { createRequire } from "node:module";
 
 // Bumped on every behavioural change. Windows side reads this via regex.
-const BRIDGE_VERSION = "2.17.0";
-
-/**
- * Lazily loads `@parcel/watcher` (staged next to this script as
- * `watcher.node`). Returns null if the binding is missing or the host CPU
- * can't load it — callers fall back to `fs.watch`.
- */
-let cachedParcel;
-function loadParcelWatcher() {
-  if (cachedParcel !== undefined) return cachedParcel;
-  try {
-    const require = createRequire(import.meta.url);
-    const binding = require("./watcher.node");
-    if (binding && typeof binding.subscribe === "function") {
-      cachedParcel = binding;
-      return binding;
-    }
-  } catch {
-    // fall through
-  }
-  cachedParcel = null;
-  return null;
-}
+const BRIDGE_VERSION = "2.18.0";
 
 const PROTOCOL_VERSION = Number(process.env.PORACODE_HOOK_PROTOCOL_VERSION ?? "1") || 1;
 const SECRET = process.env.PORACODE_HOOK_SECRET;
@@ -1088,37 +1065,13 @@ function rollback(unsubs) {
 }
 
 /**
- * Start watching `target` (absolute POSIX path). Tries parcel-watcher first,
- * falls back to recursive `fs.watch`. Returns a sync `unsubscribe()` fn.
- * `onChange(scope, paths)` is called in either case; `paths` is the list of
- * changed POSIX paths relative to `target` (empty array for fs.watch fallback).
+ * Start watching `target` (absolute POSIX path) with Node's built-in watcher.
+ * The bridge deliberately does not load a separately deployed native module:
+ * providers in a distro share the same Linux uid and could replace it before a
+ * lazy load. Returns a synchronous `unsubscribe()` function.
  */
 function startWatch(target, scope, ignore, onChange) {
-  const parcel = loadParcelWatcher();
-  if (parcel) {
-    const ignorePaths = ignore.map((name) => resolvePath(target, name));
-    // Root watcher's own .git subtree handled separately via a second
-    // subscription — same pattern wsl-watcher.cjs used.
-    let active = true;
-    const subPromise = parcel.subscribe(
-      target,
-      (err, events) => {
-        if (!active || err) return;
-        const evts = Array.isArray(events) ? events : [];
-        const rel = evts
-          .map((e) => normalizeRelative(target, e && e.path))
-          .filter((s) => s.length > 0);
-        onChange(scope, rel.slice(0, 5));
-      },
-      { backend: "inotify", ignore: ignorePaths },
-    );
-    return () => {
-      active = false;
-      subPromise.then((s) => s?.unsubscribe?.()).catch(() => undefined);
-    };
-  }
-
-  // fs.watch fallback. Use the filename when Node provides one; pathless
+  // Use the filename when Node provides one; pathless
   // events still wake the supervisor so WSL trees do not go stale.
   const watcher = fsWatch(target, { recursive: true }, (_ev, filename) => {
     let normalized = "";
@@ -1136,13 +1089,6 @@ function startWatch(target, scope, ignore, onChange) {
       // best effort
     }
   };
-}
-
-function normalizeRelative(root, p) {
-  if (!p || typeof p !== "string") return "";
-  if (!p.startsWith(root)) return "";
-  const rel = p.slice(root.length).replace(/^\/+/, "");
-  return rel;
 }
 
 function shouldIgnore(relativePath, ignore) {

@@ -204,6 +204,7 @@ export class ThreadOutputPipeline {
       return;
     }
 
+    const previousStatus = session.status;
     this.clearSessionTimers(session, { preserveCliHookTerminalFallback: true });
     if (session.workingSilenceTimer && status !== "working") {
       clearTimeout(session.workingSilenceTimer);
@@ -214,6 +215,23 @@ export class ThreadOutputPipeline {
     session.attention = attention;
     session.lastStatusChangeAt = Date.now();
     this.emitState(session, errorMessage, options);
+    const launchTurnHasDeferredTerminalWrite = Boolean(
+      session.pendingTerminalPrompt ||
+      session.pendingTerminalSegments?.length ||
+      session.pendingTerminalPreInputs?.length ||
+      session.pendingTerminalWriteInFlight,
+    );
+    if (
+      (session.presentationMode ?? session.adapter.capabilities.presentationMode) === "terminal" &&
+      (status === "inactive" ||
+        ((status === "idle" || status === "error") &&
+          (previousStatus === "working" ||
+            (previousStatus === "launching" &&
+              (session.activeTerminalSkillLeaseIds?.length ?? 0) > 0 &&
+              !launchTurnHasDeferredTerminalWrite))))
+    ) {
+      this.options.onTerminalTurnSettled?.(session);
+    }
   }
 
   /**
@@ -274,7 +292,7 @@ export class ThreadOutputPipeline {
       session.pendingTerminalWriteInFlight = true;
       void sleep(500)
         .then(() => writeSubmittedPrompt(pty, chunks, session.projectLocation))
-        .then(() => {
+        .finally(() => {
           session.pendingTerminalWriteInFlight = false;
         });
       return;
@@ -284,18 +302,23 @@ export class ThreadOutputPipeline {
       const segments = session.pendingTerminalSegments;
       session.pendingTerminalPrompt = undefined;
       session.pendingTerminalSegments = undefined;
-      void sleep(500).then(() =>
-        writeSubmittedPrompt(
-          pty,
-          session.adapter.buildDirectInput?.(
-            prompt,
-            segments,
-            session.config,
+      session.pendingTerminalWriteInFlight = true;
+      void sleep(500)
+        .then(() =>
+          writeSubmittedPrompt(
+            pty,
+            session.adapter.buildDirectInput?.(
+              prompt,
+              segments,
+              session.config,
+              session.projectLocation,
+            ) ?? [prompt, "\r"],
             session.projectLocation,
-          ) ?? [prompt, "\r"],
-          session.projectLocation,
-        ),
-      );
+          ),
+        )
+        .finally(() => {
+          session.pendingTerminalWriteInFlight = false;
+        });
     }
   }
 

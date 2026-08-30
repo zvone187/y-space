@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  chmod,
   copyFile,
   lstat,
+  mkdtemp,
   mkdir,
   readFile,
   readdir,
@@ -14,7 +16,7 @@ import {
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, win32 } from "node:path";
 import type {
   AgentKind,
@@ -95,6 +97,24 @@ const MAX_MARKETPLACE_FILES = 200;
 const MAX_MARKETPLACE_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_MARKETPLACE_SKILL_BYTES = 10 * 1024 * 1024;
 const MARKETPLACE_DOWNLOAD_CONCURRENCY = 8;
+const MAX_TRUSTED_SKILL_FILES = 64;
+const MAX_TRUSTED_SKILL_BYTES = 2 * 1024 * 1024;
+const MAX_ACTIVE_TRUSTED_SKILL_COPIES = 12;
+
+interface TrustedSkillTempCopy {
+  readonly leaseId: string;
+}
+
+interface TrustedSkillLeaseState {
+  readonly leaseId: string;
+  readonly roots: Set<string>;
+  readonly released: Promise<void>;
+  resolveReleased(): void;
+  producers: number;
+  materializations: number;
+  releaseRequested: boolean;
+  cleanupPromise?: Promise<void>;
+}
 
 interface LocatedRoot {
   providerId: string;
@@ -213,6 +233,16 @@ async function resolveWslWindowsPaths(
     paths.map((path) => `wslpath -a -w -- ${quotePosixShellArg(path)}`),
   );
   return results.map((result) => (result?.ok && result.stdout ? result.stdout : undefined));
+}
+
+async function resolveHostPathForWsl(
+  distro: string,
+  hostPath: string,
+): Promise<string | undefined> {
+  const [result] = await batchWslCommandsAsync(distro, [
+    `wslpath -a -u -- ${quotePosixShellArg(hostPath)}`,
+  ]);
+  return result?.ok && posix.isAbsolute(result.stdout) ? result.stdout : undefined;
 }
 
 function disabledRoot(rootPath: string): string {
@@ -492,6 +522,59 @@ function isCanonicalManagedSkillPath(path: string, folderName: string): boolean 
   );
 }
 
+async function copyTrustedSkillTree(
+  sourceDirectory: string,
+  destinationDirectory: string,
+  counters: { files: number; bytes: number },
+): Promise<void> {
+  const sourceStats = await lstat(sourceDirectory);
+  if (!sourceStats.isDirectory() || sourceStats.isSymbolicLink()) {
+    throw new Error("trusted skill root is not a plain directory");
+  }
+  await mkdir(destinationDirectory, { recursive: false, mode: 0o700 });
+  const entries = await readdir(sourceDirectory, { withFileTypes: true });
+  for (const entry of entries) {
+    const sourcePath = join(sourceDirectory, entry.name);
+    const destinationPath = join(destinationDirectory, entry.name);
+    const stats = await lstat(sourcePath);
+    if (stats.isSymbolicLink()) throw new Error("trusted skill package contains a symlink");
+    if (stats.isDirectory()) {
+      await copyTrustedSkillTree(sourcePath, destinationPath, counters);
+      continue;
+    }
+    if (!stats.isFile()) throw new Error("trusted skill package contains a special file");
+    counters.files += 1;
+    counters.bytes += stats.size;
+    if (counters.files > MAX_TRUSTED_SKILL_FILES || counters.bytes > MAX_TRUSTED_SKILL_BYTES) {
+      throw new Error("trusted skill package exceeds materialization limits");
+    }
+    const content = await readFile(sourcePath);
+    if (content.length !== stats.size) throw new Error("trusted skill changed while reading");
+    const mode = (stats.mode & 0o111) !== 0 ? 0o500 : 0o400;
+    await writeFile(destinationPath, content, { flag: "wx", mode });
+  }
+}
+
+async function repairTrustedSkillTempPermissions(path: string): Promise<void> {
+  let info;
+  try {
+    info = await lstat(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+    throw error;
+  }
+  // Never follow a provider-planted link while repairing an app-owned temp
+  // tree. rm() removes the link itself on the subsequent cleanup attempt.
+  if (info.isSymbolicLink()) return;
+  if (!info.isDirectory()) {
+    await chmod(path, 0o600);
+    return;
+  }
+  await chmod(path, 0o700);
+  const entries = await readdir(path);
+  await Promise.all(entries.map((entry) => repairTrustedSkillTempPermissions(join(path, entry))));
+}
+
 export class SkillsService {
   private readonly adapters: ReadonlyMap<AgentKind, AgentAdapter>;
   private readonly env: NodeJS.ProcessEnv;
@@ -509,6 +592,10 @@ export class SkillsService {
     distro: string,
     paths: readonly string[],
   ) => Promise<readonly (string | undefined)[]>;
+  private readonly resolveHostPathForWsl: (
+    distro: string,
+    hostPath: string,
+  ) => Promise<string | undefined>;
   private readonly wslFsPath: (distro: string, linuxPath: string) => string;
   private readonly resolveAgentVersion: (kind: AgentKind, wslDistro?: string) => string | undefined;
   private readonly fetchImpl: typeof fetch;
@@ -519,6 +606,12 @@ export class SkillsService {
     { expiresAt: number; result: SkillMarketplaceResult }
   >();
   private readonly marketplaceSkills = new Map<string, MarketplaceSkill>();
+  private readonly trustedSkillTempDirs = new Map<string, TrustedSkillTempCopy>();
+  private readonly trustedSkillLeases = new Map<string, TrustedSkillLeaseState>();
+  private readonly trustedSkillCleanupRetryRoots = new Set<string>();
+  private trustedSkillTempReservations = 0;
+  private trustedSkillCleanupRetryPromise: Promise<void> | undefined;
+  private disposed = false;
 
   constructor(options: SkillsServiceOptions) {
     this.adapters = options.adapters;
@@ -528,6 +621,7 @@ export class SkillsService {
     this.resolveWslEnv = options.resolveWslEnv ?? resolveWslEnvironment;
     this.resolveWslRealPaths = options.resolveWslRealPaths ?? resolveWslRealPaths;
     this.resolveWslWindowsPaths = options.resolveWslWindowsPaths ?? resolveWslWindowsPaths;
+    this.resolveHostPathForWsl = options.resolveHostPathForWsl ?? resolveHostPathForWsl;
     this.wslFsPath = options.wslFsPath ?? toWslUncPath;
     this.resolveAgentVersion = options.resolveAgentVersion ?? (() => undefined);
     this.fetchImpl = options.fetch ?? fetch;
@@ -1300,20 +1394,44 @@ export class SkillsService {
     projectLocation?: ProjectLocation;
     segments: PromptSegment[];
     nativePlugins?: readonly AgentNativePlugin[];
+    /** Unique terminal launch/turn that owns any private materialized copies. */
+    leaseId?: string;
   }): Promise<PromptSegment[]> {
     const segments = input.segments;
+    if (this.disposed) return segments;
     if (!segments.some((segment) => segment.kind === "skill")) return segments;
+    const leaseId = input.leaseId ?? randomUUID();
+    const lease = this.beginTrustedSkillLease(leaseId);
+    try {
+      return await this.rewriteTerminalSkillSegmentsForLease(input, leaseId, lease);
+    } finally {
+      lease.producers -= 1;
+      const cleanup = this.maybeFinalizeTrustedSkillLease(leaseId, lease);
+      if (cleanup) await cleanup;
+    }
+  }
+
+  private async rewriteTerminalSkillSegmentsForLease(
+    input: {
+      agentKind: string;
+      projectLocation?: ProjectLocation;
+      segments: PromptSegment[];
+      nativePlugins?: readonly AgentNativePlugin[];
+    },
+    leaseId: string,
+    lease: TrustedSkillLeaseState,
+  ): Promise<PromptSegment[]> {
+    const segments = input.segments;
     const adapter = this.adapters.get(input.agentKind);
     const environment = await this.resolveEnvironment(input.projectLocation);
     const nativeRootPaths = this.nativeSkillRootPaths(adapter, environment);
     const bundledRoot = this.bundledRoot();
-    let bundledHintRoot = bundledRoot?.displayPath;
-    if (bundledRoot && environment.wsl && environment.distro) {
-      const [result] = await batchWslCommandsAsync(environment.distro, [
-        `wslpath -a -u -- ${quotePosixShellArg(bundledRoot.fsPath)}`,
-      ]);
-      if (result?.ok && result.stdout) bundledHintRoot = result.stdout;
-    }
+    const trustedPackedRoots = [
+      ...(bundledRoot ? [bundledRoot.displayPath] : []),
+      ...this.pluginSkillRoots()
+        .filter(({ plugin }) => plugin.source === "bundled")
+        .map(({ skillsRoot }) => skillsRoot.replace(/\\/gu, "/")),
+    ];
     const managedDisplayFor = (scope: SkillScope): string | undefined =>
       scope === "project" && !environment.projectFsPath
         ? undefined
@@ -1322,41 +1440,212 @@ export class SkillsService {
       (adapter?.skillSupport?.projectionRoots ?? []).some((spec) =>
         scope === "global" ? Boolean(spec.globalPath) : Boolean(spec.projectPath),
       );
-
     let changed = false;
-    const rewritten = segments.map<PromptSegment>((segment) => {
-      if (segment.kind !== "skill") return segment;
-      if (this.nativePluginReplacement(segment, input.nativePlugins)) return segment;
-      // No SKILL.md path — the agent resolves this skill from its own catalog,
-      // so the invocation text is already the right thing to type.
-      const segmentPath = segment.path;
-      if (!segmentPath) return segment;
-      if (isPathUnderAny(segmentPath, nativeRootPaths)) return segment;
-      const managedDisplay = managedDisplayFor(segment.scope);
-      // Managed skills this adapter projects into its own folders resolve
-      // natively in the CLI (e.g. `.agents` skills copied to `.claude/skills`).
-      if (
-        managedDisplay &&
-        isPathUnderAny(segmentPath, [managedDisplay]) &&
-        projectsScope(segment.scope)
-      ) {
-        return segment;
-      }
-      const normalized = segmentPath.replace(/\\/gu, "/");
-      const hintPath =
-        bundledRoot && bundledHintRoot && isPathUnderAny(segmentPath, [bundledRoot.displayPath])
-          ? posix.join(
-              bundledHintRoot,
-              posix.relative(bundledRoot.displayPath.replace(/\\/gu, "/"), normalized),
-            )
+    const rewritten = await Promise.all(
+      segments.map<Promise<PromptSegment>>(async (segment) => {
+        if (segment.kind !== "skill") return segment;
+        if (this.nativePluginReplacement(segment, input.nativePlugins)) return segment;
+        // No SKILL.md path — the agent resolves this skill from its own catalog,
+        // so the invocation text is already the right thing to type.
+        const segmentPath = segment.path;
+        if (!segmentPath) return segment;
+        if (isPathUnderAny(segmentPath, nativeRootPaths)) return segment;
+        const managedDisplay = managedDisplayFor(segment.scope);
+        // Managed skills this adapter projects into its own folders resolve
+        // natively in the CLI (e.g. `.agents` skills copied to `.claude/skills`).
+        if (
+          managedDisplay &&
+          isPathUnderAny(segmentPath, [managedDisplay]) &&
+          projectsScope(segment.scope)
+        ) {
+          return segment;
+        }
+        const normalized = segmentPath.replace(/\\/gu, "/");
+        changed = true;
+        const hintPath = isPathUnderAny(segmentPath, trustedPackedRoots)
+          ? await this.materializeTrustedSkillHint(segmentPath, environment, leaseId, lease)
           : normalized;
-      changed = true;
-      return {
-        kind: "text",
-        content: buildSkillPathHintText(segment.name, hintPath),
-      };
-    });
+        // A packaged built-in must never fall back to exposing an ASAR virtual
+        // path to an external CLI. If verified materialization fails, preserve
+        // only the user's invocation and let the provider report it unavailable.
+        if (!hintPath) return { kind: "text", content: segment.invocation };
+        return {
+          kind: "text",
+          content: buildSkillPathHintText(segment.name, hintPath),
+        };
+      }),
+    );
     return changed ? rewritten : segments;
+  }
+
+  /**
+   * External terminal providers cannot traverse Electron's virtual ASAR. Copy
+   * one signed skill package into a fresh lease-private directory for the
+   * owning terminal turn. No copy is reused across invocations, so a provider
+   * can never persistently poison the authoritative built-in for a later turn.
+   */
+  private async materializeTrustedSkillHint(
+    skillFilePath: string,
+    environment: ResolvedEnvironment,
+    leaseId: string,
+    lease: TrustedSkillLeaseState,
+  ): Promise<string | undefined> {
+    if (lease.releaseRequested) return undefined;
+    // Reserve synchronously before the first await. Prompt segments are
+    // rewritten concurrently, so a check-only admission would let every
+    // segment observe the same free slot and escape the global storage cap.
+    if (
+      this.trustedSkillTempDirs.size + this.trustedSkillTempReservations >=
+      MAX_ACTIVE_TRUSTED_SKILL_COPIES
+    ) {
+      return undefined;
+    }
+    lease.materializations += 1;
+    this.trustedSkillTempReservations += 1;
+    let tempRoot: string | undefined;
+    try {
+      const sourceDirectory = dirname(skillFilePath);
+      tempRoot = await mkdtemp(join(tmpdir(), "y-space-skill-"));
+      if (lease.releaseRequested) {
+        await this.removeTrustedSkillTemp(tempRoot, lease);
+        return undefined;
+      }
+      this.trustedSkillTempDirs.set(tempRoot, { leaseId });
+      lease.roots.add(tempRoot);
+      const destinationDirectory = join(tempRoot, basename(sourceDirectory));
+      const counters = { files: 0, bytes: 0 };
+      await copyTrustedSkillTree(sourceDirectory, destinationDirectory, counters);
+      const hostSkillPath = join(destinationDirectory, SKILL_FILE);
+      let hintPath: string | undefined;
+      if (environment.wsl && environment.distro) {
+        hintPath = await this.resolveHostPathForWsl(environment.distro, hostSkillPath);
+      } else {
+        hintPath = hostSkillPath.replace(/\\/gu, "/");
+      }
+      if (lease.releaseRequested) {
+        await this.removeTrustedSkillTemp(tempRoot, lease);
+        return undefined;
+      }
+      return hintPath;
+    } catch {
+      if (tempRoot) await this.removeTrustedSkillTemp(tempRoot, lease);
+      return undefined;
+    } finally {
+      lease.materializations -= 1;
+      this.trustedSkillTempReservations -= 1;
+      const cleanup = this.maybeFinalizeTrustedSkillLease(leaseId, lease);
+      if (cleanup) await cleanup;
+    }
+  }
+
+  private beginTrustedSkillLease(leaseId: string): TrustedSkillLeaseState {
+    let lease = this.trustedSkillLeases.get(leaseId);
+    if (!lease) {
+      let resolveReleased!: () => void;
+      const released = new Promise<void>((nextResolve) => {
+        resolveReleased = nextResolve;
+      });
+      lease = {
+        leaseId,
+        roots: new Set(),
+        released,
+        resolveReleased,
+        producers: 0,
+        materializations: 0,
+        releaseRequested: false,
+      };
+      this.trustedSkillLeases.set(leaseId, lease);
+    }
+    lease.producers += 1;
+    return lease;
+  }
+
+  private maybeFinalizeTrustedSkillLease(
+    leaseId: string,
+    lease: TrustedSkillLeaseState,
+  ): Promise<void> | undefined {
+    if (!lease.releaseRequested || lease.producers > 0 || lease.materializations > 0) {
+      return undefined;
+    }
+    if (!lease.cleanupPromise) {
+      lease.cleanupPromise = (async () => {
+        await Promise.all([...lease.roots].map((root) => this.removeTrustedSkillTemp(root, lease)));
+        if (this.trustedSkillLeases.get(leaseId) === lease) {
+          this.trustedSkillLeases.delete(leaseId);
+        }
+        lease.resolveReleased();
+      })();
+    }
+    return lease.cleanupPromise;
+  }
+
+  private async removeTrustedSkillTemp(
+    root: string,
+    lease?: TrustedSkillLeaseState,
+  ): Promise<void> {
+    if (!this.trustedSkillTempDirs.has(root) && lease) {
+      this.trustedSkillTempDirs.set(root, { leaseId: lease.leaseId });
+    }
+    lease?.roots.delete(root);
+    try {
+      await this.deleteTrustedSkillTempRoot(root);
+      this.trustedSkillTempDirs.delete(root);
+      this.trustedSkillCleanupRetryRoots.delete(root);
+    } catch {
+      // The copy still exists and therefore still consumes one global slot.
+      // Its lease may settle, but disposal or a later lease release retries it.
+      this.trustedSkillCleanupRetryRoots.add(root);
+    }
+  }
+
+  private async deleteTrustedSkillTempRoot(root: string): Promise<void> {
+    try {
+      await rm(root, { recursive: true, force: true });
+    } catch {
+      await repairTrustedSkillTempPermissions(root);
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+
+  private retryTrustedSkillTempCleanup(): Promise<void> {
+    if (this.trustedSkillCleanupRetryPromise) return this.trustedSkillCleanupRetryPromise;
+    if (this.trustedSkillCleanupRetryRoots.size === 0) return Promise.resolve();
+    const roots = [...this.trustedSkillCleanupRetryRoots];
+    const cleanup = Promise.all(roots.map((root) => this.removeTrustedSkillTemp(root)))
+      .then(() => undefined)
+      .finally(() => {
+        if (this.trustedSkillCleanupRetryPromise === cleanup) {
+          this.trustedSkillCleanupRetryPromise = undefined;
+        }
+      });
+    this.trustedSkillCleanupRetryPromise = cleanup;
+    return cleanup;
+  }
+
+  /** Remove copies only after their exact owning terminal launch/turn is finished. */
+  async releaseTerminalSkillCopies(leaseId: string): Promise<void> {
+    const lease = this.trustedSkillLeases.get(leaseId);
+    // Close admission synchronously. A retry of an older failed root must not
+    // let this lease's in-flight materialization publish while release waits.
+    if (lease) lease.releaseRequested = true;
+    await this.retryTrustedSkillTempCleanup();
+    if (!lease) return;
+    const cleanup = this.maybeFinalizeTrustedSkillLease(leaseId, lease);
+    if (cleanup) await cleanup;
+    else await lease.released;
+  }
+
+  async dispose(): Promise<void> {
+    this.disposed = true;
+    await Promise.all(
+      [...this.trustedSkillLeases.keys()].map((leaseId) =>
+        this.releaseTerminalSkillCopies(leaseId),
+      ),
+    );
+    await this.retryTrustedSkillTempCleanup();
+    const roots = [...this.trustedSkillTempDirs.keys()];
+    await Promise.all(roots.map((root) => this.removeTrustedSkillTemp(root)));
+    await this.retryTrustedSkillTempCleanup();
   }
 
   /**

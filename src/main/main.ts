@@ -1,9 +1,11 @@
-import { existsSync, watch } from "node:fs";
+import { watch } from "node:fs";
+import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   app,
   BrowserWindow,
+  dialog,
   globalShortcut,
   ipcMain,
   Menu,
@@ -101,7 +103,10 @@ import {
   type RendererProcessGoneIntent,
 } from "./diagnostics/processGone";
 import { configureSecretStorageKey } from "@/shared/secretStorage";
-import { readOrCreateSafeStorageSecretKey } from "./secretStorageKey";
+import {
+  readOrCreateSafeStorageSecretKey,
+  SecretStorageKeyUnavailableError,
+} from "./secretStorageKey";
 import { createDesktopRemoteAccessController, type DesktopRemoteAccessController } from "./remote";
 import { readOrCreateRemoteAccessIdentity } from "./remote/identity";
 import { createGitStateExecutor, GitStateService } from "./gitState";
@@ -126,37 +131,48 @@ import {
   type PrWatchService,
 } from "./prWatch";
 import { shouldUseMockKeychain } from "./mockKeychain";
-import {
-  capturePipedreamBootstrapEnv,
-  capturePipedreamBootstrapEnvFile,
-} from "@/shared/pipedreamBootstrap";
+import { scrubDeprecatedPipedreamExecEnvironment } from "@/shared/pipedreamBootstrap";
 import { PipedreamMainService } from "./pipedream/PipedreamMainService";
 import { createOrderlyPipedreamShutdown } from "./pipedream/orderlyPipedreamShutdown";
 import { createProcessRuntimeShutdown } from "./processRuntimeShutdown";
-import {
-  applyPersistedPipedreamEnvFile,
-  clearPipedreamEnvFilePath,
-  writePipedreamEnvFilePath,
-} from "./pipedream/pipedreamEnvFileSettings";
+import { createPipedreamCredentialStore } from "./pipedream/pipedreamCredentialStore";
+import { applyPipedreamCredentialsWithRecovery } from "./pipedream/pipedreamCredentialRecovery";
+import { describePipedreamCredentialStartupFailure } from "./pipedream/pipedreamCredentialStartupFailure";
+import { canDestructivelyImportPipedreamCredentials } from "./pipedream/pipedreamCredentialProtection";
+import { recoverMalformedMcpOAuthCredentialStore } from "./pipedream/mcpOAuthCredentialStoreRecovery";
 import { buildApplicationMenuTemplate } from "./applicationMenu";
+import { AuthoritativePipedreamBootstrap } from "./pipedream/authoritativePipedreamBootstrap";
+import { SUPERVISOR_BOOTSTRAP_FAILURE_CODE } from "@/shared/supervisorSecretBootstrap";
 
-const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
-const explicitPipedreamEnvFile = process.env.PIPEDREAM_ENV_FILE?.trim();
-delete process.env.PIPEDREAM_ENV_FILE;
-const developmentPipedreamEnvFile = isDev
-  ? [join(process.cwd(), ".env.pipedream"), join(process.cwd(), "..", ".env.pipedream")].find(
-      (path) => existsSync(path),
-    )
-  : undefined;
-const launchPipedreamBootstrap = explicitPipedreamEnvFile
-  ? capturePipedreamBootstrapEnvFile(explicitPipedreamEnvFile)
-  : developmentPipedreamEnvFile
-    ? capturePipedreamBootstrapEnvFile(developmentPipedreamEnvFile)
-    : capturePipedreamBootstrapEnv();
-const hasExplicitPipedreamBootstrap =
-  Boolean(explicitPipedreamEnvFile || developmentPipedreamEnvFile) ||
-  launchPipedreamBootstrap.state !== "absent";
-let pipedreamBootstrap = launchPipedreamBootstrap;
+const isDev = !app.isPackaged && Boolean(process.env.VITE_DEV_SERVER_URL);
+const PIPEDREAM_EXEC_ENV_REJECTED_SWITCH = "--pipedream-env-rejected";
+// Exec-time values remain visible in native process listings even after JS
+// scrubbing. Detect them before any supervisor/window can start, scrub the JS
+// aliases defensively, and fail closed with a native migration notice below.
+const deprecatedPipedreamExecEnvironmentDetected = scrubDeprecatedPipedreamExecEnvironment(
+  process.env,
+);
+if (deprecatedPipedreamExecEnvironmentDetected) {
+  try {
+    const child = spawn(
+      process.execPath,
+      [
+        ...process.argv
+          .slice(1)
+          .filter((argument) => argument !== PIPEDREAM_EXEC_ENV_REJECTED_SWITCH),
+        PIPEDREAM_EXEC_ENV_REJECTED_SWITCH,
+      ],
+      { env: process.env, detached: true, stdio: "ignore" },
+    );
+    child.unref();
+  } catch {
+    // A clean relaunch is best effort. Never keep the tainted process alive
+    // behind a dialog where an already-running agent could inspect it.
+  }
+  process.exit(0);
+}
+const pipedreamExecEnvironmentRejected = process.argv.includes(PIPEDREAM_EXEC_ENV_REJECTED_SWITCH);
+const pipedreamBootstrap = new AuthoritativePipedreamBootstrap();
 const channel = resolvePoracodeChannel();
 const baseDirOverride = process.env.PORACODE_BASE_DIR;
 const legacyBaseDirOverride = process.env.LIGHTCODE_BASE_DIR?.trim() || undefined;
@@ -687,11 +703,30 @@ function handleSupervisorEventForSleep(event: SupervisorEvent): void {
 registerLocalFileProtocolScheme();
 registerPickerProtocolScheme();
 
+function showPipedreamExecEnvironmentMigrationWarning(): Promise<unknown> {
+  return dialog.showMessageBox({
+    type: "warning",
+    buttons: ["Quit"],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+    title: "Move Pipedream setup into Y Space",
+    message:
+      "Y Space did not start because Pipedream credentials were found in its launch environment.",
+    detail:
+      "Remove PIPEDREAM_* and PIPEDREAM_ENV_FILE from the launch environment, reopen Y Space, then import the dedicated setup file from Connections. No agents or app windows were started.",
+  });
+}
+
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   app.on("second-instance", (_event, commandLine) => {
     if (!app.isReady()) return;
+    if (commandLine.includes(PIPEDREAM_EXEC_ENV_REJECTED_SWITCH)) {
+      void showPipedreamExecEnvironmentMigrationWarning();
+      return;
+    }
     if (
       poracodePaths &&
       shouldStartMinimized(
@@ -708,6 +743,11 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
+      if (pipedreamExecEnvironmentRejected) {
+        await showPipedreamExecEnvironmentMigrationWarning();
+        app.quit();
+        return;
+      }
       const brandedProductName = productNameFor(channel);
       if (preserveLegacySafeStorageIdentity) app.setName(brandedProductName);
       repairLegacyMacAppPath(channel, { isPackaged: app.isPackaged });
@@ -724,9 +764,58 @@ if (!hasSingleInstanceLock) {
       browserSession.setUserAgent(browserUserAgent);
 
       const paths = requirePoracodePaths();
-      if (!hasExplicitPipedreamBootstrap) {
-        pipedreamBootstrap = applyPersistedPipedreamEnvFile(paths.baseDir, pipedreamBootstrap);
+      let secretStorageKey;
+      try {
+        secretStorageKey = readOrCreateSafeStorageSecretKey(paths.baseDir);
+      } catch (error) {
+        if (error instanceof SecretStorageKeyUnavailableError) {
+          await dialog.showMessageBox({
+            type: "error",
+            buttons: ["Quit"],
+            defaultId: 0,
+            cancelId: 0,
+            noLink: true,
+            title: "Credential storage is locked",
+            message: "Y Space could not unlock its saved credentials.",
+            detail:
+              "Restore access to your operating system credential store, then reopen Y Space. Existing encrypted data was not changed.",
+          });
+        }
+        throw error;
       }
+      // Configure the same OS-backed key in main before resolving any sealed
+      // Pipedream credential or starting the supervisor/provider boundary.
+      configureSecretStorageKey(secretStorageKey.key);
+      const appIsolatedCredentialStorage = canDestructivelyImportPipedreamCredentials({
+        platform: process.platform,
+        isPackaged: app.isPackaged,
+        persistentKey: secretStorageKey.persistent,
+        usesMockKeychain: app.commandLine.hasSwitch("use-mock-keychain"),
+        executablePath: process.execPath,
+      });
+      const pipedreamCredentialStore = createPipedreamCredentialStore(paths.baseDir, {
+        appIsolatedPersistentKey: appIsolatedCredentialStorage,
+      });
+      pipedreamBootstrap.replace(
+        await applyPipedreamCredentialsWithRecovery({
+          store: pipedreamCredentialStore,
+          startupBootstrap: pipedreamBootstrap.current(),
+          confirmReset: async () => {
+            const recovery = await dialog.showMessageBox({
+              type: "warning",
+              buttons: ["Quit", "I removed the setup file — Reset"],
+              defaultId: 0,
+              cancelId: 0,
+              noLink: true,
+              title: "Pipedream storage needs recovery",
+              message: "Y Space cannot unlock the saved Pipedream credentials.",
+              detail:
+                "Quit and remove the original plaintext setup file if it still exists. Only then choose Reset. Resetting forgets the unreadable encrypted copy and allows Y Space to start without Pipedream.",
+            });
+            return recovery.response === 1;
+          },
+        }),
+      );
       const browserCookieImportExtensionSourceDir = app.isPackaged
         ? join(process.resourcesPath, "chrome-extension")
         : join(process.cwd(), "chrome-extension");
@@ -780,26 +869,17 @@ if (!hasSingleInstanceLock) {
       }
 
       initDatabase(paths.dbPath);
-      const secretStorageKey = readOrCreateSafeStorageSecretKey(paths.baseDir);
-      // Configure the same key in main so it can seal captured secrets (e.g. usage
-      // login cookies); the supervisor configures it from the env var it receives.
-      configureSecretStorageKey(secretStorageKey);
 
       const supervisorPath = join(__dirname, "supervisor.cjs");
-      const wslHelpersDir = app.isPackaged
-        ? join(process.resourcesPath, "wsl-helpers")
-        : join(__dirname, "..", "..", "resources", "wsl-helpers");
-      const bundledSkillsDir = app.isPackaged
-        ? join(process.resourcesPath, "skills")
-        : join(__dirname, "..", "..", "resources", "skills");
-      const bundledPluginsDir = app.isPackaged
-        ? join(process.resourcesPath, "plugins")
-        : join(__dirname, "..", "..", "resources", "plugins");
+      const bundledResourcesRoot = app.isPackaged
+        ? join(process.resourcesPath, "app.asar", "resources")
+        : join(__dirname, "..", "..", "resources");
+      const wslHelpersDir = join(bundledResourcesRoot, "wsl-helpers");
+      const bundledSkillsDir = join(bundledResourcesRoot, "skills");
+      const bundledPluginsDir = join(bundledResourcesRoot, "plugins");
       const sshConnectionManager = new SshConnectionManager({
         mainBundleDir: __dirname,
-        agentPluginsDir: app.isPackaged
-          ? join(process.resourcesPath, "agent-plugins")
-          : join(__dirname, "..", "..", "resources", "agent-plugins"),
+        agentPluginsDir: join(bundledResourcesRoot, "agent-plugins"),
         wslHelpersDir,
         bundledSkillsDir,
         bundledPluginsDir,
@@ -822,9 +902,67 @@ if (!hasSingleInstanceLock) {
         wslHelpersDir,
         bundledSkillsDir,
         bundledPluginsDir,
-        secretStorageKey,
+        secretStorageKey: secretStorageKey.key,
+        allowPipedreamOauthPersistence: appIsolatedCredentialStorage,
+        recoverStartupFailure: async (failureCode) => {
+          if (failureCode !== SUPERVISOR_BOOTSTRAP_FAILURE_CODE.MCP_OAUTH_STORE_UNAVAILABLE) {
+            app.quit();
+            return "stop";
+          }
+          if (appIsolatedCredentialStorage) {
+            await dialog.showMessageBox({
+              type: "error",
+              buttons: ["Quit"],
+              defaultId: 0,
+              cancelId: 0,
+              noLink: true,
+              title: "MCP sign-in storage is unavailable",
+              message: "Y Space could not safely open its saved MCP sign-ins.",
+              detail:
+                "No agents were started and existing Keychain-backed sign-in data was not changed. Check access to the Y Space data folder and Keychain, then reopen the app.",
+            });
+            app.quit();
+            return "stop";
+          }
+          try {
+            const outcome = await recoverMalformedMcpOAuthCredentialStore({
+              baseDir: paths.baseDir,
+              confirmReset: async () => {
+                const recovery = await dialog.showMessageBox({
+                  type: "warning",
+                  buttons: ["Quit", "Reset saved sign-ins"],
+                  defaultId: 0,
+                  cancelId: 0,
+                  noLink: true,
+                  title: "MCP sign-in storage needs recovery",
+                  message: "Y Space cannot safely inspect its saved MCP sign-ins.",
+                  detail:
+                    "No agents were started and the existing file was not changed. It may contain plaintext or OAuth token data. Reset only if you accept permanently deleting all saved MCP sign-ins from this device.",
+                });
+                return recovery.response === 1;
+              },
+            });
+            if (outcome === "stop") app.quit();
+            return outcome;
+          } catch (error) {
+            captureMainException(error, { "poracode.feature_area": "supervisor" });
+            await dialog.showMessageBox({
+              type: "error",
+              buttons: ["Quit"],
+              defaultId: 0,
+              cancelId: 0,
+              noLink: true,
+              title: "MCP sign-in recovery failed",
+              message: "Y Space could not safely reset its saved MCP sign-ins.",
+              detail:
+                "The supervisor remains stopped. Check access to the Y Space data folder, then reopen the app and try again.",
+            });
+            app.quit();
+            return "stop";
+          }
+        },
         resolvePipedreamPrivilegedBootstrap: () => ({
-          bootstrap: pipedreamBootstrap,
+          bootstrap: pipedreamBootstrap.current(),
           externalUserId: pipedreamExternalUserId,
         }),
         resolveExtraEnv: () => {
@@ -930,17 +1068,15 @@ if (!hasSingleInstanceLock) {
           supervisorClient.call("pipedreamInternalCancelPersonalMcpOauth", { flowId }),
         clearPersonalMcpOauth: () =>
           supervisorClient.call("pipedreamInternalClearPersonalMcpOauth", {}),
-        persistEnvFilePath: (filePath) => writePipedreamEnvFilePath(paths.baseDir, filePath),
-        clearEnvFilePath: () => clearPipedreamEnvFilePath(paths.baseDir),
-        fallbackBootstrap: () => launchPipedreamBootstrap,
-        configureBootstrap: async (bootstrap) => {
-          const snapshot = await supervisorClient.configurePipedream({
-            bootstrap,
-            externalUserId: pipedreamExternalUserId,
-          });
-          pipedreamBootstrap = bootstrap;
-          return snapshot;
-        },
+        credentialStore: pipedreamCredentialStore,
+        fallbackBootstrap: () => ({ state: "absent" }),
+        configureBootstrap: (bootstrap) =>
+          pipedreamBootstrap.configure(bootstrap, (authoritative) =>
+            supervisorClient.configurePipedream({
+              bootstrap: authoritative,
+              externalUserId: pipedreamExternalUserId,
+            }),
+          ),
         openConnectUrl: async (url, ownership) => {
           const manager = browserPanelManager;
           if (!manager) throw new Error("Embedded browser is not initialized.");
@@ -1468,9 +1604,23 @@ if (!hasSingleInstanceLock) {
         ensureMainWindow();
       });
     })
-    .catch((error: unknown) => {
+    .catch(async (error: unknown) => {
       console.error("[poracode] failed to initialize:", error);
       captureMainException(error, { "poracode.feature_area": "main-initialization" });
+      const pipedreamFailureNotice = describePipedreamCredentialStartupFailure(error);
+      if (pipedreamFailureNotice) {
+        try {
+          await dialog.showMessageBox({
+            ...pipedreamFailureNotice,
+            buttons: [...pipedreamFailureNotice.buttons],
+          });
+        } catch (dialogError) {
+          console.error(
+            "[y-space] failed to show Pipedream credential recovery notice:",
+            dialogError,
+          );
+        }
+      }
       app.quit();
     });
 }

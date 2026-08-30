@@ -4,17 +4,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  isPipedreamPersonalMcpUrl,
   PIPEDREAM_PERSONAL_MCP_URL,
   type McpServer,
   type ResolvedMcpServer,
 } from "@/shared/contracts";
 import { encryptSecret } from "@/shared/secretStorage";
 import {
+  createFileDurability,
+  type FileDurability,
+  type FileDurabilityOperations,
+} from "@/shared/fileDurability";
+import {
   buildClaudeMcpLaunchConfig,
   buildCodexMcp,
   buildOpenCodeMcpLaunchConfig,
 } from "@/supervisor/agents/userMcp/translate";
-import { McpOAuthService } from "./McpOAuthService";
+import { McpOAuthCredentialStoreUnavailableError, McpOAuthService } from "./McpOAuthService";
 import type {
   PersonalMcpLoopbackRelay,
   PersonalMcpRelayBindingInfo,
@@ -199,6 +205,331 @@ async function flushNetworkContinuation(): Promise<void> {
 }
 
 describe("McpOAuthService", () => {
+  it("starts with a missing Windows store and keeps new credentials session-only", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-windows-session-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const operations: FileDurabilityOperations = {
+      open: vi.fn<(path: string, flags: "r" | "r+") => number>(),
+      sync: vi.fn<(descriptor: number) => void>(),
+      close: vi.fn<(descriptor: number) => void>(),
+    };
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      durability: createFileDurability("win32", operations),
+    });
+    cleanups.push(() => service.dispose());
+    const url = "https://session-only.example.test/mcp";
+    const internals = service as unknown as {
+      updateEntry(
+        serverUrl: string,
+        update: (entry: Record<string, unknown>) => Record<string, unknown>,
+      ): void;
+    };
+
+    expect(service.status().authenticatedUrls).toEqual([]);
+    internals.updateEntry(url, (entry) => ({
+      ...entry,
+      tokens: encryptSecret(
+        baseDir,
+        JSON.stringify({ access_token: "session-token", token_type: "Bearer" }),
+      ),
+    }));
+
+    expect(service.status().authenticatedUrls).toEqual([url]);
+    expect(() => readFileSync(storePath, "utf8")).toThrow(/ENOENT|no such file/i);
+    expect(operations.open).not.toHaveBeenCalled();
+    expect(operations.sync).not.toHaveBeenCalled();
+    expect(operations.close).not.toHaveBeenCalled();
+
+    const restarted = new McpOAuthService({
+      baseDir,
+      storePath,
+      durability: createFileDurability("win32", operations),
+    });
+    cleanups.push(() => restarted.dispose());
+    expect(restarted.status().authenticatedUrls).toEqual([]);
+  });
+
+  it("starts from a valid generic-only Windows store without rewriting its namespace", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-windows-existing-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const genericUrl = "https://existing.example.test/mcp";
+    const sealed = (accessToken: string) =>
+      encryptSecret(baseDir, JSON.stringify({ access_token: accessToken, token_type: "Bearer" }));
+    const serialized = JSON.stringify({
+      servers: {
+        [genericUrl]: { tokens: sealed("generic-token") },
+      },
+    });
+    writeFileSync(storePath, serialized, { mode: 0o600 });
+    const operations: FileDurabilityOperations = {
+      open: vi.fn<(path: string, flags: "r" | "r+") => number>(),
+      sync: vi.fn<(descriptor: number) => void>(),
+      close: vi.fn<(descriptor: number) => void>(),
+    };
+
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      durability: createFileDurability("win32", operations),
+      persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+      persistPersonalCredentials: false,
+      failClosedOnStoreLoadError: true,
+    });
+    cleanups.push(() => service.dispose());
+
+    expect(service.status().authenticatedUrls).toEqual([genericUrl]);
+    expect(readFileSync(storePath, "utf8")).toBe(serialized);
+    expect(operations.open).not.toHaveBeenCalled();
+    expect(operations.sync).not.toHaveBeenCalled();
+    expect(operations.close).not.toHaveBeenCalled();
+  });
+
+  it("signs out a session-only Personal account on Windows when the store is absent", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-windows-clear-missing-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const operations: FileDurabilityOperations = {
+      open: vi.fn<(path: string, flags: "r" | "r+") => number>(),
+      sync: vi.fn<(descriptor: number) => void>(),
+      close: vi.fn<(descriptor: number) => void>(),
+    };
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      durability: createFileDurability("win32", operations),
+      persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+      persistPersonalCredentials: false,
+      failClosedOnStoreLoadError: true,
+    });
+    cleanups.push(() => service.dispose());
+    const internals = service as unknown as {
+      updateEntry(
+        serverUrl: string,
+        update: (entry: Record<string, unknown>) => Record<string, unknown>,
+      ): void;
+    };
+    internals.updateEntry(PIPEDREAM_PERSONAL_MCP_URL, (entry) => ({
+      ...entry,
+      tokens: encryptSecret(
+        baseDir,
+        JSON.stringify({ access_token: "session-personal-token", token_type: "Bearer" }),
+      ),
+    }));
+    expect(service.status().authenticatedUrls).toEqual([PIPEDREAM_PERSONAL_MCP_URL]);
+
+    expect(() => service.clearPersonalCredentials({ strictPersistence: true })).not.toThrow();
+
+    expect(service.status().authenticatedUrls).toEqual([]);
+    expect(() => readFileSync(storePath, "utf8")).toThrow(/ENOENT|no such file/i);
+    expect(operations.open).not.toHaveBeenCalled();
+    expect(operations.sync).not.toHaveBeenCalled();
+    expect(operations.close).not.toHaveBeenCalled();
+  });
+
+  it("signs out a session-only Personal account without rewriting a valid generic Windows store", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-windows-clear-generic-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const genericUrl = "https://existing.example.test/mcp";
+    const serialized = JSON.stringify({
+      servers: {
+        [genericUrl]: {
+          tokens: encryptSecret(
+            baseDir,
+            JSON.stringify({ access_token: "generic-token", token_type: "Bearer" }),
+          ),
+        },
+      },
+    });
+    writeFileSync(storePath, serialized, { mode: 0o600 });
+    const operations: FileDurabilityOperations = {
+      open: vi.fn<(path: string, flags: "r" | "r+") => number>(),
+      sync: vi.fn<(descriptor: number) => void>(),
+      close: vi.fn<(descriptor: number) => void>(),
+    };
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      durability: createFileDurability("win32", operations),
+      persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+      persistPersonalCredentials: false,
+      failClosedOnStoreLoadError: true,
+    });
+    cleanups.push(() => service.dispose());
+    const internals = service as unknown as {
+      updateEntry(
+        serverUrl: string,
+        update: (entry: Record<string, unknown>) => Record<string, unknown>,
+      ): void;
+    };
+    internals.updateEntry(PIPEDREAM_PERSONAL_MCP_URL, (entry) => ({
+      ...entry,
+      tokens: encryptSecret(
+        baseDir,
+        JSON.stringify({ access_token: "session-personal-token", token_type: "Bearer" }),
+      ),
+    }));
+    expect(service.status().authenticatedUrls.sort()).toEqual(
+      [genericUrl, PIPEDREAM_PERSONAL_MCP_URL].sort(),
+    );
+
+    expect(() => service.clearPersonalCredentials({ strictPersistence: true })).not.toThrow();
+
+    expect(service.status().authenticatedUrls).toEqual([genericUrl]);
+    expect(readFileSync(storePath, "utf8")).toBe(serialized);
+    expect(operations.open).not.toHaveBeenCalled();
+    expect(operations.sync).not.toHaveBeenCalled();
+    expect(operations.close).not.toHaveBeenCalled();
+  });
+
+  it("signs out Personal on Windows while retaining an unrelated dirty generic projection", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-windows-dirty-generic-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const genericUrl = "https://existing.example.test/mcp";
+    const sealed = (accessToken: string) =>
+      encryptSecret(baseDir, JSON.stringify({ access_token: accessToken, token_type: "Bearer" }));
+    const serialized = JSON.stringify({
+      servers: { [genericUrl]: { tokens: sealed("generic-token-on-disk") } },
+    });
+    writeFileSync(storePath, serialized, { mode: 0o600 });
+    const operations: FileDurabilityOperations = {
+      open: vi.fn<(path: string, flags: "r" | "r+") => number>(),
+      sync: vi.fn<(descriptor: number) => void>(),
+      close: vi.fn<(descriptor: number) => void>(),
+    };
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      durability: createFileDurability("win32", operations),
+      persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+      persistPersonalCredentials: false,
+      failClosedOnStoreLoadError: true,
+    });
+    cleanups.push(() => service.dispose());
+    const internals = service as unknown as {
+      updateEntry(
+        serverUrl: string,
+        update: (entry: Record<string, unknown>) => Record<string, unknown>,
+      ): void;
+    };
+    internals.updateEntry(genericUrl, (entry) => ({
+      ...entry,
+      tokens: sealed("new-session-generic-token"),
+    }));
+    internals.updateEntry(PIPEDREAM_PERSONAL_MCP_URL, (entry) => ({
+      ...entry,
+      tokens: sealed("session-personal-token"),
+    }));
+
+    expect(() => service.clearPersonalCredentials({ strictPersistence: true })).not.toThrow();
+
+    expect(service.status().authenticatedUrls).toEqual([genericUrl]);
+    expect(readFileSync(storePath, "utf8")).toBe(serialized);
+    expect(() => service.clear({ url: genericUrl }, { strictPersistence: true })).toThrow(
+      "Could not persist the OAuth credential change.",
+    );
+    expect(readFileSync(storePath, "utf8")).toBe(serialized);
+  });
+
+  it("rewrites Personal credentials after a persistence-enabled post-rename fsync failure", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-post-rename-clear-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const genericUrl = "https://existing.example.test/mcp";
+    const sealed = (accessToken: string) =>
+      encryptSecret(baseDir, JSON.stringify({ access_token: accessToken, token_type: "Bearer" }));
+    writeFileSync(
+      storePath,
+      JSON.stringify({ servers: { [genericUrl]: { tokens: sealed("generic-token") } } }),
+      { mode: 0o600 },
+    );
+    let fileFlushes = 0;
+    let directoryFlushes = 0;
+    const durability: FileDurability = {
+      syncFile: () => {
+        fileFlushes += 1;
+      },
+      syncDirectory: () => {
+        directoryFlushes += 1;
+        if (directoryFlushes === 2) {
+          throw new Error("simulated post-rename directory fsync failure");
+        }
+      },
+    };
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      durability,
+      failClosedOnStoreLoadError: true,
+    });
+    cleanups.push(() => service.dispose());
+    const internals = service as unknown as {
+      updateEntry(
+        serverUrl: string,
+        update: (entry: Record<string, unknown>) => Record<string, unknown>,
+      ): void;
+    };
+    internals.updateEntry(PIPEDREAM_PERSONAL_MCP_URL, (entry) => ({
+      ...entry,
+      tokens: sealed("personal-token-after-rename"),
+    }));
+    const afterFailedCommit = JSON.parse(readFileSync(storePath, "utf8")) as {
+      servers: Record<string, unknown>;
+    };
+    expect(afterFailedCommit.servers).toHaveProperty(PIPEDREAM_PERSONAL_MCP_URL);
+
+    expect(() => service.clearPersonalCredentials({ strictPersistence: true })).not.toThrow();
+
+    const afterClear = JSON.parse(readFileSync(storePath, "utf8")) as {
+      servers: Record<string, unknown>;
+    };
+    expect(afterClear.servers).not.toHaveProperty(PIPEDREAM_PERSONAL_MCP_URL);
+    expect(afterClear.servers).toHaveProperty(genericUrl);
+    expect(fileFlushes).toBe(2);
+  });
+
+  it("blocks startup when a Windows store still contains legacy Personal Pipedream credentials", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-windows-legacy-personal-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const genericUrl = "https://existing.example.test/mcp";
+    const sealed = (accessToken: string) =>
+      encryptSecret(baseDir, JSON.stringify({ access_token: accessToken, token_type: "Bearer" }));
+    const serialized = JSON.stringify({
+      servers: {
+        [genericUrl]: { tokens: sealed("generic-token") },
+        [PIPEDREAM_PERSONAL_MCP_URL]: { tokens: sealed("legacy-personal-token") },
+      },
+    });
+    writeFileSync(storePath, serialized, { mode: 0o600 });
+    const operations: FileDurabilityOperations = {
+      open: vi.fn<(path: string, flags: "r" | "r+") => number>(),
+      sync: vi.fn<(descriptor: number) => void>(),
+      close: vi.fn<(descriptor: number) => void>(),
+    };
+
+    expect(
+      () =>
+        new McpOAuthService({
+          baseDir,
+          storePath,
+          durability: createFileDurability("win32", operations),
+          persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+          failClosedOnStoreLoadError: true,
+        }),
+    ).toThrow(McpOAuthCredentialStoreUnavailableError);
+
+    expect(readFileSync(storePath, "utf8")).toBe(serialized);
+    expect(operations.open).not.toHaveBeenCalled();
+    expect(operations.sync).not.toHaveBeenCalled();
+    expect(operations.close).not.toHaveBeenCalled();
+  });
+
   it("completes the DCR + PKCE authorization flow through the loopback callback", async () => {
     const fake = await startFakeAuthServer({ expiresIn: 3600 });
     const service = makeService();
@@ -782,7 +1113,10 @@ describe("McpOAuthService", () => {
         {
           tokens: encryptSecret(
             baseDir,
-            JSON.stringify({ access_token: `legacy-personal-token-${index}` }),
+            JSON.stringify({
+              access_token: `legacy-personal-token-${index}`,
+              token_type: "Bearer",
+            }),
           ),
         },
       ]),
@@ -793,7 +1127,10 @@ describe("McpOAuthService", () => {
         servers: {
           ...sealedTokens,
           "https://generic.example.test/mcp": {
-            tokens: encryptSecret(baseDir, JSON.stringify({ access_token: "generic-token" })),
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "generic-token", token_type: "Bearer" }),
+            ),
           },
         },
       }),
@@ -810,6 +1147,61 @@ describe("McpOAuthService", () => {
       servers: Record<string, unknown>;
     };
     expect(Object.keys(persisted.servers)).toEqual(["https://generic.example.test/mcp"]);
+  });
+
+  it("keeps Personal Pipedream OAuth session-only when durable persistence is not trusted", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-session-only-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    const genericUrl = "https://generic.example.test/mcp";
+    const sealed = (accessToken: string) =>
+      encryptSecret(baseDir, JSON.stringify({ access_token: accessToken, token_type: "Bearer" }));
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: { tokens: sealed("legacy-personal-token") },
+          [genericUrl]: { tokens: sealed("generic-token") },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const persistCredentialsForServer = (url: string) => !isPipedreamPersonalMcpUrl(url);
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      persistCredentialsForServer,
+    });
+    cleanups.push(() => service.dispose());
+
+    expect(service.status().authenticatedUrls).toEqual([genericUrl]);
+    const internals = service as unknown as {
+      updateEntry(
+        serverUrl: string,
+        update: (entry: Record<string, unknown>) => Record<string, unknown>,
+      ): void;
+    };
+    internals.updateEntry(PIPEDREAM_PERSONAL_MCP_URL, (entry) => ({
+      ...entry,
+      tokens: sealed("session-personal-token"),
+      tokensSavedAt: Date.now(),
+    }));
+
+    expect(service.status().authenticatedUrls.sort()).toEqual(
+      [genericUrl, PIPEDREAM_PERSONAL_MCP_URL].sort(),
+    );
+    const persisted = JSON.parse(readFileSync(storePath, "utf8")) as {
+      servers: Record<string, unknown>;
+    };
+    expect(Object.keys(persisted.servers)).toEqual([genericUrl]);
+
+    const restarted = new McpOAuthService({
+      baseDir,
+      storePath,
+      persistCredentialsForServer,
+    });
+    cleanups.push(() => restarted.dispose());
+    expect(restarted.status().authenticatedUrls).toEqual([genericUrl]);
   });
 
   it("invalidates a Personal URL alias while its sign-in listener is still opening", async () => {
@@ -1047,6 +1439,151 @@ describe("McpOAuthService", () => {
       service.clear({ url: "https://mcp.pipedream.net/v2" }, { strictPersistence: true }),
     ).toThrow(/persist|credential/i);
     expect(readFileSync(storePath, "utf8")).toBe(malformedStore);
+  });
+
+  it("fails closed without modifying a malformed store under a restrictive policy", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-fail-closed-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    const malformedStore = `{"servers":{"${PIPEDREAM_PERSONAL_MCP_URL}":{"tokens":"sentinel"}}`;
+    writeFileSync(storePath, malformedStore, { mode: 0o600 });
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+
+    expect(
+      () =>
+        new McpOAuthService({
+          baseDir,
+          storePath,
+          persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+          failClosedOnStoreLoadError: true,
+        }),
+    ).toThrow("The OAuth credential store could not be verified safely.");
+    expect(readFileSync(storePath, "utf8")).toBe(malformedStore);
+  });
+
+  it.each([
+    "null",
+    "[]",
+    "{}",
+    '{"servers":null}',
+    '{"servers":[]}',
+    `{"servers":{"${PIPEDREAM_PERSONAL_MCP_URL}":{"tokens":"sentinel","unexpected":"legacy-material"}}}`,
+  ])("fails closed without rewriting valid JSON with a noncanonical shape: %s", (store) => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-shape-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    writeFileSync(storePath, store, { mode: 0o600 });
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+
+    expect(
+      () =>
+        new McpOAuthService({
+          baseDir,
+          storePath,
+          persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+          failClosedOnStoreLoadError: true,
+        }),
+    ).toThrow("The OAuth credential store could not be verified safely.");
+    expect(readFileSync(storePath, "utf8")).toBe(store);
+  });
+
+  it.each(["file flush", "rename", "directory flush"] as const)(
+    "refuses restrictive startup when durable legacy cleanup fails during %s",
+    (failurePoint) => {
+      const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-durable-cleanup-"));
+      const storePath = join(baseDir, "mcp-oauth.json");
+      const sealed = encryptSecret(
+        baseDir,
+        JSON.stringify({ access_token: "legacy-personal-token", token_type: "Bearer" }),
+      );
+      writeFileSync(
+        storePath,
+        JSON.stringify({
+          servers: { [PIPEDREAM_PERSONAL_MCP_URL]: { tokens: sealed } },
+        }),
+        { mode: 0o600 },
+      );
+      cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+      const durability: FileDurability = {
+        syncFile: () => {
+          if (failurePoint === "file flush") throw new Error("simulated file flush failure");
+          if (failurePoint === "rename") {
+            rmSync(storePath);
+            mkdirSync(storePath);
+          }
+        },
+        syncDirectory: () => {
+          if (failurePoint === "directory flush") {
+            throw new Error("simulated directory flush failure");
+          }
+        },
+      };
+
+      expect(
+        () =>
+          new McpOAuthService({
+            baseDir,
+            storePath,
+            persistCredentialsForServer: (url) => !isPipedreamPersonalMcpUrl(url),
+            failClosedOnStoreLoadError: true,
+            durability,
+          }),
+      ).toThrow("The OAuth credential store could not be verified safely.");
+    },
+  );
+
+  it("repairs a prior post-rename directory flush before trusting the cleared store on relaunch", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-relaunch-repair-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    const url = "https://mcp.example.com";
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [url]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "old-token", token_type: "Bearer" }),
+            ),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    let directoryFlushes = 0;
+    const firstDurability: FileDurability = {
+      syncFile: () => undefined,
+      syncDirectory: () => {
+        directoryFlushes += 1;
+        if (directoryFlushes === 2) {
+          throw new Error("simulated post-rename directory flush failure");
+        }
+      },
+    };
+    const first = new McpOAuthService({
+      baseDir,
+      storePath,
+      failClosedOnStoreLoadError: true,
+      durability: firstDurability,
+    });
+    cleanups.push(() => first.dispose());
+
+    expect(() => first.clear({ url }, { strictPersistence: true })).toThrow(
+      "Could not persist the OAuth credential change.",
+    );
+
+    const repairedDirectories: string[] = [];
+    const second = new McpOAuthService({
+      baseDir,
+      storePath,
+      failClosedOnStoreLoadError: true,
+      durability: {
+        syncFile: () => undefined,
+        syncDirectory: (path) => repairedDirectories.push(path),
+      },
+    });
+    cleanups.push(() => second.dispose());
+    expect(second.status().authenticatedUrls).toEqual([]);
+    expect(repairedDirectories).toEqual([baseDir]);
   });
 
   it("does not report credentials encrypted with an unavailable key as authenticated", () => {

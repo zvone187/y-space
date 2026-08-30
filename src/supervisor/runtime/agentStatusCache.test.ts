@@ -19,7 +19,7 @@ function makeTempDir(): string {
 }
 
 function makeRuntime(emit: ConstructorParameters<typeof SupervisorRuntime>[0]): SupervisorRuntime {
-  const runtime = new SupervisorRuntime(emit);
+  const runtime = new SupervisorRuntime(emit, { allowPipedreamOauthPersistence: false });
   runtimesToDispose.push(runtime);
   return runtime;
 }

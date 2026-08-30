@@ -1,14 +1,20 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest, type IncomingHttpHeaders } from "node:http";
 import { connect as connectSocket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { decryptSecret } from "@/shared/secretStorage";
 import {
   PipedreamMainService,
   type PipedreamConnectTabOwnership,
   type PipedreamMainServiceOptions,
 } from "./PipedreamMainService";
+import {
+  createPipedreamCredentialStore,
+  type PipedreamCredentialDurability,
+  type PipedreamCredentialStore,
+} from "./pipedreamCredentialStore";
 import { resetSensitiveSessionPartitionPoolForTests } from "../browser/sensitiveSessionPartitionPool";
 
 const tempRoots: string[] = [];
@@ -25,9 +31,14 @@ afterEach(() => {
   for (const root of tempRoots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+function createTestCredentialStore(): PipedreamCredentialStore {
+  const root = mkdtempSync(join(tmpdir(), "y-space-pipedream-store-"));
+  tempRoots.push(root);
+  return createPipedreamCredentialStore(root, { appIsolatedPersistentKey: true });
+}
+
 function makeService(overrides?: {
-  persistEnvFilePath?: (filePath: string) => void;
-  clearEnvFilePath?: () => void;
+  credentialStore?: PipedreamCredentialStore;
   configureBootstrap?: PipedreamMainServiceOptions["configureBootstrap"];
 }) {
   return new PipedreamMainService({
@@ -38,8 +49,7 @@ function makeService(overrides?: {
     openConnectUrl: async () => ({ tabId: "sensitive-tab-test" }),
     closeConnectTab: async () => undefined,
     isConnectTabOpen: async () => true,
-    persistEnvFilePath: overrides?.persistEnvFilePath ?? (() => undefined),
-    clearEnvFilePath: overrides?.clearEnvFilePath ?? (() => undefined),
+    credentialStore: overrides?.credentialStore ?? createTestCredentialStore(),
     fallbackBootstrap: () => ({ state: "absent" }),
     configureBootstrap:
       overrides?.configureBootstrap ??
@@ -145,8 +155,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -192,8 +201,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -231,8 +239,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -288,8 +295,7 @@ describe("PipedreamMainService", () => {
         openTabs.delete(tabId);
       },
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -359,8 +365,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -418,8 +423,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -465,8 +469,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab: async () => undefined,
       isConnectTabOpen,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -516,8 +519,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => inspection.promise,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -578,8 +580,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -652,8 +653,7 @@ describe("PipedreamMainService", () => {
         openTabs.delete(tabId);
       },
       isConnectTabOpen,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -705,8 +705,7 @@ describe("PipedreamMainService", () => {
         throw new Error("exact sensitive tab is still open");
       },
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -750,8 +749,7 @@ describe("PipedreamMainService", () => {
         },
         closeConnectTab,
         isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-        persistEnvFilePath: () => undefined,
-        clearEnvFilePath: () => undefined,
+        credentialStore: createTestCredentialStore(),
         fallbackBootstrap: () => ({ state: "absent" }),
         configureBootstrap: async () => ({}) as never,
       });
@@ -799,8 +797,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -846,8 +843,7 @@ describe("PipedreamMainService", () => {
           openTabs.delete(tabId);
         },
         isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-        persistEnvFilePath: () => undefined,
-        clearEnvFilePath: () => undefined,
+        credentialStore: createTestCredentialStore(),
         fallbackBootstrap: () => ({ state: "absent" }),
         configureBootstrap: async () => ({}) as never,
       });
@@ -886,8 +882,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -930,8 +925,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -975,8 +969,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1002,8 +995,7 @@ describe("PipedreamMainService", () => {
         tabOpen = false;
       },
       isConnectTabOpen: async (tabId) => tabId === "sensitive-tab-private" && tabOpen,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1036,8 +1028,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl: async () => ({ tabId: "sensitive-success" }),
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1095,8 +1086,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl: async () => ({ tabId: "sensitive-host-check" }),
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1122,8 +1112,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl: async () => ({ tabId: "sensitive-failure" }),
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1155,8 +1144,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1191,8 +1179,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1225,8 +1212,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl: async () => ({ tabId: "sensitive-retry" }),
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1250,8 +1236,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl: async () => ({ tabId: "sensitive-direct-deadline" }),
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1281,8 +1266,7 @@ describe("PipedreamMainService", () => {
         openConnectUrl: async () => ({ tabId: "sensitive-tab-private" }),
         closeConnectTab,
         isConnectTabOpen: async () => tabOpen,
-        persistEnvFilePath: () => undefined,
-        clearEnvFilePath: () => undefined,
+        credentialStore: createTestCredentialStore(),
         fallbackBootstrap: () => ({ state: "absent" }),
         configureBootstrap: async () => ({}) as never,
       });
@@ -1320,8 +1304,7 @@ describe("PipedreamMainService", () => {
         },
         closeConnectTab,
         isConnectTabOpen: async (tabId) => openTabIds.has(tabId),
-        persistEnvFilePath: () => undefined,
-        clearEnvFilePath: () => undefined,
+        credentialStore: createTestCredentialStore(),
         fallbackBootstrap: () => ({ state: "absent" }),
         configureBootstrap: async () => ({}) as never,
       } as PipedreamConnectLifecycleOptions);
@@ -1364,8 +1347,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabIds.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     } as PipedreamConnectLifecycleOptions);
@@ -1402,8 +1384,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1431,8 +1412,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1464,8 +1444,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabIds.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     } as PipedreamConnectLifecycleOptions);
@@ -1500,8 +1479,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1540,8 +1518,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl: async () => ({ tabId: "sensitive-idle-socket" }),
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1598,8 +1575,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabIds.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1634,8 +1610,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1680,8 +1655,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1725,8 +1699,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1786,8 +1759,7 @@ describe("PipedreamMainService", () => {
       },
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1843,8 +1815,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab,
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1904,8 +1875,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1944,8 +1914,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap: async () => ({}) as never,
     });
@@ -1954,7 +1923,7 @@ describe("PipedreamMainService", () => {
     expect(openConnectUrl).not.toHaveBeenCalled();
   });
 
-  it("imports a selected env file, persists only its path, and returns a redacted snapshot", async () => {
+  it("imports a selected env file, removes the plaintext source, and returns a redacted snapshot", async () => {
     const root = mkdtempSync(join(tmpdir(), "y-space-pipedream-main-"));
     tempRoots.push(root);
     const filePath = join(root, ".env.pipedream");
@@ -1967,13 +1936,12 @@ describe("PipedreamMainService", () => {
         "PIPEDREAM_ENVIRONMENT=development",
       ].join("\n"),
     );
-    const persistEnvFilePath = vi.fn<(filePath: string) => void>();
     const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>(
       async () => ({
         personalMcp: { enabled: false, authenticated: false, serverName: "pd" as const },
         connect: {
           state: "ready" as const,
-          credentialSource: "environment" as const,
+          credentialSource: "secure-storage" as const,
           environment: "development" as const,
           projectIdHint: "proj_…0123",
           projectName: "Pipedream Connect",
@@ -1981,7 +1949,7 @@ describe("PipedreamMainService", () => {
         },
       }),
     );
-    const service = makeService({ persistEnvFilePath, configureBootstrap });
+    const service = makeService({ configureBootstrap });
 
     const result = await service.importEnvironmentFile(filePath);
 
@@ -1989,13 +1957,13 @@ describe("PipedreamMainService", () => {
       status: "configured",
       snapshot: { connect: { state: "ready" } },
     });
-    expect(persistEnvFilePath).toHaveBeenCalledExactlyOnceWith(filePath);
     expect(configureBootstrap).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ state: "ready", source: "environment" }),
+      expect.objectContaining({ state: "ready", source: "secure-storage" }),
     );
     expect(JSON.stringify(result)).not.toMatch(
       /runtime-client-secret|runtime-client-id|Runtime123/,
     );
+    expect(existsSync(filePath)).toBe(false);
   });
 
   it("returns a safe validation result without replacing config for an unrelated file", async () => {
@@ -2003,19 +1971,18 @@ describe("PipedreamMainService", () => {
     tempRoots.push(root);
     const filePath = join(root, ".env.pipedream");
     writeFileSync(filePath, "UNRELATED=value\n");
-    const persistEnvFilePath = vi.fn<(filePath: string) => void>();
     const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>();
-    const service = makeService({ persistEnvFilePath, configureBootstrap });
+    const service = makeService({ configureBootstrap });
 
     await expect(service.importEnvironmentFile(filePath)).resolves.toEqual({
       status: "invalid",
-      reason: "no-supported-values",
+      reason: "not-dedicated",
     });
-    expect(persistEnvFilePath).not.toHaveBeenCalled();
+    expect(existsSync(filePath)).toBe(true);
     expect(configureBootstrap).not.toHaveBeenCalled();
   });
 
-  it("does not persist a selected path when live configuration fails", async () => {
+  it("keeps recoverable sealed credentials and no plaintext source when live configuration fails", async () => {
     const root = mkdtempSync(join(tmpdir(), "y-space-pipedream-main-"));
     tempRoots.push(root);
     const filePath = join(root, ".env.pipedream");
@@ -2028,34 +1995,162 @@ describe("PipedreamMainService", () => {
         "PIPEDREAM_ENVIRONMENT=development",
       ].join("\n"),
     );
-    const persistEnvFilePath = vi.fn<(filePath: string) => void>();
     const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>(
       async () => {
         throw new Error("configuration unavailable");
       },
     );
-    const service = makeService({ persistEnvFilePath, configureBootstrap });
+    const service = makeService({ configureBootstrap });
 
     await expect(service.importEnvironmentFile(filePath)).rejects.toThrow(
       "configuration unavailable",
     );
-    expect(persistEnvFilePath).not.toHaveBeenCalled();
+    expect(existsSync(filePath)).toBe(false);
   });
 
-  it("forgets path metadata and restores the launch-time fallback", async () => {
-    const clearEnvFilePath = vi.fn<() => void>();
+  it.each(["removed marker file flush", "active file flush", "active directory flush"] as const)(
+    "installs committed imported credentials live when %s fails",
+    async (failurePoint) => {
+      const root = mkdtempSync(join(tmpdir(), "y-space-pipedream-import-commit-"));
+      tempRoots.push(root);
+      const filePath = join(root, ".env.pipedream");
+      writeFileSync(
+        filePath,
+        [
+          "PIPEDREAM_CLIENT_ID=client-id",
+          "PIPEDREAM_CLIENT_SECRET=client-secret",
+          "PIPEDREAM_PROJECT_ID=proj_Committed123",
+          "PIPEDREAM_ENVIRONMENT=development",
+        ].join("\n"),
+      );
+      const payloadAt = (path: string) =>
+        JSON.parse(
+          decryptSecret(
+            root,
+            (JSON.parse(readFileSync(path, "utf8")) as { sealed: string }).sealed,
+          ),
+        ) as { state: string; source?: { phase?: string } };
+      const durability: PipedreamCredentialDurability = {
+        syncFile: (path) => {
+          const payload = payloadAt(path);
+          if (failurePoint === "removed marker file flush" && payload.source?.phase === "removed") {
+            throw new Error("simulated removed marker flush failure");
+          }
+          if (failurePoint === "active file flush" && payload.state === "active") {
+            throw new Error("simulated active temp flush failure");
+          }
+        },
+        syncDirectory: (path) => {
+          const storePath = join(root, "pipedream-credentials.json");
+          if (
+            failurePoint === "active directory flush" &&
+            path === root &&
+            existsSync(storePath) &&
+            payloadAt(storePath).state === "active"
+          ) {
+            throw new Error("simulated active directory flush failure");
+          }
+        },
+      };
+      const credentialStore = createPipedreamCredentialStore(root, {
+        appIsolatedPersistentKey: true,
+        durability,
+      });
+      const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>(
+        async () =>
+          ({
+            personalMcp: { enabled: false, authenticated: false, serverName: "pd" as const },
+            connect: { state: "ready" as const },
+          }) as never,
+      );
+      const service = makeService({ credentialStore, configureBootstrap });
+
+      await expect(service.importEnvironmentFile(filePath)).rejects.toThrow(
+        "Pipedream credentials were secured, but final storage confirmation failed.",
+      );
+      expect(existsSync(filePath)).toBe(false);
+      expect(configureBootstrap).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          state: "ready",
+          source: "secure-storage",
+          credentials: expect.objectContaining({ projectId: "proj_Committed123" }),
+        }),
+      );
+    },
+  );
+
+  it("forgets sealed credentials before restoring the launch-time fallback", async () => {
+    const backingStore = createTestCredentialStore();
+    const clear = vi.fn<() => void>(() => backingStore.clear());
+    const credentialStore: PipedreamCredentialStore = { ...backingStore, clear };
     const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>(
       async () => ({
         personalMcp: { enabled: false, authenticated: false, serverName: "pd" as const },
         connect: { state: "absent" as const },
       }),
     );
-    const service = makeService({ clearEnvFilePath, configureBootstrap });
+    const service = makeService({ credentialStore, configureBootstrap });
 
     await expect(service.clearEnvironmentFile()).resolves.toMatchObject({
       connect: { state: "absent" },
     });
-    expect(clearEnvFilePath).toHaveBeenCalledOnce();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(configureBootstrap).toHaveBeenCalledExactlyOnceWith({ state: "absent" });
+  });
+
+  it("does not claim the launch-time fallback when forgetting sealed credentials fails", async () => {
+    const backingStore = createTestCredentialStore();
+    const credentialStore: PipedreamCredentialStore = {
+      ...backingStore,
+      clear: () => {
+        throw new Error("secure store unavailable");
+      },
+    };
+    const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>();
+    const service = makeService({ credentialStore, configureBootstrap });
+
+    await expect(service.clearEnvironmentFile()).rejects.toThrow("secure store unavailable");
+    expect(configureBootstrap).not.toHaveBeenCalled();
+  });
+
+  it("revokes live authority when durable clear fails after the credential unlink", async () => {
+    const root = mkdtempSync(join(tmpdir(), "y-space-pipedream-clear-commit-"));
+    tempRoots.push(root);
+    const sourcePath = join(root, ".env.pipedream");
+    writeFileSync(
+      sourcePath,
+      [
+        "PIPEDREAM_CLIENT_ID=client-id",
+        "PIPEDREAM_CLIENT_SECRET=client-secret",
+        "PIPEDREAM_PROJECT_ID=proj_Clear123",
+        "PIPEDREAM_ENVIRONMENT=development",
+      ].join("\n"),
+    );
+    let failDirectoryFlush = false;
+    const durability: PipedreamCredentialDurability = {
+      syncFile: () => undefined,
+      syncDirectory: () => {
+        if (failDirectoryFlush) throw new Error("simulated post-unlink flush failure");
+      },
+    };
+    const credentialStore = createPipedreamCredentialStore(root, {
+      appIsolatedPersistentKey: true,
+      durability,
+    });
+    expect(credentialStore.importEnvironmentFile(sourcePath).status).toBe("configured");
+    const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>(
+      async () => ({
+        personalMcp: { enabled: false, authenticated: false, serverName: "pd" as const },
+        connect: { state: "absent" as const },
+      }),
+    );
+    const service = makeService({ credentialStore, configureBootstrap });
+    failDirectoryFlush = true;
+
+    await expect(service.clearEnvironmentFile()).rejects.toThrow(
+      "Pipedream credentials could not be cleared durably.",
+    );
+    expect(existsSync(join(root, "pipedream-credentials.json"))).toBe(false);
     expect(configureBootstrap).toHaveBeenCalledExactlyOnceWith({ state: "absent" });
   });
 
@@ -2080,8 +2175,7 @@ describe("PipedreamMainService", () => {
       openConnectUrl,
       closeConnectTab: async () => undefined,
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap,
     });
@@ -2130,8 +2224,7 @@ describe("PipedreamMainService", () => {
         openTabs.delete(tabId);
       },
       isConnectTabOpen: async (tabId) => openTabs.has(tabId),
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore: createTestCredentialStore(),
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap,
     });
@@ -2179,6 +2272,14 @@ describe("PipedreamMainService", () => {
         } as never;
       },
     );
+    const backingStore = createTestCredentialStore();
+    const credentialStore: PipedreamCredentialStore = {
+      ...backingStore,
+      importEnvironmentFile: (path) => {
+        order.push("secure");
+        return backingStore.importEnvironmentFile(path);
+      },
+    };
     const service = new PipedreamMainService({
       createConnectLink: async () => ({
         connectLinkUrl: "https://pipedream.com/connect?app=gmail&token=private",
@@ -2194,8 +2295,7 @@ describe("PipedreamMainService", () => {
         ownership?.onTabClosed(tabId);
       },
       isConnectTabOpen: async () => true,
-      persistEnvFilePath: () => undefined,
-      clearEnvFilePath: () => undefined,
+      credentialStore,
       fallbackBootstrap: () => ({ state: "absent" }),
       configureBootstrap,
     });
@@ -2203,7 +2303,7 @@ describe("PipedreamMainService", () => {
 
     await service.importEnvironmentFile(filePath);
 
-    expect(order).toEqual(["close", "configure"]);
+    expect(order).toEqual(["close", "secure", "configure"]);
     expect(ownership?.canOpenTab()).toBe(false);
     await expect(service.getConnectFlowStatus({ flowId })).resolves.toEqual({ state: "closed" });
   });

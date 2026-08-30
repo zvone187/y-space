@@ -5,6 +5,7 @@ import type {
   ProjectLocation,
   RuntimeEvent,
   ThreadConfig,
+  ToolCallPayload,
 } from "@/shared/contracts";
 import type {
   AgentAdapter,
@@ -31,8 +32,23 @@ class FakeHandle implements StructuredSessionHandle {
   interrupted = false;
   startTurns: Array<{ prompt: string; config: ThreadConfig }> = [];
   resolvedRequests: Array<{ requestId: string | number; response: unknown }> = [];
+  disposeCalls = 0;
+  activate?: () => Promise<void>;
 
-  constructor(private readonly interruptError?: string) {}
+  constructor(
+    private readonly interruptError?: string,
+    private readonly disposeGate?: Promise<void>,
+    private readonly lifecycle?: string[],
+    activateGate?: Promise<void>,
+  ) {
+    if (activateGate) {
+      this.activate = async () => {
+        this.lifecycle?.push("activate:start");
+        await activateGate;
+        this.lifecycle?.push("activate:done");
+      };
+    }
+  }
 
   setListener(listener: StructuredSessionListener): void {
     this.listener = listener;
@@ -41,6 +57,7 @@ class FakeHandle implements StructuredSessionHandle {
     this.startTurns.push({ prompt, config });
   }
   async interruptTurn(): Promise<void> {
+    this.lifecycle?.push("interrupt");
     this.interrupted = true;
     if (this.interruptError) this.listener?.onError(this.interruptError);
   }
@@ -48,7 +65,11 @@ class FakeHandle implements StructuredSessionHandle {
     this.resolvedRequests.push({ requestId, response });
   }
   async dispose(): Promise<void> {
+    this.disposeCalls += 1;
+    this.lifecycle?.push("dispose:start");
+    await this.disposeGate;
     this.disposed = true;
+    this.lifecycle?.push("dispose:done");
   }
 
   emit(event: RuntimeEvent): void {
@@ -77,8 +98,12 @@ interface Harness {
   inputs: CreateStructuredSessionInput[];
   appended: Array<{ threadId: string; event: RuntimeEvent }>;
   mcpTargets: string[];
+  revokedMcpChildren: string[];
   releasedMcpChildren: string[];
+  lifecycle: string[];
   releaseCreate: () => void;
+  releaseDispose: () => void;
+  releaseActivate: () => void;
 }
 
 function makeHarness(options?: {
@@ -89,20 +114,33 @@ function makeHarness(options?: {
   statusCapabilities?: AgentCapability | null;
   createFailures?: number;
   deferCreate?: boolean;
+  deferDispose?: boolean;
+  deferActivate?: boolean;
   interruptError?: string;
   baseSpawnEnv?: Record<string, string>;
   browserExclusive?: boolean;
   parentBrowserMcp?: boolean;
+  projectLocation?: ProjectLocation;
 }): Harness {
   const handles: FakeHandle[] = [];
   const inputs: CreateStructuredSessionInput[] = [];
   const appended: Array<{ threadId: string; event: RuntimeEvent }> = [];
   const mcpTargets: string[] = [];
+  const revokedMcpChildren: string[] = [];
   const releasedMcpChildren: string[] = [];
+  const lifecycle: string[] = [];
   let createFailures = options?.createFailures ?? 0;
   let releaseCreate!: () => void;
   const createGate = new Promise<void>((resolve) => {
     releaseCreate = resolve;
+  });
+  let releaseDispose!: () => void;
+  const disposeGate = new Promise<void>((resolve) => {
+    releaseDispose = resolve;
+  });
+  let releaseActivate!: () => void;
+  const activateGate = new Promise<void>((resolve) => {
+    releaseActivate = resolve;
   });
 
   const adapter = {
@@ -137,7 +175,12 @@ function makeHarness(options?: {
         createFailures -= 1;
         throw new Error("session launch failed");
       }
-      const handle = new FakeHandle(options?.interruptError);
+      const handle = new FakeHandle(
+        options?.interruptError,
+        options?.deferDispose ? disposeGate : undefined,
+        lifecycle,
+        options?.deferActivate ? activateGate : undefined,
+      );
       handles.push(handle);
       return handle;
     },
@@ -147,7 +190,7 @@ function makeHarness(options?: {
     getParentContext: (threadId) =>
       threadId === PARENT
         ? {
-            projectLocation: PROJECT,
+            projectLocation: options?.projectLocation ?? PROJECT,
             config: {
               model: "parent-model",
               approvalPolicy: "never",
@@ -173,8 +216,14 @@ function makeHarness(options?: {
         })),
       };
     },
-    releaseParentMcpAccess: (parentThreadId, childThreadId) => {
-      if (parentThreadId === PARENT) releasedMcpChildren.push(childThreadId);
+    revokeParentMcpAccess: (parentThreadId: string, childThreadId: string) => {
+      if (parentThreadId !== PARENT) return undefined;
+      lifecycle.push("revoke");
+      revokedMcpChildren.push(childThreadId);
+      return () => {
+        lifecycle.push("filter-cleanup");
+        releasedMcpChildren.push(childThreadId);
+      };
     },
     appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
   };
@@ -192,8 +241,12 @@ function makeHarness(options?: {
     inputs,
     appended,
     mcpTargets,
+    revokedMcpChildren,
     releasedMcpChildren,
+    lifecycle,
     releaseCreate,
+    releaseDispose,
+    releaseActivate,
   };
 }
 
@@ -566,12 +619,88 @@ describe("SubagentRunManager", () => {
     const h = makeHarness({ deferCreate: true });
     h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
     await flush();
-    await h.manager.cancelAllForThread(PARENT);
+    const cancellation = h.manager.cancelAllForThread(PARENT);
     h.releaseCreate();
-    await flush();
+    await cancellation;
     await flush();
     expect(h.handles[0]?.disposed).toBe(true);
     expect(h.handles[0]?.startTurns).toEqual([]);
+  });
+
+  it("awaits late structured-child teardown before releasing MCP access during disposal", async () => {
+    const h = makeHarness({ deferCreate: true, deferDispose: true });
+    h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+
+    let disposalSettled = false;
+    const disposal = h.manager.dispose().then(() => {
+      disposalSettled = true;
+    });
+    await flush();
+    expect(disposalSettled).toBe(false);
+    expect(() => h.manager.spawn(PARENT, { agent: "codex", prompt: "late" })).toThrow(
+      SubagentSpawnError,
+    );
+    expect(() => h.manager.spawnMany(PARENT, [{ agent: "codex", prompt: "late batch" }])).toThrow(
+      SubagentSpawnError,
+    );
+    expect(h.revokedMcpChildren).toEqual([h.inputs[0]!.threadId]);
+    expect(h.releasedMcpChildren).toEqual([]);
+
+    h.releaseCreate();
+    await flush();
+    expect(h.handles).toHaveLength(1);
+    expect(h.handles[0]!.disposed).toBe(false);
+    expect(h.releasedMcpChildren).toEqual([]);
+
+    h.releaseDispose();
+    await disposal;
+    expect(h.handles[0]!.disposed).toBe(true);
+    expect(h.handles[0]!.disposeCalls).toBe(1);
+    expect(h.releasedMcpChildren).toEqual([h.inputs[0]!.threadId]);
+    expect(h.lifecycle.indexOf("revoke")).toBeLessThan(h.lifecycle.indexOf("interrupt"));
+    expect(h.lifecycle.indexOf("interrupt")).toBeLessThan(h.lifecycle.indexOf("dispose:done"));
+    expect(h.lifecycle.indexOf("dispose:done")).toBeLessThan(h.lifecycle.indexOf("filter-cleanup"));
+    expect(
+      h.appended.some(
+        ({ event }) =>
+          event.type === "item.completed" &&
+          (event.payload as ToolCallPayload | undefined)?.crossagentStatus === "cancelled",
+      ),
+    ).toBe(true);
+
+    await h.manager.dispose();
+    expect(h.handles[0]!.disposeCalls).toBe(1);
+    expect(h.releasedMcpChildren).toEqual([h.inputs[0]!.threadId]);
+  });
+
+  it("waits for deferred activation and re-disposes its late resources before filter cleanup", async () => {
+    const h = makeHarness({ deferActivate: true });
+    h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await vi.waitFor(() => expect(h.lifecycle).toContain("activate:start"));
+
+    let disposalSettled = false;
+    const disposal = h.manager.dispose().then(() => {
+      disposalSettled = true;
+    });
+    await flush();
+
+    expect(h.handles).toHaveLength(1);
+    expect(h.handles[0]!.disposeCalls).toBe(1);
+    expect(disposalSettled).toBe(false);
+    expect(h.releasedMcpChildren).toEqual([]);
+
+    h.releaseActivate();
+    await disposal;
+
+    expect(h.handles[0]!.disposeCalls).toBe(2);
+    expect(h.lifecycle.indexOf("activate:done")).toBeLessThan(
+      h.lifecycle.lastIndexOf("dispose:done"),
+    );
+    expect(h.lifecycle.lastIndexOf("dispose:done")).toBeLessThan(
+      h.lifecycle.indexOf("filter-cleanup"),
+    );
+    expect(h.releasedMcpChildren).toEqual([h.inputs[0]!.threadId]);
   });
 
   it("enforces the per-parent concurrency cap", () => {
@@ -970,6 +1099,67 @@ describe("SubagentRunManager", () => {
     expect(tileDone?.payload).toMatchObject({ status: "success", result: "done work" });
   });
 
+  it("awaits one-shot child exit before manager disposal settles", async () => {
+    const appended: Array<{ threadId: string; event: RuntimeEvent }> = [];
+    const adapter = {
+      kind: "commandcode",
+      label: "Command Code",
+      capabilities: {
+        models: [{ id: "cc-1", label: "CC One" }],
+        efforts: [],
+        approvalPolicies: [],
+        sandboxModes: [],
+        bypassPermissions: { approvalPolicy: "yolo" },
+      },
+      buildSubagentOneShotCommand: () => ({
+        command: process.execPath,
+        args: [
+          "-e",
+          "process.stdout.write('ready'); process.on('SIGTERM', () => setTimeout(() => process.exit(7), 75)); setInterval(() => {}, 1000)",
+        ],
+        stdin: "",
+      }),
+    } as unknown as AgentAdapter;
+    const manager = new SubagentRunManager({
+      adapters: new Map([["commandcode" as never, adapter]]),
+      host: {
+        getParentContext: () => ({
+          projectLocation:
+            process.platform === "win32"
+              ? { kind: "windows", path: tmpdir() }
+              : { kind: "posix", path: tmpdir() },
+          config: { model: "parent" },
+        }),
+        appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
+      },
+    });
+
+    manager.spawn(PARENT, { agent: "commandcode", prompt: "go" });
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      if (appended.some(({ event }) => event.type === "content.delta")) break;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(appended.some(({ event }) => event.type === "content.delta")).toBe(true);
+
+    let disposalSettled = false;
+    const disposal = manager.dispose().then(() => {
+      disposalSettled = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(disposalSettled).toBe(false);
+    await disposal;
+    expect(
+      appended.some(
+        ({ event }) =>
+          event.type === "item.completed" &&
+          (event.payload as ToolCallPayload | undefined)?.crossagentStatus === "cancelled",
+      ),
+    ).toBe(true);
+    expect(() => manager.spawn(PARENT, { agent: "commandcode", prompt: "late" })).toThrow(
+      SubagentSpawnError,
+    );
+  });
+
   it("rejects a Browser-enabled one-shot child before building or spawning its command", () => {
     const buildSubagentOneShotCommand = vi.fn<
       NonNullable<AgentAdapter["buildSubagentOneShotCommand"]>
@@ -1007,6 +1197,112 @@ describe("SubagentRunManager", () => {
     );
     expect(buildSubagentOneShotCommand).not.toHaveBeenCalled();
     expect(appended).toEqual([]);
+  });
+
+  it("rejects a WSL one-shot child before building or spawning its command", () => {
+    const buildSubagentOneShotCommand = vi.fn<
+      NonNullable<AgentAdapter["buildSubagentOneShotCommand"]>
+    >(() => ({
+      command: "wsl.exe",
+      args: ["-d", "Ubuntu", "--", "commandcode"],
+      stdin: "",
+    }));
+    const adapter = {
+      kind: "commandcode",
+      label: "Command Code",
+      capabilities: {
+        models: [{ id: "cc-1", label: "CC One" }],
+        efforts: [],
+        approvalPolicies: [],
+        sandboxModes: [],
+        bypassPermissions: { approvalPolicy: "yolo" },
+      },
+      buildSubagentOneShotCommand,
+    } as unknown as AgentAdapter;
+    const appended: Array<{ threadId: string; event: RuntimeEvent }> = [];
+    const manager = new SubagentRunManager({
+      adapters: new Map([["commandcode" as never, adapter]]),
+      host: {
+        getParentContext: () => ({
+          projectLocation: {
+            kind: "wsl",
+            distro: "Ubuntu",
+            linuxPath: "/home/test/project",
+            uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\test\\project",
+          },
+          config: { model: "parent" },
+        }),
+        appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
+      },
+    });
+
+    expect(() => manager.spawn(PARENT, { agent: "commandcode", prompt: "go" })).toThrow(
+      /one-shot subagents are unavailable for WSL projects.+Use a provider with structured subagent support, or open the project outside WSL/iu,
+    );
+    expect(buildSubagentOneShotCommand).not.toHaveBeenCalled();
+    expect(appended).toEqual([]);
+  });
+
+  it("rejects a native Windows one-shot child before building or spawning its command", () => {
+    const buildSubagentOneShotCommand = vi.fn<
+      NonNullable<AgentAdapter["buildSubagentOneShotCommand"]>
+    >(() => ({ command: "commandcode.exe", args: [], stdin: "" }));
+    const adapter = {
+      kind: "commandcode",
+      label: "Command Code",
+      capabilities: {
+        models: [{ id: "cc-1", label: "CC One" }],
+        efforts: [],
+        approvalPolicies: [],
+        sandboxModes: [],
+        bypassPermissions: { approvalPolicy: "yolo" },
+      },
+      buildSubagentOneShotCommand,
+    } as unknown as AgentAdapter;
+    const appended: Array<{ threadId: string; event: RuntimeEvent }> = [];
+    const manager = new SubagentRunManager({
+      adapters: new Map([["commandcode" as never, adapter]]),
+      host: {
+        getParentContext: () => ({
+          projectLocation: { kind: "windows", path: "C:\\repo" },
+          config: { model: "parent" },
+        }),
+        appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
+      },
+    });
+
+    expect(() => manager.spawn(PARENT, { agent: "commandcode", prompt: "go" })).toThrow(
+      /one-shot subagents are unavailable for native Windows projects.+Use a provider with structured subagent support/iu,
+    );
+    expect(buildSubagentOneShotCommand).not.toHaveBeenCalled();
+    expect(appended).toEqual([]);
+  });
+
+  it("preserves structured subagent sessions for WSL projects", async () => {
+    const projectLocation: ProjectLocation = {
+      kind: "wsl",
+      distro: "Ubuntu",
+      linuxPath: "/home/test/project",
+      uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\test\\project",
+    };
+    const h = makeHarness({ projectLocation });
+
+    h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+
+    expect(h.inputs).toHaveLength(1);
+    expect(h.inputs[0]!.projectLocation).toEqual(projectLocation);
+  });
+
+  it("preserves structured subagent sessions for native Windows projects", async () => {
+    const projectLocation: ProjectLocation = { kind: "windows", path: "C:\\repo" };
+    const h = makeHarness({ projectLocation });
+
+    h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+
+    expect(h.inputs).toHaveLength(1);
+    expect(h.inputs[0]!.projectLocation).toEqual(projectLocation);
   });
 
   it("throws for unknown agents and missing prompts", () => {

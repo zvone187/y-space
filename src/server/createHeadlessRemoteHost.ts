@@ -219,6 +219,9 @@ export async function createHeadlessRemoteHost(
     ...(options.bundledSkillsDir ? { bundledSkillsDir: options.bundledSkillsDir } : {}),
     ...(options.bundledPluginsDir ? { bundledPluginsDir: options.bundledPluginsDir } : {}),
     secretStorageKey: options.secretStorageKey,
+    // Headless hosts do not have Y Space's verified app-isolated macOS
+    // Keychain identity. Personal Pipedream OAuth remains session-only.
+    allowPipedreamOauthPersistence: false,
     resolveExtraEnv: () => {
       const info = appControlsMcpIngress?.getInfo();
       return info
@@ -425,62 +428,75 @@ export async function createHeadlessRemoteHost(
   serverRef = server;
 
   let started = false;
+  let disposed = false;
   let relayHandle: RelayHostHandle | null = null;
+
+  const disposeHost = async (): Promise<void> => {
+    if (disposed) return;
+    disposed = true;
+    relayHandle?.dispose();
+    relayHandle = null;
+    // Await the HTTP server close FIRST so in-flight requests finish before
+    // the database (which they may read/write) is torn down — and before
+    // the port-forward gateway/proxy are disposed: a POST /api/ports/forward
+    // in flight during shutdown must not race a gateway torn down out from
+    // under it (the gateway's own `disposed` guard makes this airtight
+    // regardless of ordering, but disposing after keeps the two aligned).
+    await server.dispose();
+    scheduleService.dispose();
+    prWatchService?.dispose();
+    prWatchService = null;
+    gitStateService?.dispose();
+    gitStateService = null;
+    appControlsMcpIngress?.dispose();
+    appControlsMcpIngress = null;
+    portForwarding.dispose();
+    supervisorClient.dispose();
+    closeDatabase();
+  };
+
   return {
     server,
     async start() {
-      if (!started) {
-        await appControlsMcpIngress?.start();
-        supervisorClient.start(paths.baseDir);
-        scheduleService.start();
-        prWatchService?.start();
-        gitStateService?.start();
-        const gitWarmupInterests = buildRemoteGitTargetInterests(dbGetThreads(), {
-          includeRecentFallback: true,
-        });
-        if (gitWarmupInterests.length > 0) {
-          void gitStateService?.refreshInterests(gitWarmupInterests, { fetchRemote: true });
+      if (disposed) throw new Error("Headless remote host is disposed.");
+      try {
+        if (!started) {
+          await appControlsMcpIngress?.start();
+          supervisorClient.start(paths.baseDir);
+          await supervisorClient.waitUntilReady();
+          scheduleService.start();
+          prWatchService?.start();
+          gitStateService?.start();
+          const gitWarmupInterests = buildRemoteGitTargetInterests(dbGetThreads(), {
+            includeRecentFallback: true,
+          });
+          if (gitWarmupInterests.length > 0) {
+            void gitStateService?.refreshInterests(gitWarmupInterests, { fetchRemote: true });
+          }
+          started = true;
         }
-        started = true;
+        const info = await server.start();
+        // Optionally register with a relay so devices can reach this server across
+        // networks. The relay only ever talks to the server's own loopback port,
+        // so RemoteAccessServer is unchanged. Requires a secret to claim the id.
+        if (options.relayUrl && options.relaySecret && !relayHandle) {
+          const localHttpUrl = resolveLocalProxyBase(host, info.httpBaseUrl);
+          relayHandle = startRelayHost({
+            relayUrl: options.relayUrl,
+            serverId: identity.desktopId,
+            secret: options.relaySecret,
+            label: identity.label,
+            localHttpUrl,
+            ...(options.reportError ? { reportError: (e) => options.reportError?.(e) } : {}),
+            ...(options.onRelayRegistered ? { onRegistered: options.onRelayRegistered } : {}),
+          });
+        }
+        return info;
+      } catch (error) {
+        await disposeHost().catch((cleanupError) => options.reportError?.(cleanupError));
+        throw error;
       }
-      const info = await server.start();
-      // Optionally register with a relay so devices can reach this server across
-      // networks. The relay only ever talks to the server's own loopback port,
-      // so RemoteAccessServer is unchanged. Requires a secret to claim the id.
-      if (options.relayUrl && options.relaySecret && !relayHandle) {
-        const localHttpUrl = resolveLocalProxyBase(host, info.httpBaseUrl);
-        relayHandle = startRelayHost({
-          relayUrl: options.relayUrl,
-          serverId: identity.desktopId,
-          secret: options.relaySecret,
-          label: identity.label,
-          localHttpUrl,
-          ...(options.reportError ? { reportError: (e) => options.reportError?.(e) } : {}),
-          ...(options.onRelayRegistered ? { onRegistered: options.onRelayRegistered } : {}),
-        });
-      }
-      return info;
     },
-    async dispose() {
-      relayHandle?.dispose();
-      relayHandle = null;
-      // Await the HTTP server close FIRST so in-flight requests finish before
-      // the database (which they may read/write) is torn down — and before
-      // the port-forward gateway/proxy are disposed: a POST /api/ports/forward
-      // in flight during shutdown must not race a gateway torn down out from
-      // under it (the gateway's own `disposed` guard makes this airtight
-      // regardless of ordering, but disposing after keeps the two aligned).
-      await server.dispose();
-      scheduleService.dispose();
-      prWatchService?.dispose();
-      prWatchService = null;
-      gitStateService?.dispose();
-      gitStateService = null;
-      appControlsMcpIngress?.dispose();
-      appControlsMcpIngress = null;
-      portForwarding.dispose();
-      supervisorClient.dispose();
-      closeDatabase();
-    },
+    dispose: disposeHost,
   };
 }

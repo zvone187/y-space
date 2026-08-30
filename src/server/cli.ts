@@ -4,6 +4,7 @@ import { resolvePoracodeBaseDir } from "@/shared/poracodePaths";
 import { preparePoracodeDataRoot } from "@/main/poracodeData";
 import { installShutdown, reportFatalStartupError } from "./cliRuntime";
 import { createHeadlessRemoteHost } from "./createHeadlessRemoteHost";
+import { scrubDeprecatedPipedreamExecEnvironment } from "@/shared/pipedreamBootstrap";
 import { readOrCreateHeadlessSecretKey, readOrCreateRelaySecret } from "./headlessSecretKey";
 import {
   fulfillPairingControlRequest,
@@ -26,7 +27,8 @@ import {
  *   PORACODE_REMOTE_ACCESS_HOST             bind host (default 0.0.0.0)
  *   PORACODE_REMOTE_ACCESS_PORT             bind port (default: first available 49152-65535)
  *   PORACODE_REMOTE_ACCESS_ADVERTISED_HOST  host advertised in pairing URLs
- *   PORACODE_SECRET_STORAGE_KEY             base64 32-byte key (else file-backed)
+ *   PORACODE_SECRET_STORAGE_KEY             base64 32-byte key (required for new Windows installs;
+ *                                            otherwise file-backed)
  *   PORACODE_BETTER_SQLITE3_NATIVE_BINDING  optional Node-ABI better_sqlite3.node
  *   PORACODE_WSL_HELPERS_DIR                in-WSL helper assets dir
  *   PORACODE_REMOTE_RELAY_URL               relay /host control URL (cross-network)
@@ -139,6 +141,11 @@ export function acquireDataDirLock(
 }
 
 async function serve(): Promise<void> {
+  if (scrubDeprecatedPipedreamExecEnvironment(process.env)) {
+    throw new Error(
+      "Pipedream credentials are not accepted through the headless server launch environment.",
+    );
+  }
   process.env.PORACODE_HEADLESS_SERVER = "1";
   const baseDir = process.env.PORACODE_BASE_DIR?.trim() || resolvePoracodeBaseDir();
   // Ensure the data dir exists before the secret key is written into it.

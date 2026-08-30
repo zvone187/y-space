@@ -71,7 +71,7 @@ export class SessionRuntimeLifecycle {
   private bindStructuredSession(session: SessionRuntime): void {
     session.structuredSession?.setListener({
       onClose: () => {
-        if (!this.canHandleStructuredEvent(session)) return;
+        if (!this.context.isCurrentSession(session)) return;
         this.handleStructuredSessionClosed(session);
       },
       onError: (errorMessage) => {
@@ -207,6 +207,7 @@ export class SessionRuntimeLifecycle {
         // Temporary launch-resource cleanup is best effort.
       }
       session.launchCleanup = undefined;
+      releaseMcpToolFilterCleanup(session);
       if (session.ignoreExit) return;
       if (!this.context.isCurrentSession(session)) return;
 
@@ -228,6 +229,12 @@ export class SessionRuntimeLifecycle {
   }
 
   private handleStructuredSessionClosed(session: SessionRuntime): void {
+    // Restart/close owns teardown explicitly. Releasing here would delete the
+    // old WSL filter deployment while a hybrid PTY can still be exiting.
+    if (session.ignoreExit) {
+      if (!session.pty) releaseMcpToolFilterCleanup(session);
+      return;
+    }
     this.context.releaseExitedMcpLaunch(session);
     if (session.status === "inactive") return;
     // onError is the authoritative non-clean boundary. A derivative transport
@@ -245,5 +252,15 @@ export class SessionRuntimeLifecycle {
     session.stopSessionRefWatcher?.();
     session.stopSessionRefWatcher = undefined;
     setTimeout(() => this.context.ptyLifecycle.kill(session), 150);
+  }
+}
+
+function releaseMcpToolFilterCleanup(session: SessionRuntime): void {
+  const cleanup = session.mcpToolFilterCleanup;
+  session.mcpToolFilterCleanup = undefined;
+  try {
+    cleanup?.();
+  } catch {
+    // Temporary filter cleanup is best effort and must not disrupt exit state.
   }
 }

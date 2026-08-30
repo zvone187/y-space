@@ -132,9 +132,12 @@ export interface ThreadSessionManagerOptions {
    * Must never throw; returns the segments to type.
    */
   rewriteTerminalSkillSegments?(input: {
+    leaseId: string;
     agentKind: AgentKind;
     projectLocation: ProjectLocation;
     segments: PromptSegment[];
     nativePlugins?: readonly AgentNativePlugin[];
   }): Promise<PromptSegment[]>;
+  /** Release private skill trees after their exact terminal launch/turn ends. */
+  releaseTerminalSkillCopies?(leaseId: string): Promise<void> | void;
 }

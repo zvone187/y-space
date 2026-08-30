@@ -233,8 +233,11 @@ export interface SubagentRunHost {
     targetAgentKind: AgentKind,
     childConfig: ThreadConfig,
   ): Promise<{ mcpServers?: ResolvedMcpServer[] }>;
-  /** Release a structured child's launch-scoped MCP authorization. */
-  releaseParentMcpAccess?(parentThreadId: string, childThreadId: string): void;
+  /**
+   * Revoke a child's launch authorization and relay immediately. Returns the
+   * detached filter-deployment cleanup lease, which must run after process exit.
+   */
+  revokeParentMcpAccess?(parentThreadId: string, childThreadId: string): (() => void) | undefined;
   /** Append a (re-tagged) runtime event into the parent thread's event stream. */
   appendRuntimeEvent(parentThreadId: string, event: RuntimeEvent): void;
 }

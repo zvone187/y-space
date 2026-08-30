@@ -500,4 +500,34 @@ describe("SessionRuntimeLifecycle", () => {
       expect(harness.mocks.releaseExitedMcpLaunch).toHaveBeenCalledExactlyOnceWith(harness.session);
     },
   );
+
+  it("releases a stopped structured filter without revoking restart authority", () => {
+    const cleanup = vi.fn<() => void>();
+    const harness = createHarness({
+      withPty: false,
+      session: { ignoreExit: true, mcpToolFilterCleanup: cleanup },
+    });
+    harness.lifecycle.attach(harness.session);
+
+    harness.structuredListener?.onClose();
+
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(harness.mocks.releaseExitedMcpLaunch).not.toHaveBeenCalled();
+    expect(harness.mocks.updateState).not.toHaveBeenCalled();
+  });
+
+  it("defers hybrid filter cleanup until the ignored PTY actually exits", () => {
+    const cleanup = vi.fn<() => void>();
+    const harness = createHarness({
+      session: { ignoreExit: true, mcpToolFilterCleanup: cleanup },
+    });
+    harness.lifecycle.attach(harness.session);
+
+    harness.structuredListener?.onClose();
+    expect(cleanup).not.toHaveBeenCalled();
+
+    harness.emitPtyExit(0);
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(harness.mocks.releaseExitedMcpLaunch).not.toHaveBeenCalled();
+  });
 });

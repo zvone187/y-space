@@ -71,6 +71,9 @@ export function createPluginSourceResolver(opts: PluginSourceResolverOptions): (
     const override = process.env[opts.sourceEnvVar];
     if (override) candidates.push(resolve(override));
     if (typeof process.resourcesPath === "string" && process.resourcesPath.length > 0) {
+      candidates.push(
+        join(process.resourcesPath, "app.asar", "resources", "agent-plugins", opts.kind),
+      );
       candidates.push(join(process.resourcesPath, "agent-plugins", opts.kind));
     }
     candidates.push(resolve(opts.callerDir));
@@ -721,8 +724,21 @@ export function resolveForwardRuntimeSourcePath(): string {
   const callerDir = __dirname;
   const candidates: string[] = [];
   if (typeof process.resourcesPath === "string" && process.resourcesPath.length > 0) {
+    candidates.push(
+      join(
+        process.resourcesPath,
+        "app.asar",
+        "resources",
+        "agent-plugins",
+        "_runtime",
+        FORWARD_RUNTIME_FILE,
+      ),
+    );
     candidates.push(join(process.resourcesPath, "agent-plugins", "_runtime", FORWARD_RUNTIME_FILE));
   }
+  candidates.push(
+    resolve(callerDir, "../../resources/agent-plugins/_runtime", FORWARD_RUNTIME_FILE),
+  );
   candidates.push(resolve(callerDir, "forward-runtime", FORWARD_RUNTIME_FILE));
   candidates.push(resolve(callerDir, "../plugin/forward-runtime", FORWARD_RUNTIME_FILE));
   candidates.push(

@@ -1,10 +1,10 @@
 {
-  "version": 11,
+  "version": 12,
   "project": "Y Space",
   "branch": "y-space-pipedream-live",
   "platform": "macOS Apple Silicon desktop",
   "testedOn": "2026-08-30",
-  "status": "final_hardened_fresh_package_verified_pipedream_oauth_confirmation_pending",
+  "status": "final_unsigned_arm64_package_verified_pipedream_oauth_confirmation_pending",
   "currentPhase": {
     "name": "Trusted visible agent cursor and Pipedream completion architecture",
     "baseBranch": "y-space-glass-polish",
@@ -13,31 +13,30 @@
     "failFirst": "Cursor, native-input, sensitive presentation, guest-attachment, Pipedream relay, OAuth lifecycle, and shutdown regressions were added before their implementation fixes.",
     "implementationStatus": "complete_with_external_oauth_and_claude_auth_gates",
     "performanceBoundary": "One reusable aria-hidden cursor overlay is retained per resident page; ordinary browser guests, sensitive guests, presentation feedback, timers, and tab metadata remain explicitly bounded.",
-    "reviewStatus": "Final packaged Codex and OpenCode runs produced visible embedded-Browser evidence, including a real Codex link click/navigation and a real OpenCode inspection of the same first-class tab. The exact rebuilt bundle was launched once with an isolated profile and --use-mock-keychain; PID 39788 stayed open across the entire final Connections, global-tab, Codex, and OpenCode run and remains open for user testing. Final adversarial regressions cover OAuth generation races, strict atomic sign-out, pending/root/child revocation, disconnect quarantine, sensitive-tab ownership, bounded teardown, cross-agent launch-configuration supersession, and raw-bearer isolation behind a revocable Personal Pipedream loopback relay. Gmail OAuth and live Claude inference remain unclaimed external authorization gates."
+    "reviewStatus": "Earlier packaged Codex and OpenCode runs produced visible embedded-Browser evidence, including a real Codex link click/navigation. The definitive replacement package then passed OpenCode GLM-5.3-Flash hover, native click, single fill-with-submit, final URL/title inspection, and Browser verified acceptance. The reviewed replacement bundle was launched with an isolated profile and the literal --use-mock-keychain argument; PID 3806 stayed open across the definitive OpenCode and cursor acceptance and remains open for user testing. Final adversarial regressions cover OAuth generation races, strict atomic sign-out, pending/root/child revocation, disconnect quarantine, sensitive-tab ownership, bounded teardown, cross-agent launch-configuration supersession, raw-bearer isolation behind a revocable Personal Pipedream loopback relay, and fail-closed Browser evidence freshness. Gmail OAuth and live Claude inference remain unclaimed external authorization gates."
   },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
-    "app": "release/pipedream-hardening-final/mac-arm64/Y Space.app",
-    "dmg": "release/pipedream-hardening-final/Y-Space-1.6.6-arm64.dmg",
+    "app": "/tmp/y-space-pipedream-final-3x1rp5/mac-arm64/Y Space.app",
     "architecture": "arm64",
-    "sha256": "492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb",
-    "bytes": 156281136,
-    "appAsarSha256": "b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42",
-    "appAsarBytes": 136509365,
-    "executableSha256": "97fa83a9e03a3ae3f9a73377f13c5b953eb94f91184317d777836e243fe80f21",
-    "executableBytes": 52896,
-    "codesign": "codesign --verify --deep --strict passed; ad-hoc/runtime signature with no Team ID",
-    "qaLaunch": "The final packaged UI run launched once from the exact rebuilt bundle with an isolated PORACODE_BASE_DIR and explicit --use-mock-keychain; PID 39788 remained open between every final test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
+    "appDiskBytes": 456638464,
+    "appAsarSha256": "acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71",
+    "appAsarBytes": 164148100,
+    "executableSha256": "6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86",
+    "executableBytes": 52752,
+    "codesign": "codesign --verify --deep --strict passed; ad-hoc hardened-runtime signature with no Team ID",
+    "qaLaunch": "The final packaged UI run launched from the exact rebuilt bundle with PORACODE_BASE_DIR=/tmp/y-space-pipedream-definitive-qa.qptzx8 and the literal --use-mock-keychain argument; PID 3806 remained open between every definitive test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
-      "status": "pass on the final reviewed source state under Node.js 24.13.0",
-      "passedFiles": 925,
-      "skippedFiles": 5,
-      "passedTests": 10880,
-      "skippedTests": 85,
-      "durationSeconds": 122.85
+      "status": "pass on the final reviewed source state under Node.js 26.8.1",
+      "passedFiles": 937,
+      "skippedFiles": 6,
+      "passedTests": 11105,
+      "skippedTests": 86,
+      "durationSeconds": 85.74,
+      "focusedTimeoutStress": "The sole timing-race candidate from the preceding loaded run passed 10 of 10 sequential focused repeats before this green full-suite run."
     },
     "targetedBranding": {
       "status": "pass",
@@ -63,7 +62,7 @@
       "diffCheck": "pass"
     },
     "productionBuilds": {
-      "desktop": "pass on final source; packaged and hands-on tested as the thin ARM64 app and DMG above",
+      "desktop": "pass on final source; packaged and hands-on tested as the thin ARM64 app above",
       "website": "pass with Next 16.3.1; 62 of 62 static pages generated"
     }
   },
@@ -138,10 +137,10 @@
       "focusedPersonalAuthority": "7 files and 142 tests passed for loopback bearer isolation, refresh, alias clear, sign-out, filtering, and lifecycle bounds.",
       "independentReview": "Independent hardening review lanes passed 289/289 and 217/217 tests. A final security re-audit passed 305/305 high-risk tests and 104/104 accepted-turn/start-close tests; both reviewers reported no remaining concrete P1/P2 finding.",
       "finalHighRiskMatrix": "15 files and 437 tests passed with one intentional skip.",
-      "fullSuite": "925 files and 10,880 tests passed with 5 files and 85 tests skipped.",
+      "fullSuite": "937 files and 11,105 tests passed with 6 files and 86 tests skipped in 85.74 seconds; the preceding loaded-run timeout fixture passed 10 of 10 focused stress repeats before the green full rerun.",
       "checks": "Typecheck, standard/type-aware lint, formatting, diff integrity, production build, ARM64 native-binary inspection, and deep/strict code-sign verification passed.",
       "localization": "3,345 messages were extracted with zero missing translations across all 12 translated catalogs.",
-      "desktopQa": "One exact fresh hardened bundle process remained open under --use-mock-keychain while Computer Use verified composer and Settings Connections entry points, independent global Browser peers, Codex 5.6 Sol browser click/navigation, OpenCode Big Pickle tab inspection, and collapsed final-answer presentation."
+      "desktopQa": "The definitive hardened bundle remained open as PID 3806 under the literal --use-mock-keychain argument while Computer Use verified the embedded Browser, OpenCode GLM-5.3-Flash hover/click/single-fill control, visible orange cursor, canonical URL/title inspection, collapsed final-answer presentation, and Browser verified badge. Earlier packaged QA covers both Connections entry points, independent global Browser peers, and Codex 5.6 Sol click/navigation."
     },
     "passCriteria": [
       "Connect expiry is distinct from user cancellation in the contract, main process, and shared popup.",
@@ -257,16 +256,19 @@
         "OpenCode 1.18.23 reported configured OpenCode Zen and Z.AI providers.",
         "opencode/gpt-5.6-luna returned YSPACE_OPENCODE_GPT_PASS.",
         "zai/glm-4.5-flash returned YSPACE_OPENCODE_GLM_PASS.",
-        "A final packaged in-app OpenCode task using ZAI GLM-4.5-Flash used only Y Space built-in Browser tools and listed all 9 global browser tabs.",
+        "An earlier packaged in-app OpenCode task using ZAI GLM-4.5-Flash used only Y Space built-in Browser tools and listed all 9 global browser tabs.",
         "It created or focused https://example.com without external browser control and reported active tab tab-3e5ee0a7-e49e-4224-ade6-3229ba824a63 with title Example Domain.",
         "It captured a 39,346-byte 1140x1646 Browser screenshot and returned to Idle.",
-        "A second final packaged task visibly selected OpenCode GPT-5.6 Terra, started with 10 global browser tabs, reused the existing example.com page, created one example.org peer tab, and captured a Browser screenshot.",
+        "A second earlier packaged task visibly selected OpenCode GPT-5.6 Terra, started with 10 global browser tabs, reused the existing example.com page, created one example.org peer tab, and captured a Browser screenshot.",
         "OpenCode GPT-5.6 Terra closed only its disposable example.org tab, reactivated the original example.com tab, verified the final count returned to 10, and reported the active tab ID/title before returning to Idle.",
-        "Signed provider-session isolation and Browser/app-controls wiring pass automated tests."
+        "Signed provider-session isolation and Browser/app-controls wiring pass automated tests.",
+        "The definitive replacement package ran OpenCode Zai GLM-5.3-Flash in thread 2584095a-c07a-48ed-9b88-992baca340d8. It created one embedded DuckDuckGo peer, hovered and clicked the page search box, used exactly one browser.fill with submit, then inspected the final URL and title through canonical Browser tools.",
+        "The final answer reported tab-d4b752ca-8d88-4e5a-8400-61ef0f626174, title Definitive Y Space OpenCode browser test at DuckDuckGo, and exact URL https://duckduckgo.com/?ia=web&origin=funnel_home_website&t=h_&q=Definitive+Y+Space+OpenCode+browser+test&chip-select=search. It settled to Worked · 19 steps with Browser verified · 5 actions."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/final-opencode-browser-control-success.jpeg",
-        "implementation assets/qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg"
+        "implementation assets/qa-screenshots/final-opencode-gpt56-terra-browser-control.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-browser-verified.jpeg"
       ]
     },
     {
@@ -290,7 +292,7 @@
       "title": "Extension-free cookie-file preview and import",
       "status": "pass",
       "evidence": [
-        "The final packaged app selected a harmless JSON fixture through the native file picker.",
+        "An earlier packaged app selected a harmless JSON fixture through the native file picker.",
         "The preview and import completed with 1 cookie accepted and 0 rejected for example.com.",
         "No Chrome or Brave extension and no external browser control were used."
       ],
@@ -322,14 +324,14 @@
       "title": "Pipedream environment-file safety and read-only live credentials flow",
       "status": "pass_without_external_grant",
       "evidence": [
-        "The native picker accepted a harmless syntactically complete environment fixture in the final packaged app.",
+        "The native picker accepted a harmless syntactically complete environment fixture in an earlier packaged app.",
         "The fake credentials were rejected safely without leaking their values.",
         "Forget environment file removed the saved path and returned the UI to its unconfigured state.",
         "The ignored mode-600 root environment file produced a ready bootstrap without printing any credential value.",
         "The production token broker completed a client-credentials exchange against Pipedream's official token endpoint.",
         "The production API client completed the configured project lookup and returned 1 app for a read-only Slack catalog sample.",
         "The credential-excluding account-list request for a synthetic QA external user returned 0 accounts, as expected.",
-        "The final packaged app launched with the real ignored file, displayed BYO Connect as Ready, and stated that credentials are never exposed to agents.",
+        "An earlier packaged app launched with the real ignored file, displayed BYO Connect as Ready, and stated that credentials are never exposed to agents.",
         "A hands-on Slack search returned the live Slack result and Connect button while Connected accounts remained empty; the Connect button was not clicked.",
         "After clean quit, no Pipedream environment-path or connection-store JSON had been persisted in the Y Space user-data directory.",
         "Six focused Pipedream boundary test files passed all 34 tests with loopback binding enabled.",
@@ -428,7 +430,7 @@
       "title": "Native macOS Y Space menu identity",
       "status": "pass",
       "evidence": [
-        "The final packaged app exposed the Y Space application menu.",
+        "An earlier packaged app exposed the Y Space application menu.",
         "The native menu showed About Y Space and Quit Y Space."
       ]
     },
@@ -465,7 +467,7 @@
       "id": "YS-BRAND-E2E-001",
       "title": "Fresh-profile white and orange visual baseline",
       "userStory": "As a Y Space user, I want a calm white workspace so the product feels approachable rather than like a developer IDE.",
-      "setup": "Launch the final packaged ARM64 app with an isolated empty Y Space base directory. The final captured content frame is 1219x768; narrower responsive behavior is covered by component regressions rather than claimed as a second manual capture.",
+      "setup": "Launch an unsigned packaged ARM64 app with an isolated empty Y Space base directory. The captured content frame is 1219x768; narrower responsive behavior is covered by component regressions rather than claimed as a second manual capture.",
       "steps": [
         "Launch from a cold profile and observe the first painted frame through the settled main workspace.",
         "Open a thread, the sidebar, composer, and right workspace without selecting a custom theme.",
@@ -504,7 +506,7 @@
         "The former four-icon footer is consolidated into one More control, with sidebar visibility inside that menu."
       ],
       "evidence": [
-        "The final packaged footer showed only More.",
+        "The earlier packaged footer showed only More.",
         "Opening More exposed Workspace, Usage, Pull requests, Schedules, What's New, Remote Access Off, Settings, and Hide sidebar in the accessibility tree.",
         "Hide sidebar collapsed the rail to one bottom More control; its menu exposed Show sidebar, which restored the expanded sidebar.",
         "Sidebar footer, workspace menu, task-row, usage, and accessibility regression tests passed."
@@ -533,7 +535,7 @@
         "Existing packaged global-tab QA remained green after the visual consolidation.",
         "Browser pages, Files, Git, Usage, Notes, Terminal, source, PDF, XLS, and XLSX remained peers in the sole top strip.",
         "Global-tab keyboard, reorder, close, state-preservation, and browser-residency regressions passed.",
-        "Computer Use dragged the final packaged Files grip into the lower right-panel half; the UI rendered the Files split and reported panel-tab:files dropping on panel-dock-zone:right-panel. Closing Split restored the two browser peers unchanged."
+        "Computer Use dragged an earlier packaged Files grip into the lower right-panel half; the UI rendered the Files split and reported panel-tab:files dropping on panel-dock-zone:right-panel. Closing Split restored the two browser peers unchanged."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/branding-mixed-global-tabs-final.jpg",
@@ -558,7 +560,7 @@
         "Submit, stop, attachments, review, authentication docks, and responsive layout remain functional and accessible."
       ],
       "evidence": [
-        "The final packaged welcome/composer surface remained a single calm card with named controls and native system typography.",
+        "The earlier packaged welcome/composer surface remained a single calm card with named controls and native system typography.",
         "Prior packaged Codex and OpenCode workflows exercised submit, running/idle state, browser evidence, and return to Idle on the same implementation base.",
         "Focused ChatPane, header, composer, attachment, review, and responsive component regressions passed; the final full-suite run also completed cleanly."
       ],
@@ -569,7 +571,7 @@
       "id": "YS-BRAND-E2E-005",
       "title": "Orange brand assets and native package identity",
       "userStory": "As a user, I want Y Space to present one coherent white/orange identity in the app, package, dock, and owned assets.",
-      "setup": "Build the unsigned ARM64 app and DMG from the final source and inspect generated desktop, PWA, and native assets.",
+      "setup": "Build the unsigned ARM64 app from the final source and inspect generated desktop, PWA, and native assets.",
       "steps": [
         "Inspect the app icon, wordmark, native menu, About identity, PWA manifest, and generated icons.",
         "Search stable brand sources and generation constants for the retired indigo token.",
@@ -583,7 +585,7 @@
       "evidence": [
         "Brand-contract tests passed for owned desktop, mobile, PWA, social, and website assets.",
         "The final executable is thin arm64 and the unsigned/ad-hoc app passed deep/strict code-sign verification with no Team ID.",
-        "The final hardened DMG is 156281136 bytes with SHA-256 492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb.",
+        "The definitive unsigned app is 456,638,464 on-disk bytes; app.asar SHA-256 is acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71 and executable SHA-256 is 6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86.",
         "The packaged Contents/Resources/icon.icns is byte-identical to build/icon.icns (SHA-256 f597bd9d2d3917cbde3d98319a6bbcad2f5beb31eae8e16525fac2d20ae77eab).",
         "The native application menu remained Y Space and the isolated packaged process left no helper after clean quit."
       ],
@@ -605,7 +607,7 @@
         "Only intended tabs restore and zero packaged helpers survive quit."
       ],
       "evidence": [
-        "Fresh-profile light appearance was manually verified in the final package.",
+        "Fresh-profile light appearance was manually verified in an earlier packaged build; the definitive OpenCode and cursor acceptance remained in light mode but was not a second full theme recapture.",
         "Theme preset, settings migration, and appearance contract tests verify that explicit saved themes remain honored and both variants use orange identity.",
         "The existing packaged two-cycle browser soak reached the 30-tab metadata cap, peaked at six live guests, returned to four after cleanup, restored only intended tabs, and left zero helpers after quit."
       ],
@@ -663,14 +665,17 @@
         "Redacted process summary and unchanged-profile checksum"
       ],
       "manualEvidence": [
-        "The final packaged app visibly selected OpenCode Big Pickle, found Codex's existing Alpha global Browser tab, changed the form to QA-FINAL-OPENCODE-LATEST, clicked Save, and displayed the new saved status while Working stayed collapsed.",
+        "An earlier packaged acceptance visibly selected OpenCode Big Pickle, found Codex's existing Alpha global Browser tab, changed the form to QA-FINAL-OPENCODE-LATEST, clicked Save, and displayed the new saved status while Working stayed collapsed.",
         "The settled answer reported active tab tab-36536349-d6cd-4b71-a8d3-e73e59c7a65e, the exact localhost URL and title, one remaining tab, and Browser verified · 6 actions.",
         "No external browser process appeared; the user's pre-existing Google Chrome PID 685 remained unchanged. The launch-scoped profile and command-gate suites passed without changing the normal OpenCode profile.",
-        "The final rebuilt package launched from an isolated data root, installed only y-space-status.js plus y-space-status.plugin.json, removed legacy Poracode/Lightcode status drops, exited with no Y Space helper left behind, and again left Chrome PID 685 untouched."
+        "An earlier rebuilt package launched from an isolated data root, installed only y-space-status.js plus y-space-status.plugin.json, removed legacy Poracode/Lightcode status drops, exited with no Y Space helper left behind, and again left Chrome PID 685 untouched.",
+        "The definitive OpenCode GLM-5.3-Flash replay used only Y Space Browser calls: open/focus, snapshot, hover, native click, one fill with submit, URL wait, get_url, and get_title. Database evidence contains exactly one browser_fill and no browser.type, shell, file, script, or external-browser workaround.",
+        "The definitive answer settled with the exact embedded tab id/title/URL and Browser verified · 5 actions while the intermediate 19-step work row remained collapsed."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/browser-exclusive-opencode-working-final.jpeg",
-        "implementation assets/qa-screenshots/browser-exclusive-opencode-settled-final.jpeg"
+        "implementation assets/qa-screenshots/browser-exclusive-opencode-settled-final.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-browser-verified.jpeg"
       ],
       "status": "pass"
     },
@@ -696,7 +701,7 @@
         "Before/after profile checksums"
       ],
       "manualEvidence": [
-        "The final packaged app visibly selected Codex GPT-5.6 Sol and used 15 nested mcp__browser__ calls through the isolated Code Mode host; no shell or external-browser route performed the page work.",
+        "An earlier packaged app visibly selected Codex GPT-5.6 Sol and used 15 nested mcp__browser__ calls through the isolated Code Mode host; no shell or external-browser route performed the page work.",
         "Codex saved QA-CODEX-FINAL in Alpha, created Beta as a second global Browser peer, reached Count: 2, listed both tabs, closed Beta, returned to Alpha, and reported the exact surviving tab ID with Browser verified · 11 actions.",
         "The packaged Codex process used a private CODEX_HOME and the user's completed CODEX_SQLITE_HOME, initialized successfully, created no private SQLite backfill database, and left no helper after quit. Terminal and structured launch contracts are covered by passing regressions; the visible click run exercised the structured GUI path."
       ],
@@ -787,13 +792,15 @@
         "Find and accessibility-state evidence"
       ],
       "manualEvidence": [
-        "Codex settled to Worked · 38 steps and OpenCode to Worked · 24 steps, both closed by default with the final answer and Browser proof badge visible.",
+        "In earlier packaged runs, Codex settled to Worked · 38 steps and OpenCode to Worked · 24 steps, both closed by default with the final answer and Browser proof badge visible.",
         "Computer Use expanded and collapsed each settled disclosure; intermediate MCP/thought detail appeared only while open, and the final answer remained visible after collapse.",
-        "Projection, question boundaries, hidden-match mapping, and accessibility semantics pass component regressions."
+        "Projection, question boundaries, hidden-match mapping, and accessibility semantics pass component regressions.",
+        "The definitive replacement-package OpenCode run settled to one closed Worked · 19 steps disclosure with only the final answer and Browser verified · 5 actions visible."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/browser-exclusive-codex-5-6-sol-settled-final.jpeg",
-        "implementation assets/qa-screenshots/browser-exclusive-opencode-settled-final.jpeg"
+        "implementation assets/qa-screenshots/browser-exclusive-opencode-settled-final.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-browser-verified.jpeg"
       ],
       "status": "pass"
     },
@@ -820,8 +827,8 @@
       ],
       "manualEvidence": [
         "The established two-cycle soak retained the six-live-guest ceiling, returned to baseline after cleanup, and showed no repeatable leak signal.",
-        "In the final package Codex created and closed a disposable Beta browser. After clean quit every Y Space/agent/browser helper exited; relaunch restored only Alpha and did not recreate Beta.",
-        "The user's existing Google Chrome PID 685 remained untouched throughout both final provider runs and the restart check."
+        "In an earlier package Codex created and closed a disposable Beta browser. After clean quit every Y Space/agent/browser helper exited; relaunch restored only Alpha and did not recreate Beta.",
+        "The user's existing Google Chrome PID 685 remained untouched throughout both earlier provider runs and the restart check."
       ],
       "artifact": "implementation assets/browser-memory-soak.json",
       "status": "pass_no_leak_signal"
@@ -844,7 +851,7 @@
       ],
       "proofToCapture": ["Full light-mode window", "Focused composer", "Open glass menu"],
       "evidence": [
-        "The final unsigned packaged ARM64 app opened in light mode with macOS sidebar frosting at the new 90% default.",
+        "An earlier unsigned packaged ARM64 app opened in light mode with macOS sidebar frosting at the new 90% default.",
         "The thread header, one global tab rail, Browser toolbar/address field, and 20px composer read as a single restrained glass language while transcript and web content remained crisp.",
         "The focused composer retained diffuse elevation plus a single orange focus edge; the Browser menu exposed New tab, Bookmarks, History, Take Screenshot, Hard Reload, Copy Current URL, Clear Cookies, Clear Cache, and Settings.",
         "No dark surface remained in the light shell and muted sidebar text stayed legible."
@@ -861,7 +868,7 @@
       "id": "YS-GLASS-E2E-002",
       "title": "Rounded chrome preserves global-tab and browser interaction",
       "userStory": "As a user, I want the softer design without losing precise desktop controls.",
-      "setup": "Use the final packaged app with one retained Browser page, then create disposable Browser peers in the sole global strip.",
+      "setup": "Use an unsigned packaged app with one retained Browser page, then create disposable Browser peers in the sole global strip.",
       "instrumentation": "Use Computer Use to click, type, resize, switch surfaces, exercise keyboard traversal, and attempt the native HTML tab drag gesture; capture the resulting selected states.",
       "steps": [
         "Switch global tabs with mouse and keyboard, reorder one tab, and close a disposable tab.",
@@ -951,14 +958,16 @@
         "Keyboard and narrow-layout evidence"
       ],
       "evidence": [
-        "Computer Use clicked the final packaged app's composer plus menu, selected Integrations, and opened the shared light glass popup.",
+        "Computer Use clicked an earlier packaged app's composer plus menu, selected Integrations, and opened the shared light glass popup.",
         "Computer Use then opened Settings, selected Connections, and clicked Manage integrations; the same popup and renderer-owned search state appeared.",
         "The live catalog reported 3,235 integrations, advanced through a second cursor page, returned six Gmail matches, and rendered the explicit zero-result state for a synthetic query.",
         "The packaged app was quit through its native menu, left no helper or listener, relaunched against the same isolated profile, returned to Ready, and reloaded the same live catalog.",
         "A fail-first renderer regression proved the underlying Settings Escape handler previously won; the shared overlay stack fix now closes only Integrations and restores its Settings trigger.",
         "Computer Use repeated Settings → Connections → Manage integrations in the freshly rebuilt ARM64 package and verified both Escape and the popup close button return to the still-open Connections settings surface.",
-        "The final hardened package was launched once with --use-mock-keychain and kept open across composer, compact More menu, Settings, Connections, popup-stack, and embedded-Browser checks; the same PID remained live and no credential prompt appeared.",
-        "A second clean-profile package built from the final hardening source was launched from its exact bundle path with --use-mock-keychain and left running. Computer Use opened Integrations from the active composer, opened Connections from Settings, and confirmed both routes share the same global popup state.",
+        "An earlier hardened package was launched once with --use-mock-keychain and kept open across composer, compact More menu, Settings, Connections, popup-stack, and embedded-Browser checks; the same PID remained live and no credential prompt appeared.",
+        "A second earlier clean-profile package built from the hardened source was launched from its exact bundle path with --use-mock-keychain and left running. Computer Use opened Integrations from the active composer, opened Connections from Settings, and confirmed both routes share the same global popup state.",
+        "The three completion-audit fail-first regressions now pass: focus transfers safely after the asynchronous popup load, an account-reconciliation failure cannot suppress the independent catalog request, and loaded catalog rows remain render-bounded while every result stays reachable.",
+        "The definitive reviewed replacement bundle is /tmp/y-space-pipedream-final-3x1rp5/mac-arm64/Y Space.app. It remained open as PID 3806 under the literal --use-mock-keychain argument throughout final Browser acceptance; ordinary releases retain normal credential storage.",
         "Automated cursor regressions cover duplicate in-flight cursors, A-to-B-to-A loops, and retry after a failed page. Full manual cursor exhaustion plus narrow-window and induced-retry presentation checks are not claimed here."
       ],
       "screenshots": [
@@ -966,7 +975,12 @@
         "implementation assets/qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg",
         "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg"
       ],
-      "status": "partial_pass_packaged_catalog_narrow_retry_edges_pending"
+      "completionAuditFailFirst": [
+        "Initial focus remains behind the modeless popup while the async snapshot surface is loading.",
+        "An opening account-reconciliation failure suppresses the independent initial catalog request.",
+        "Accumulated catalog pages render every loaded app row instead of a bounded scroll window."
+      ],
+      "status": "pass_packaged_and_automated"
     },
     {
       "id": "YS-PIPEDREAM-COMPLETE-E2E-002",
@@ -1088,7 +1102,7 @@
         "Post-quit process and route cleanup evidence"
       ],
       "evidence": [
-        "The final release scan covered 549 regular files in the rebuilt app bundle and found zero exact matches for the configured Pipedream client ID, client secret, or project ID; no environment file name was packaged.",
+        "The definitive replacement scan covered 288 regular files in the rebuilt app bundle and found zero exact matches for the configured Pipedream client ID, client secret, or project ID; no environment file name was packaged. The non-secret environment label was excluded from the secret claim because its value is generic.",
         "The final tracked-source scan found zero exact matches for those same three configured values.",
         "The exact-value scan was repeated after the last source fixes and report update; tracked source and the final app bundle remained clear.",
         "The only persisted Pipedream metadata before OAuth was a mode-0600 versioned file containing a scope hash and an empty accounts array.",
@@ -1119,19 +1133,22 @@
         "Linked sanitized ledgers for every preceding Pipedream E2E"
       ],
       "evidence": [
-        "Final hardened DMG: release/pipedream-hardening-final/Y-Space-1.6.6-arm64.dmg, 156,281,136 bytes, SHA-256 492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb.",
-        "The hardened packaged app.asar SHA-256 is b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42 and its main executable SHA-256 is 97fa83a9e03a3ae3f9a73377f13c5b953eb94f91184317d777836e243fe80f21.",
+        "Definitive unsigned app: /tmp/y-space-pipedream-final-3x1rp5/mac-arm64/Y Space.app, 456,638,464 on-disk bytes (435 MiB). Its app.asar SHA-256 is acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71 and its main executable SHA-256 is 6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86.",
         "The app executable is thin arm64; deep/strict codesign verification passed with an ad-hoc hardened-runtime signature and no Team ID.",
-        "Authoritative Node 24 validation passed 925 files and 10,880 tests with 5 files and 85 tests skipped. The final high-risk matrix passed 15 files / 437 tests with one intentional skip; independent hardening lanes passed 289/289 and 217/217, and the final security re-audit passed 305/305 plus 104/104 accepted-turn/start-close tests. Typecheck, standard/type-aware lint, formatting, 3,345-message localization extraction with zero missing translations, JSON/diff integrity, production build, package signature, and exact-secret scans also passed.",
+        "Authoritative Node 26.8.1 validation passed 937 files and 11,105 tests with 6 files and 86 tests skipped in 85.74 seconds. The sole timing-race candidate from the preceding loaded run passed 10 of 10 focused repeats before the green full rerun. The final high-risk matrix passed 15 files / 437 tests with one intentional skip; independent hardening lanes passed 289/289 and 217/217, and the final security re-audit passed 305/305 plus 104/104 accepted-turn/start-close tests.",
         "A final P1 audit found and fixed a same-directory OpenCode relay-sharing boundary: front-door bindings now rotate per thread launch, and regressions prove distinct routes/bearers plus independent 404 revocation while a sibling task remains live.",
-        "Computer Use verified both popup entry points, white/orange glass presentation, one global Browser strip, a real Codex 5.6 Sol click/navigation, a real OpenCode Big Pickle inspection, and collapsed final-answer presentation. The exact final app remained one persistent isolated --use-mock-keychain process across all final UI checks and is still open for user testing.",
+        "Computer Use verified both popup entry points, white/orange glass presentation, one global Browser strip, a real Codex 5.6 Sol click/navigation, and the definitive OpenCode Zai GLM-5.3-Flash hover/click/single-fill workflow. OpenCode reported the exact embedded tab/title/URL and settled to a collapsed Worked · 19 steps row with Browser verified · 5 actions.",
+        "The definitive app remained one isolated process, PID 3806, launched with PORACODE_BASE_DIR=/tmp/y-space-pipedream-definitive-qa.qptzx8 and the literal --use-mock-keychain argument. It remains open for user testing; ordinary release launches do not auto-enable mock credential storage.",
         "A final adversarial pass added generation-safe OAuth writes/returns, strict atomic clear, main-only generic-clear rejection, pending/root/child authority revocation, bounded disposal, disconnect quarantine, and exact sensitive-tab cleanup ownership.",
         "Gmail OAuth, the explicit account grant, live agent read, connected-account persistence, and scoped disconnect remain at the explicit authorization boundary and are not claimed."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg",
         "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-global-browser-tabs.jpeg",
-        "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg"
+        "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-visible-agent-cursor-hover.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-visible-agent-cursor-click.jpeg",
+        "implementation assets/qa-screenshots/final-opencode-browser-verified.jpeg"
       ],
       "status": "partial_pass_oauth_pending"
     },
@@ -1157,13 +1174,13 @@
         "Codex Browser-tool transcript and cursor-free Browser MCP screenshot"
       ],
       "evidence": [
-        "The final packaged Codex GPT-5.6 Sol task found and focused the existing cursor-b global Browser tab, clicked #cursor-click-button exactly once, and returned Browser verified.",
+        "An earlier packaged Codex GPT-5.6 Sol task found and focused the existing cursor-b global Browser tab, clicked #cursor-click-button exactly once, and returned Browser verified.",
         "The value-free fixture ledger recorded 16 native events. Its newest pointermove, pointerdown, pointerup, and click entries all reported Trusted: yes.",
         "Computer Use captured implementation assets/qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg with the final answer beside the visible embedded Browser.",
-        "In the exact final persistent --use-mock-keychain process, Codex 5.6 Sol reused the existing Example Domain tab, clicked Learn more, navigated it to https://www.iana.org/help/example-domains, reported visible H1 Example Domains, and settled to one collapsed Worked · 21 steps row with Browser verified · 4 actions.",
+        "In an earlier persistent --use-mock-keychain process, Codex 5.6 Sol reused the existing Example Domain tab, clicked Learn more, navigated it to https://www.iana.org/help/example-domains, reported visible H1 Example Domains, and settled to one collapsed Worked · 21 steps row with Browser verified · 4 actions.",
         "Computer Use captured implementation assets/qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg from that fresh-package run."
       ],
-      "status": "pass_final_package"
+      "status": "pass_packaged"
     },
     {
       "id": "YS-AGENT-CURSOR-E2E-002",
@@ -1215,9 +1232,11 @@
         "Post-remount single-overlay evidence"
       ],
       "evidence": [
-        "The final packaged OpenCode Big Pickle task reused Codex's exact existing cursor-b global Browser tab and added one new seven-event trusted click sequence, increasing the ledger from 16 to 23.",
+        "An earlier packaged OpenCode Big Pickle task reused Codex's exact existing cursor-b global Browser tab and added one new seven-event trusted click sequence, increasing the ledger from 16 to 23.",
         "The OpenCode final answer reported the newest pointermove, pointerdown, pointerup, and click as Trusted: yes; Computer Use captured the orange cursor directly over the Single-click target in implementation assets/qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg.",
-        "Automated launch/thread/tab authority regressions cover concurrent same-directory OpenCode routes, sibling revocation isolation, navigation/remount invalidation, and sensitive-tab exclusion."
+        "Automated launch/thread/tab authority regressions cover concurrent same-directory OpenCode routes, sibling revocation isolation, navigation/remount invalidation, and sensitive-tab exclusion.",
+        "The definitive OpenCode GLM-5.3-Flash cursor run visibly parked the orange-and-white agent cursor on the active DuckDuckGo search field for hover and native click/focus. It completed snapshot, hover, wait, click, wait, hover, and wait without typing, filling, submitting, navigation, shell, or an external browser, then settled with Browser verified · 4 actions.",
+        "Computer Use captured implementation assets/qa-screenshots/final-opencode-visible-agent-cursor-hover.jpeg and final-opencode-visible-agent-cursor-click.jpeg from the persistent PID 3806 process."
       ],
       "status": "pass_single_launch_packaged_multi_launch_automated"
     },
@@ -1243,9 +1262,10 @@
         "Final package identity, codesign, cleanup, and post-relaunch sequence"
       ],
       "evidence": [
-        "The complete Node 24 suite passed 925 files and 10,880 tests; focused fixture tests passed 2 of 2, and typecheck, standard/type-aware lint, formatting, localization, JSON, and diff checks passed.",
+        "The complete Node 26.8.1 suite passed 937 files and 11,105 tests with 6 files and 86 tests skipped in 85.74 seconds; the preceding loaded-run timeout candidate passed 10 of 10 focused stress repeats before the green full rerun.",
         "The final ARM64 package passed deep/strict ad-hoc codesign verification. Cursor overlay, transient feedback, animation/timer cleanup, presentation lease, guest residency, sensitive guest, and shutdown boundaries are covered by passing regressions.",
-        "Final hardened DMG SHA-256: 492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb; app.asar SHA-256: b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42."
+        "Definitive app path: /tmp/y-space-pipedream-final-3x1rp5/mac-arm64/Y Space.app; app.asar SHA-256: acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71; executable SHA-256: 6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86.",
+        "PID 3806 remains open under the literal --use-mock-keychain argument after the definitive browser and cursor runs."
       ],
       "status": "pass_automated_package_and_live_provider_actions"
     }

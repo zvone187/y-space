@@ -314,6 +314,9 @@ export class CursorSdkSession implements StructuredSessionHandle {
     let listeners: CursorSdkWorkerListeners | undefined;
     try {
       worker = await this.dependencies.spawnWorker(this.workerSpawnInput());
+      if (this.disposed) {
+        throw new Error("Cursor SDK session was disposed before activation completed.");
+      }
       listeners = this.attachWorkerListeners(worker);
       if (listeners.pendingTransportError) throw listeners.pendingTransportError;
       this.worker = worker;

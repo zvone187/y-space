@@ -22,7 +22,14 @@ const cdpUserDataDir = process.env.PORACODE_CDP_USER_DATA_DIR?.trim();
 if (cdpUserDataDir) {
   const require = createRequire(import.meta.url);
   const electronPath = require("electron");
-  const app = spawn(electronPath, [`--user-data-dir=${cdpUserDataDir}`, "."], {
+  const electronArgs = [`--user-data-dir=${cdpUserDataDir}`];
+  if (process.env.PORACODE_USE_MOCK_KEYCHAIN === "1") {
+    // Test-only invariant: put the switch on the actual Electron command line,
+    // rather than relying solely on main-process configuration.
+    electronArgs.push("--use-mock-keychain");
+  }
+  electronArgs.push(".");
+  const app = spawn(electronPath, electronArgs, {
     stdio: "inherit",
     windowsHide: process.platform === "win32",
     env,

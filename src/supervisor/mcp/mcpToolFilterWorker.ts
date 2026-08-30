@@ -5,6 +5,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "@/shared/contracts";
+import { createOwnedWslTempDeploymentCleanup } from "../wsl/wslWorkerTempCleanup";
 import { createMcpToolFilterProxy } from "./mcpToolFilterProxy";
 
 const CONFIG_ENV_PREFIX = "PORACODE_MCP_FILTER_CONFIG_";
@@ -24,6 +25,14 @@ function readConfig(): { server: McpServer; disabledTools: string[]; browserExcl
     browserExclusive?: boolean;
   };
   return { ...decoded, browserExclusive: decoded.browserExclusive === true };
+}
+
+function registerDeploymentCleanup(): void {
+  const linuxBaseDir = process.argv[3];
+  if (!linuxBaseDir) return;
+  const cleanup = createOwnedWslTempDeploymentCleanup(linuxBaseDir, process.argv[1] ?? "");
+  if (!cleanup) throw new Error("Invalid MCP filter deployment cleanup path");
+  process.once("exit", cleanup);
 }
 
 function createUpstreamTransport(server: McpServer) {
@@ -48,6 +57,7 @@ function createUpstreamTransport(server: McpServer) {
 }
 
 async function main(): Promise<void> {
+  registerDeploymentCleanup();
   const config = readConfig();
   const client = new Client({ name: "poracode-mcp-filter", version: "1.0.0" });
   await client.connect(createUpstreamTransport(config.server) as Transport);

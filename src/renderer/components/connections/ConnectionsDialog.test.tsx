@@ -186,7 +186,7 @@ describe("ConnectionsDialogHost", () => {
     vi.useRealTimers();
   });
 
-  it("opens one accessible glass dialog from the shared host and reconciles accounts before showing the initial catalog", async () => {
+  it("opens one accessible glass dialog from the shared host with current accounts and the initial catalog", async () => {
     bridgeMock.pipedreamRefreshAccounts.mockResolvedValue(readySnapshot([SLACK_ACCOUNT]));
 
     const dialog = await openDialog("settings");
@@ -203,6 +203,37 @@ describe("ConnectionsDialogHost", () => {
     expect(initialCatalogRequest).not.toHaveProperty("cursor");
     expect(within(dialog).getByText("Workspace Slack")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Connect Gmail" })).toBeInTheDocument();
+  });
+
+  it("moves initial focus into the dialog and onto search when the async ready surface mounts", async () => {
+    const initialSnapshot = deferred<PipedreamSnapshot>();
+    bridgeMock.pipedreamGetSnapshot.mockReturnValue(initialSnapshot.promise);
+
+    const dialog = await openDialog();
+
+    await waitFor(() => expect(dialog).toHaveFocus());
+
+    await act(async () => initialSnapshot.resolve(readySnapshot()));
+    const search = await within(dialog).findByRole("textbox", { name: "Search integrations" });
+
+    await waitFor(() => expect(search).toHaveFocus());
+  });
+
+  it("does not steal focus from a dialog control when the async ready surface mounts", async () => {
+    const initialSnapshot = deferred<PipedreamSnapshot>();
+    bridgeMock.pipedreamGetSnapshot.mockReturnValue(initialSnapshot.promise);
+    const dialog = await openDialog();
+    await waitFor(() => expect(dialog).toHaveFocus());
+    const closeButton = within(dialog).getByRole("button", { name: "Close integrations" });
+
+    closeButton.focus();
+    expect(closeButton).toHaveFocus();
+    await act(async () => initialSnapshot.resolve(readySnapshot()));
+
+    expect(
+      await within(dialog).findByRole("textbox", { name: "Search integrations" }),
+    ).toBeVisible();
+    await waitFor(() => expect(closeButton).toHaveFocus());
   });
 
   it("does not paint Connections until the sensitive native view hide is acknowledged", async () => {
@@ -231,7 +262,7 @@ describe("ConnectionsDialogHost", () => {
     }
   });
 
-  it("retains the Ready account surface and normal retry when opening reconciliation is offline", async () => {
+  it("loads the catalog and retains normal account retry when opening reconciliation is offline", async () => {
     bridgeMock.pipedreamGetSnapshot.mockResolvedValue(readySnapshot([SLACK_ACCOUNT]));
     bridgeMock.pipedreamRefreshAccounts
       .mockRejectedValueOnce(new Error("simulated offline refresh"))
@@ -242,8 +273,10 @@ describe("ConnectionsDialogHost", () => {
     expect(await within(dialog).findByText("Workspace Slack")).toBeVisible();
     expect(within(dialog).queryByText("Set up integrations")).not.toBeInTheDocument();
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
-      "Could not load integrations. Try again.",
+      "Could not refresh connected accounts. Try again.",
     );
+    await waitFor(() => expect(bridgeMock.pipedreamListApps).toHaveBeenCalledOnce());
+    expect(within(dialog).getByRole("button", { name: "Connect Gmail" })).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Refresh accounts" }));
     await waitFor(() => expect(bridgeMock.pipedreamRefreshAccounts).toHaveBeenCalledTimes(2));
@@ -289,6 +322,27 @@ describe("ConnectionsDialogHost", () => {
     ).toBeVisible();
     expect(document.body.textContent).not.toContain(".env.pipedream");
     expect(document.body.textContent).not.toContain("PIPEDREAM_CLIENT_SECRET");
+  });
+
+  it.each([
+    ["incomplete-values", "The selected file is missing one or more required Pipedream values."],
+    ["invalid-values", "The selected file contains invalid Pipedream values."],
+    ["not-dedicated", "Choose a dedicated file that contains only Pipedream credentials."],
+    [
+      "secure-storage-unavailable",
+      "Secure credential storage is unavailable on this computer, so the setup file was not changed.",
+    ],
+  ] as const)("explains the %s secure-import rejection", async (reason, expectedMessage) => {
+    bridgeMock.pipedreamGetSnapshot.mockResolvedValue({
+      personalMcp: { enabled: false, authenticated: false, serverName: "pd" },
+      connect: { state: "absent" },
+    });
+    bridgeMock.pipedreamChooseEnvFile.mockResolvedValue({ status: "invalid", reason });
+    const dialog = await openDialog();
+
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Choose setup file" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(expectedMessage);
   });
 
   it.each([
@@ -370,6 +424,7 @@ describe("ConnectionsDialogHost", () => {
       name: "Load more integrations",
     });
 
+    loadMore.focus();
     fireEvent.click(loadMore);
 
     await waitFor(() => expect(bridgeMock.pipedreamListApps).toHaveBeenCalledTimes(2));
@@ -382,6 +437,97 @@ describe("ConnectionsDialogHost", () => {
     expect(
       within(dialog).queryByRole("button", { name: "Load more integrations" }),
     ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(dialog).getByRole("textbox", { name: "Search integrations" })).toHaveFocus(),
+    );
+  });
+
+  it("moves focus from Load more to the newly available Next page control", async () => {
+    const firstPage = Array.from({ length: 50 }, (_, index) => ({
+      id: `app_First${index}`,
+      slug: `first-${index}`,
+      name: `First ${index}`,
+    }));
+    const secondPage = Array.from({ length: 10 }, (_, index) => ({
+      id: `app_Second${index}`,
+      slug: `second-${index}`,
+      name: `Second ${index}`,
+    }));
+    bridgeMock.pipedreamListApps
+      .mockResolvedValueOnce(appsPage(firstPage, { nextCursor: "catalog-page-2", totalCount: 60 }))
+      .mockResolvedValueOnce(appsPage(secondPage, { totalCount: 60 }));
+    const dialog = await openDialog();
+    const loadMore = await within(dialog).findByRole("button", {
+      name: "Load more integrations",
+    });
+
+    loadMore.focus();
+    fireEvent.click(loadMore);
+
+    await waitFor(() => expect(bridgeMock.pipedreamListApps).toHaveBeenCalledTimes(2));
+    const next = within(dialog).getByRole("button", { name: "Next integrations" });
+    await waitFor(() => expect(next).toHaveFocus());
+    expect(next).toBeEnabled();
+  });
+
+  it("keeps the live catalog DOM bounded while every loaded integration remains keyboard-pageable", async () => {
+    const manyApps = Array.from({ length: 100 }, (_, index) => ({
+      id: `app_Catalog${index}`,
+      slug: `catalog-${index}`,
+      name: `Integration ${index}`,
+    }));
+    bridgeMock.pipedreamListApps.mockResolvedValue(
+      appsPage(manyApps, { nextCursor: "catalog-page-2", totalCount: 3_235 }),
+    );
+    const dialog = await openDialog();
+
+    await within(dialog).findByRole("button", { name: "Connect Integration 0" });
+    expect(within(dialog).getAllByRole("button", { name: /^Connect Integration / }).length).toBe(
+      50,
+    );
+    expect(
+      within(dialog).queryByRole("button", { name: "Connect Integration 50" }),
+    ).not.toBeInTheDocument();
+
+    const nextPage = within(dialog).getByRole("button", { name: "Next integrations" });
+    expect(nextPage).toHaveAttribute("aria-controls");
+    expect(
+      within(dialog).queryByRole("button", { name: "Load more integrations" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Showing 1–50 of 100 loaded integrations · 3235 total"),
+    ).toBeInTheDocument();
+
+    nextPage.focus();
+    fireEvent.click(nextPage);
+
+    expect(
+      await within(dialog).findByRole("button", { name: "Connect Integration 50" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Connect Integration 0" })).toBeNull();
+    expect(within(dialog).getAllByRole("button", { name: /^Connect Integration / }).length).toBe(
+      50,
+    );
+    expect(within(dialog).getByRole("button", { name: "Previous integrations" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Load more integrations" })).toBeVisible();
+    expect(nextPage).toBeDisabled();
+    expect(nextPage).toHaveFocus();
+    expect(
+      within(dialog).getByText("Showing 51–100 of 100 loaded integrations · 3235 total"),
+    ).toBeInTheDocument();
+
+    const previousPage = within(dialog).getByRole("button", { name: "Previous integrations" });
+    previousPage.focus();
+    fireEvent.click(previousPage);
+
+    expect(
+      await within(dialog).findByRole("button", { name: "Connect Integration 0" }),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole("button", { name: "Connect Integration 50" }),
+    ).not.toBeInTheDocument();
+    expect(previousPage).toBeDisabled();
+    expect(previousPage).toHaveFocus();
   });
 
   it("coalesces duplicate requests for the same in-flight catalog cursor", async () => {

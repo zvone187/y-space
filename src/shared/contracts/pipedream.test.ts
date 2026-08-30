@@ -181,4 +181,30 @@ describe("Pipedream public contracts", () => {
       pipedreamDisconnectAccountPayloadSchema.safeParse({ accountId: "../../tokens" }).success,
     ).toBe(false);
   });
+
+  it("accepts safe Pipedream app slugs while preserving opaque identifier bytes", () => {
+    expect(pipedreamBeginConnectPayloadSchema.parse({ appSlug: "_0codekit" })).toEqual({
+      appSlug: "_0codekit",
+    });
+    expect(pipedreamBeginConnectPayloadSchema.parse({ appSlug: "µ-torrent" })).toEqual({
+      appSlug: "µ-torrent",
+    });
+    expect(pipedreamBeginConnectPayloadSchema.parse({ appSlug: "e\u0301quipe" })).toEqual({
+      appSlug: "e\u0301quipe",
+    });
+  });
+
+  it.each([
+    "bad slug",
+    " badslug",
+    "badslug ",
+    "bad/slug",
+    "bad\\slug",
+    "bad?slug",
+    "bad#slug",
+    "bad%slug",
+    "\u0000bad",
+  ])("rejects unsafe Pipedream app slug %j", (appSlug) => {
+    expect(pipedreamBeginConnectPayloadSchema.safeParse({ appSlug }).success).toBe(false);
+  });
 });

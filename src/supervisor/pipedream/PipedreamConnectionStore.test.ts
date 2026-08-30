@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { writeFileAtomic } from "@/shared/atomicFile";
+import type { FileDurability } from "@/shared/fileDurability";
 import { PipedreamConnectionStore } from "./PipedreamConnectionStore";
 
 const ACCOUNT = {
@@ -70,6 +71,32 @@ describe("PipedreamConnectionStore", () => {
     const protectedOnThisPlatform =
       process.platform === "win32" || (statSync(filePath).mode & 0o777) === 0o600;
     expect(protectedOnThisPlatform).toBe(true);
+  });
+
+  it("flushes the grant file and its namespace before publishing authorization changes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "y-space-pipedream-store-durable-"));
+    roots.push(root);
+    const filePath = join(root, "pipedream-connections.json");
+    const order: string[] = [];
+    const durability: FileDurability = {
+      syncFile: (path) => order.push(`file:${path}`),
+      syncDirectory: (path) => order.push(`directory:${path}`),
+    };
+    const store = new PipedreamConnectionStore({ filePath, durability });
+
+    store.replaceRemoteAccounts([ACCOUNT]);
+    store.setAgentAccess(ACCOUNT.id, true);
+
+    expect(order).toHaveLength(4);
+    expect(order[0]).toMatch(
+      new RegExp(`^file:${filePath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\.`),
+    );
+    expect(order[1]).toBe(`directory:${root}`);
+    expect(order[2]).toMatch(
+      new RegExp(`^file:${filePath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\.`),
+    );
+    expect(order[3]).toBe(`directory:${root}`);
+    expect(store.listGrantedForRelay()).toHaveLength(1);
   });
 
   it("preserves grants for refreshed accounts, drops disconnected accounts, and defaults new ones off", async () => {

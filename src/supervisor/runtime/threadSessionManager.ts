@@ -6,8 +6,10 @@ import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import {
   MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN,
   MAX_BROWSER_EVIDENCE_THREADS,
+  BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL,
   Y_SPACE_BROWSER_EVIDENCE_SOURCE,
   browserEvidenceActionKind,
+  isBrowserEvidenceStateBoundary,
   type BrowserMcpToolCallReport,
 } from "@/shared/browserMcpEvidence";
 import {
@@ -56,6 +58,7 @@ import {
   resolveLaunchSpec,
 } from "../agents/base";
 import { ensureNodePtySpawnHelperExecutable } from "../nodePty";
+import { combineMcpToolFilterCleanups, getMcpToolFilterCleanup } from "../mcp/McpToolFilterService";
 import { BufferedLogWriter } from "./bufferedLogWriter";
 import type { QueuedStructuredTurn, SessionRuntime, ShellSessionRuntime } from "./sessionTypes";
 import { ThreadOutputPipeline, resolveThreadStatusSource } from "./threadOutputPipeline";
@@ -141,6 +144,7 @@ interface SubagentMcpLaunchAuthority {
   parentThreadId: string;
   parentSessionInstanceId: string;
   authorization: McpLaunchAuthorization;
+  mcpToolFilterCleanup?: (() => void) | undefined;
 }
 
 interface SubagentMcpResolutionRequest {
@@ -154,8 +158,8 @@ interface BrowserEvidenceTurnLedger {
   turnId: string;
   /** Canonical item ids, capped so a runaway page loop cannot grow this ledger. */
   actionItemIds: string[];
-  /** First canonical negative marker, retained even when successes filled the cap. */
-  failureItemId?: string;
+  /** One post-cap invalidator retained after ordinary proof rows stop growing. */
+  postCapInvalidationItemId?: string;
 }
 
 interface PendingStartMcpSettings {
@@ -203,6 +207,11 @@ export class ThreadSessionManager {
   private readonly rootMcpLaunchAuthorities = new Map<string, RootMcpLaunchAuthority>();
   /** Ephemeral structured-child authority, tied to the exact live parent. */
   private readonly subagentMcpLaunchAuthorities = new Map<string, SubagentMcpLaunchAuthority>();
+  /** Revoked child filter deployments retained until that child process exits. */
+  private readonly detachedSubagentMcpFilterCleanups = new Map<
+    string,
+    { parentThreadId: string; cleanup: () => void }
+  >();
   /** Latest same-id child resolution, retained across an epoch-safe retry rebuild. */
   private readonly subagentMcpResolutionRequests = new Map<string, SubagentMcpResolutionRequest>();
   /** App-owned proof for only the latest accepted user turn of each live task. */
@@ -244,6 +253,7 @@ export class ThreadSessionManager {
       onStartQueuedLaunchPrompt: (session) =>
         this.structuredTurnQueue.startQueuedLaunchPrompt(session),
       onStartSessionRefDiscovery: (session) => this.pollSessionRefDiscovery(session),
+      onTerminalTurnSettled: (session) => this.settleTerminalSkillLeases(session),
     });
     // Construct the watchdog first: it drains the pending-steer slot via the
     // free `clearPendingSteerSlot` (no back-reference to SteerCoordinator), so
@@ -429,7 +439,10 @@ export class ThreadSessionManager {
     // Connection/control and tab-directory calls prove only that the MCP is
     // reachable. Require a real page navigation, inspection, or interaction
     // before minting an outcome used by the final-response badge.
-    if (!browserEvidenceActionKind(payload.toolName)) return false;
+    const isStateBoundary = isBrowserEvidenceStateBoundary(payload.toolName);
+    if (!browserEvidenceActionKind(payload.toolName) && !isStateBoundary) {
+      return false;
+    }
     const liveIdentity = this.resolveMcpCallerIdentity({
       routing: "thread",
       threadId: payload.threadId,
@@ -443,30 +456,37 @@ export class ThreadSessionManager {
     const ledger = this.browserEvidenceTurns.get(ownerThreadId);
     if (!ledger || ledger.turnId !== payload.turnId) return false;
     if (!childAuthority && ledger.launchId !== payload.launchId) return false;
-    if (ledger.actionItemIds.length >= MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN) {
-      // Reserve at most one extra bounded row so a late failure can never be
-      // hidden by a turn that already filled the successful evidence cap.
-      if (payload.success || ledger.failureItemId) return false;
+    const evidenceCapReached = ledger.actionItemIds.length >= MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN;
+    if (evidenceCapReached) {
+      // Reserve one extra bounded invalidation row so neither a late failure
+      // nor a tab-state mutation can be hidden by a turn that filled the normal
+      // proof cap. Later proof is capped too, so one invalidator is sufficient.
+      if ((!isStateBoundary && payload.success) || ledger.postCapInvalidationItemId) return false;
     }
 
+    const isPostCapInvalidation = evidenceCapReached;
     const itemId = `browser-evidence-${randomUUID()}`;
     const browserEvidence: NonNullable<ToolCallPayload["browserEvidence"]> = {
       source: Y_SPACE_BROWSER_EVIDENCE_SOURCE,
       occurredAt: payload.occurredAt,
       // A failed/ambiguous result proves only that an authenticated Browser
       // action failed. Never persist result-derived tab or page metadata on it.
-      ...(payload.success && payload.tabId ? { tabId: payload.tabId } : {}),
-      ...(payload.success && payload.url ? { url: payload.url } : {}),
-      ...(payload.success && payload.title ? { title: payload.title } : {}),
+      ...(!isPostCapInvalidation && payload.success && payload.tabId
+        ? { tabId: payload.tabId }
+        : {}),
+      ...(!isPostCapInvalidation && payload.success && payload.url ? { url: payload.url } : {}),
+      ...(!isPostCapInvalidation && payload.success && payload.title
+        ? { title: payload.title }
+        : {}),
     };
     const toolPayload: ToolCallPayload = {
-      name: payload.toolName,
+      name: isPostCapInvalidation ? BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL : payload.toolName,
       serverId: "browser",
-      status: payload.success ? "success" : "error",
+      status: isPostCapInvalidation || !payload.success ? "error" : "success",
       browserEvidence,
     };
     ledger.actionItemIds.push(itemId);
-    if (!payload.success) ledger.failureItemId ??= itemId;
+    if (evidenceCapReached) ledger.postCapInvalidationItemId = itemId;
     this.enqueueRuntimeEvent(ownerThreadId, {
       type: "item.started",
       threadId: ownerThreadId,
@@ -660,6 +680,7 @@ export class ThreadSessionManager {
 
   /** Revoke relay authority only when the exact active runtime has ended. */
   private releaseExitedMcpLaunch(session: SessionRuntime): void {
+    this.releaseSessionMcpToolFilters(session);
     const identity = session.mcpIdentity;
     if (!identity?.launchId) return;
     const current = this.rootMcpLaunchAuthorities.get(session.threadId);
@@ -678,6 +699,7 @@ export class ThreadSessionManager {
   private revokeSubagentMcpAccessForParent(parentThreadId: string): void {
     for (const [childThreadId, authority] of this.subagentMcpLaunchAuthorities) {
       if (authority.parentThreadId === parentThreadId) {
+        this.detachSubagentMcpFilterCleanup(childThreadId, authority);
         this.subagentMcpLaunchAuthorities.delete(childThreadId);
         this.options.releasePipedreamMcpBindings?.(childThreadId);
       }
@@ -687,6 +709,46 @@ export class ThreadSessionManager {
         this.subagentMcpResolutionRequests.delete(childThreadId);
       }
     }
+  }
+
+  private detachSubagentMcpFilterCleanup(
+    childThreadId: string,
+    authority: SubagentMcpLaunchAuthority,
+  ): void {
+    const cleanup = authority.mcpToolFilterCleanup;
+    authority.mcpToolFilterCleanup = undefined;
+    if (!cleanup) return;
+    const detached = this.detachedSubagentMcpFilterCleanups.get(childThreadId);
+    if (detached && detached.parentThreadId !== authority.parentThreadId) {
+      detached.cleanup();
+      this.detachedSubagentMcpFilterCleanups.delete(childThreadId);
+    }
+    const combined = combineMcpToolFilterCleanups(
+      detached?.parentThreadId === authority.parentThreadId ? detached.cleanup : undefined,
+      cleanup,
+    );
+    if (combined) {
+      this.detachedSubagentMcpFilterCleanups.set(childThreadId, {
+        parentThreadId: authority.parentThreadId,
+        cleanup: combined,
+      });
+    }
+  }
+
+  private adoptSessionMcpToolFilters(
+    session: SessionRuntime,
+    cleanup: (() => void) | undefined,
+  ): void {
+    session.mcpToolFilterCleanup = combineMcpToolFilterCleanups(
+      session.mcpToolFilterCleanup,
+      cleanup,
+    );
+  }
+
+  private releaseSessionMcpToolFilters(session: SessionRuntime): void {
+    const cleanup = session.mcpToolFilterCleanup;
+    session.mcpToolFilterCleanup = undefined;
+    cleanup?.();
   }
 
   private beginBrowserEvidenceTurnForSession(session: SessionRuntime): string | undefined {
@@ -1008,6 +1070,7 @@ export class ThreadSessionManager {
       };
       const previousChildAuthority = this.subagentMcpLaunchAuthorities.get(childThreadId);
       if (previousChildAuthority) {
+        previousChildAuthority.mcpToolFilterCleanup?.();
         this.releasePipedreamMcpIdentityBindingsBestEffort(
           previousChildAuthority.authorization.identity,
         );
@@ -1064,6 +1127,17 @@ export class ThreadSessionManager {
         currentChildAuthority?.parentThreadId === threadId &&
         currentChildAuthority.parentSessionInstanceId === attempt.session.instanceId &&
         currentChildAuthority.authorization.identity.launchId === attempt.childIdentity.launchId;
+      if (resolution.status === "resolved") {
+        const cleanup = getMcpToolFilterCleanup(resolution.mcpServers);
+        if (exactAuthorityIsCurrent && currentChildAuthority) {
+          currentChildAuthority.mcpToolFilterCleanup = combineMcpToolFilterCleanups(
+            currentChildAuthority.mcpToolFilterCleanup,
+            cleanup,
+          );
+        } else {
+          cleanup?.();
+        }
+      }
       const epochCrossed =
         attempt.personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
         attempt.mcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch;
@@ -1152,16 +1226,44 @@ export class ThreadSessionManager {
     return {};
   }
 
-  releaseSubagentParentMcpAccess(parentThreadId: string, childThreadId: string): void {
+  revokeSubagentParentMcpAccess(
+    parentThreadId: string,
+    childThreadId: string,
+  ): (() => void) | undefined {
     const authority = this.subagentMcpLaunchAuthorities.get(childThreadId);
     if (authority && authority.parentThreadId !== parentThreadId) return;
     const request = this.subagentMcpResolutionRequests.get(childThreadId);
     if (!authority && request && request.parentThreadId !== parentThreadId) return;
+    const retainedCleanup = this.detachedSubagentMcpFilterCleanups.get(childThreadId);
+    if (
+      !authority &&
+      !request &&
+      retainedCleanup &&
+      retainedCleanup.parentThreadId !== parentThreadId
+    ) {
+      return;
+    }
+    if (authority) this.detachSubagentMcpFilterCleanup(childThreadId, authority);
     this.subagentMcpLaunchAuthorities.delete(childThreadId);
     if (request?.parentThreadId === parentThreadId) {
       this.subagentMcpResolutionRequests.delete(childThreadId);
     }
+    const filterCleanup = this.detachedSubagentMcpFilterCleanups.get(childThreadId);
+    if (filterCleanup?.parentThreadId === parentThreadId) {
+      this.detachedSubagentMcpFilterCleanups.delete(childThreadId);
+    }
     this.options.releasePipedreamMcpBindings?.(childThreadId);
+    if (!filterCleanup || filterCleanup.parentThreadId !== parentThreadId) return undefined;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      filterCleanup.cleanup();
+    };
+  }
+
+  releaseSubagentParentMcpAccess(parentThreadId: string, childThreadId: string): void {
+    this.revokeSubagentParentMcpAccess(parentThreadId, childThreadId)?.();
   }
 
   private revokeExactSubagentMcpAccess(parentThreadId: string, identity: McpLaunchIdentity): void {
@@ -1170,6 +1272,7 @@ export class ThreadSessionManager {
       current?.parentThreadId === parentThreadId &&
       current.authorization.identity.launchId === identity.launchId
     ) {
+      current.mcpToolFilterCleanup?.();
       this.subagentMcpLaunchAuthorities.delete(identity.threadId);
     }
     this.releasePipedreamMcpIdentityBindingsBestEffort(identity);
@@ -1184,6 +1287,7 @@ export class ThreadSessionManager {
       pendingRequest?.parentThreadId !== authority.parentThreadId ||
       pendingRequest.parentSessionInstanceId !== authority.parentSessionInstanceId
     ) {
+      this.detachSubagentMcpFilterCleanup(childThreadId, authority);
       this.subagentMcpLaunchAuthorities.delete(childThreadId);
     }
     // Pending attempts retain only their exact ordering record. The route is
@@ -1401,6 +1505,8 @@ export class ThreadSessionManager {
       if (!structuredSession || !update) continue;
       reloads.push(
         this.runMcpReloadSessionOperation(session, timeoutParticipants, async () => {
+          let newMcpToolFilterCleanup: (() => void) | undefined;
+          let mcpToolFilterCleanupTransferred = false;
           try {
             const refreshed = await this.resolveCurrentMcpLaunchSnapshot(session);
             if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
@@ -1434,6 +1540,7 @@ export class ThreadSessionManager {
               adapter: session.adapter,
               ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
             });
+            newMcpToolFilterCleanup = getMcpToolFilterCleanup(mcpServers);
             if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
               this.releasePipedreamMcpLaunchBindingsBestEffort(session);
               return;
@@ -1444,10 +1551,10 @@ export class ThreadSessionManager {
             ) {
               return;
             }
-            const updateResult = await this.settleProviderMcpUpdateWithin(
-              session,
-              update(mcpServers),
-            );
+            const providerUpdate = update(mcpServers);
+            this.adoptSessionMcpToolFilters(session, newMcpToolFilterCleanup);
+            mcpToolFilterCleanupTransferred = true;
+            const updateResult = await this.settleProviderMcpUpdateWithin(session, providerUpdate);
             if (updateResult === "failed") throw new Error("Provider MCP update failed.");
             if (updateResult === "timed-out") {
               if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
@@ -1483,6 +1590,8 @@ export class ThreadSessionManager {
               `[supervisor] failed to reload MCP servers for thread ${session.threadId}:`,
               error,
             );
+          } finally {
+            if (!mcpToolFilterCleanupTransferred) newMcpToolFilterCleanup?.();
           }
         }),
       );
@@ -1917,11 +2026,7 @@ export class ThreadSessionManager {
     this.outputPipeline.clearSessionTimers(session);
     this.rootMcpLaunchAuthorities.delete(session.threadId);
     this.browserEvidenceTurns.delete(session.threadId);
-    for (const [childThreadId, authority] of this.subagentMcpLaunchAuthorities) {
-      if (authority.parentThreadId !== session.threadId) continue;
-      this.subagentMcpLaunchAuthorities.delete(childThreadId);
-      this.releasePipedreamMcpBindingsBestEffort(childThreadId);
-    }
+    this.revokeSubagentMcpAccessForParent(session.threadId);
     this.releasePipedreamMcpBindingsBestEffort(session.threadId);
     try {
       this.ptyLifecycle.kill(session);
@@ -1944,7 +2049,9 @@ export class ThreadSessionManager {
         // Process authority is already gone and the PTY is already killed.
       }
     }
+    teardowns.push(this.ptyLifecycle.waitForExit(session));
     const stop = this.settleBestEffortWithin(teardowns).finally(() => {
+      if (!session.pty || session.ptyExited) this.releaseSessionMcpToolFilters(session);
       if (this.personalOauthRevocationStops.get(session) === stop) {
         this.personalOauthRevocationStops.delete(session);
       }
@@ -2056,6 +2163,8 @@ export class ThreadSessionManager {
     if (!structuredSession || !identity || !update) return { state: "applied" };
     const agentMcpSettingsReloadEpoch =
       this.agentMcpSettingsReloadEpochs.get(session.agentKind) ?? 0;
+    let newMcpToolFilterCleanup: (() => void) | undefined;
+    let mcpToolFilterCleanupTransferred = false;
     try {
       if (
         !this.isCurrentStructuredMcpHandle(session, structuredSession) ||
@@ -2095,6 +2204,7 @@ export class ThreadSessionManager {
         adapter: session.adapter,
         ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
       });
+      newMcpToolFilterCleanup = getMcpToolFilterCleanup(mcpServers);
       if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
         this.releasePipedreamMcpLaunchBindingsBestEffort(session);
         return { state: "applied" };
@@ -2105,7 +2215,10 @@ export class ThreadSessionManager {
       ) {
         return { state: "applied" };
       }
-      const updateResult = await this.settleProviderMcpUpdateWithin(session, update(mcpServers));
+      const providerUpdate = update(mcpServers);
+      this.adoptSessionMcpToolFilters(session, newMcpToolFilterCleanup);
+      mcpToolFilterCleanupTransferred = true;
+      const updateResult = await this.settleProviderMcpUpdateWithin(session, providerUpdate);
       if (updateResult === "failed") throw new Error("Provider MCP update failed.");
       if (updateResult === "timed-out") {
         if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
@@ -2163,6 +2276,8 @@ export class ThreadSessionManager {
         );
       }
       return { state: "failed-pending" };
+    } finally {
+      if (!mcpToolFilterCleanupTransferred) newMcpToolFilterCleanup?.();
     }
   }
 
@@ -2424,41 +2539,13 @@ export class ThreadSessionManager {
     if (this.options.applyMcpServerAuthorization) {
       mcpServers = await this.options.applyMcpServerAuthorization(mcpServers);
     }
-    if (this.options.prepareMcpToolFilters) {
-      const candidateSnapshot: McpLaunchSnapshot = {
-        ...input.mcpLaunchSnapshot,
-        mcpServers,
-        pluginBuiltInMcpServerIds: pluginContributions.builtInMcpServerIds,
-      };
-      const effectiveConfig = this.spawnPipeline.resolveMcpLaunchConfig(
-        workspaceLaunchConfig(
-          input.projectLocation,
-          input.config,
-          input.adapter,
-          candidateSnapshot.disabledBuiltInMcpServerIds,
-          candidateSnapshot.pluginBuiltInMcpServerIds,
-        ),
-        candidateSnapshot,
-        input.adapter,
-        input.threadId,
-      );
-      // Keep Personal Pipedream recognizable until the privileged resolver
-      // replaces it with a launch-scoped localhost capability. The initial
-      // launch follows the same ordering; live/restart reloads must not wrap
-      // the upstream URL (or bearer) in a generic stdio filter first.
-      const personalMcpServers = mcpServers
-        .filter(isPersonalPipedreamMcpServer)
-        .map(stripResolvedAuthorizationHeader);
-      const filterableServers = mcpServers.filter(
-        (server) => !isPersonalPipedreamMcpServer(server),
-      );
-      const filteredServers = await this.options.prepareMcpToolFilters(
-        filterableServers,
-        input.projectLocation,
-        effectiveConfig.browserMcp === true,
-      );
-      mcpServers = [...filteredServers, ...personalMcpServers];
-    }
+    // Snapshots are durable restart inputs, not owners of process-scoped WSL
+    // deployments. Tool filters are staged by resolveMcpServersForLaunch for
+    // each actual provider attempt.
+    mcpServers = [
+      ...mcpServers.filter((server) => !isPersonalPipedreamMcpServer(server)),
+      ...mcpServers.filter(isPersonalPipedreamMcpServer).map(stripResolvedAuthorizationHeader),
+    ];
 
     return {
       snapshot: {
@@ -2549,6 +2636,82 @@ export class ThreadSessionManager {
     }
   }
 
+  private sessionOwnsTerminalSkillLease(
+    session: SessionRuntime | undefined,
+    leaseId: string,
+  ): boolean {
+    return Boolean(
+      session?.activeTerminalSkillLeaseIds?.includes(leaseId) ||
+      session?.pendingTerminalSkillLeaseIds?.includes(leaseId),
+    );
+  }
+
+  private stageTerminalSkillLease(session: SessionRuntime, leaseId: string): void {
+    const activeLeaseCount = session.activeTerminalSkillLeaseIds?.length ?? 0;
+    if (
+      session.status === "working" ||
+      (activeLeaseCount > 0 &&
+        (session.status === "launching" || session.status === "idle" || session.status === "error"))
+    ) {
+      (session.pendingTerminalSkillLeaseIds ??= []).push(leaseId);
+      return;
+    }
+    (session.activeTerminalSkillLeaseIds ??= []).push(leaseId);
+  }
+
+  private abandonTerminalSkillLease(session: SessionRuntime, leaseId: string): boolean {
+    let owned = false;
+    const activeIndex = session.activeTerminalSkillLeaseIds?.indexOf(leaseId) ?? -1;
+    if (activeIndex >= 0) {
+      session.activeTerminalSkillLeaseIds?.splice(activeIndex, 1);
+      owned = true;
+    }
+    const pendingIndex = session.pendingTerminalSkillLeaseIds?.indexOf(leaseId) ?? -1;
+    if (pendingIndex >= 0) {
+      session.pendingTerminalSkillLeaseIds?.splice(pendingIndex, 1);
+      owned = true;
+    }
+    if (
+      session.activeTerminalSkillLeaseIds?.length === 0 &&
+      session.pendingTerminalSkillLeaseIds?.length
+    ) {
+      session.activeTerminalSkillLeaseIds.push(session.pendingTerminalSkillLeaseIds.shift()!);
+    }
+    return owned;
+  }
+
+  private takeAllTerminalSkillLeases(session: SessionRuntime): string[] {
+    const leaseIds = [
+      ...(session.activeTerminalSkillLeaseIds ?? []),
+      ...(session.pendingTerminalSkillLeaseIds ?? []),
+    ];
+    session.activeTerminalSkillLeaseIds = [];
+    session.pendingTerminalSkillLeaseIds = [];
+    return leaseIds;
+  }
+
+  private async releaseTerminalSkillLeases(leaseIds: readonly string[]): Promise<void> {
+    await Promise.all(
+      leaseIds.map(async (leaseId) => {
+        await this.options.releaseTerminalSkillCopies?.(leaseId);
+      }),
+    );
+  }
+
+  private settleTerminalSkillLeases(session: SessionRuntime): void {
+    if (session.status === "inactive") {
+      const leaseIds = this.takeAllTerminalSkillLeases(session);
+      void this.releaseTerminalSkillLeases(leaseIds);
+      return;
+    }
+    const completedLeaseIds = session.activeTerminalSkillLeaseIds?.splice(0) ?? [];
+    const nextLeaseId = session.pendingTerminalSkillLeaseIds?.shift();
+    if (nextLeaseId) {
+      (session.activeTerminalSkillLeaseIds ??= []).push(nextLeaseId);
+    }
+    void this.releaseTerminalSkillLeases(completedLeaseIds);
+  }
+
   async startThread(payload: StartThreadPayload): Promise<StartThreadResult> {
     if (this.disposed) {
       throw new Error("ThreadSessionManager is disposed.");
@@ -2583,7 +2746,8 @@ export class ThreadSessionManager {
       this.agentSettingsPersonalMcpThreads.delete(threadId);
     }
 
-    const run = this.spawnPipeline.startThreadInner({ ...payload, threadId });
+    const terminalSkillLeaseId = randomUUID();
+    const run = this.spawnPipeline.startThreadInner({ ...payload, threadId }, terminalSkillLeaseId);
     this.startLocks.set(
       threadId,
       run.then(
@@ -2597,6 +2761,10 @@ export class ThreadSessionManager {
       if (this.removedPersonalPendingStarts.has(threadId)) return { threadId };
       throw error;
     } finally {
+      const session = this.sessions.get(threadId);
+      if (!this.sessionOwnsTerminalSkillLease(session, terminalSkillLeaseId)) {
+        await this.options.releaseTerminalSkillCopies?.(terminalSkillLeaseId);
+      }
       this.startLocks.delete(threadId);
       this.pendingStartMcpSettings.delete(threadId);
       this.removedPersonalPendingStarts.delete(threadId);
@@ -2655,7 +2823,41 @@ export class ThreadSessionManager {
     };
     if (session.status === "inactive") {
       // Guaranteed to have a sessionRef here — the no-ref case threw above.
-      await this.spawnPipeline.restartThread(session, turn);
+      if (!usesStructuredFlow && effectiveSegments?.some((segment) => segment.kind === "skill")) {
+        const terminalSkillLeaseId = randomUUID();
+        try {
+          const terminalSegments = await this.resolveTerminalSkillSegments(
+            session,
+            effectiveSegments,
+            terminalSkillLeaseId,
+          );
+          if (!this.isCurrentSession(session)) return;
+          const terminalTurn =
+            terminalSegments === effectiveSegments
+              ? turn
+              : {
+                  ...turn,
+                  prompt: this.formatSegmentsForPrompt(session, terminalSegments, payload.prompt),
+                  ...(terminalSegments ? { segments: terminalSegments } : {}),
+                };
+          await this.spawnPipeline.restartThread(session, terminalTurn, terminalSkillLeaseId);
+        } finally {
+          if (
+            !this.sessionOwnsTerminalSkillLease(
+              this.sessions.get(session.threadId),
+              terminalSkillLeaseId,
+            )
+          ) {
+            try {
+              await this.options.releaseTerminalSkillCopies?.(terminalSkillLeaseId);
+            } catch {
+              // Best-effort cleanup must not replace the prompt-delivery failure.
+            }
+          }
+        }
+      } else {
+        await this.spawnPipeline.restartThread(session, turn);
+      }
       return;
     }
     if (
@@ -2707,41 +2909,79 @@ export class ThreadSessionManager {
     }
 
     const pty = requireSessionPty(session);
-    // Terminal skills fallback: skill segments the CLI can't resolve natively
-    // become short path-hint text before the prompt is typed into the PTY.
-    const terminalSegments = await this.resolveTerminalSkillSegments(session, effectiveSegments);
-    // Workspace-sandboxed agents (e.g. Command Code) can't read attachments that
-    // live outside the project, so copy them in and re-format with the new paths.
-    // localizeWorkspaceAttachments returns the same array when it's a no-op, so
-    // reuse the already-formatted prompt unless paths actually changed.
-    const ptySegments = await this.localizeWorkspaceAttachments(session, terminalSegments);
-    const ptyPrompt =
-      ptySegments === effectiveSegments
-        ? prompt
-        : this.formatSegmentsForPrompt(session, ptySegments, payload.prompt);
-    this.beginBrowserEvidenceTurnForSession(session);
-    await writeSubmittedPrompt(
-      pty,
-      session.adapter.buildDirectInput?.(
-        ptyPrompt,
-        ptySegments,
-        session.config,
+    const terminalSkillLeaseId = randomUUID();
+    this.stageTerminalSkillLease(session, terminalSkillLeaseId);
+    let submitted = false;
+    try {
+      // Terminal skills fallback: skill segments the CLI can't resolve natively
+      // become short path-hint text before the prompt is typed into the PTY.
+      const terminalSegments = await this.resolveTerminalSkillSegments(
+        session,
+        effectiveSegments,
+        terminalSkillLeaseId,
+      );
+      // Workspace-sandboxed agents (e.g. Command Code) can't read attachments that
+      // live outside the project, so copy them in and re-format with the new paths.
+      // localizeWorkspaceAttachments returns the same array when it's a no-op, so
+      // reuse the already-formatted prompt unless paths actually changed.
+      const ptySegments = await this.localizeWorkspaceAttachments(session, terminalSegments);
+      const ptyPrompt =
+        ptySegments === effectiveSegments
+          ? prompt
+          : this.formatSegmentsForPrompt(session, ptySegments, payload.prompt);
+      const canWriteTerminalInput = () =>
+        !(
+          this.disposed ||
+          session.ignoreExit ||
+          session.ptyExited ||
+          !this.isCurrentSession(session)
+        );
+      if (!canWriteTerminalInput()) {
+        return;
+      }
+      this.beginBrowserEvidenceTurnForSession(session);
+      const promptSubmitted = await writeSubmittedPrompt(
+        pty,
+        session.adapter.buildDirectInput?.(
+          ptyPrompt,
+          ptySegments,
+          session.config,
+          session.projectLocation,
+        ) ?? [ptyPrompt, "\r"],
         session.projectLocation,
-      ) ?? [ptyPrompt, "\r"],
-      session.projectLocation,
-    );
+        canWriteTerminalInput,
+      );
+      if (!promptSubmitted) {
+        return;
+      }
+      submitted = true;
 
-    // Optimistic working edge for CLI-hook agents with no turn-START event
-    // (Command Code): show `working` the instant the prompt is sent. Gated on
-    // `cliHookEnvInjected` so the authoritative `Stop` hook is guaranteed wired
-    // to return the thread to idle — never strands it in `working`.
-    if (session.adapter.optimisticWorkingOnSubmit && session.cliHookEnvInjected) {
-      this.outputPipeline.updateState(session, "working", "working");
-    }
+      // Optimistic working edge for CLI-hook agents with no turn-START event
+      // (Command Code): show `working` the instant the prompt is sent. Gated on
+      // `cliHookEnvInjected` so the authoritative `Stop` hook is guaranteed wired
+      // to return the thread to idle — never strands it in `working`.
+      if (session.adapter.optimisticWorkingOnSubmit && session.cliHookEnvInjected) {
+        this.outputPipeline.updateState(session, "working", "working");
+      }
 
-    await sleep(300);
-    if (session.prevChunk.includes("[Pasted text")) {
-      pty.write("\r");
+      await sleep(300);
+      if (!canWriteTerminalInput()) {
+        return;
+      }
+      if (session.prevChunk.includes("[Pasted text")) {
+        if (!canWriteTerminalInput()) return;
+        pty.write("\r");
+      }
+    } finally {
+      if (!submitted) {
+        if (this.abandonTerminalSkillLease(session, terminalSkillLeaseId)) {
+          try {
+            await this.options.releaseTerminalSkillCopies?.(terminalSkillLeaseId);
+          } catch {
+            // Best-effort cleanup must not replace the prompt-delivery failure.
+          }
+        }
+      }
     }
   }
 
@@ -2918,10 +3158,12 @@ export class ThreadSessionManager {
   private async resolveTerminalSkillSegments(
     session: SessionRuntime,
     segments: PromptSegment[] | undefined,
+    leaseId: string,
   ): Promise<PromptSegment[] | undefined> {
     if (!segments?.some((segment) => segment.kind === "skill")) return segments;
     return (
       (await this.options.rewriteTerminalSkillSegments?.({
+        leaseId,
         agentKind: session.agentKind,
         projectLocation: session.projectLocation,
         ...(session.nativePlugins ? { nativePlugins: session.nativePlugins } : {}),
@@ -3016,6 +3258,16 @@ export class ThreadSessionManager {
   }
 
   async closeThread(payload: CloseThreadPayload): Promise<void> {
+    let childTeardown = Promise.resolve();
+    try {
+      childTeardown = Promise.resolve(this.options.crossagentMcp?.cancelAll(payload.threadId)).then(
+        () => undefined,
+        () => undefined,
+      );
+    } catch {
+      // Parent authority revocation below remains fail-closed even if child
+      // bookkeeping is already unavailable.
+    }
     this.options.releasePipedreamMcpBindings?.(payload.threadId);
     // Revoke before any asynchronous provider teardown so a bearer cannot race
     // close, restart, or a pending-start abort.
@@ -3030,6 +3282,7 @@ export class ThreadSessionManager {
       this.rememberRemovedThread(payload.threadId);
       this.ptyLifecycle.killShell(shell);
       await this.ptyLifecycle.waitForExit(shell);
+      await childTeardown;
       return;
     }
 
@@ -3039,10 +3292,12 @@ export class ThreadSessionManager {
         this.pendingStartAborts.add(payload.threadId);
         this.rememberRemovedThread(payload.threadId);
       }
+      await childTeardown;
       return;
     }
 
     existing.ignoreExit = true;
+    await this.releaseTerminalSkillLeases(this.takeAllTerminalSkillLeases(existing));
     this.rememberRemovedThread(payload.threadId);
     this.outputPipeline.clearSessionTimers(existing);
     existing.stopSessionRefWatcher?.();
@@ -3058,14 +3313,15 @@ export class ThreadSessionManager {
       this.sessionsBySessionId.delete(existing.sessionRef.providerSessionId);
     }
     this.runtimeEventRouter.clearAllForThread(payload.threadId);
-    void this.options.crossagentMcp?.cancelAll(payload.threadId);
     this.options.crossagentMcp?.unregister(payload.threadId);
+    await childTeardown;
     await existing.structuredSession?.dispose();
     if (existing.structuredSession) {
       await sleep(150);
     }
     this.ptyLifecycle.kill(existing);
     await this.ptyLifecycle.waitForExit(existing);
+    if (!existing.pty || existing.ptyExited) this.releaseSessionMcpToolFilters(existing);
   }
 
   async startShell(payload: StartShellPayload): Promise<void> {
@@ -3236,8 +3492,11 @@ export class ThreadSessionManager {
         session.ignoreExit = true;
         this.rememberRemovedThread(session.threadId);
         this.outputPipeline.clearSessionTimers(session);
+        await this.releaseTerminalSkillLeases(this.takeAllTerminalSkillLeases(session));
         await session.structuredSession?.dispose();
         this.ptyLifecycle.kill(session);
+        await this.ptyLifecycle.waitForExit(session);
+        if (!session.pty || session.ptyExited) this.releaseSessionMcpToolFilters(session);
       }),
     );
     this.sessions.clear();
@@ -3245,7 +3504,14 @@ export class ThreadSessionManager {
     this.agentSettingsPersonalMcpThreads.clear();
     this.agentMcpSettingsReloadEpochs.clear();
     this.rootMcpLaunchAuthorities.clear();
+    for (const authority of this.subagentMcpLaunchAuthorities.values()) {
+      authority.mcpToolFilterCleanup?.();
+    }
     this.subagentMcpLaunchAuthorities.clear();
+    for (const detached of this.detachedSubagentMcpFilterCleanups.values()) {
+      detached.cleanup();
+    }
+    this.detachedSubagentMcpFilterCleanups.clear();
     this.subagentMcpResolutionRequests.clear();
     this.browserEvidenceTurns.clear();
 

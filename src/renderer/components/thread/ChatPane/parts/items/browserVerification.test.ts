@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
+import { BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL } from "@/shared/browserMcpEvidence";
 import { claimsBrowserVerification, resolveBrowserVerificationBadge } from "./browserVerification";
 
 describe("browser final-response verification", () => {
@@ -34,6 +35,295 @@ describe("browser final-response verification", () => {
         ["user-1", "browser-1", "browser-2", "answer-1"],
         ["answer-1"],
         "I clicked and selected everything in the browser successfully.",
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("does not recover an interaction claim with only a later inspection success", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-click", "click", {
+        tabId: "tab-interaction-failed",
+        url: "https://example.test/",
+      }),
+      failedEvidence("browser-select-failed", "select"),
+      evidence("browser-snapshot", "snapshot", {
+        tabId: "tab-interaction-failed",
+        url: "https://example.test/",
+      }),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-click", "browser-select-failed", "browser-snapshot", "answer-1"],
+        ["answer-1"],
+        "Selected the requested option in Browser tab tab-interaction-failed.",
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("treats a post-cap invalidation marker as a global verification taint", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-click", "click", {
+        tabId: "tab-capped",
+        url: "https://example.test/",
+      }),
+      failedEvidence("browser-cap-invalidation", BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL),
+      item("answer-1", "assistant_message"),
+    ]);
+    const ids = ["user-1", "browser-click", "browser-cap-invalidation", "answer-1"];
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ids,
+        ["answer-1"],
+        "Clicked Browser tab tab-capped successfully.",
+      ),
+    ).toEqual({ kind: "unverified" });
+    expect(resolveBrowserVerificationBadge(items, ids, ["answer-1"], "Done.")).toEqual({
+      kind: "unverified",
+    });
+  });
+
+  it("accepts a later authenticated Browser success that recovers from an earlier failure", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-click", "click", {
+        tabId: "tab-recovered",
+        url: "https://duckduckgo.com/",
+      }),
+      failedEvidence("browser-fill-failed", "fill"),
+      evidence("browser-type-recovered", "type", {
+        tabId: "tab-recovered",
+        url: "https://duckduckgo.com/?q=recovered",
+      }),
+      evidence("browser-url", "wait_for_url", {
+        tabId: "tab-recovered",
+        url: "https://duckduckgo.com/?q=recovered",
+      }),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        [
+          "user-1",
+          "browser-click",
+          "browser-fill-failed",
+          "browser-type-recovered",
+          "browser-url",
+          "answer-1",
+        ],
+        ["answer-1"],
+        "Typed the query in Browser tab tab-recovered and verified https://duckduckgo.com/?q=recovered.",
+      ),
+    ).toEqual({ kind: "verified", actionCount: 2 });
+  });
+
+  it("accepts authoritative URL and title reads after an imprecise wait timeout", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-fill", "fill", {
+        tabId: "tab-recovered",
+        url: "https://duckduckgo.com/",
+      }),
+      failedEvidence("browser-wait", "wait_for_url"),
+      evidence("browser-url", "get_url", {
+        tabId: "tab-recovered",
+        url: "https://duckduckgo.com/?q=recovered",
+      }),
+      evidence("browser-title", "get_title", {
+        tabId: "tab-recovered",
+        url: "https://duckduckgo.com/?q=recovered",
+      }),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-fill", "browser-wait", "browser-url", "browser-title", "answer-1"],
+        ["answer-1"],
+        [
+          "Filled Browser tab tab-recovered.",
+          "Final title: Recovered search.",
+          "Final URL: https://duckduckgo.com/?q=recovered.",
+        ].join(" "),
+      ),
+    ).toEqual({ kind: "verified", actionCount: 3 });
+  });
+
+  it("keeps a composite interaction and final-page claim unverified without inspection recovery", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-fill", "fill", {
+        tabId: "tab-unrecovered",
+        url: "https://duckduckgo.com/",
+      }),
+      failedEvidence("browser-wait", "wait_for_url"),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-fill", "browser-wait", "answer-1"],
+        ["answer-1"],
+        [
+          "Filled Browser tab tab-unrecovered.",
+          "Final title: Claimed result.",
+          "Final URL: https://duckduckgo.com/?q=unproven.",
+        ].join(" "),
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("does not let a post-timeout interaction stand in for final-page inspection", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-fill", "fill", {
+        tabId: "tab-unrecovered",
+        url: "https://duckduckgo.com/",
+      }),
+      failedEvidence("browser-wait", "wait_for_url"),
+      evidence("browser-click", "click", {
+        tabId: "tab-unrecovered",
+        url: "https://duckduckgo.com/?q=claimed",
+      }),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-fill", "browser-wait", "browser-click", "answer-1"],
+        ["answer-1"],
+        [
+          "Filled Browser tab tab-unrecovered.",
+          "Final title: Claimed result.",
+          "Final URL: https://duckduckgo.com/?q=claimed.",
+        ].join(" "),
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("requires final-title inspection recovery even without a literal tab or URL reference", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-fill", "fill", {
+        tabId: "tab-title-only",
+        url: "https://example.test/",
+      }),
+      failedEvidence("browser-wait", "wait_for_url"),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-fill", "browser-wait", "answer-1"],
+        ["answer-1"],
+        "I filled the field in the browser. Final title: Claimed result.",
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("does not use stale metadata captured before a later page-changing action", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-url", "get_url", {
+        tabId: "tab-stale-metadata",
+        url: "https://example.test/before",
+      }),
+      evidence("browser-title", "get_title", {
+        tabId: "tab-stale-metadata",
+        url: "https://example.test/before",
+      }),
+      evidence("browser-fill", "fill", {
+        tabId: "tab-stale-metadata",
+        url: "https://example.test/after",
+      }),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-url", "browser-title", "browser-fill", "answer-1"],
+        ["answer-1"],
+        [
+          "Filled Browser tab tab-stale-metadata.",
+          "Final title: Claimed after state.",
+          "Final URL: https://example.test/after.",
+        ].join(" "),
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("does not use stale metadata captured before a failed page-changing action", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-url", "get_url", {
+        tabId: "tab-stale-failure",
+        url: "https://example.test/before",
+      }),
+      evidence("browser-title", "get_title", {
+        tabId: "tab-stale-failure",
+        url: "https://example.test/before",
+      }),
+      failedEvidence("browser-navigate-failed", "navigate"),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-url", "browser-title", "browser-navigate-failed", "answer-1"],
+        ["answer-1"],
+        "Final Browser URL: https://example.test/claimed.",
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("invalidates page metadata when the claimed tab is closed afterward", () => {
+    const items = byId([
+      item("user-1", "user_message"),
+      evidence("browser-url", "get_url", {
+        tabId: "tab-closed-after-read",
+        url: "https://example.test/before-close",
+      }),
+      evidence("browser-title", "get_title", {
+        tabId: "tab-closed-after-read",
+        url: "https://example.test/before-close",
+      }),
+      evidence("browser-close", "close_tab"),
+      item("answer-1", "assistant_message"),
+    ]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "browser-url", "browser-title", "browser-close", "answer-1"],
+        ["answer-1"],
+        "Final Browser URL for tab-closed-after-read: https://example.test/before-close.",
+      ),
+    ).toEqual({ kind: "unverified" });
+  });
+
+  it("recognizes an explicit final Browser title as an inspection claim by itself", () => {
+    const items = byId([item("user-1", "user_message"), item("answer-1", "assistant_message")]);
+
+    expect(
+      resolveBrowserVerificationBadge(
+        items,
+        ["user-1", "answer-1"],
+        ["answer-1"],
+        "Final browser title: Claimed result.",
       ),
     ).toEqual({ kind: "unverified" });
   });

@@ -794,6 +794,18 @@
             by this pre-implementation report.
           </div>
         </details>
+        <details open>
+          <summary>Completion-audit follow-up · fail-first</summary>
+          <div class="detail-body">
+            A fresh requirement audit found three remaining popup defects before live OAuth:
+            asynchronous opening focus can stay behind the modeless dialog, an account refresh
+            failure suppresses the independent catalog request, and complete catalog traversal
+            renders every accumulated row. Three new fail-first regressions reproduce exactly those
+            failures while the other 29 dialog tests remain green. PC-91 through PC-93 require focus
+            handoff, independent recovery, and a bounded scrollable catalog before another release
+            candidate is built.
+          </div>
+        </details>
       </section>
 
       <section class="board-section">

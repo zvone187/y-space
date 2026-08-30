@@ -1,8 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
-import { isAbsolute } from "node:path";
 import {
   pipedreamBeginConnectPayloadSchema,
   pipedreamBeginConnectResultSchema,
@@ -24,17 +22,18 @@ import {
   type PipedreamPersonalMcpOauthFlowStatus,
   type PipedreamSnapshot,
 } from "@/shared/contracts";
-import {
-  capturePipedreamBootstrapEnvText,
-  PIPEDREAM_ENV_FILE_MAX_BYTES,
-  type PipedreamBootstrap,
-} from "@/shared/pipedreamBootstrap";
+import type { PipedreamBootstrap } from "@/shared/pipedreamBootstrap";
 import type { PipedreamPrivilegedConnectLinkResult } from "@/shared/pipedreamPrivilegedIpc";
 import {
   allocateSensitiveSessionPartition,
   releaseUnusedSensitiveSessionPartition,
   type SensitiveSessionPartitionPoolLease,
 } from "../browser/sensitiveSessionPartitionPool";
+import {
+  PipedreamCredentialClearError,
+  PipedreamCredentialImportCommittedError,
+  type PipedreamCredentialStore,
+} from "./pipedreamCredentialStore";
 
 export interface PipedreamMainServiceOptions {
   readonly createConnectLink: (
@@ -51,8 +50,7 @@ export interface PipedreamMainServiceOptions {
   readonly waitPersonalMcpOauth?: (flowId: string) => Promise<McpOauthWaitResult>;
   readonly cancelPersonalMcpOauth?: (flowId: string) => Promise<void>;
   readonly clearPersonalMcpOauth?: () => Promise<void>;
-  readonly persistEnvFilePath: (filePath: string) => void;
-  readonly clearEnvFilePath: () => void;
+  readonly credentialStore: PipedreamCredentialStore;
   readonly fallbackBootstrap: () => PipedreamBootstrap;
   readonly configureBootstrap: (bootstrap: PipedreamBootstrap) => Promise<PipedreamSnapshot>;
 }
@@ -487,41 +485,39 @@ export class PipedreamMainService {
   }
 
   async importEnvironmentFile(filePath: string): Promise<PipedreamEnvFileImportResult> {
-    if (!isAbsolute(filePath) || filePath.length > 4_096) {
-      return { status: "invalid", reason: "unreadable" };
-    }
-
-    let serialized: string;
-    try {
-      const metadata = statSync(filePath);
-      if (!metadata.isFile()) return { status: "invalid", reason: "unreadable" };
-      if (metadata.size > PIPEDREAM_ENV_FILE_MAX_BYTES) {
-        return { status: "invalid", reason: "too-large" };
-      }
-      serialized = readFileSync(filePath, "utf8");
-      if (Buffer.byteLength(serialized, "utf8") > PIPEDREAM_ENV_FILE_MAX_BYTES) {
-        return { status: "invalid", reason: "too-large" };
-      }
-    } catch {
-      return { status: "invalid", reason: "unreadable" };
-    }
-
-    const bootstrap = capturePipedreamBootstrapEnvText(serialized, {});
-    if (bootstrap.state === "absent") {
-      return { status: "invalid", reason: "no-supported-values" };
-    }
-
     return this.#withConfigurationMutation(async () => {
-      const snapshot = await this.#options.configureBootstrap(bootstrap);
-      this.#options.persistEnvFilePath(filePath);
+      let imported: ReturnType<PipedreamCredentialStore["importEnvironmentFile"]>;
+      let committedImportError: PipedreamCredentialImportCommittedError | undefined;
+      try {
+        imported = this.#options.credentialStore.importEnvironmentFile(filePath);
+      } catch (error) {
+        if (!(error instanceof PipedreamCredentialImportCommittedError)) throw error;
+        committedImportError = error;
+        imported = { status: "configured", bootstrap: error.bootstrap };
+      }
+      if (imported.status === "invalid") return imported;
+      const snapshot = await this.#options.configureBootstrap(imported.bootstrap);
+      if (committedImportError) throw committedImportError;
       return pipedreamEnvFileImportResultSchema.parse({ status: "configured", snapshot });
     });
   }
 
   async clearEnvironmentFile(): Promise<PipedreamSnapshot> {
     return this.#withConfigurationMutation(async () => {
+      let committedClearError: PipedreamCredentialClearError | undefined;
+      try {
+        this.#options.credentialStore.clear();
+      } catch (error) {
+        if (!(error instanceof PipedreamCredentialClearError) || !error.credentialsRemoved) {
+          throw error;
+        }
+        committedClearError = error;
+      }
+
+      // Once the store unlink commits, revoke the authoritative bootstrap and
+      // live supervisor even if the final directory fsync reported failure.
       const snapshot = await this.#options.configureBootstrap(this.#options.fallbackBootstrap());
-      this.#options.clearEnvFilePath();
+      if (committedClearError) throw committedClearError;
       return snapshot;
     });
   }

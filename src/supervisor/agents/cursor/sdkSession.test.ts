@@ -282,6 +282,26 @@ describe("CursorSdkSession", () => {
     });
   });
 
+  it("disposes a worker that finishes spawning after activation was disposed", async () => {
+    const worker = new FakeWorker();
+    const pendingWorker = deferred<FakeWorker>();
+    const spawnWorker = vi.fn<(input: unknown) => Promise<FakeWorker>>(
+      async () => pendingWorker.promise,
+    );
+    const session = await CursorSdkSession.create(input(), {
+      spawnWorker,
+      newId: () => "id-1",
+    });
+
+    const activation = session.activate();
+    await vi.waitFor(() => expect(spawnWorker).toHaveBeenCalledOnce());
+    await session.dispose();
+    pendingWorker.resolve(worker);
+
+    await expect(activation).rejects.toThrow("disposed before activation");
+    expect(worker.dispose).toHaveBeenCalledOnce();
+  });
+
   it("derives a stable Cursor-shaped local identity from the Poracode thread", () => {
     const first = cursorSdkAgentId("thread-123456789");
     expect(first).toMatch(

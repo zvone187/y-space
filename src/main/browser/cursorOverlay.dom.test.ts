@@ -16,6 +16,28 @@ const isolatedRemove = Element.prototype.remove;
 const isolatedAppendChild = Node.prototype.appendChild;
 const isolatedGetComputedStyle = window.getComputedStyle;
 const isolatedGetPropertyValue = CSSStyleDeclaration.prototype.getPropertyValue;
+let trustedGetComputedStyle = isolatedGetComputedStyle;
+const isolatedMatchesDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "matches");
+const isolatedShowPopoverDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "showPopover",
+);
+const isolatedHidePopoverDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "hidePopover",
+);
+const isolatedShowModalDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLDialogElement.prototype,
+  "showModal",
+);
+const isolatedDialogCloseDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLDialogElement.prototype,
+  "close",
+);
+
+interface TopLayerModel {
+  readonly order: HTMLElement[];
+}
 
 interface CursorDomState {
   identity?: string;
@@ -26,7 +48,102 @@ interface CursorDomState {
   sessionHidden?: boolean;
 }
 
-function installBrowserPrimitives(reducedMotion: boolean): void {
+function installBrowserPrimitives(reducedMotion: boolean): TopLayerModel {
+  const order: HTMLElement[] = [];
+  const openPopovers = new WeakSet<HTMLElement>();
+  const removeFromTopLayer = (element: HTMLElement): void => {
+    const index = order.indexOf(element);
+    if (index >= 0) order.splice(index, 1);
+  };
+  const toggleEvent = (
+    type: "beforetoggle" | "toggle",
+    oldState: "closed" | "open",
+    newState: "closed" | "open",
+    cancelable: boolean,
+  ): Event => {
+    const event = new Event(type, { cancelable });
+    Object.defineProperties(event, {
+      oldState: { configurable: true, value: oldState },
+      newState: { configurable: true, value: newState },
+    });
+    return event;
+  };
+  Object.defineProperty(HTMLElement.prototype, "showPopover", {
+    configurable: true,
+    writable: true,
+    value: function (this: HTMLElement): void {
+      if (!this.isConnected || this.getAttribute("popover") !== "manual") {
+        throw new DOMException("Popover is not valid", "InvalidStateError");
+      }
+      if (openPopovers.has(this)) return;
+      if (!this.dispatchEvent(toggleEvent("beforetoggle", "closed", "open", true))) return;
+      if (!this.isConnected || this.getAttribute("popover") !== "manual") return;
+      removeFromTopLayer(this);
+      openPopovers.add(this);
+      order.push(this);
+      this.dispatchEvent(toggleEvent("toggle", "closed", "open", false));
+    },
+  });
+  Object.defineProperty(HTMLElement.prototype, "hidePopover", {
+    configurable: true,
+    writable: true,
+    value: function (this: HTMLElement): void {
+      if (!openPopovers.has(this)) return;
+      this.dispatchEvent(toggleEvent("beforetoggle", "open", "closed", false));
+      openPopovers.delete(this);
+      removeFromTopLayer(this);
+      this.dispatchEvent(toggleEvent("toggle", "open", "closed", false));
+    },
+  });
+  Object.defineProperty(Element.prototype, "matches", {
+    configurable: true,
+    writable: true,
+    value: function (this: Element, selector: string): boolean {
+      if (selector === ":popover-open") {
+        if (!(this instanceof HTMLElement) || !this.isConnected) {
+          if (this instanceof HTMLElement) openPopovers.delete(this);
+          return false;
+        }
+        return openPopovers.has(this);
+      }
+      const nativeMatches = isolatedMatchesDescriptor?.value as Element["matches"] | undefined;
+      return nativeMatches ? Reflect.apply(nativeMatches, this, [selector]) : false;
+    },
+  });
+  trustedGetComputedStyle = ((element: Element, pseudoElement?: string | null) => {
+    const computed = isolatedGetComputedStyle.call(window, element, pseudoElement);
+    if (!(element instanceof HTMLElement) || !openPopovers.has(element)) return computed;
+    return new Proxy(computed, {
+      get(target, property, receiver) {
+        if (property === "display") return "block";
+        const value = Reflect.get(target, property, receiver) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  }) as typeof window.getComputedStyle;
+  Object.defineProperty(window, "getComputedStyle", {
+    configurable: true,
+    writable: true,
+    value: trustedGetComputedStyle,
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+    configurable: true,
+    writable: true,
+    value: function (this: HTMLDialogElement): void {
+      if (!this.isConnected) throw new DOMException("Dialog is not connected", "InvalidStateError");
+      removeFromTopLayer(this);
+      this.setAttribute("open", "");
+      order.push(this);
+    },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", {
+    configurable: true,
+    writable: true,
+    value: function (this: HTMLDialogElement): void {
+      this.removeAttribute("open");
+      removeFromTopLayer(this);
+    },
+  });
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 900 });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: 700 });
@@ -67,6 +184,7 @@ function installBrowserPrimitives(reducedMotion: boolean): void {
       return 1;
     },
   });
+  return { order };
 }
 
 function addTarget(): HTMLButtonElement {
@@ -169,7 +287,7 @@ function evaluatingCdp(): CdpSession {
       Object.defineProperty(window, "getComputedStyle", {
         configurable: true,
         writable: true,
-        value: isolatedGetComputedStyle,
+        value: trustedGetComputedStyle,
       });
       try {
         const value = await window.eval(String(params?.expression ?? ""));
@@ -207,6 +325,7 @@ function evaluatingCdp(): CdpSession {
 
 afterEach(() => {
   vi.useRealTimers();
+  trustedGetComputedStyle = isolatedGetComputedStyle;
   Object.defineProperty(Document.prototype, "querySelectorAll", {
     configurable: true,
     writable: true,
@@ -237,6 +356,29 @@ afterEach(() => {
     writable: true,
     value: isolatedGetPropertyValue,
   });
+  if (isolatedMatchesDescriptor) {
+    Object.defineProperty(Element.prototype, "matches", isolatedMatchesDescriptor);
+  }
+  if (isolatedShowPopoverDescriptor) {
+    Object.defineProperty(HTMLElement.prototype, "showPopover", isolatedShowPopoverDescriptor);
+  } else {
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).showPopover;
+  }
+  if (isolatedHidePopoverDescriptor) {
+    Object.defineProperty(HTMLElement.prototype, "hidePopover", isolatedHidePopoverDescriptor);
+  } else {
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).hidePopover;
+  }
+  if (isolatedShowModalDescriptor) {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", isolatedShowModalDescriptor);
+  } else {
+    delete (HTMLDialogElement.prototype as unknown as Record<string, unknown>).showModal;
+  }
+  if (isolatedDialogCloseDescriptor) {
+    Object.defineProperty(HTMLDialogElement.prototype, "close", isolatedDialogCloseDescriptor);
+  } else {
+    delete (HTMLDialogElement.prototype as unknown as Record<string, unknown>).close;
+  }
   document.body.replaceChildren();
   document.getElementById("__y_space_screenshot_cursor_hide__")?.remove();
   document.getElementById("__y_space_session_cursor_hide__")?.remove();
@@ -263,7 +405,12 @@ describe("Y Space cursor DOM lifecycle", () => {
       },
     });
 
-    const expression = cursorGlideExpr({ x: 140, y: 70, kind: "element" }, 0, "hover");
+    // This test targets Chromium's transform serialization, not the production
+    // 250 ms transport deadline. Give a parallel full-suite worker enough time
+    // to reach evaluation even when the host is saturated.
+    const expression = cursorGlideExpr({ x: 140, y: 70, kind: "element" }, 0, "hover", undefined, {
+      deadlineEpochMs: Date.now() + 5_000,
+    });
     const moved = await evaluate<{ ok: boolean; x?: number; y?: number; reason?: string }>(
       expression,
     );
@@ -300,12 +447,62 @@ describe("Y Space cursor DOM lifecycle", () => {
     expect(hosts).toHaveLength(1);
     expect(host.shadowRoot).toBeNull();
     expect(host.getAttribute("aria-hidden")).toBe("true");
+    expect(host.getAttribute("popover")).toBe("manual");
+    expect(host.matches(":popover-open")).toBe(true);
     expect(host.style.pointerEvents).toBe("none");
     expect(host.style.transform).toBe("translate3d(140px,70px,0)");
     expect(cursorState().host).toBe(host);
     expect(cursorState().feedback.id).toBe("__y_space_agent_cursor_feedback__");
     expect(hostileState.target).toBe(document.body);
     expect(hostileState.targetKind).toBe("viewport");
+  });
+
+  it("promotes its manual popover above modal top-layer entries before every path check", async () => {
+    const topLayer = installBrowserPrimitives(false);
+    const firstDialog = document.createElement("dialog");
+    document.body.appendChild(firstDialog);
+    firstDialog.showModal();
+    const operationToken = "modal-top-layer-order";
+    const identity = {
+      mainDocumentIdentity: "direct-expression",
+      hostId: "__y_space_agent_cursor__",
+      stateKey: "__y_space_agent_cursor_state__",
+    };
+
+    await expect(
+      evaluate<{ ok: boolean }>(
+        cursorGlideExpr({ x: 140, y: 70, kind: "element" }, 0, "click", undefined, {
+          identity,
+          operationToken,
+        }),
+      ),
+    ).resolves.toMatchObject({ ok: true });
+    const host = cursorState().host;
+    expect(topLayer.order).toEqual([firstDialog, host]);
+
+    const laterDialog = document.createElement("dialog");
+    document.body.appendChild(laterDialog);
+    laterDialog.showModal();
+    expect(topLayer.order.at(-1)).toBe(laterDialog);
+
+    await expect(
+      evaluate<{ ok: boolean }>(cursorPathVerificationExpr(identity, operationToken)),
+    ).resolves.toEqual({ ok: true });
+    expect(topLayer.order).toEqual([firstDialog, laterDialog, host]);
+    expect(host.matches(":popover-open")).toBe(true);
+  });
+
+  it("fails closed when the manual popover API is unavailable", async () => {
+    installBrowserPrimitives(false);
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).showPopover;
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).hidePopover;
+
+    await expect(
+      evaluate<{ ok: boolean; reason?: string }>(
+        cursorGlideExpr({ x: 140, y: 70, kind: "element" }, 0, "click"),
+      ),
+    ).resolves.toEqual({ ok: false, reason: "cursor-overlay-unverified" });
+    expect(document.querySelector("#__y_space_agent_cursor__")).toBeNull();
   });
 
   it("uses a trusted document-scoped origin instead of page-spoofed visual state", async () => {
@@ -385,6 +582,33 @@ describe("Y Space cursor DOM lifecycle", () => {
     ).resolves.toEqual({ ok: false });
   });
 
+  it("fails a path check when the page cancels top-layer re-promotion", async () => {
+    installBrowserPrimitives(false);
+    const operationToken = "hostile-popover-cancellation";
+    const identity = {
+      mainDocumentIdentity: "direct-expression",
+      hostId: "__y_space_agent_cursor__",
+      stateKey: "__y_space_agent_cursor_state__",
+    };
+    await expect(
+      evaluate<{ ok: boolean }>(
+        cursorGlideExpr({ x: 140, y: 70, kind: "element" }, 0, "click", undefined, {
+          identity,
+          operationToken,
+        }),
+      ),
+    ).resolves.toMatchObject({ ok: true });
+    const host = cursorState().host;
+    host.addEventListener("beforetoggle", (event) => {
+      if ((event as Event & { newState?: string }).newState === "open") event.preventDefault();
+    });
+
+    await expect(
+      evaluate<{ ok: boolean }>(cursorPathVerificationExpr(identity, operationToken)),
+    ).resolves.toEqual({ ok: false });
+    expect(host.matches(":popover-open")).toBe(false);
+  });
+
   it("cannot resume into late visible motion after its renderer deadline", async () => {
     vi.useFakeTimers();
     installBrowserPrimitives(false);
@@ -431,25 +655,46 @@ describe("Y Space cursor DOM lifecycle", () => {
     installBrowserPrimitives(false);
     const cdp = evaluatingCdp();
     const state = await installIsolatedCursor(cdp);
+    const beforeToggle = vi.fn<(event: Event) => void>();
+    state.host.addEventListener("beforetoggle", beforeToggle);
     const spoof = document.createElement("div");
     spoof.id = "__y_space_screenshot_cursor_hide__";
     document.head.appendChild(spoof);
 
     await withCursorOverlayHidden(cdp, async () => {
       expect(getComputedStyle(state.host).visibility).toBe("hidden");
+      expect(state.host.matches(":popover-open")).toBe(true);
       expect(state.screenshotOwners?.[0]).toContain("y-space-screenshot-");
       expect(document.getElementById("__y_space_screenshot_cursor_hide__")).toBe(spoof);
     });
 
     expect(getComputedStyle(state.host).visibility).not.toBe("hidden");
+    expect(state.host.matches(":popover-open")).toBe(true);
     expect(state.screenshotOwners).toEqual([]);
     expect(document.getElementById("__y_space_screenshot_cursor_hide__")).toBe(spoof);
+    expect(beforeToggle).not.toHaveBeenCalled();
+  });
+
+  it("rejects screenshot restoration when the page closes the top-layer host", async () => {
+    installBrowserPrimitives(false);
+    const cdp = evaluatingCdp();
+    const state = await installIsolatedCursor(cdp);
+
+    await expect(
+      withCursorOverlayHidden(cdp, async () => {
+        state.host.hidePopover();
+        return "image";
+      }),
+    ).rejects.toThrow("could not restore cursor visibility");
+    expect(state.host.matches(":popover-open")).toBe(false);
   });
 
   it("keeps session visibility in isolated state and confirms exact-host hide/show", async () => {
     installBrowserPrimitives(false);
     const cdp = evaluatingCdp();
     const state = await installIsolatedCursor(cdp);
+    const beforeToggle = vi.fn<(event: Event) => void>();
+    state.host.addEventListener("beforetoggle", beforeToggle);
     const spoof = document.createElement("div");
     spoof.id = "__y_space_session_cursor_hide__";
     document.head.appendChild(spoof);
@@ -457,12 +702,26 @@ describe("Y Space cursor DOM lifecycle", () => {
     await expect(setCursorOverlayVisible(cdp, false)).resolves.toBe(true);
     expect(state.sessionHidden).toBe(true);
     expect(getComputedStyle(state.host).visibility).toBe("hidden");
+    expect(state.host.matches(":popover-open")).toBe(true);
     expect(document.getElementById("__y_space_session_cursor_hide__")).toBe(spoof);
+    expect(beforeToggle).not.toHaveBeenCalled();
 
     await expect(setCursorOverlayVisible(cdp, true)).resolves.toBe(true);
     expect(state.sessionHidden).toBe(false);
     expect(getComputedStyle(state.host).visibility).not.toBe("hidden");
+    expect(state.host.matches(":popover-open")).toBe(true);
     expect(document.getElementById("__y_space_session_cursor_hide__")).toBe(spoof);
+    expect(beforeToggle).not.toHaveBeenCalled();
+  });
+
+  it("does not report a page-closed top-layer host as session-visible", async () => {
+    installBrowserPrimitives(false);
+    const cdp = evaluatingCdp();
+    const state = await installIsolatedCursor(cdp);
+    state.host.hidePopover();
+
+    await expect(setCursorOverlayVisible(cdp, true)).resolves.toBe(false);
+    expect(state.host.matches(":popover-open")).toBe(false);
   });
 
   it("ignores hostile main-world prototype patches while replacing spoofed hide styles", async () => {

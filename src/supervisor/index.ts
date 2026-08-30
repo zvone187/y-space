@@ -16,6 +16,9 @@ import {
   type PipedreamPrivilegedReply,
 } from "@/shared/pipedreamPrivilegedIpc";
 import { capturePrivilegedMcpEnvironment } from "./privilegedMcpEnvironment";
+import { createSupervisorSecretBootstrapGate } from "./secretBootstrapGate";
+import { McpOAuthCredentialStoreUnavailableError } from "./mcp/McpOAuthService";
+import { SUPERVISOR_BOOTSTRAP_FAILURE_CODE } from "@/shared/supervisorSecretBootstrap";
 
 const isDev = process.env.PORACODE_IS_DEV === "1" || Boolean(process.env.VITE_DEV_SERVER_URL);
 
@@ -23,15 +26,31 @@ initializeSupervisorSentry({
   appVersion: process.env.PORACODE_APP_VERSION ?? process.env.npm_package_version ?? "dev",
   isDev,
 });
-configureSecretStorageKey(process.env.PORACODE_SECRET_STORAGE_KEY);
-delete process.env.PORACODE_SECRET_STORAGE_KEY;
 capturePrivilegedMcpEnvironment();
 
-const runtime = new SupervisorRuntime((event) => {
-  process.send?.(event);
-});
+interface SupervisorContext {
+  readonly runtime: SupervisorRuntime;
+  readonly handlers: ReturnType<typeof createSupervisorIpcHandlers>;
+}
 
-const handlers = createSupervisorIpcHandlers(runtime);
+const secretBootstrapGate = createSupervisorSecretBootstrapGate<SupervisorContext>(
+  (bootstrap) => {
+    configureSecretStorageKey(bootstrap.secretStorageKey);
+    const runtime = new SupervisorRuntime(
+      (event) => {
+        process.send?.(event);
+      },
+      { allowPipedreamOauthPersistence: bootstrap.allowPipedreamOauthPersistence },
+    );
+    return { runtime, handlers: createSupervisorIpcHandlers(runtime) };
+  },
+  {
+    classifyInitializationError: (error) =>
+      error instanceof McpOAuthCredentialStoreUnavailableError
+        ? SUPERVISOR_BOOTSTRAP_FAILURE_CODE.MCP_OAUTH_STORE_UNAVAILABLE
+        : SUPERVISOR_BOOTSTRAP_FAILURE_CODE.INITIALIZATION_FAILED,
+  },
+);
 
 let isShuttingDown = false;
 const SUPERVISOR_SHUTDOWN_TIMEOUT_MS = 5_000;
@@ -49,8 +68,9 @@ async function shutdownSupervisor(exitCode = 0): Promise<void> {
   }
   isShuttingDown = true;
   try {
+    const runtime = secretBootstrapGate.current()?.runtime;
     await Promise.race([
-      runtime.disposeAsync(),
+      runtime?.disposeAsync() ?? Promise.resolve(),
       new Promise<void>((resolve) => setTimeout(resolve, SUPERVISOR_SHUTDOWN_TIMEOUT_MS)),
     ]);
   } finally {
@@ -58,14 +78,32 @@ async function shutdownSupervisor(exitCode = 0): Promise<void> {
   }
 }
 
-async function handleRequest(request: SupervisorRequest): Promise<unknown> {
-  const handler = handlers[request.type];
+async function handleRequest(
+  context: SupervisorContext,
+  request: SupervisorRequest,
+): Promise<unknown> {
+  const handler = context.handlers[request.type];
   return handler(request.payload as never);
 }
 
 process.on("message", (message: unknown) => {
+  const bootstrapDecision = secretBootstrapGate.handle(message);
+  if (bootstrapDecision.handled) {
+    if (bootstrapDecision.reply) process.send?.(bootstrapDecision.reply);
+    return;
+  }
+
+  const context = secretBootstrapGate.current();
+  if (!context) {
+    const replyTo = readBoundedRequestId(message);
+    if (replyTo) {
+      process.send?.({ replyTo, ok: false, error: "Supervisor is not ready." });
+    }
+    return;
+  }
+
   if (isPipedreamPrivilegedBootstrapMessage(message)) {
-    void runtime
+    void context.runtime
       .configurePipedream(message.payload)
       .then(
         (data): PipedreamPrivilegedReply => ({
@@ -87,7 +125,7 @@ process.on("message", (message: unknown) => {
     return;
   }
   if (isPipedreamPrivilegedConnectLinkRequest(message)) {
-    void runtime.pipedreamService
+    void context.runtime.pipedreamService
       .createConnectLink(
         { appSlug: message.request.appSlug },
         {
@@ -115,7 +153,7 @@ process.on("message", (message: unknown) => {
     return;
   }
   if (!isSupervisorRequest(message)) return;
-  void handleRequest(message)
+  void handleRequest(context, message)
     .then(
       (data): SupervisorReply => ({
         replyTo: message.id,
@@ -128,6 +166,20 @@ process.on("message", (message: unknown) => {
     })
     .then((reply) => process.send?.(reply));
 });
+
+function readBoundedRequestId(value: unknown): string | undefined {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("id" in value) ||
+    typeof value.id !== "string" ||
+    value.id.length === 0 ||
+    value.id.length > 128
+  ) {
+    return undefined;
+  }
+  return value.id;
+}
 
 function isSupervisorRequest(value: unknown): value is SupervisorRequest {
   return (

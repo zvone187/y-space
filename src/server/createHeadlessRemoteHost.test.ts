@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   tmpBase: "",
   capturedOnEvent: undefined as ((event: unknown) => void) | undefined,
   supervisorStart: vi.fn<(baseDir: string) => void>(),
+  supervisorWaitUntilReady: vi.fn<() => Promise<void>>(async () => {}),
   supervisorDispose: vi.fn<() => void>(),
   supervisorCall: vi.fn<() => Promise<unknown>>(async () => ({})),
   initDatabase: vi.fn<(dbPath: string) => void>(),
@@ -77,6 +78,7 @@ vi.mock("@/main/db", () => ({
 vi.mock("@/main/supervisor/SupervisorClient", () => ({
   SupervisorClient: class {
     start = h.supervisorStart;
+    waitUntilReady = h.supervisorWaitUntilReady;
     dispose = h.supervisorDispose;
     call = h.supervisorCall;
     constructor(options: { onEvent: (event: unknown) => void }) {
@@ -121,6 +123,8 @@ describe("createHeadlessRemoteHost", () => {
     h.tmpBase = mkdtempSync(join(tmpdir(), "lc-headless-"));
     h.capturedOnEvent = undefined;
     h.supervisorStart.mockReset();
+    h.supervisorWaitUntilReady.mockReset();
+    h.supervisorWaitUntilReady.mockResolvedValue();
     h.supervisorDispose.mockReset();
     h.initDatabase.mockReset();
     h.closeDatabase.mockReset();
@@ -154,6 +158,22 @@ describe("createHeadlessRemoteHost", () => {
     });
 
     await host.dispose();
+  });
+
+  it("fails startup and tears down when supervisor readiness is blocked", async () => {
+    h.supervisorWaitUntilReady.mockRejectedValue(
+      new Error("Supervisor security bootstrap failed."),
+    );
+    const host = await makeHost();
+    const serverStart = vi.spyOn(host.server, "start");
+
+    await expect(host.start()).rejects.toThrow("Supervisor security bootstrap failed.");
+
+    expect(h.supervisorStart).toHaveBeenCalledWith(h.tmpBase);
+    expect(h.supervisorWaitUntilReady).toHaveBeenCalledOnce();
+    expect(serverStart).not.toHaveBeenCalled();
+    expect(h.supervisorDispose).toHaveBeenCalledOnce();
+    expect(h.closeDatabase).toHaveBeenCalledOnce();
   });
 
   it("forks the supervisor only once across repeated start() calls", async () => {

@@ -5,6 +5,8 @@ export const SSH_RUNTIME_ENTRY_CONFIG = {
   supervisor: ["@opencode-ai/sdk", "@sentry/node"],
   claudeSdkProbeWorker: [],
   cursorSdkWorker: [],
+  mcpProbeWorker: [],
+  mcpToolFilterWorker: [],
 } as const satisfies Record<string, readonly string[]>;
 
 export type SshRuntimeEntryName = keyof typeof SSH_RUNTIME_ENTRY_CONFIG;

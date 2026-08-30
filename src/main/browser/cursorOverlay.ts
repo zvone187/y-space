@@ -202,6 +202,27 @@ function __ysApplyCursorVisibility(state){
   const hidden=state.sessionHidden===true||(Array.isArray(state.screenshotOwners)&&state.screenshotOwners.length>0);
   CSSStyleDeclaration.prototype.setProperty.call(state.host.style,"visibility",hidden?"hidden":"visible","important");
 }
+function __ysCursorPopoverOpen(state){
+  if(!state||!state.host||!state.host.isConnected||state.host.ownerDocument!==document||state.host.getAttribute("popover")!=="manual") return false;
+  const matches=Element.prototype.matches;
+  if(typeof matches!=="function") return false;
+  try { return matches.call(state.host,":popover-open")===true; } catch(e) { return false; }
+}
+function __ysPromoteCursor(state){
+  if(!state||!state.host||!state.host.isConnected||state.host.ownerDocument!==document||state.host.getAttribute("popover")!=="manual") return false;
+  const show=HTMLElement.prototype.showPopover;
+  const hide=HTMLElement.prototype.hidePopover;
+  if(typeof show!=="function"||typeof hide!=="function") return false;
+  try {
+    if(__ysCursorPopoverOpen(state)){
+      hide.call(state.host);
+      if(__ysCursorPopoverOpen(state)) return false;
+    }
+    if(!state.host.isConnected||state.host.getAttribute("popover")!=="manual") return false;
+    show.call(state.host);
+    return state.host.isConnected&&__ysCursorPopoverOpen(state);
+  } catch(e) { return false; }
+}
 function __ysAgentCursor(HOST_ID,STATE_KEY){
   let state=window[STATE_KEY];
   if(state&&state.identity===STATE_KEY&&state.hostId===HOST_ID&&state.host&&state.host.isConnected&&state.host.id===HOST_ID){
@@ -216,10 +237,12 @@ function __ysAgentCursor(HOST_ID,STATE_KEY){
   host.id=HOST_ID;
   Element.prototype.setAttribute.call(host,"aria-hidden","true");
   Element.prototype.setAttribute.call(host,"inert","");
+  Element.prototype.setAttribute.call(host,"popover","manual");
   Element.prototype.setAttribute.call(host,"style","all:initial;position:fixed!important;left:0!important;top:0!important;width:1px!important;height:1px!important;z-index:2147483647!important;pointer-events:none!important;will-change:transform!important;transform:translate3d(-48px,-48px,0);contain:layout style!important;visibility:hidden!important");
   const root=Element.prototype.attachShadow.call(host,{mode:"closed"});
   const css=\`
     :host,*{box-sizing:border-box;pointer-events:none!important}
+    :host::backdrop{background:transparent!important;pointer-events:none!important}
     #__y_space_agent_cursor_pointer__{position:absolute;left:0;top:0;width:28px;height:31px;filter:drop-shadow(0 3px 7px rgba(30,24,20,.22));transform:translate(-2px,-1px)}
     #__y_space_agent_cursor_pointer__ svg{display:block;width:28px;height:31px;overflow:visible}
     #__y_space_agent_cursor_feedback__{position:absolute;left:0;top:0;display:grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border:2px solid #ffffff;border-radius:999px;background:#ff5a1f;color:#ffffff;font:700 10px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em;box-shadow:0 3px 12px rgba(255,90,31,.32);opacity:0;transform:translate(-50%,-50%) scale(.55);transform-origin:center;white-space:nowrap}
@@ -276,7 +299,7 @@ function __ysStopFeedback(state){
   state.feedback.style.opacity="0";
 }
 function __ysCursorHostValid(state,HOST_ID,STATE_KEY,expectVisible){
-  if(!state||window[STATE_KEY]!==state||state.identity!==STATE_KEY||state.hostId!==HOST_ID||!state.host||!state.host.isConnected||state.host.ownerDocument!==document||(state.host.parentNode!==document.body&&state.host.parentNode!==document.documentElement)||state.host.id!==HOST_ID||state.host.getAttribute("aria-hidden")!=="true"||!state.host.hasAttribute("inert")||!state.root||state.feedback?.getRootNode()!==state.root) return false;
+  if(!state||window[STATE_KEY]!==state||state.identity!==STATE_KEY||state.hostId!==HOST_ID||!state.host||!state.host.isConnected||state.host.ownerDocument!==document||(state.host.parentNode!==document.body&&state.host.parentNode!==document.documentElement)||state.host.id!==HOST_ID||state.host.getAttribute("aria-hidden")!=="true"||!state.host.hasAttribute("inert")||state.host.getAttribute("popover")!=="manual"||!__ysCursorPopoverOpen(state)||!state.root||state.feedback?.getRootNode()!==state.root) return false;
   const style=getComputedStyle(state.host);
   const isNone=function(value){return value===""||value==="none"||value==="normal";};
   const overflowVisible=function(value){return value===""||value==="visible";};
@@ -284,6 +307,7 @@ function __ysCursorHostValid(state,HOST_ID,STATE_KEY,expectVisible){
   return style.position==="fixed"&&style.pointerEvents==="none"&&style.zIndex==="2147483647"&&style.width==="1px"&&style.height==="1px"&&style.display!=="none"&&opacity===1&&overflowVisible(style.overflowX)&&overflowVisible(style.overflowY)&&style.contentVisibility!=="hidden"&&isNone(style.clipPath)&&isNone(style.filter)&&isNone(style.maskImage)&&isNone(style.offsetPath)&&isNone(style.rotate)&&isNone(style.scale)&&isNone(style.translate)&&(!expectVisible||style.visibility==="visible");
 }
 async function __ysCursorPainted(state,HOST_ID,STATE_KEY,expectVisible){
+  if(!__ysPromoteCursor(state)) return false;
   const painted=await new Promise(function(resolve){
     let settled=false;
     const timer=setTimeout(function(){if(!settled){settled=true;resolve(false);}},120);
@@ -363,6 +387,7 @@ function hideOverlayForScreenshotExpr(token: string, identity: CursorVisualIdent
 
 function restoreOverlayAfterScreenshotExpr(token: string, identity: CursorVisualIdentity): string {
   return `(() => {
+  ${CURSOR_INSTALL}
   const phase="restore";
   const HOST_ID=${JSON.stringify(identity.hostId)};
   const STATE_KEY=${JSON.stringify(identity.stateKey)};
@@ -375,8 +400,9 @@ function restoreOverlayAfterScreenshotExpr(token: string, identity: CursorVisual
   const mustBeVisible=state.screenshotOwners.length===0&&!sessionOwned;
   if(state.host&&state.host.isConnected) CSSStyleDeclaration.prototype.setProperty.call(state.host.style,"visibility",mustBeVisible?"visible":"hidden","important");
   const connected=!!(state.host&&state.host.isConnected&&state.host.id===HOST_ID&&window[STATE_KEY]===state);
-  const visible=connected&&getComputedStyle(state.host).visibility!=="hidden";
-  return {ok:!tokenOwned&&(!mustBeVisible||!connected||visible),tokenOwned:tokenOwned,screenshotOwnerCount:state.screenshotOwners.length,sessionOwned:sessionOwned,hostCount:connected?1:0,visibleHostCount:visible?1:0};
+  const topLayerIntact=!connected||__ysCursorPopoverOpen(state);
+  const visible=connected&&__ysCursorHostValid(state,HOST_ID,STATE_KEY,true);
+  return {ok:!tokenOwned&&topLayerIntact&&(!mustBeVisible||!connected||visible),tokenOwned:tokenOwned,screenshotOwnerCount:state.screenshotOwners.length,sessionOwned:sessionOwned,hostCount:connected?1:0,visibleHostCount:visible?1:0};
 })()`;
 }
 
@@ -407,6 +433,7 @@ interface SessionOverlayVisibilityResult {
 
 function sessionOverlayVisibilityExpr(visible: boolean, identity: CursorVisualIdentity): string {
   return `(async () => {
+  ${CURSOR_INSTALL}
   const phase=${JSON.stringify(visible ? "session-show" : "session-hide")};
   const HOST_ID=${JSON.stringify(identity.hostId)};
   const STATE_KEY=${JSON.stringify(identity.stateKey)};
@@ -416,11 +443,12 @@ function sessionOverlayVisibilityExpr(visible: boolean, identity: CursorVisualId
   const screenshotOwnerCount=Array.isArray(state.screenshotOwners)?state.screenshotOwners.length:0;
   const connected=!!(state.host&&state.host.isConnected&&state.host.id===HOST_ID&&window[STATE_KEY]===state);
   if(connected) CSSStyleDeclaration.prototype.setProperty.call(state.host.style,"visibility",state.sessionHidden||screenshotOwnerCount>0?"hidden":"visible","important");
+  const topLayerIntact=!connected||__ysCursorPopoverOpen(state);
   if(connected){await new Promise(function(resolve){let done=false;const timer=setTimeout(function(){if(!done){done=true;resolve(false);}},120);requestAnimationFrame(function(){if(!done){done=true;clearTimeout(timer);resolve(true);}});});}
   const hidden=connected&&getComputedStyle(state.host).visibility==="hidden";
-  const visibleHostCount=connected&&!hidden?1:0;
+  const visibleHostCount=connected&&!hidden&&__ysCursorHostValid(state,HOST_ID,STATE_KEY,true)?1:0;
   const hiddenHostCount=hidden?1:0;
-  const ok=${visible ? "state.sessionHidden===false&&(screenshotOwnerCount>0||!connected||visibleHostCount===1)" : "state.sessionHidden===true&&(!connected||hiddenHostCount===1)"};
+  const ok=topLayerIntact&&${visible ? "state.sessionHidden===false&&(screenshotOwnerCount>0||!connected||visibleHostCount===1)" : "state.sessionHidden===true&&(!connected||hiddenHostCount===1)"};
   return {ok:ok,sessionOwned:state.sessionHidden===true,screenshotOwnerCount:screenshotOwnerCount,hostCount:connected?1:0,hiddenHostCount:hiddenHostCount,visibleHostCount:visibleHostCount};
 })()`;
 }
@@ -687,7 +715,7 @@ export function cursorGlideExpr(
     state.moveTransform=serializedFinalTransform;
     state.x=displayX; state.y=displayY;
     await Promise.resolve();
-    if(Date.now()>=DEADLINE||state.moveToken!==TOKEN||!__ysCursorHostValid(state,HOST_ID,STATE_KEY,true)||!__ysCursorTransformMatches(state,serializedFinalTransform)){
+    if(Date.now()>=DEADLINE||state.moveToken!==TOKEN||!__ysPromoteCursor(state)||!__ysCursorHostValid(state,HOST_ID,STATE_KEY,true)||!__ysCursorTransformMatches(state,serializedFinalTransform)){
       __ysCancelCursorMove(state,TOKEN);
       return {ok:false,reason:"cursor-overlay-unverified"};
     }
@@ -713,12 +741,13 @@ export function cursorPathVerificationExpr(
   operationToken: string,
 ): string {
   return `(() => {
+    ${CURSOR_INSTALL}
     const phase="path-verify";
     const HOST_ID=${JSON.stringify(identity.hostId)};
     const STATE_KEY=${JSON.stringify(identity.stateKey)};
     const TOKEN=${JSON.stringify(operationToken)};
     const state=window[STATE_KEY];
-    if(!state||window[STATE_KEY]!==state||state.identity!==STATE_KEY||state.hostId!==HOST_ID||state.moveToken!==TOKEN||!state.host||!state.host.isConnected||state.host.ownerDocument!==document||(state.host.parentNode!==document.body&&state.host.parentNode!==document.documentElement)||state.host.id!==HOST_ID||state.host.getAttribute("aria-hidden")!=="true"||!state.host.hasAttribute("inert")||!state.root||state.feedback?.getRootNode()!==state.root||state.host.dataset.phase!=="move") return {ok:false};
+    if(!state||window[STATE_KEY]!==state||state.identity!==STATE_KEY||state.hostId!==HOST_ID||state.moveToken!==TOKEN||!state.host||!state.host.isConnected||state.host.ownerDocument!==document||(state.host.parentNode!==document.body&&state.host.parentNode!==document.documentElement)||state.host.id!==HOST_ID||state.host.getAttribute("aria-hidden")!=="true"||!state.host.hasAttribute("inert")||state.host.getAttribute("popover")!=="manual"||!state.root||state.feedback?.getRootNode()!==state.root||state.host.dataset.phase!=="move"||!__ysPromoteCursor(state)) return {ok:false};
     const style=getComputedStyle(state.host);
     const inlineStyle=state.host.style;
     const isNone=function(value){return value===""||value==="none"||value==="normal";};
@@ -1032,6 +1061,12 @@ interface EditableTargetState {
   length?: number;
 }
 
+interface TextReplaceSelectionState {
+  kind: "value" | "other";
+  observable: boolean;
+  selected: boolean;
+}
+
 interface ToggleTargetState {
   ok: boolean;
   checked?: boolean;
@@ -1231,6 +1266,28 @@ const TARGET_EDITABLE_STATE_FUNCTION = `function () {
     content=textDescriptor&&textDescriptor.get?Reflect.apply(textDescriptor.get,this,[]):null;
   }
   return {active:activeMatches,editable:editable,length:typeof content==="string"?content.length:null};
+}`;
+
+const TARGET_REPLACE_SELECTION_FUNCTION = `function () {
+  let proto=null;
+  if(this instanceof HTMLInputElement) proto=HTMLInputElement.prototype;
+  else if(this instanceof HTMLTextAreaElement) proto=HTMLTextAreaElement.prototype;
+  else return {kind:"other",observable:false,selected:false};
+  const valueDescriptor=Object.getOwnPropertyDescriptor(proto,"value");
+  const startDescriptor=Object.getOwnPropertyDescriptor(proto,"selectionStart");
+  const endDescriptor=Object.getOwnPropertyDescriptor(proto,"selectionEnd");
+  if(!valueDescriptor||!valueDescriptor.get||!startDescriptor||!startDescriptor.get||!endDescriptor||!endDescriptor.get){
+    return {kind:"value",observable:false,selected:false};
+  }
+  try{
+    const value=Reflect.apply(valueDescriptor.get,this,[]);
+    const start=Reflect.apply(startDescriptor.get,this,[]);
+    const end=Reflect.apply(endDescriptor.get,this,[]);
+    const observable=typeof value==="string"&&Number.isInteger(start)&&Number.isInteger(end);
+    return {kind:"value",observable:observable,selected:observable&&start===0&&end===value.length};
+  }catch{
+    return {kind:"value",observable:false,selected:false};
+  }
 }`;
 
 const TARGET_TEXT_MATCH_FUNCTION = `function (expected,replace,beforeLength) {
@@ -2726,6 +2783,32 @@ export async function dispatchNativeText(
     if (selectAll.status !== "completed") {
       return preservePriorNativeInputAmbiguity(selectAll);
     }
+    const selectionTargetActive = await verifyTargetActive(cdp, target);
+    if (selectionTargetActive.status !== "completed") {
+      return preservePriorNativeInputAmbiguity(selectionTargetActive);
+    }
+    const selection = await callIsolatedNode<TextReplaceSelectionState>(
+      cdp,
+      target.backendNodeId,
+      target.executionContextId,
+      TARGET_REPLACE_SELECTION_FUNCTION,
+    );
+    if (selection.status !== "fulfilled") {
+      return {
+        status: "ambiguous",
+        reason:
+          selection.status === "timed-out"
+            ? "text-selection-verification-timeout"
+            : "text-selection-verification-rejected",
+      };
+    }
+    if (
+      selection.value.kind === "value" &&
+      selection.value.observable &&
+      !selection.value.selected
+    ) {
+      return { status: "ambiguous", reason: "text-selection-did-not-apply" };
+    }
     const cleared = await dispatchKeyboardKeyStroke(
       cdp,
       "Backspace",
@@ -2734,6 +2817,30 @@ export async function dispatchNativeText(
       nativeKeyboard,
     );
     if (cleared.status !== "completed") return preservePriorNativeInputAmbiguity(cleared);
+    const clearedState = await callIsolatedNode<EditableTargetState>(
+      cdp,
+      target.backendNodeId,
+      target.executionContextId,
+      TARGET_EDITABLE_STATE_FUNCTION,
+    );
+    if (clearedState.status !== "fulfilled") {
+      return {
+        status: "ambiguous",
+        reason:
+          clearedState.status === "timed-out"
+            ? "text-clear-verification-timeout"
+            : "text-clear-verification-rejected",
+      };
+    }
+    if (!clearedState.value.active) {
+      return { status: "ambiguous", reason: "text-target-not-active" };
+    }
+    if (!clearedState.value.editable || !Number.isInteger(clearedState.value.length)) {
+      return { status: "ambiguous", reason: "text-target-state-unavailable" };
+    }
+    if (clearedState.value.length !== 0) {
+      return { status: "ambiguous", reason: "text-clear-did-not-commit" };
+    }
   } else {
     const movedToEnd = await dispatchKeyboardKeyStroke(
       cdp,

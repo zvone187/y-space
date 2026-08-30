@@ -88,4 +88,18 @@ describe("processTree", () => {
     expect(taskkillSpawnSyncMock).not.toHaveBeenCalled();
     expect(processKillSpy).toHaveBeenCalledExactlyOnceWith(-31337, "SIGKILL");
   });
+
+  it("forwards an explicit graceful signal to an owned POSIX process group", () => {
+    const processKillSpy = vi.spyOn(process, "kill").mockImplementation(() => true);
+
+    Object.defineProperty(process, "platform", {
+      configurable: true,
+      value: "linux",
+    });
+
+    terminateChildProcessTree({ pid: 31337 }, { ownedProcessGroup: true, signal: "SIGTERM" });
+
+    expect(taskkillSpawnSyncMock).not.toHaveBeenCalled();
+    expect(processKillSpy).toHaveBeenCalledExactlyOnceWith(-31337, "SIGTERM");
+  });
 });

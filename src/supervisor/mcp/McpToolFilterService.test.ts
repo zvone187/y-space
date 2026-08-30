@@ -1,8 +1,12 @@
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@/shared/contracts";
 import { buildCodexMcp } from "@/supervisor/agents/userMcp";
-import { prepareMcpToolFilters } from "./McpToolFilterService";
+import {
+  getMcpToolFilterCleanup,
+  prepareMcpToolFilters,
+  type McpToolFilterDependencies,
+} from "./McpToolFilterService";
 
 const originalHelpersDir = process.env.PORACODE_WSL_HELPERS_DIR;
 
@@ -110,5 +114,84 @@ describe("prepareMcpToolFilters", () => {
 
     expect(new Set(configNames).size).toBe(2);
     expect(() => buildCodexMcp(filtered)).not.toThrow();
+  });
+
+  it("gives each long-lived WSL filter worker its own deferred cleanup path", async () => {
+    const cleanupFirst = vi.fn<() => void>();
+    const cleanupSecond = vi.fn<() => void>();
+    const deploy = vi
+      .fn<NonNullable<McpToolFilterDependencies["deploy"]>>()
+      .mockReturnValueOnce({
+        linuxBaseDir: "/tmp/poracode-mcp-filter-1-first",
+        cleanup: cleanupFirst,
+      })
+      .mockReturnValueOnce({
+        linuxBaseDir: "/tmp/poracode-mcp-filter-1-second",
+        cleanup: cleanupSecond,
+      });
+    const dependencies: McpToolFilterDependencies = {
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "24.10.0",
+        source: "user-installed",
+      }),
+      deploy,
+    };
+
+    const filtered = await prepareMcpToolFilters(
+      [server(), { ...server(), id: "second", name: "second" }],
+      {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/workspace",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\workspace",
+      },
+      true,
+      dependencies,
+    );
+
+    expect(deploy).toHaveBeenCalledTimes(2);
+    expect(cleanupFirst).not.toHaveBeenCalled();
+    expect(cleanupSecond).not.toHaveBeenCalled();
+    expect(
+      filtered.map((entry) => entry.transport.type === "stdio" && entry.transport.args.at(-1)),
+    ).toEqual(["/tmp/poracode-mcp-filter-1-first", "/tmp/poracode-mcp-filter-1-second"]);
+
+    const release = getMcpToolFilterCleanup(filtered);
+    expect(release).toBeTypeOf("function");
+    release?.();
+    release?.();
+    expect(cleanupFirst).toHaveBeenCalledOnce();
+    expect(cleanupSecond).toHaveBeenCalledOnce();
+  });
+
+  it("cleans already-staged filter workers if a later deployment fails", async () => {
+    const cleanup = vi.fn<() => void>();
+    const deploy = vi
+      .fn<NonNullable<McpToolFilterDependencies["deploy"]>>()
+      .mockReturnValueOnce({ linuxBaseDir: "/tmp/first", cleanup })
+      .mockReturnValueOnce(null);
+
+    await expect(
+      prepareMcpToolFilters(
+        [server(), { ...server(), id: "second", name: "second" }],
+        {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/demo/workspace",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\workspace",
+        },
+        true,
+        {
+          resolveNode: async () => ({
+            nodePath: "/usr/bin/node",
+            nodeVersion: "24.10.0",
+            source: "user-installed",
+          }),
+          deploy,
+        },
+      ),
+    ).rejects.toThrow("could not be deployed");
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 });

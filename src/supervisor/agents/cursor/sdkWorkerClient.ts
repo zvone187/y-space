@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ProjectLocation } from "@/shared/contracts";
@@ -13,8 +13,9 @@ import {
   type ResolveNodeOptions,
 } from "../../wsl/runtime";
 import {
+  buildVerifiedWslEsmArgv,
   deployFilesToWslTempBase,
-  resolveWslHelpersDir,
+  type WslBaseDeployResult,
   type WslDeployFile,
 } from "../../wsl/wslDeploy";
 import {
@@ -69,7 +70,7 @@ export interface CursorSdkWorkerClientDependencies {
     distro: string,
     baseName: string,
     files: readonly WslDeployFile[],
-  ) => { linuxBaseDir: string } | null;
+  ) => WslBaseDeployResult | null;
 }
 
 export type CursorSdkWorkerEventListener = (event: CursorSdkWorkerEvent) => void;
@@ -96,6 +97,7 @@ interface SpawnedWorker {
   discovery: CursorSdkWorkerDiscovery;
   projectCwd: string;
   useProcessGroup: boolean;
+  cleanup?: () => void;
 }
 
 export async function spawnCursorSdkWorker(
@@ -109,6 +111,7 @@ export async function spawnCursorSdkWorker(
     spawned.projectCwd,
     options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
     spawned.useProcessGroup,
+    spawned.cleanup,
   );
   try {
     await client.waitUntilReady(options.bootTimeoutMs ?? DEFAULT_BOOT_TIMEOUT_MS);
@@ -138,11 +141,21 @@ export class CursorSdkWorkerClient {
     private readonly projectCwd: string,
     private readonly requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
     private readonly useProcessGroup = false,
+    cleanup?: () => void,
   ) {
     this.ready = new Promise<void>((resolve, reject) => {
       this.resolveReady = resolve;
       this.rejectReady = reject;
     });
+    if (cleanup) {
+      child.once("close", () => {
+        try {
+          cleanup();
+        } catch {
+          // Deployment cleanup is best effort and must not disrupt transport teardown.
+        }
+      });
+    }
     this.attachProcess();
   }
 
@@ -486,10 +499,14 @@ async function spawnWslWorker(
   dependencies: CursorSdkWorkerClientDependencies,
 ): Promise<SpawnedWorker> {
   const location = options.projectLocation as WslLocation;
-  const helpersDir = options.helpersDir ?? resolveWslHelpersDir();
-  const workerSource =
-    options.workerPath ?? (helpersDir ? join(helpersDir, "cursor-sdk-worker.mjs") : "");
-  if (!workerSource || !existsSync(workerSource)) {
+  const workerSource = options.workerPath ?? defaultNativeWorkerPath();
+  if (!existsSync(workerSource)) {
+    throw new Error("Cursor SDK worker helper is unavailable for WSL.");
+  }
+  let workerContent: Buffer;
+  try {
+    workerContent = readFileSync(workerSource);
+  } catch {
     throw new Error("Cursor SDK worker helper is unavailable for WSL.");
   }
   const resolveNode = dependencies.resolveNode ?? resolveNodeForDistro;
@@ -498,27 +515,39 @@ async function spawnWslWorker(
     dependencies.deploy ??
     ((distro, baseName, files) => deployFilesToWslTempBase(distro, baseName, files));
   const deployed = deploy(location.distro, `poracode-cursor-sdk-${process.pid}`, [
-    { src: workerSource, relDest: "cursor-sdk/cursor-sdk-worker.mjs" },
+    { content: workerContent, relDest: "cursor-sdk/cursor-sdk-worker.mjs" },
   ]);
   if (!deployed) {
     throw new Error("Cursor SDK worker could not be deployed to WSL.");
   }
-  const workerPath = `${deployed.linuxBaseDir}/cursor-sdk/cursor-sdk-worker.mjs`;
-  const safeEnv = sanitizePrivilegedChildEnvironment(stripApiKey(options.env) ?? {});
-  const command = buildAgentCommand(location, node.nodePath, [workerPath], node.nodePath, safeEnv);
-  const useProcessGroup = process.platform !== "win32";
-  const child = spawnProcess(command.command, command.args, {
-    env: sanitizePrivilegedChildEnvironment({ ...process.env, ...command.env }),
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-    detached: useProcessGroup,
-  });
-  return {
-    child,
-    discovery,
-    projectCwd: location.linuxPath,
-    useProcessGroup,
-  };
+  try {
+    const workerPath = `${deployed.linuxBaseDir}/cursor-sdk/cursor-sdk-worker.mjs`;
+    const safeEnv = sanitizePrivilegedChildEnvironment(stripApiKey(options.env) ?? {});
+    const command = buildAgentCommand(
+      location,
+      node.nodePath,
+      buildVerifiedWslEsmArgv(workerPath, workerContent),
+      node.nodePath,
+      safeEnv,
+    );
+    const useProcessGroup = process.platform !== "win32";
+    const child = spawnProcess(command.command, command.args, {
+      env: sanitizePrivilegedChildEnvironment({ ...process.env, ...command.env }),
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+      detached: useProcessGroup,
+    });
+    return {
+      child,
+      discovery,
+      projectCwd: location.linuxPath,
+      useProcessGroup,
+      cleanup: deployed.cleanup,
+    };
+  } catch (error) {
+    deployed.cleanup();
+    throw error;
+  }
 }
 
 /**
@@ -552,10 +581,8 @@ function moduleDirectory(): string {
   return typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
 }
 
-function unpackedAsarPath(path: string): string {
-  return path.replace(/([\\/])app\.asar([\\/])/, "$1app.asar.unpacked$2");
-}
-
 function defaultNativeWorkerPath(): string {
-  return join(unpackedAsarPath(moduleDirectory()), "cursorSdkWorker.mjs");
+  // The Electron child inherits ASAR support through ELECTRON_RUN_AS_NODE, so
+  // execute the integrity-checked packed worker directly.
+  return join(moduleDirectory(), "cursorSdkWorker.mjs");
 }

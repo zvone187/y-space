@@ -205,8 +205,9 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
     this.activated = true;
 
+    let acquired: AcquiredOpenCodeServer;
     try {
-      this.acquired = await acquireOpenCodeServer(this.buildAcquireInput());
+      acquired = await acquireOpenCodeServer(this.buildAcquireInput());
     } catch (cause) {
       // Surface server-startup failures (sandbox blocks, ENOENT, port races,
       // macOS quarantine) as classified user-facing strings rather than the
@@ -217,6 +218,11 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       }
       throw new Error(message, { cause });
     }
+    if (this.disposed) {
+      await acquired.dispose().catch(() => undefined);
+      throw new Error("OpencodeSdkSession was disposed before activation completed.");
+    }
+    this.acquired = acquired;
 
     if (this.isGui) {
       this.mapperState = createOpenCodeMapperState(this.threadId);

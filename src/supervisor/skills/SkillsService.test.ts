@@ -1,4 +1,5 @@
 import {
+  chmod,
   copyFile,
   lstat,
   mkdtemp,
@@ -28,6 +29,17 @@ import { dropSkillSegmentsOnPolicyFailure } from "./pluginSkillPolicy";
 
 /** Packages ship with the app; tests reuse the real manifests, not copies of them. */
 const SHIPPED_PLUGINS_DIR = join(process.cwd(), "resources", "plugins");
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T | PromiseLike<T>): void;
+} {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
 
 async function writePluginPackage(root: string, name: string, skills: readonly string[]) {
   const dir = join(root, "plugins", name);
@@ -1292,10 +1304,13 @@ describe("SkillsService", () => {
       projectLocation,
       segments: [bundledSegment, { kind: "text", content: " Create one." }],
     });
-    expect(rewritten[0]).toEqual({
-      kind: "text",
-      content: `Use the "skill-creator" agent skill: read ${bundledDir.replaceAll("\\", "/")}/skill-creator/SKILL.md and follow its instructions.`,
-    });
+    expect(rewritten[0]).toMatchObject({ kind: "text" });
+    const firstHint = (rewritten[0] as Extract<(typeof rewritten)[number], { kind: "text" }>)
+      .content;
+    const firstPath = /: read (.+) and follow its instructions\.$/u.exec(firstHint)?.[1];
+    expect(firstPath).toBeTruthy();
+    expect(firstPath).not.toContain(bundledDir.replaceAll("\\", "/"));
+    await expect(readFile(firstPath!, "utf8")).resolves.toContain("Bundled body");
     expect(rewritten[1]).toEqual({ kind: "text", content: " Create one." });
 
     // Claude CLI: managed skills are projected into `.claude/skills` → the
@@ -1340,18 +1355,290 @@ describe("SkillsService", () => {
       homeDirectory: () => home,
       env: { PORACODE_BUNDLED_SKILLS_DIR: bundledDir },
     });
-    expect(
-      await readerService.rewriteTerminalSkillSegments({
-        agentKind: "reader",
-        projectLocation,
-        segments: [bundledSegment],
+    const readerRewritten = await readerService.rewriteTerminalSkillSegments({
+      agentKind: "reader",
+      projectLocation,
+      segments: [bundledSegment],
+    });
+    const readerHint = (
+      readerRewritten[0] as Extract<(typeof readerRewritten)[number], { kind: "text" }>
+    ).content;
+    const readerPath = /: read (.+) and follow its instructions\.$/u.exec(readerHint)?.[1];
+    expect(readerPath).toBeTruthy();
+    expect(readerPath).not.toBe(firstPath);
+    await expect(readFile(readerPath!, "utf8")).resolves.toContain("Bundled body");
+    await Promise.all([bundledService.dispose(), readerService.dispose()]);
+  });
+
+  it("atomically caps concurrent private skill copies and releases them by terminal owner", async () => {
+    const bundledDir = join(root, "bundled-skills-cap");
+    const segments = await Promise.all(
+      Array.from({ length: 13 }, async (_, index) => {
+        const name = `bundled-${index}`;
+        await writeSkill(join(bundledDir, name), name, `Body ${index}`);
+        return {
+          kind: "skill" as const,
+          name,
+          path: join(bundledDir, name, "SKILL.md").replaceAll("\\", "/"),
+          invocation: `/${name}`,
+          provider: "Y Space built-ins",
+          scope: "global" as const,
+        };
       }),
-    ).toEqual([
-      {
-        kind: "text",
-        content: `Use the "skill-creator" agent skill: read ${bundledDir.replaceAll("\\", "/")}/skill-creator/SKILL.md and follow its instructions.`,
+    );
+    const bundledService = new SkillsService({
+      adapters,
+      homeDirectory: () => home,
+      env: { PORACODE_BUNDLED_SKILLS_DIR: bundledDir },
+    });
+
+    const rewritten = await bundledService.rewriteTerminalSkillSegments({
+      agentKind: "claude",
+      projectLocation,
+      leaseId: "thread-cap",
+      segments,
+    });
+    const paths = rewritten.flatMap((segment) => {
+      if (segment.kind !== "text") return [];
+      const path = /: read (.+) and follow its instructions\.$/u.exec(segment.content)?.[1];
+      return path ? [path] : [];
+    });
+    expect(paths).toHaveLength(12);
+    expect(rewritten.filter((segment) => segment.kind === "text")).toHaveLength(13);
+    await Promise.all(
+      paths.map((path) => expect(readFile(path, "utf8")).resolves.toMatch(/Body/u)),
+    );
+
+    await bundledService.releaseTerminalSkillCopies("thread-cap");
+    await Promise.all(
+      paths.map((path) => expect(readFile(path, "utf8")).rejects.toMatchObject({ code: "ENOENT" })),
+    );
+    await bundledService.dispose();
+  });
+
+  it("retains a failed cleanup against the global cap and retries it during disposal", async () => {
+    const bundledDir = join(root, "bundled-skills-cleanup-retry");
+    await writeSkill(join(bundledDir, "cleanup-retry"), "cleanup-retry", "Retry body");
+    const bundledService = new SkillsService({
+      adapters,
+      homeDirectory: () => home,
+      env: { PORACODE_BUNDLED_SKILLS_DIR: bundledDir },
+    });
+    const internals = bundledService as unknown as {
+      deleteTrustedSkillTempRoot(root: string): Promise<void>;
+      trustedSkillCleanupRetryRoots: Set<string>;
+      trustedSkillTempDirs: Map<string, unknown>;
+    };
+    let failNextDelete = true;
+    const deleteTrustedSkillTempRoot = vi.fn<(tempRoot: string) => Promise<void>>(
+      async (tempRoot) => {
+        if (failNextDelete) {
+          failNextDelete = false;
+          throw Object.assign(new Error("injected temp cleanup failure"), { code: "EBUSY" });
+        }
+        await rm(tempRoot, { recursive: true, force: true });
       },
-    ]);
+    );
+    Object.assign(internals, { deleteTrustedSkillTempRoot });
+    const segment = {
+      kind: "skill" as const,
+      name: "cleanup-retry",
+      path: join(bundledDir, "cleanup-retry", "SKILL.md").replaceAll("\\", "/"),
+      invocation: "/cleanup-retry",
+      provider: "Y Space built-ins",
+      scope: "global" as const,
+    };
+
+    const firstRewrite = await bundledService.rewriteTerminalSkillSegments({
+      agentKind: "claude",
+      projectLocation,
+      leaseId: "failed-cleanup",
+      segments: [segment],
+    });
+    const firstPath =
+      firstRewrite[0]?.kind === "text"
+        ? /: read (.+) and follow its instructions\.$/u.exec(firstRewrite[0].content)?.[1]
+        : undefined;
+    expect(firstPath).toBeTruthy();
+    const failedRoot = dirname(dirname(firstPath!));
+
+    await bundledService.releaseTerminalSkillCopies("failed-cleanup");
+
+    expect(deleteTrustedSkillTempRoot).toHaveBeenCalledExactlyOnceWith(failedRoot);
+    await expect(lstat(failedRoot)).resolves.toBeTruthy();
+    expect(internals.trustedSkillTempDirs.has(failedRoot)).toBe(true);
+    expect(internals.trustedSkillCleanupRetryRoots.has(failedRoot)).toBe(true);
+
+    const capRewrite = await bundledService.rewriteTerminalSkillSegments({
+      agentKind: "claude",
+      projectLocation,
+      leaseId: "cap-after-failed-cleanup",
+      segments: Array.from({ length: 12 }, () => ({ ...segment })),
+    });
+    const capPaths = capRewrite.flatMap((rewritten) => {
+      if (rewritten.kind !== "text") return [];
+      const hintPath = /: read (.+) and follow its instructions\.$/u.exec(rewritten.content)?.[1];
+      return hintPath ? [hintPath] : [];
+    });
+    expect(capPaths).toHaveLength(11);
+    expect(internals.trustedSkillTempDirs.size).toBe(12);
+
+    await bundledService.dispose();
+
+    expect(internals.trustedSkillTempDirs.size).toBe(0);
+    expect(internals.trustedSkillCleanupRetryRoots.size).toBe(0);
+    await expect(lstat(failedRoot)).rejects.toMatchObject({ code: "ENOENT" });
+    await Promise.all(
+      capPaths.map((path) =>
+        expect(lstat(dirname(dirname(path)))).rejects.toMatchObject({ code: "ENOENT" }),
+      ),
+    );
+  });
+
+  it.runIf(process.platform !== "win32")(
+    "repairs nested permissions before removing a trusted skill temp root",
+    async () => {
+      const bundledDir = join(root, "bundled-skills-permission-cleanup");
+      await writeSkill(
+        join(bundledDir, "permission-cleanup"),
+        "permission-cleanup",
+        "Permission body",
+      );
+      const bundledService = new SkillsService({
+        adapters,
+        homeDirectory: () => home,
+        env: { PORACODE_BUNDLED_SKILLS_DIR: bundledDir },
+      });
+      const rewritten = await bundledService.rewriteTerminalSkillSegments({
+        agentKind: "claude",
+        projectLocation,
+        leaseId: "permission-cleanup",
+        segments: [
+          {
+            kind: "skill",
+            name: "permission-cleanup",
+            path: join(bundledDir, "permission-cleanup", "SKILL.md").replaceAll("\\", "/"),
+            invocation: "/permission-cleanup",
+            provider: "Y Space built-ins",
+            scope: "global",
+          },
+        ],
+      });
+      const skillPath =
+        rewritten[0]?.kind === "text"
+          ? /: read (.+) and follow its instructions\.$/u.exec(rewritten[0].content)?.[1]
+          : undefined;
+      expect(skillPath).toBeTruthy();
+      const tempRoot = dirname(dirname(skillPath!));
+      const skillRoot = dirname(skillPath!);
+      await chmod(skillRoot, 0o000);
+
+      try {
+        await bundledService.releaseTerminalSkillCopies("permission-cleanup");
+        await expect(lstat(tempRoot)).rejects.toMatchObject({ code: "ENOENT" });
+      } finally {
+        await chmod(skillRoot, 0o700).catch(() => undefined);
+        await chmod(tempRoot, 0o700).catch(() => undefined);
+        await rm(tempRoot, { recursive: true, force: true });
+        await bundledService.dispose();
+      }
+    },
+  );
+
+  it("waits for in-flight materialization and prevents a released lease from publishing a late copy", async () => {
+    const bundledDir = join(root, "bundled-skills-release-race");
+    await writeSkill(join(bundledDir, "release-race"), "release-race", "Race body");
+    const bundledService = new SkillsService({
+      adapters,
+      homeDirectory: () => home,
+      env: { PORACODE_BUNDLED_SKILLS_DIR: bundledDir },
+    });
+    const materializationStarted = deferred<void>();
+    const continueMaterialization = deferred<void>();
+    const internals = bundledService as unknown as {
+      materializeTrustedSkillHint: (...args: unknown[]) => Promise<string | undefined>;
+    };
+    const materializeTrustedSkillHint = internals.materializeTrustedSkillHint.bind(bundledService);
+    vi.spyOn(internals, "materializeTrustedSkillHint").mockImplementation(async (...args) => {
+      materializationStarted.resolve();
+      await continueMaterialization.promise;
+      return materializeTrustedSkillHint(...args);
+    });
+
+    const rewrite = bundledService.rewriteTerminalSkillSegments({
+      agentKind: "claude",
+      projectLocation,
+      leaseId: "release-race",
+      segments: [
+        {
+          kind: "skill",
+          name: "release-race",
+          path: join(bundledDir, "release-race", "SKILL.md").replaceAll("\\", "/"),
+          invocation: "/release-race",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    await materializationStarted.promise;
+
+    let releaseSettled = false;
+    const release = bundledService.releaseTerminalSkillCopies("release-race").then(() => {
+      releaseSettled = true;
+    });
+    await Promise.resolve();
+    expect(releaseSettled).toBe(false);
+
+    continueMaterialization.resolve();
+    await expect(rewrite).resolves.toEqual([{ kind: "text", content: "/release-race" }]);
+    await release;
+    await bundledService.dispose();
+  });
+
+  it("does not admit a materialization whose launch reaches rewrite after disposal", async () => {
+    const bundledDir = join(root, "bundled-skills-disposed-launch");
+    await writeSkill(join(bundledDir, "disposed-launch"), "disposed-launch", "Disposed body");
+    const bundledService = new SkillsService({
+      adapters,
+      homeDirectory: () => home,
+      env: { PORACODE_BUNDLED_SKILLS_DIR: bundledDir },
+    });
+    const segments = [
+      {
+        kind: "skill" as const,
+        name: "disposed-launch",
+        path: join(bundledDir, "disposed-launch", "SKILL.md").replaceAll("\\", "/"),
+        invocation: "/disposed-launch",
+        provider: "Y Space built-ins",
+        scope: "global" as const,
+      },
+    ];
+    const launchMayRewrite = deferred<void>();
+    const internals = bundledService as unknown as {
+      materializeTrustedSkillHint: (...args: unknown[]) => Promise<string | undefined>;
+      trustedSkillTempDirs: Map<string, unknown>;
+      trustedSkillLeases: Map<string, unknown>;
+    };
+    const materializeTrustedSkillHint = vi.spyOn(internals, "materializeTrustedSkillHint");
+    const lateRewrite = launchMayRewrite.promise.then(() =>
+      bundledService.rewriteTerminalSkillSegments({
+        agentKind: "claude",
+        projectLocation,
+        leaseId: "disposed-launch",
+        segments,
+      }),
+    );
+
+    await bundledService.dispose();
+    launchMayRewrite.resolve();
+    try {
+      await expect(lateRewrite).resolves.toBe(segments);
+      expect(materializeTrustedSkillHint).not.toHaveBeenCalled();
+      expect(internals.trustedSkillTempDirs.size).toBe(0);
+      expect(internals.trustedSkillLeases.size).toBe(0);
+    } finally {
+      await bundledService.dispose();
+    }
   });
 
   it("uses provider-declared scope and root precedence", async () => {

@@ -2,6 +2,7 @@ import { spawn as spawnChild } from "node:child_process";
 import { spawn as spawnPty, type IDisposable } from "node-pty";
 import { stripAnsi } from "@/shared/ansi";
 import type { ProjectLocation } from "@/shared/contracts";
+import { terminateChildProcessTree, terminateProcessTree } from "@/shared/processTree";
 import { withCommandBaseSpawnEnv, type AgentAdapter } from "@/supervisor/agents/base";
 import { buildOneShotSpec } from "@/supervisor/oneShotSpawn";
 import { ensureNodePtySpawnHelperExecutable } from "@/supervisor/nodePty";
@@ -49,10 +50,12 @@ export interface OneShotChildParams {
 export interface OneShotChildHandle {
   /** SIGTERM now, SIGKILL after a grace period. Idempotent. */
   cancel(): void;
+  /** Cancel the child and wait until its process has exited. Idempotent. */
+  dispose(): Promise<void>;
 }
 
 /** A no-op handle returned when spawning failed synchronously (already settled). */
-const NOOP_HANDLE: OneShotChildHandle = { cancel: () => {} };
+const NOOP_HANDLE: OneShotChildHandle = { cancel: () => {}, dispose: async () => {} };
 
 /** Terminal result computed by a transport from its exit signal. */
 interface SettleResult {
@@ -144,9 +147,14 @@ function driveChild(
   params: OneShotChildParams,
 ): OneShotChildHandle {
   let settled = false;
+  let cancelling = false;
   let killTimer: ReturnType<typeof setTimeout> | undefined;
   let flushTimer: ReturnType<typeof setTimeout> | undefined;
   let buffer = "";
+  let resolveExited!: () => void;
+  const exited = new Promise<void>((resolve) => {
+    resolveExited = resolve;
+  });
 
   const flush = () => {
     if (flushTimer) {
@@ -167,11 +175,15 @@ function driveChild(
     clearTimeout(lifetimeTimer);
     if (killTimer) clearTimeout(killTimer);
     flush();
-    params.onSettle(
-      result.errorMessage
-        ? { status: result.status, errorMessage: result.errorMessage }
-        : { status: result.status },
-    );
+    try {
+      params.onSettle(
+        result.errorMessage
+          ? { status: result.status, errorMessage: result.errorMessage }
+          : { status: result.status },
+      );
+    } finally {
+      resolveExited();
+    }
   };
 
   transport.onData((chunk) => {
@@ -184,24 +196,40 @@ function driveChild(
       flushTimer = armUnref(setTimeout(flush, STDOUT_FLUSH_MS));
     }
   });
-  transport.onExit((result) => settle(result));
+  transport.onExit((result) => {
+    // A leader can exit while descendants retain its process group. Reap that
+    // exact app-owned tree before reporting completion or resolving dispose().
+    transport.killForce();
+    settle(result);
+  });
 
   transport.write(input);
 
   const cancel = () => {
-    if (settled) return;
+    if (settled || cancelling) return;
+    cancelling = true;
     transport.kill();
     killTimer = armUnref(setTimeout(() => transport.killForce(), KILL_GRACE_MS));
   };
 
-  return { cancel };
+  return {
+    cancel,
+    async dispose() {
+      cancel();
+      await exited;
+    },
+  };
 }
 
 /** child_process lane: pipe stdio, accumulate stderr, settle from close/error. */
 function spawnProcessTransport(spec: SpawnSpec): ChildTransport {
+  const ownsPosixProcessGroup = process.platform !== "win32";
   const child = spawnChild(spec.command, spec.args, {
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
+    // A dedicated group gives TERM/KILL a stable tree target even when the
+    // one-shot leader forks tools or exits before its descendants.
+    detached: ownsPosixProcessGroup,
     ...(spec.cwd ? { cwd: spec.cwd } : {}),
     ...(spec.env
       ? { env: sanitizePrivilegedChildEnvironment({ ...processEnvRecord(), ...spec.env }) }
@@ -212,6 +240,15 @@ function spawnProcessTransport(spec: SpawnSpec): ChildTransport {
   child.stderr?.on("data", (data: Buffer) => {
     stderrChunks.push(data.toString());
   });
+
+  const terminate = (signal: NodeJS.Signals): void => {
+    if (ownsPosixProcessGroup) {
+      terminateChildProcessTree(child, { ownedProcessGroup: true, signal });
+      return;
+    }
+    // taskkill /T /F is the only reliable native Windows tree primitive here.
+    terminateChildProcessTree(child);
+  };
 
   return {
     write(input) {
@@ -236,10 +273,10 @@ function spawnProcessTransport(spec: SpawnSpec): ChildTransport {
       });
     },
     kill() {
-      child.kill("SIGTERM");
+      terminate("SIGTERM");
     },
     killForce() {
-      if (!child.killed) child.kill("SIGKILL");
+      terminate("SIGKILL");
     },
   };
 }
@@ -256,6 +293,16 @@ function spawnPtyTransport(spec: SpawnSpec): ChildTransport {
 
   let dataDisposable: IDisposable | undefined;
   let exitDisposable: IDisposable | undefined;
+  const ownsPosixProcessGroup = process.platform !== "win32";
+  const terminate = (signal: NodeJS.Signals): void => {
+    if (ownsPosixProcessGroup) {
+      // forkpty creates a session/process-group leader; target that group rather
+      // than node-pty's leader-only Unix kill implementation.
+      terminateProcessTree(pty.pid, { ownedProcessGroup: true, signal });
+      return;
+    }
+    terminateProcessTree(pty.pid);
+  };
 
   return {
     write(input) {
@@ -276,18 +323,10 @@ function spawnPtyTransport(spec: SpawnSpec): ChildTransport {
       });
     },
     kill() {
-      try {
-        pty.kill();
-      } catch {
-        // PTY may already be gone.
-      }
+      terminate("SIGTERM");
     },
     killForce() {
-      try {
-        pty.kill("SIGKILL");
-      } catch {
-        // Already reaped.
-      }
+      terminate("SIGKILL");
     },
   };
 }

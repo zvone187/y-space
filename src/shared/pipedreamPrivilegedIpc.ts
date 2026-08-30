@@ -3,6 +3,7 @@ import type {
   PipedreamBootstrapCredentials,
   PipedreamEnvKey,
 } from "./pipedreamBootstrap";
+import { PIPEDREAM_PROJECT_ID_MAX_LENGTH } from "./pipedreamBootstrap";
 import type { PipedreamSnapshot } from "./contracts/pipedream";
 
 export interface PipedreamPrivilegedBootstrapPayload {
@@ -125,7 +126,7 @@ function isPipedreamBootstrap(value: unknown): value is PipedreamBootstrap {
   return (
     hasOnlyKeys(value, ["state", "source", "credentials"]) &&
     value.state === "ready" &&
-    value.source === "environment" &&
+    (value.source === "environment" || value.source === "secure-storage") &&
     isPipedreamCredentials(value.credentials)
   );
 }
@@ -137,6 +138,7 @@ function isPipedreamCredentials(value: unknown): value is PipedreamBootstrapCred
     isBoundedString(value.clientId, 4_096) &&
     isBoundedString(value.clientSecret, 16_384) &&
     typeof value.projectId === "string" &&
+    value.projectId.length <= PIPEDREAM_PROJECT_ID_MAX_LENGTH &&
     /^proj_[a-zA-Z0-9]+$/.test(value.projectId) &&
     (value.environment === "development" || value.environment === "production")
   );

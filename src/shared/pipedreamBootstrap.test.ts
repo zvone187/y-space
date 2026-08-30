@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import {
   PIPEDREAM_ENV_KEYS,
   capturePipedreamBootstrapEnv,
-  capturePipedreamBootstrapEnvFile,
+  scrubDeprecatedPipedreamExecEnvironment,
 } from "./pipedreamBootstrap";
 
 const COMPLETE_ENV = {
@@ -66,25 +63,28 @@ describe("capturePipedreamBootstrapEnv", () => {
     expectPipedreamKeysScrubbed(env);
   });
 
-  it("loads the dedicated local env file without copying secrets into process env", () => {
-    const root = mkdtempSync(join(tmpdir(), "y-space-pipedream-env-"));
-    const filePath = join(root, ".env.pipedream");
-    writeFileSync(
-      filePath,
-      [
-        `PIPEDREAM_CLIENT_ID=${COMPLETE_ENV.PIPEDREAM_CLIENT_ID}`,
-        `PIPEDREAM_CLIENT_SECRET='${COMPLETE_ENV.PIPEDREAM_CLIENT_SECRET}'`,
-        `PIPEDREAM_PROJECT_ID=${COMPLETE_ENV.PIPEDREAM_PROJECT_ID}`,
-        `PIPEDREAM_ENVIRONMENT=${COMPLETE_ENV.PIPEDREAM_ENVIRONMENT}`,
-      ].join("\n"),
-    );
-    const env: NodeJS.ProcessEnv = { PATH: "/usr/bin" };
+  it("never captures credentials directly from process.env", () => {
+    const keys = [...PIPEDREAM_ENV_KEYS, "PIPEDREAM_ENV_FILE"] as const;
+    const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+    Object.assign(process.env, COMPLETE_ENV, { PIPEDREAM_ENV_FILE: "/private/setup.env" });
     try {
-      expect(capturePipedreamBootstrapEnvFile(filePath, env)).toMatchObject({ state: "ready" });
-      expectPipedreamKeysScrubbed(env);
-      expect(JSON.stringify(env)).not.toContain(COMPLETE_ENV.PIPEDREAM_CLIENT_SECRET);
+      expect(capturePipedreamBootstrapEnv(process.env)).toEqual({ state: "absent" });
+      expectPipedreamKeysScrubbed(process.env);
+      expect(process.env.PIPEDREAM_ENV_FILE).toBeUndefined();
     } finally {
-      rmSync(root, { recursive: true, force: true });
+      for (const key of keys) {
+        const value = previous[key];
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
+  });
+
+  it("detects deprecated exec inputs without returning their values", () => {
+    const env: NodeJS.ProcessEnv = { ...COMPLETE_ENV, PIPEDREAM_ENV_FILE: "/setup.env" };
+    expect(scrubDeprecatedPipedreamExecEnvironment(env)).toBe(true);
+    expectPipedreamKeysScrubbed(env);
+    expect(env.PIPEDREAM_ENV_FILE).toBeUndefined();
+    expect(scrubDeprecatedPipedreamExecEnvironment(env)).toBe(false);
   });
 });

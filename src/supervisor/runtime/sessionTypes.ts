@@ -75,6 +75,8 @@ export interface SessionRuntime {
   structuredSession?: StructuredSessionHandle | undefined;
   /** Releases temporary resources created specifically for this PTY launch. */
   launchCleanup?: (() => void) | undefined;
+  /** Releases WSL MCP-filter deployments after this provider process has stopped. */
+  mcpToolFilterCleanup?: (() => void) | undefined;
   /** Mode the thread was launched in. Preserved for restart / recovery flows. */
   presentationMode?: ThreadPresentationMode;
   ignoreExit?: boolean;
@@ -87,6 +89,10 @@ export interface SessionRuntime {
   pendingTerminalWriteInFlight?: boolean | undefined;
   pendingTerminalPrompt?: string | undefined;
   pendingTerminalSegments?: PromptSegment[] | undefined;
+  /** Skill-copy leases consumed by the currently active terminal turn. */
+  activeTerminalSkillLeaseIds?: string[] | undefined;
+  /** FIFO lease markers for prompts submitted while another terminal turn is working. */
+  pendingTerminalSkillLeaseIds?: string[] | undefined;
   /**
    * Single staged steer message. Set when the user submits while the thread
    * is `working`; cleared when the in-flight turn resolves with `cancelled`
@@ -192,6 +198,7 @@ export interface ThreadOutputPipelineCallbacks {
   onRecoverInvalidSessionRef(session: SessionRuntime): void;
   onStartQueuedLaunchPrompt(session: SessionRuntime): void;
   onStartSessionRefDiscovery(session: SessionRuntime): void;
+  onTerminalTurnSettled?(session: SessionRuntime): void;
 }
 
 export interface ThreadOutputPipelineHooks extends ThreadOutputPipelineCallbacks {

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { IPty } from "node-pty";
@@ -74,7 +74,7 @@ function makeTempDir(): string {
 }
 
 function makeRuntime(emit: ConstructorParameters<typeof SupervisorRuntime>[0]): SupervisorRuntime {
-  const runtime = new SupervisorRuntime(emit);
+  const runtime = new SupervisorRuntime(emit, { allowPipedreamOauthPersistence: false });
   runtimesToDispose.push(runtime);
   return runtime;
 }
@@ -257,6 +257,36 @@ function createRuntimeSession(overrides: Record<string, unknown> = {}) {
 }
 
 describe("SupervisorRuntime thread input", () => {
+  it("fails closed on an existing malformed OAuth store when Personal persistence is allowed", () => {
+    const tempDir = makeTempDir();
+    process.env.PORACODE_DATA_DIR = tempDir;
+    const storePath = join(tempDir, "mcp-oauth.json");
+    const malformedStore = '{"servers":{"https://mcp.pipedream.net/v2":{"tokens":"sentinel"}}';
+    writeFileSync(storePath, malformedStore, { mode: 0o600 });
+    let unexpectedRuntime: SupervisorRuntime | undefined;
+
+    try {
+      expect(() => {
+        unexpectedRuntime = new SupervisorRuntime(() => undefined, {
+          allowPipedreamOauthPersistence: true,
+        });
+      }).toThrow("The OAuth credential store could not be verified safely.");
+    } finally {
+      void unexpectedRuntime?.dispose();
+    }
+
+    expect(readFileSync(storePath, "utf8")).toBe(malformedStore);
+  });
+
+  it("still starts with a missing OAuth store when Personal persistence is allowed", () => {
+    process.env.PORACODE_DATA_DIR = makeTempDir();
+    const runtime = new SupervisorRuntime(() => undefined, {
+      allowPipedreamOauthPersistence: true,
+    });
+    runtimesToDispose.push(runtime);
+    expect(runtime).toBeInstanceOf(SupervisorRuntime);
+  });
+
   beforeEach(() => {
     process.env[BROWSER_MCP_URL_ENV] = "http://127.0.0.1:43199";
     process.env[BROWSER_MCP_TOKEN_ENV] = "runtime-test-browser-token";
@@ -2117,6 +2147,7 @@ describe("SupervisorRuntime thread input", () => {
         }),
       ),
     );
+    await vi.waitFor(() => expect(adapter.createStructuredSession).toHaveBeenCalledOnce());
 
     emitted.length = 0;
     await runtime.threadSessionManager.interruptThread({ threadId: "thread-gui-pre-session-stop" });

@@ -621,7 +621,10 @@ function BrowserTabWebview(props: {
       void attemptAttach(attachCycle, 0);
     };
     el.addEventListener("dom-ready", requestAttach);
-    if (props.visible) requestAttach();
+    // Every rendered guest is inside the bounded resident-page set. Attach it
+    // eagerly even while hidden: a promoted background page may have emitted
+    // its one-shot dom-ready before this effect installed the listener.
+    requestAttach();
     return () => {
       cancelled = true;
       attachCycle += 1;

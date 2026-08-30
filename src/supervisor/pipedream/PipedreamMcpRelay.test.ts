@@ -3,6 +3,7 @@ import {
   PIPEDREAM_MCP_V3_URL,
   PipedreamMcpSessionRegistry,
   buildPipedreamMcpUpstreamHeaders,
+  buildPipedreamMcpUpstreamUrl,
   shouldRetryAfterPipedreamUnauthorized,
 } from "./PipedreamMcpRelay";
 
@@ -31,7 +32,6 @@ describe("PipedreamMcpRelay security", () => {
       projectId: "proj_Test123",
       environment: "development",
       externalUserId: "y-space-install-private-id",
-      appSlug: "slack",
       accountId: "apn_Account123",
     });
 
@@ -40,7 +40,7 @@ describe("PipedreamMcpRelay security", () => {
     expect(headers.get("x-pd-project-id")).toBe("proj_Test123");
     expect(headers.get("x-pd-environment")).toBe("development");
     expect(headers.get("x-pd-external-user-id")).toBe("y-space-install-private-id");
-    expect(headers.get("x-pd-app-slug")).toBe("slack");
+    expect(headers.has("x-pd-app-slug")).toBe(false);
     expect(headers.get("x-pd-account-id")).toBe("apn_Account123");
     expect(headers.get("x-pd-registry")).toBe("all");
 
@@ -53,6 +53,13 @@ describe("PipedreamMcpRelay security", () => {
     for (const stripped of ["cookie", "origin", "host", "x-forwarded-for"]) {
       expect(headers.has(stripped)).toBe(false);
     }
+  });
+
+  it("pins and URL-encodes a Unicode app selector without putting it in an HTTP header", () => {
+    expect(buildPipedreamMcpUpstreamUrl("µ-torrent")).toBe(
+      "https://remote.mcp.pipedream.net/v3?app=%C2%B5-torrent",
+    );
+    expect(() => buildPipedreamMcpUpstreamUrl("https://attacker.invalid/mcp")).toThrow(/slug/i);
   });
 
   it("binds upstream MCP session ids to exactly one local relay binding", () => {

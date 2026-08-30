@@ -343,10 +343,12 @@
           <div class="sticky bg-yellow">
             <h3>What the final package proved</h3>
             <p>
-              One fresh ARM64 process stayed open under <code>--use-mock-keychain</code> for the
-              entire final manual run. Computer Use verified both Connections entry points,
-              independent global Browser peers, a real Codex click/navigation, and a real OpenCode
-              inspection in the visible embedded Browser.
+              The reviewed ARM64 replacement stayed open as PID 3806 under the literal
+              <code>--use-mock-keychain</code> argument. Computer Use verified the embedded Browser,
+              OpenCode GLM-5.3-Flash hover, native click, single fill-with-submit, exact final
+              URL/title, visible orange cursor, collapsed work, and
+              <code>Browser verified</code> badge. Earlier packaged acceptance covers both
+              Connections entry points and a real Codex click/navigation.
             </p>
           </div>
           <div class="sticky bg-pink">
@@ -440,19 +442,21 @@
               </tr>
               <tr>
                 <td>Codex/OpenCode embedded Browser</td>
-                <td class="pass">Passed on final package</td>
+                <td class="pass">Passed across packaged builds</td>
                 <td>
-                  Codex GPT-5.6 Sol and OpenCode Big Pickle visibly controlled the same first-class
-                  Y Space Browser tab through the packaged launch-scoped Browser route.
+                  Earlier packaged runs proved Codex GPT-5.6 Sol and OpenCode shared a first-class Y
+                  Space Browser tab. The definitive GLM-5.3-Flash replay then used only the embedded
+                  route for hover, click, one fill-with-submit, and final inspection.
                 </td>
               </tr>
               <tr>
                 <td>Visible trusted cursor</td>
                 <td class="pass">Passed on final package</td>
                 <td>
-                  Packaged Codex and OpenCode cursor fixtures recorded trusted native pointer
-                  sequences, and the final fresh Codex run visibly clicked the existing embedded tab
-                  before navigating it to IANA.
+                  Packaged Codex/OpenCode fixtures recorded trusted native pointer sequences. The
+                  definitive replay visibly parked the orange-and-white cursor on the DuckDuckGo
+                  search field for hover and native click/focus, then finished with verified Browser
+                  evidence.
                 </td>
               </tr>
               <tr>
@@ -492,23 +496,26 @@
                 </td>
               </tr>
               <tr>
-                <td>Final native Quit + relaunch</td>
-                <td class="pass">Lifecycle regressions passed</td>
+                <td>Earlier packaged Quit + relaunch</td>
+                <td class="pass">Earlier package + lifecycle regressions passed</td>
                 <td>
-                  Orderly-shutdown, renderer-loss, guest cleanup, process-group, and persisted
-                  Browser verification paths pass. The final package is ad-hoc signed and launches
-                  as a thin ARM64 app.
+                  Earlier packaged QA completed native quit and relaunch. Current orderly-shutdown,
+                  renderer-loss, guest cleanup, process-group, and persisted Browser verification
+                  regressions pass. The definitive thin ARM64 package is ad-hoc signed and PID 3806
+                  is intentionally still open for user testing.
                 </td>
               </tr>
               <tr>
                 <td>Persistent test credential isolation</td>
                 <td class="pass">Passed on final package</td>
                 <td>
-                  Final manual QA used one continuously open package process, PID 39788, launched
-                  from the exact rebuilt bundle with an isolated profile and
-                  <code>--use-mock-keychain</code>. It remained open between every final test case
-                  and is intentionally still running. The flag is launch-scoped to testing; ordinary
-                  release launches continue to use the normal operating-system credential store.
+                  Definitive manual QA used one continuously open package process, PID 3806,
+                  launched from the exact rebuilt bundle with
+                  <code>PORACODE_BASE_DIR=/tmp/y-space-pipedream-definitive-qa.qptzx8</code> and the
+                  literal <code>--use-mock-keychain</code> argument. It remained open between every
+                  definitive test case and is intentionally still running. The flag is launch-scoped
+                  to testing; ordinary releases continue to use the normal operating-system
+                  credential store.
                 </td>
               </tr>
             </tbody>
@@ -555,8 +562,9 @@
             <h3>Final checks recorded</h3>
             <ul>
               <li>
-                The complete Node 24 suite passed 925 files and 10,880 tests in 122.85 seconds, with
-                5 files / 85 tests skipped.
+                The complete Node 26.8.1 suite passed 937 files and 11,105 tests in 85.74 seconds,
+                with 6 files / 86 tests skipped. The preceding loaded-run timeout candidate passed
+                10 of 10 focused stress repeats before the green rerun.
               </li>
               <li>
                 Typecheck, standard/type-aware lint, formatting, 3,345-message localization with
@@ -564,18 +572,21 @@
               </li>
               <li>The final unsigned ARM64 app passed deep/strict ad-hoc codesign verification.</li>
               <li>
-                Computer Use captured final packaged Codex and OpenCode trusted-input results.
+                Computer Use captured earlier packaged Codex evidence plus definitive OpenCode
+                hover, click, single-fill, visible-cursor, and verified-answer evidence.
               </li>
               <li>
                 Exact configured Pipedream credential values had zero matches across tracked source
-                and all 549 regular files in the final hardened app bundle; no <code>.env</code>
-                file is packaged.
+                and all 288 regular files in the definitive app bundle; no <code>.env</code> file is
+                packaged. The generic non-secret environment label is excluded from the secret
+                claim.
               </li>
               <li>
-                Final hardened DMG: 156,281,136 bytes,
-                <code>492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb</code>;
-                packaged <code>app.asar</code>:
-                <code>b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42</code>.
+                Definitive unsigned app: 456,638,464 on-disk bytes (435 MiB); packaged
+                <code>app.asar</code> SHA-256
+                <code>acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71</code>;
+                executable SHA-256
+                <code>6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86</code>.
               </li>
             </ul>
           </div>
@@ -624,22 +635,56 @@
             <a href="qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg"
               ><img
                 src="qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg"
-                alt="Final packaged Codex trusted click result beside the embedded Browser"
+                alt="Earlier packaged Codex trusted click result beside the embedded Browser"
             /></a>
             <figcaption>
-              Final Codex proof: one embedded-tab click produced trusted pointermove, pointerdown,
-              pointerup, and click events.
+              Earlier packaged Codex proof: one embedded-tab click produced trusted pointermove,
+              pointerdown, pointerup, and click events.
             </figcaption>
           </figure>
           <figure>
             <a href="qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg"
               ><img
                 src="qa-screenshots/opencode-final-package-visible-cursor-trusted-click.jpeg"
-                alt="OpenCode final answer beside the visible Y Space cursor on the click target"
+                alt="Earlier OpenCode answer beside the visible Y Space cursor on the click target"
             /></a>
             <figcaption>
-              Final OpenCode proof: the orange-and-white cursor is visibly parked on the real target
-              and the second trusted event sequence raised the ledger from 16 to 23.
+              Earlier OpenCode fixture proof: the orange-and-white cursor is visibly parked on the
+              real target and the second trusted event sequence raised the ledger from 16 to 23.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/final-opencode-visible-agent-cursor-hover.jpeg"
+              ><img
+                src="qa-screenshots/final-opencode-visible-agent-cursor-hover.jpeg"
+                alt="Definitive Y Space OpenCode run with orange agent cursor hovering the DuckDuckGo search field"
+            /></a>
+            <figcaption>
+              Definitive hover proof: OpenCode GLM-5.3-Flash moved the orange Y Space agent cursor
+              onto the active embedded DuckDuckGo search field while work stayed collapsed.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/final-opencode-visible-agent-cursor-click.jpeg"
+              ><img
+                src="qa-screenshots/final-opencode-visible-agent-cursor-click.jpeg"
+                alt="Definitive Y Space OpenCode native click and focus on the embedded DuckDuckGo search field"
+            /></a>
+            <figcaption>
+              Definitive click proof: the same orange cursor is on the real focused field during a
+              native Browser click; no external browser or synthetic transcript-only claim is used.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/final-opencode-browser-verified.jpeg"
+              ><img
+                src="qa-screenshots/final-opencode-browser-verified.jpeg"
+                alt="Definitive OpenCode final answer with Browser verified badge beside DuckDuckGo results"
+            /></a>
+            <figcaption>
+              Definitive answer proof: exact tab id, title, and URL are visible beside the embedded
+              results page, with <code>Worked · 19 steps</code> collapsed and
+              <code>Browser verified · 5 actions</code> shown.
             </figcaption>
           </figure>
           <figure>
@@ -660,8 +705,8 @@
                 alt="Fresh hardened Y Space Connections popup over the embedded Browser"
             /></a>
             <figcaption>
-              Fresh hardened bundle: the active composer opened the same light glass Connections
-              surface while the exact <code>--use-mock-keychain</code> process remained live.
+              Earlier hardened bundle: the active composer opened the same light glass Connections
+              surface while its <code>--use-mock-keychain</code> process remained live.
             </figcaption>
           </figure>
           <figure>
@@ -671,8 +716,8 @@
                 alt="Fresh hardened Y Space package with DuckDuckGo and Example Domain global Browser peers"
             /></a>
             <figcaption>
-              Fresh hardened bundle: DuckDuckGo and Example Domain are independent Browser peers in
-              the one global tab strip; switching and cleanup were manually verified.
+              Earlier hardened bundle: DuckDuckGo and Example Domain are independent Browser peers
+              in the one global tab strip; switching and cleanup were manually verified.
             </figcaption>
           </figure>
           <figure>
@@ -682,8 +727,8 @@
                 alt="Fresh Y Space package showing Codex browser verification beside the navigated IANA page"
             /></a>
             <figcaption>
-              Fresh-package agent proof: Codex 5.6 Sol reused the existing embedded tab, clicked its
-              visible link, reached the IANA page, and settled to one collapsed Worked row with
+              Earlier packaged agent proof: Codex 5.6 Sol reused the existing embedded tab, clicked
+              its visible link, reached the IANA page, and settled to one collapsed Worked row with
               <code>Browser verified · 4 actions</code>.
             </figcaption>
           </figure>
@@ -785,15 +830,19 @@
           <div class="detail-body">
             <ul>
               <li><a href="qa-e2e-tests.json">QA source of truth and detailed evidence</a></li>
+              <li>
+                <a href="definitive-opencode-browser-qa.json"
+                  >Definitive OpenCode, cursor, package, and launch ledger</a
+                >
+              </li>
               <li><a href="pass-criteria.md">Combined pass criteria</a></li>
               <li><a href="browser-memory-soak.json">Browser memory and residency soak</a></li>
               <li>
                 <a href="glass-browser-residency-qa.json">Glass Browser residency sample</a>
               </li>
               <li>
-                <a href="../release/pipedream-hardening-final/Y-Space-1.6.6-arm64.dmg"
-                  >Final hardened unsigned ARM64 DMG</a
-                >
+                Definitive local unsigned app:
+                <code>/tmp/y-space-pipedream-final-3x1rp5/mac-arm64/Y Space.app</code>
               </li>
             </ul>
           </div>
@@ -811,8 +860,10 @@
 
       <p class="footer-note">
         Worktree <code>y-space-pipedream-live</code> · hardening start <code>0dfeda90</code> ·
-        upstream comparison <code>9fdadda</code> · no PR requested · final hardened unsigned DMG
-        SHA-256 <code>492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb</code> ·
+        upstream comparison <code>9fdadda</code> · no PR requested · definitive unsigned ARM64 app
+        <code>app.asar</code> SHA-256
+        <code>acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71</code> · executable
+        SHA-256 <code>6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86</code> ·
         implementation commit follows this report revision. No secret values are included.
       </p>
     </main>

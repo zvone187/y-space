@@ -331,8 +331,8 @@ msgstr "{0} 需要输入。"
 #. placeholder {0}: props.catalog.apps.length
 #. placeholder {1}: props.catalog.totalCount
 #: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
-msgid "{0} of {1} integrations shown"
-msgstr "显示 {0}/{1} 个集成"
+#~ msgid "{0} of {1} integrations shown"
+#~ msgstr "显示 {0}/{1} 个集成"
 
 #. placeholder {0}: job.steps.filter((step) => step.status === "completed").length
 #. placeholder {1}: job.steps.length
@@ -2484,6 +2484,10 @@ msgstr "请先选择已连接的浏览器配置文件，再预览 Cookie。"
 #: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
 msgid "Choose a cookie export"
 msgstr "选择 Cookie 导出文件"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Choose a dedicated file that contains only Pipedream credentials."
+msgstr "请选择一个仅包含 Pipedream 凭据的专用文件。"
 
 #: src/mobile/views/ManageProjectsView.tsx
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -6709,6 +6713,7 @@ msgid "Integration access changed. Restart running agents to apply the update."
 msgstr "集成访问权限已更改。请重启正在运行的智能体以应用更新。"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 #: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "Integrations"
 msgstr "集成"
@@ -8074,6 +8079,10 @@ msgstr "新建工作区"
 msgid "New worktree"
 msgstr "新工作树"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Next"
+msgstr "下一页"
+
 #: src/renderer/commands/registry.ts
 msgid "Next chat"
 msgstr "下一个聊天"
@@ -8081,6 +8090,10 @@ msgstr "下一个聊天"
 #: src/renderer/components/composer/ImageLightbox.tsx
 msgid "Next image"
 msgstr "下一张图片"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Next integrations"
+msgstr "下一组集成"
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "Next match"
@@ -9689,6 +9702,10 @@ msgstr "预览扩展程序 Cookie"
 msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
 msgstr "预览仅显示域级别的数量。在您确认最终选择之前，不会复制任何内容。从 Firefox 和 Safari 导出的数据可使用 Cookie-Editor JSON 或 Netscape cookies.txt。"
 
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Previous"
+msgstr "上一页"
+
 #: src/renderer/commands/registry.ts
 msgid "Previous chat"
 msgstr "上一个聊天"
@@ -9696,6 +9713,10 @@ msgstr "上一个聊天"
 #: src/renderer/components/composer/ImageLightbox.tsx
 msgid "Previous image"
 msgstr "上一张图片"
+
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Previous integrations"
+msgstr "上一组集成"
 
 #: src/renderer/components/find/FindBar.tsx
 msgid "Previous match"
@@ -11417,6 +11438,10 @@ msgstr "正在搜索..."
 msgid "Searching…"
 msgstr "正在搜索…"
 
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Secure credential storage is unavailable on this computer, so the setup file was not changed."
+msgstr "此计算机无法使用安全凭据存储，因此设置文件未被更改。"
+
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 #~ msgid "Security-focused directory with verified skill metadata."
 #~ msgstr "注重安全并提供已验证技能元数据的目录。"
@@ -11812,6 +11837,13 @@ msgstr "显示语音输入按钮"
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Showing {0, plural, one {# skill} other {# skills}}"
 msgstr "正在显示 {0, plural, other {# 个技能}}"
+
+#. placeholder {0}: visibleApps.length === 0 ? 0 : visibleStartIndex + 1
+#. placeholder {1}: props.catalog.apps.length
+#. placeholder {2}: props.catalog.totalCount
+#: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
+msgid "Showing {0}–{visibleEndIndex} of {1} loaded integrations · {2} total"
+msgstr "显示已加载的 {1} 个集成中的第 {0}–{visibleEndIndex} 个 · 共 {2} 个"
 
 #: src/mobile/views/HostFolderPicker.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteHostFolderPicker.tsx
@@ -12902,6 +12934,10 @@ msgid "The selected configuration is incomplete."
 msgstr "所选配置不完整。"
 
 #: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "The selected file contains invalid Pipedream values."
+msgstr "所选文件包含无效的 Pipedream 值。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file could not be read."
 msgstr "无法读取所选文件。"
 
@@ -12912,6 +12948,10 @@ msgstr "所选文件不包含 Pipedream 凭据。"
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "The selected file does not contain valid MCP server configurations."
 #~ msgstr "所选文件不包含有效的 MCP 服务器配置。"
+
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "The selected file is missing one or more required Pipedream values."
+msgstr "所选文件缺少一个或多个必需的 Pipedream 值。"
 
 #: src/renderer/components/connections/ConnectionsDialog.tsx
 msgid "The selected file is too large."

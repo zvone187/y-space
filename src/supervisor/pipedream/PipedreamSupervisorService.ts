@@ -284,7 +284,8 @@ export class PipedreamSupervisorService {
     if (this.#pendingDisconnectAccountIds.has(accountId)) {
       throw new Error("Pipedream account disconnect is already in progress.");
     }
-    const account = this.#store.getScopedAccount(accountId) ?? this.#revokedAccounts.get(accountId);
+    const persistedAccount = this.#store.getScopedAccount(accountId);
+    const account = persistedAccount ?? this.#revokedAccounts.get(accountId);
     if (!account) {
       throw new Error("Pipedream account is not connected.");
     }
@@ -297,10 +298,16 @@ export class PipedreamSupervisorService {
     this.#revokedAccounts.set(accountId, { ...account, agentAccess: false });
     this.#releaseBindingsUsingAccount(accountId);
     try {
-      // Phase one is a durable deny. If a later cleanup write, remote request,
-      // process exit, or restart interrupts the disconnect, this row remains
-      // access-off and cannot silently become an agent grant again.
-      this.#store.beginDisconnect(accountId);
+      if (persistedAccount) {
+        // Phase one is a durable deny. If a later cleanup write, remote request,
+        // process exit, or restart interrupts the disconnect, this row remains
+        // access-off and cannot silently become an agent grant again.
+        this.#store.beginDisconnect(accountId);
+      }
+      // A retained in-memory revoked row with no persisted counterpart can only
+      // follow a successful durable removal. That absence is already the
+      // strongest durable deny, so a retry must continue to the upstream DELETE
+      // instead of trying to tombstone a row that no longer exists.
       this.#nonDurableRevocationAccountIds.delete(accountId);
     } catch {
       // The in-process quarantine still blocks every relay, but the persisted
@@ -479,7 +486,7 @@ export class PipedreamSupervisorService {
             shared.memberThreadIds.add(input.threadId);
             return {
               id: `pipedream:${localAccountId}`,
-              name: `pipedream-${account.app.slug}-${opaqueNameSuffix(localAccountId)}`,
+              name: `pd-${opaqueNameSuffix(localAccountId)}`,
               timeoutMs: 30_000,
               transport: {
                 type: "http",

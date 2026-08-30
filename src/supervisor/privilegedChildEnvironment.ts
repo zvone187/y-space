@@ -1,4 +1,4 @@
-import { PIPEDREAM_ENV_KEYS } from "@/shared/pipedreamBootstrap";
+import { PIPEDREAM_DEPRECATED_EXEC_ENV_KEYS } from "@/shared/pipedreamBootstrap";
 
 /**
  * Credentials that are valid only inside the main/supervisor control plane.
@@ -9,6 +9,7 @@ import { PIPEDREAM_ENV_KEYS } from "@/shared/pipedreamBootstrap";
  * boundary therefore filters against this one case-insensitive denylist.
  */
 export const PRIVILEGED_CHILD_ENV_KEYS = [
+  "PORACODE_SECRET_STORAGE_KEY",
   "PORACODE_BROWSER_MCP_URL",
   "PORACODE_BROWSER_MCP_TOKEN",
   "PORACODE_COMPUTER_USE_MCP_URL",
@@ -18,8 +19,7 @@ export const PRIVILEGED_CHILD_ENV_KEYS = [
   // Compatibility cleanup for the retired external-Chrome controller.
   "PORACODE_CHROME_MCP_URL",
   "PORACODE_CHROME_MCP_TOKEN",
-  ...PIPEDREAM_ENV_KEYS,
-  "PIPEDREAM_ENV_FILE",
+  ...PIPEDREAM_DEPRECATED_EXEC_ENV_KEYS,
 ] as const;
 
 const PRIVILEGED_CHILD_ENV_KEY_SET = new Set<string>(

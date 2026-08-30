@@ -1,5 +1,6 @@
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -8,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   copyPluginAssetFile,
@@ -24,6 +25,7 @@ import {
   parseExistingHooksJson,
   PLUGIN_ASSET_FILES,
   quoteHookCommandArg,
+  resolveForwardRuntimeSourcePath,
   readBundledPluginVersion,
   readPluginManifest,
   renderNativeHookPowerShellWrapper,
@@ -92,6 +94,50 @@ describe("createPluginSourceResolver", () => {
       callerDir: makeTempDir(),
     });
     expect(() => resolve()).toThrow(/test plugin source dir not found/);
+  });
+
+  it("resolves provider assets from the packaged ASAR resources root", () => {
+    const resourcesPath = makeTempDir();
+    const sourceDir = join(resourcesPath, "app.asar", "resources", "agent-plugins", "test");
+    const previousDescriptor = Object.getOwnPropertyDescriptor(process, "resourcesPath");
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(sourceDir, "plugin.json"), '{"version":"1.2.3"}', "utf8");
+    Object.defineProperty(process, "resourcesPath", { configurable: true, value: resourcesPath });
+    try {
+      const resolve = createPluginSourceResolver({
+        kind: "test",
+        sourceEnvVar: ENV_KEY,
+        callerDir: makeTempDir(),
+      });
+      expect(resolve()).toBe(sourceDir);
+    } finally {
+      if (previousDescriptor) Object.defineProperty(process, "resourcesPath", previousDescriptor);
+      else delete (process as { resourcesPath?: string }).resourcesPath;
+    }
+  });
+});
+
+describe("resolveForwardRuntimeSourcePath", () => {
+  it("resolves the shared forwarder runtime from packaged ASAR resources", () => {
+    const resourcesPath = makeTempDir();
+    const runtimePath = join(
+      resourcesPath,
+      "app.asar",
+      "resources",
+      "agent-plugins",
+      "_runtime",
+      "poracode-hook-runtime.mjs",
+    );
+    const previousDescriptor = Object.getOwnPropertyDescriptor(process, "resourcesPath");
+    mkdirSync(dirname(runtimePath), { recursive: true });
+    writeFileSync(runtimePath, "export {};\n", "utf8");
+    Object.defineProperty(process, "resourcesPath", { configurable: true, value: resourcesPath });
+    try {
+      expect(resolveForwardRuntimeSourcePath()).toBe(runtimePath);
+    } finally {
+      if (previousDescriptor) Object.defineProperty(process, "resourcesPath", previousDescriptor);
+      else delete (process as { resourcesPath?: string }).resourcesPath;
+    }
   });
 });
 

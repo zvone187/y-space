@@ -558,8 +558,8 @@ describe("PipedreamSupervisorService", () => {
     launchRefresh.resolve(accountPageResponse());
 
     await expect(Promise.all([first, second])).resolves.toEqual([
-      [expect.objectContaining({ name: expect.stringMatching(/^pipedream-slack-/u) })],
-      [expect.objectContaining({ name: expect.stringMatching(/^pipedream-slack-/u) })],
+      [expect.objectContaining({ name: expect.stringMatching(/^pd-[0-9a-f]{12}$/u) })],
+      [expect.objectContaining({ name: expect.stringMatching(/^pd-[0-9a-f]{12}$/u) })],
     ]);
     expect(accountRequests).toBe(2);
     await service.dispose();
@@ -668,7 +668,7 @@ describe("PipedreamSupervisorService", () => {
     });
     expect(servers).toHaveLength(1);
     expect(servers[0]).toMatchObject({
-      name: expect.stringMatching(/^pipedream-slack-[0-9a-f]{12}$/u),
+      name: expect.stringMatching(/^pd-[0-9a-f]{12}$/u),
       transport: { type: "http" },
     });
     const serialized = JSON.stringify({ snapshot: service.getSnapshot(), servers });
@@ -705,7 +705,7 @@ describe("PipedreamSupervisorService", () => {
     const serialized = JSON.stringify({ server, translations });
     expect(serialized).not.toMatch(/apn_Account123|proj_Test123|y-space-private-install-id/u);
     expect(serialized).toContain("127.0.0.1");
-    expect(serialized).toContain("pipedream-slack-");
+    expect(serialized).toContain('"name":"pd-');
     expect(Object.values(translations)).toHaveLength(3);
     await service.dispose();
   });
@@ -1397,6 +1397,95 @@ describe("PipedreamSupervisorService", () => {
       state: "ready",
       accounts: [expect.objectContaining({ id: "apn_Account123", agentAccess: false })],
     });
+    await service.dispose();
+  });
+
+  it("retries DELETE after persisting the revoked retry row fails", async () => {
+    let accountsOffline = false;
+    let deleteRequests = 0;
+    let deleteOffline = true;
+    let failRevokedRestore = false;
+    let durableRemovalObserved = false;
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/oauth/token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "developer-token",
+            token_type: "Bearer",
+            expires_in: 600,
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      if (init?.method === "DELETE") {
+        deleteRequests += 1;
+        if (deleteOffline) throw new Error("simulated offline DELETE");
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes("/accounts")) {
+        if (accountsOffline) throw new Error("simulated offline reconciliation");
+        return accountPageResponse();
+      }
+      throw new Error("Optional project-name probe unavailable");
+    });
+    const baseDir = await mkdtemp(join(tmpdir(), "y-space-pipedream-restore-retry-"));
+    roots.push(baseDir);
+    const service = new PipedreamSupervisorService({
+      baseDir,
+      fetch: fetchMock,
+      readPersonalMcpStatus: () => ({ enabled: true, authenticated: true }),
+      writeConnectionsFile: (...args) => {
+        const payload = JSON.parse(String(args[1])) as {
+          accounts: Array<{ id: string }>;
+        };
+        if (failRevokedRestore) {
+          if (payload.accounts.length === 0) durableRemovalObserved = true;
+          else if (
+            durableRemovalObserved &&
+            payload.accounts.some((account) => account.id === "apn_Account123")
+          ) {
+            throw new Error("simulated revoked-row restore failure");
+          }
+        }
+        writeFileAtomic(...args);
+      },
+    });
+    service.configure(readyBootstrap());
+    await service.refreshAccounts();
+    service.setAccountAgentAccess({ accountId: "apn_Account123", enabled: true });
+    accountsOffline = true;
+    failRevokedRestore = true;
+
+    await expect(service.disconnectAccount({ accountId: "apn_Account123" })).rejects.toThrow(
+      "Pipedream request failed",
+    );
+    expect(deleteRequests).toBe(1);
+    expect(durableRemovalObserved).toBe(true);
+    expect(
+      new PipedreamConnectionStore({
+        filePath: join(baseDir, "pipedream-connections.json"),
+      }).list(),
+    ).toEqual([]);
+    expect(service.getSnapshot().connect).toMatchObject({
+      state: "ready",
+      accounts: [expect.objectContaining({ id: "apn_Account123", agentAccess: false })],
+    });
+
+    await expect(service.disconnectAccount({ accountId: "apn_Account123" })).rejects.toThrow(
+      "Pipedream request failed",
+    );
+    expect(deleteRequests).toBe(2);
+    expect(service.getSnapshot().connect).toMatchObject({
+      state: "ready",
+      accounts: [expect.objectContaining({ id: "apn_Account123", agentAccess: false })],
+    });
+
+    deleteOffline = false;
+    await expect(service.disconnectAccount({ accountId: "apn_Account123" })).resolves.toMatchObject(
+      { connect: { state: "ready", accounts: [] } },
+    );
+    expect(deleteRequests).toBe(3);
     await service.dispose();
   });
 

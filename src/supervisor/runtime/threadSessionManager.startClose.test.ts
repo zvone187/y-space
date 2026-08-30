@@ -12,7 +12,10 @@ import {
 } from "@/shared/contracts";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import type { SupervisorEvent } from "@/shared/ipc";
-import { MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN } from "@/shared/browserMcpEvidence";
+import {
+  BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL,
+  MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN,
+} from "@/shared/browserMcpEvidence";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { WindowsShellPreference } from "../shellPreference";
 import type { SessionRuntime } from "./sessionTypes";
@@ -21,11 +24,14 @@ import {
   type McpLaunchAuthorization,
   type McpLaunchIdentity,
 } from "./threadSession/spawnPipeline";
+import type { ThreadSessionManagerOptions } from "./threadSession/managerOptions";
 import { BROWSER_MCP_TOKEN_ENV, BROWSER_MCP_URL_ENV } from "../agents/browserMcp";
+import { attachMcpToolFilterCleanup } from "../mcp/McpToolFilterService";
 
 const captureSupervisorException = vi.hoisted(() =>
   vi.fn<(error: unknown, tags?: Record<string, string>) => void>(),
 );
+const sleepMock = vi.hoisted(() => vi.fn<(delay?: number) => Promise<void>>(async () => undefined));
 
 vi.mock("../diagnostics/sentry", async (importActual) => {
   const actual = await importActual<typeof import("../diagnostics/sentry")>();
@@ -49,7 +55,7 @@ vi.mock("node:timers/promises", async (importActual) => {
   const actual = await importActual<typeof import("node:timers/promises")>();
   return {
     ...actual,
-    setTimeout: vi.fn<(delay?: number) => Promise<void>>(async () => undefined),
+    setTimeout: sleepMock,
   };
 });
 
@@ -225,6 +231,18 @@ function createInactiveRuntime(
   } as unknown as SessionRuntime;
 }
 
+function disabledToolServer(id: string): McpServer {
+  return {
+    id,
+    name: id,
+    description: "",
+    enabled: true,
+    timeoutMs: 30_000,
+    disabledTools: ["dangerous_tool"],
+    transport: { type: "http", url: `https://${id}.example.test/mcp`, headers: {} },
+  };
+}
+
 function attachAuthorizedRuntime(
   manager: ThreadSessionManager,
   runtime: SessionRuntime,
@@ -270,6 +288,8 @@ const savedBrowserMcpUrl = process.env[BROWSER_MCP_URL_ENV];
 const savedBrowserMcpToken = process.env[BROWSER_MCP_TOKEN_ENV];
 
 beforeEach(() => {
+  sleepMock.mockReset();
+  sleepMock.mockResolvedValue(undefined);
   process.env[BROWSER_MCP_URL_ENV] = "http://127.0.0.1:43199";
   process.env[BROWSER_MCP_TOKEN_ENV] = "thread-session-manager-test-browser-token";
 });
@@ -434,7 +454,41 @@ describe("ThreadSessionManager provider-session routing", () => {
     expect(manager.recordBrowserMcpToolCall({ ...report, turnId: nextTurnId })).toBe(false);
   });
 
-  it("retains one negative Browser outcome after the successful evidence cap is full", () => {
+  it("records tab activation and closure as authenticated metadata boundaries", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const events: SupervisorEvent[] = [];
+    const manager = createManager("codex", adapter, (event) => events.push(event));
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "browser-evidence-tab-boundaries";
+    runtime.status = "idle";
+    runtime.config = { model: "codex/model", browserMcp: true };
+    runtime.launchConfig = { ...runtime.config };
+    const identity = attachAuthorizedRuntime(manager, runtime);
+    const report = {
+      threadId: runtime.threadId,
+      launchId: identity.launchId,
+      turnId: identity.browserEvidenceTurnId!,
+      success: true,
+      occurredAt: 1_778_000_000_000,
+    };
+
+    expect(manager.recordBrowserMcpToolCall({ ...report, toolName: "activate_tab" })).toBe(true);
+    expect(manager.recordBrowserMcpToolCall({ ...report, toolName: "close_tab" })).toBe(true);
+    expect(manager.recordBrowserMcpToolCall({ ...report, toolName: "list_tabs" })).toBe(false);
+
+    expect(
+      collectRuntimeEvents(events)
+        .filter((event) => event.type === "item.started")
+        .map((event) =>
+          event.type === "item.started"
+            ? (event.payload as { name?: string } | undefined)?.name
+            : undefined,
+        ),
+    ).toEqual(["activate_tab", "close_tab"]);
+  });
+
+  it("globally taints verification after the first post-cap invalidator", () => {
     const structuredSession = createStructuredSession(Promise.resolve());
     const adapter = createAdapter("codex", structuredSession);
     const events: SupervisorEvent[] = [];
@@ -463,12 +517,59 @@ describe("ThreadSessionManager provider-session routing", () => {
     const eventCountBeforeFailure = collectRuntimeEvents(events).length;
 
     expect(
-      manager.recordBrowserMcpToolCall({ ...report, toolName: "select", success: false }),
+      manager.recordBrowserMcpToolCall({ ...report, toolName: "wait_for_url", success: false }),
     ).toBe(true);
+    expect(
+      manager.recordBrowserMcpToolCall({ ...report, toolName: "select", success: false }),
+    ).toBe(false);
     expect(collectRuntimeEvents(events).slice(eventCountBeforeFailure)).toEqual([
       expect.objectContaining({
         type: "item.started",
-        payload: expect.objectContaining({ name: "select", status: "error" }),
+        payload: expect.objectContaining({
+          name: BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL,
+          status: "error",
+        }),
+      }),
+      expect.objectContaining({ type: "item.completed" }),
+    ]);
+  });
+
+  it("retains one tab-state invalidator after the Browser evidence cap is full", () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const events: SupervisorEvent[] = [];
+    const manager = createManager("codex", adapter, (event) => events.push(event));
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "browser-evidence-cap-tab-boundary";
+    runtime.status = "idle";
+    runtime.config = { model: "codex/model", browserMcp: true };
+    runtime.launchConfig = { ...runtime.config };
+    const identity = attachAuthorizedRuntime(manager, runtime);
+    const report = {
+      threadId: runtime.threadId,
+      launchId: identity.launchId,
+      turnId: identity.browserEvidenceTurnId!,
+      toolName: "get_url",
+      success: true,
+      occurredAt: 1_778_000_000_000,
+    } as const;
+
+    for (let index = 0; index < MAX_BROWSER_EVIDENCE_ACTIONS_PER_TURN; index += 1) {
+      expect(
+        manager.recordBrowserMcpToolCall({ ...report, occurredAt: report.occurredAt + index }),
+      ).toBe(true);
+    }
+    const eventCountBeforeBoundary = collectRuntimeEvents(events).length;
+
+    expect(manager.recordBrowserMcpToolCall({ ...report, toolName: "close_tab" })).toBe(true);
+    expect(manager.recordBrowserMcpToolCall({ ...report, toolName: "activate_tab" })).toBe(false);
+    expect(collectRuntimeEvents(events).slice(eventCountBeforeBoundary)).toEqual([
+      expect.objectContaining({
+        type: "item.started",
+        payload: expect.objectContaining({
+          name: BROWSER_EVIDENCE_CAP_INVALIDATION_TOOL,
+          status: "error",
+        }),
       }),
       expect.objectContaining({ type: "item.completed" }),
     ]);
@@ -1388,6 +1489,54 @@ describe("ThreadSessionManager provider-session routing", () => {
     expect(releaseThread).not.toHaveBeenCalled();
   });
 
+  it("revokes a closing parent's child bearer before teardown and retains filter cleanup until exit", async () => {
+    const childExit = deferred();
+    const order: string[] = [];
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const parent = createInactiveRuntime("codex", adapter, structuredSession);
+    parent.threadId = "parent-close-child-filter-order";
+    manager.sessions.set(parent.threadId, parent);
+    const childThreadId = "child-close-filter-order";
+    const internals = manager as unknown as {
+      options: { crossagentMcp: ReturnType<typeof inertCrossagentMcp> };
+      subagentMcpLaunchAuthorities: Map<string, unknown>;
+      revokeSubagentParentMcpAccess(
+        parentThreadId: string,
+        childId: string,
+      ): (() => void) | undefined;
+    };
+    internals.subagentMcpLaunchAuthorities.set(childThreadId, {
+      parentThreadId: parent.threadId,
+      parentSessionInstanceId: parent.instanceId,
+      authorization: {
+        identity: { threadId: childThreadId, launchId: "child-close-filter-launch" },
+        adapter,
+        config: parent.config,
+        launchConfig: parent.launchConfig ?? parent.config,
+        mcpLaunchSnapshot: parent.mcpLaunchSnapshot,
+      },
+      mcpToolFilterCleanup: () => order.push("filter-cleanup"),
+    });
+    internals.options.crossagentMcp = inertCrossagentMcp(async (threadId) => {
+      const filterCleanup = internals.revokeSubagentParentMcpAccess(threadId, childThreadId);
+      order.push("revoke");
+      order.push("interrupt");
+      await childExit.promise;
+      order.push("child-exit");
+      filterCleanup?.();
+    });
+
+    const close = manager.closeThread({ threadId: parent.threadId });
+    await Promise.resolve();
+    expect(order).toEqual(["revoke", "interrupt"]);
+
+    childExit.resolve();
+    await close;
+    expect(order).toEqual(["revoke", "interrupt", "child-exit", "filter-cleanup"]);
+  });
+
   it("retries a structured child with the current descriptor when a stale settings resolution rejects", async () => {
     const structuredSession = createStructuredSession(Promise.resolve());
     const adapter = createAdapter("codex", structuredSession);
@@ -1833,6 +1982,651 @@ describe("ThreadSessionManager Windows shells", () => {
       ["-NoLogo"],
       expect.objectContaining({ cwd: process.cwd() }),
     );
+  });
+});
+
+describe("ThreadSessionManager terminal skill leases", () => {
+  function installTerminalSkillHooks(
+    manager: ThreadSessionManager,
+    hooks: Pick<
+      ThreadSessionManagerOptions,
+      "rewriteTerminalSkillSegments" | "releaseTerminalSkillCopies"
+    >,
+  ): void {
+    Object.assign((manager as unknown as { options: ThreadSessionManagerOptions }).options, hooks);
+  }
+
+  it("keeps a queued turn's skill lease alive when the working turn settles", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => segments);
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "queued-terminal-skills";
+    runtime.presentationMode = "terminal";
+    runtime.structuredSession = undefined;
+    runtime.status = "working";
+    runtime.attention = "working";
+    runtime.activeTerminalSkillLeaseIds = ["turn-a"];
+    runtime.pty = {
+      pid: 2_147_483_647,
+      write: vi.fn<(data: string) => void>(),
+    } as unknown as NonNullable<SessionRuntime["pty"]>;
+    manager.sessions.set(runtime.threadId, runtime);
+
+    await manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/queued-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "queued-skill",
+          invocation: "/queued-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    const queuedLeaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(queuedLeaseId).toEqual(expect.any(String));
+
+    const outputPipeline = (
+      manager as unknown as {
+        outputPipeline: {
+          updateState(
+            session: SessionRuntime,
+            status: SessionRuntime["status"],
+            attention: SessionRuntime["attention"],
+          ): void;
+        };
+      }
+    ).outputPipeline;
+    outputPipeline.updateState(runtime, "idle", "none");
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith("turn-a");
+
+    outputPipeline.updateState(runtime, "error", "error");
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith("turn-a");
+
+    outputPipeline.updateState(runtime, "working", "working");
+    outputPipeline.updateState(runtime, "idle", "none");
+    expect(releaseTerminalSkillCopies.mock.calls.map(([leaseId]) => leaseId)).toEqual([
+      "turn-a",
+      queuedLeaseId,
+    ]);
+  });
+
+  it("rewrites an inactive terminal resume and transfers its skill lease to the replacement", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewrittenSkillHint = "Read C:/temp/resume-skill/SKILL.md and follow it.";
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async () => [{ kind: "text", content: rewrittenSkillHint }]);
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "inactive-terminal-skill-resume";
+    runtime.presentationMode = "terminal";
+    manager.sessions.set(runtime.threadId, runtime);
+
+    await manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/resume-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "resume-skill",
+          path: "C:/packed/skills/resume-skill/SKILL.md",
+          invocation: "/resume-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(vi.mocked(adapter.buildResumeArgv).mock.calls[0]?.[2]).toBe(rewrittenSkillHint);
+    const replacement = manager.sessions.get(runtime.threadId)!;
+    expect(replacement).not.toBe(runtime);
+    expect(replacement.activeTerminalSkillLeaseIds).toEqual([leaseId]);
+    expect(releaseTerminalSkillCopies).not.toHaveBeenCalled();
+
+    const outputPipeline = (
+      manager as unknown as {
+        outputPipeline: {
+          updateState(
+            session: SessionRuntime,
+            status: SessionRuntime["status"],
+            attention: SessionRuntime["attention"],
+          ): void;
+        };
+      }
+    ).outputPipeline;
+    outputPipeline.updateState(replacement, "working", "working");
+    outputPipeline.updateState(replacement, "idle", "none");
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+  });
+
+  it("releases an inactive terminal resume's skill lease when restart launch fails", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    vi.mocked(adapter.buildResumeArgv).mockImplementationOnce(() => {
+      throw new Error("resume argv failed");
+    });
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => segments);
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "failed-inactive-terminal-skill-resume";
+    runtime.presentationMode = "terminal";
+    manager.sessions.set(runtime.threadId, runtime);
+
+    await expect(
+      manager.sendThreadInput({
+        threadId: runtime.threadId,
+        prompt: "/resume-skill",
+        config: runtime.config,
+        segments: [
+          {
+            kind: "skill",
+            name: "resume-skill",
+            path: "C:/packed/skills/resume-skill/SKILL.md",
+            invocation: "/resume-skill",
+            provider: "Y Space built-ins",
+            scope: "global",
+          },
+        ],
+      }),
+    ).rejects.toThrow("resume argv failed");
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+  });
+
+  it("releases an inactive terminal resume's skill lease when the thread closes during rewrite", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteStarted = deferred<void>();
+    const continueRewrite = deferred<void>();
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => {
+      rewriteStarted.resolve();
+      await continueRewrite.promise;
+      return segments;
+    });
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "stale-inactive-terminal-skill-resume";
+    runtime.presentationMode = "terminal";
+    manager.sessions.set(runtime.threadId, runtime);
+
+    const resume = manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/resume-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "resume-skill",
+          path: "C:/packed/skills/resume-skill/SKILL.md",
+          invocation: "/resume-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    await rewriteStarted.promise;
+    await manager.closeThread({ threadId: runtime.threadId });
+    continueRewrite.resolve();
+    await expect(resume).resolves.toBeUndefined();
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(adapter.buildResumeArgv).not.toHaveBeenCalled();
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+    expect(manager.sessions.has(runtime.threadId)).toBe(false);
+  });
+
+  it("does not write an active terminal skill prompt after close begins during rewrite", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteStarted = deferred<void>();
+    const continueRewrite = deferred<void>();
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => {
+      rewriteStarted.resolve();
+      await continueRewrite.promise;
+      return segments;
+    });
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const write = vi.fn<(data: string) => void>();
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "closing-active-terminal-skill";
+    runtime.presentationMode = "terminal";
+    runtime.status = "idle";
+    runtime.structuredSession = undefined;
+    runtime.pty = {
+      pid: 2_147_483_647,
+      write,
+    } as unknown as NonNullable<SessionRuntime["pty"]>;
+    manager.sessions.set(runtime.threadId, runtime);
+
+    const send = manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/closing-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "closing-skill",
+          path: "C:/packed/skills/closing-skill/SKILL.md",
+          invocation: "/closing-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    await rewriteStarted.promise;
+    const close = manager.closeThread({ threadId: runtime.threadId });
+    await vi.waitFor(() => expect(runtime.ignoreExit).toBe(true));
+    continueRewrite.resolve();
+    await Promise.all([send, close]);
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(write).not.toHaveBeenCalled();
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+  });
+
+  it("stops an active terminal skill prompt before later chunks when close begins after its text", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => segments);
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const promptDelayStarted = deferred<void>();
+    const continuePromptWrite = deferred<void>();
+    sleepMock.mockImplementationOnce(async (delay) => {
+      promptDelayStarted.resolve();
+      expect(delay).toBe(8);
+      await continuePromptWrite.promise;
+    });
+    const write = vi.fn<(data: string) => void>();
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "closing-chunked-terminal-skill";
+    runtime.presentationMode = "terminal";
+    runtime.status = "idle";
+    runtime.structuredSession = undefined;
+    runtime.pty = {
+      pid: 2_147_483_647,
+      write,
+    } as unknown as NonNullable<SessionRuntime["pty"]>;
+    manager.sessions.set(runtime.threadId, runtime);
+
+    const send = manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/closing-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "closing-skill",
+          path: "C:/packed/skills/closing-skill/SKILL.md",
+          invocation: "/closing-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    await promptDelayStarted.promise;
+    expect(write).toHaveBeenCalledExactlyOnceWith("/closing-skill");
+
+    const close = manager.closeThread({ threadId: runtime.threadId });
+    expect(runtime.ignoreExit).toBe(true);
+    continuePromptWrite.resolve();
+    await Promise.all([send, close]);
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(write).toHaveBeenCalledExactlyOnceWith("/closing-skill");
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+  });
+
+  it("does not write an active terminal skill prompt after manager disposal begins during rewrite", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteStarted = deferred<void>();
+    const continueRewrite = deferred<void>();
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => {
+      rewriteStarted.resolve();
+      await continueRewrite.promise;
+      return segments;
+    });
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const write = vi.fn<(data: string) => void>();
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "disposing-active-terminal-skill";
+    runtime.presentationMode = "terminal";
+    runtime.status = "idle";
+    runtime.structuredSession = undefined;
+    runtime.pty = {
+      pid: 2_147_483_647,
+      write,
+    } as unknown as NonNullable<SessionRuntime["pty"]>;
+    manager.sessions.set(runtime.threadId, runtime);
+
+    const send = manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/disposing-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "disposing-skill",
+          path: "C:/packed/skills/disposing-skill/SKILL.md",
+          invocation: "/disposing-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    await rewriteStarted.promise;
+    const dispose = manager.dispose();
+    expect(runtime.ignoreExit).toBe(true);
+    continueRewrite.resolve();
+    await Promise.all([send, dispose]);
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(write).not.toHaveBeenCalled();
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+  });
+
+  it("stops an active terminal skill prompt before later chunks when disposal begins after its text", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => segments);
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const promptDelayStarted = deferred<void>();
+    const continuePromptWrite = deferred<void>();
+    sleepMock.mockImplementationOnce(async (delay) => {
+      promptDelayStarted.resolve();
+      expect(delay).toBe(8);
+      await continuePromptWrite.promise;
+    });
+    const write = vi.fn<(data: string) => void>();
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "disposing-chunked-terminal-skill";
+    runtime.presentationMode = "terminal";
+    runtime.status = "idle";
+    runtime.structuredSession = undefined;
+    runtime.pty = {
+      pid: 2_147_483_647,
+      write,
+    } as unknown as NonNullable<SessionRuntime["pty"]>;
+    manager.sessions.set(runtime.threadId, runtime);
+
+    const send = manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/disposing-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "disposing-skill",
+          path: "C:/packed/skills/disposing-skill/SKILL.md",
+          invocation: "/disposing-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    await promptDelayStarted.promise;
+    expect(write).toHaveBeenCalledExactlyOnceWith("/disposing-skill");
+
+    const dispose = manager.dispose();
+    expect(runtime.ignoreExit).toBe(true);
+    continuePromptWrite.resolve();
+    await Promise.all([send, dispose]);
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(write).toHaveBeenCalledExactlyOnceWith("/disposing-skill");
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+  });
+
+  it("does not confirm a pasted terminal skill prompt after manager disposal begins", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    adapter.buildDirectInput = vi.fn<NonNullable<AgentAdapter["buildDirectInput"]>>(() => [
+      "/disposing-skill",
+    ]);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async ({ segments }) => segments);
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+    const pasteConfirmationWaitStarted = deferred<void>();
+    const continuePasteConfirmation = deferred<void>();
+    sleepMock.mockImplementation(async (delay) => {
+      if (delay !== 300) return;
+      pasteConfirmationWaitStarted.resolve();
+      await continuePasteConfirmation.promise;
+    });
+    const write = vi.fn<(data: string) => void>();
+    const runtime = createInactiveRuntime("codex", adapter, structuredSession);
+    runtime.threadId = "disposing-pasted-terminal-skill";
+    runtime.presentationMode = "terminal";
+    runtime.status = "idle";
+    runtime.structuredSession = undefined;
+    runtime.prevChunk = "[Pasted text 1200 chars]";
+    runtime.pty = {
+      pid: 2_147_483_647,
+      write,
+    } as unknown as NonNullable<SessionRuntime["pty"]>;
+    manager.sessions.set(runtime.threadId, runtime);
+
+    const send = manager.sendThreadInput({
+      threadId: runtime.threadId,
+      prompt: "/disposing-skill",
+      config: runtime.config,
+      segments: [
+        {
+          kind: "skill",
+          name: "disposing-skill",
+          path: "C:/packed/skills/disposing-skill/SKILL.md",
+          invocation: "/disposing-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+    });
+    await pasteConfirmationWaitStarted.promise;
+    expect(write).toHaveBeenCalledExactlyOnceWith("/disposing-skill");
+
+    const dispose = manager.dispose();
+    expect(runtime.ignoreExit).toBe(true);
+    continuePasteConfirmation.resolve();
+    await Promise.all([send, dispose]);
+
+    const leaseId = rewriteTerminalSkillSegments.mock.calls[0]?.[0].leaseId;
+    expect(leaseId).toEqual(expect.any(String));
+    expect(write).toHaveBeenCalledExactlyOnceWith("/disposing-skill");
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(leaseId);
+  });
+
+  it("releases the exact terminal skill lease when launch startup fails", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    vi.mocked(adapter.buildLaunchArgv).mockImplementationOnce(() => {
+      throw new Error("launch argv failed");
+    });
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    let launchLeaseId: string | undefined;
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async (input) => {
+      releaseTerminalSkillCopies.mockClear();
+      launchLeaseId = input.leaseId;
+      return input.segments;
+    });
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+
+    await expect(
+      manager.startThread({
+        threadId: "failed-terminal-skill-launch",
+        projectLocation: { kind: "windows", path: "C:\\repo" },
+        agentKind: "codex",
+        config: { model: "codex/model" },
+        prompt: "/launch-skill",
+        segments: [
+          {
+            kind: "skill",
+            name: "launch-skill",
+            invocation: "/launch-skill",
+            provider: "Y Space built-ins",
+            scope: "global",
+          },
+        ],
+        initialSize: { cols: 80, rows: 24 },
+        presentationMode: "terminal",
+      }),
+    ).rejects.toThrow("launch argv failed");
+
+    expect(launchLeaseId).toEqual(expect.any(String));
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(launchLeaseId);
+  });
+
+  it("releases the exact terminal skill lease when an in-flight launch is aborted", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("codex", structuredSession);
+    const manager = createManager("codex", adapter);
+    const releaseTerminalSkillCopies = vi.fn<(leaseId: string) => Promise<void>>(
+      async () => undefined,
+    );
+    const rewriteStarted = deferred<void>();
+    const continueRewrite = deferred<void>();
+    let launchLeaseId: string | undefined;
+    const rewriteTerminalSkillSegments = vi.fn<
+      NonNullable<ThreadSessionManagerOptions["rewriteTerminalSkillSegments"]>
+    >(async (input) => {
+      releaseTerminalSkillCopies.mockClear();
+      launchLeaseId = input.leaseId;
+      rewriteStarted.resolve();
+      await continueRewrite.promise;
+      return input.segments;
+    });
+    installTerminalSkillHooks(manager, {
+      rewriteTerminalSkillSegments,
+      releaseTerminalSkillCopies,
+    });
+
+    const start = manager.startThread({
+      threadId: "aborted-terminal-skill-launch",
+      projectLocation: { kind: "windows", path: "C:\\repo" },
+      agentKind: "codex",
+      config: { model: "codex/model" },
+      prompt: "/launch-skill",
+      segments: [
+        {
+          kind: "skill",
+          name: "launch-skill",
+          invocation: "/launch-skill",
+          provider: "Y Space built-ins",
+          scope: "global",
+        },
+      ],
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "terminal",
+    });
+    await rewriteStarted.promise;
+    await manager.interruptThread({ threadId: "aborted-terminal-skill-launch" });
+    continueRewrite.resolve();
+    await expect(start).resolves.toEqual({ threadId: "aborted-terminal-skill-launch" });
+
+    expect(launchLeaseId).toEqual(expect.any(String));
+    expect(releaseTerminalSkillCopies).toHaveBeenCalledExactlyOnceWith(launchLeaseId);
   });
 });
 
@@ -3637,6 +4431,8 @@ describe("ThreadSessionManager start guards", () => {
 
   it("revokes Personal relay authority for active subagents when parent settings remove it", async () => {
     const blockedReload = deferred();
+    const childExit = deferred();
+    const childOrder: string[] = [];
     const structuredSession = createStructuredSession(Promise.resolve());
     structuredSession.updateMcpServers = vi.fn<
       NonNullable<StructuredSessionHandle["updateMcpServers"]>
@@ -3680,6 +4476,10 @@ describe("ThreadSessionManager start guards", () => {
         settingsPath: string;
         crossagentMcp: ReturnType<typeof inertCrossagentMcp>;
       };
+      revokeSubagentParentMcpAccess(
+        parentThreadId: string,
+        childId: string,
+      ): (() => void) | undefined;
     };
     internals.subagentMcpLaunchAuthorities.set(childThreadId, {
       parentThreadId: parent.threadId,
@@ -3691,8 +4491,16 @@ describe("ThreadSessionManager start guards", () => {
         launchConfig: parent.launchConfig ?? parent.config,
         mcpLaunchSnapshot: parent.mcpLaunchSnapshot,
       },
+      mcpToolFilterCleanup: () => childOrder.push("filter-cleanup"),
     });
-    const cancelAllChildren = vi.fn<(threadId: string) => Promise<void>>(async () => undefined);
+    const cancelAllChildren = vi.fn<(threadId: string) => Promise<void>>(async (threadId) => {
+      const filterCleanup = internals.revokeSubagentParentMcpAccess(threadId, childThreadId);
+      childOrder.push("revoke");
+      childOrder.push("interrupt");
+      await childExit.promise;
+      childOrder.push("child-exit");
+      filterCleanup?.();
+    });
     internals.options.crossagentMcp = inertCrossagentMcp(cancelAllChildren);
     releasePipedreamMcpBindings.mockClear();
     writeFileSync(internals.options.settingsPath, JSON.stringify({ mcpServers: [] }), "utf8");
@@ -3705,9 +4513,12 @@ describe("ThreadSessionManager start guards", () => {
     );
     expect(internals.subagentMcpLaunchAuthorities.has(childThreadId)).toBe(false);
     expect(cancelAllChildren).toHaveBeenCalledExactlyOnceWith(parent.threadId);
+    expect(childOrder).toEqual(["revoke", "interrupt"]);
 
+    childExit.resolve();
     blockedReload.resolve();
     await reload;
+    expect(childOrder).toEqual(["revoke", "interrupt", "child-exit", "filter-cleanup"]);
   });
 
   it("terminates and restarts a live-update session when Personal OAuth revocation cannot apply", async () => {
@@ -5611,6 +6422,171 @@ describe("ThreadSessionManager start guards", () => {
       { kind: "windows", path: "C:\\repo" },
       true,
     );
+  });
+
+  it("releases staged WSL MCP filters when close aborts provider creation", async () => {
+    const providerCreationStarted = deferred<void>();
+    const finishProviderCreation = deferred<StructuredSessionHandle>();
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("opencode", structuredSession);
+    vi.mocked(adapter.createStructuredSession!).mockImplementation(async () => {
+      providerCreationStarted.resolve();
+      return finishProviderCreation.promise;
+    });
+    const manager = createManager("opencode", adapter);
+    const cleanup = vi.fn<() => void>();
+    const prepareMcpToolFilters = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) => attachMcpToolFilterCleanup([...servers], cleanup),
+    );
+    (
+      manager as unknown as { options: { prepareMcpToolFilters: typeof prepareMcpToolFilters } }
+    ).options.prepareMcpToolFilters = prepareMcpToolFilters;
+
+    const launch = manager.startThread({
+      threadId: "thread-wsl-filter-abort",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/repo",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\repo",
+      },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [disabledToolServer("abort-filter")],
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    await providerCreationStarted.promise;
+
+    await manager.closeThread({ threadId: "thread-wsl-filter-abort" });
+    expect(cleanup).not.toHaveBeenCalled();
+    finishProviderCreation.resolve(structuredSession);
+    await launch;
+
+    expect(cleanup).toHaveBeenCalledOnce();
+    expect(manager.sessions.has("thread-wsl-filter-abort")).toBe(false);
+  });
+
+  it("releases staged WSL MCP filters when provider creation fails", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("opencode", structuredSession);
+    vi.mocked(adapter.createStructuredSession!).mockRejectedValue(new Error("provider failed"));
+    const manager = createManager("opencode", adapter);
+    const cleanup = vi.fn<() => void>();
+    const prepareMcpToolFilters = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) => attachMcpToolFilterCleanup([...servers], cleanup),
+    );
+    (
+      manager as unknown as { options: { prepareMcpToolFilters: typeof prepareMcpToolFilters } }
+    ).options.prepareMcpToolFilters = prepareMcpToolFilters;
+
+    await expect(
+      manager.startThread({
+        threadId: "thread-wsl-filter-provider-failure",
+        projectLocation: {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/demo/repo",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\repo",
+        },
+        agentKind: "opencode",
+        config: { model: "opencode/model" },
+        prompt: "",
+        initialSize: { cols: 80, rows: 24 },
+        presentationMode: "gui",
+        mcpServers: [disabledToolServer("failed-filter")],
+        disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+      }),
+    ).rejects.toThrow("Structured runtime session creation failed.");
+
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("hands staged WSL MCP filter cleanup to the live session until close", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    const adapter = createAdapter("opencode", structuredSession);
+    const manager = createManager("opencode", adapter);
+    const cleanup = vi.fn<() => void>();
+    const prepareMcpToolFilters = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) => attachMcpToolFilterCleanup([...servers], cleanup),
+    );
+    (
+      manager as unknown as { options: { prepareMcpToolFilters: typeof prepareMcpToolFilters } }
+    ).options.prepareMcpToolFilters = prepareMcpToolFilters;
+
+    await manager.startThread({
+      threadId: "thread-wsl-filter-live",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/repo",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\repo",
+      },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [disabledToolServer("live-filter")],
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+
+    expect(cleanup).not.toHaveBeenCalled();
+    await manager.closeThread({ threadId: "thread-wsl-filter-live" });
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("retains old and replacement WSL MCP filter leases across a live reload", async () => {
+    const structuredSession = createStructuredSession(Promise.resolve());
+    structuredSession.updateMcpServers = vi.fn<
+      NonNullable<StructuredSessionHandle["updateMcpServers"]>
+    >(async () => undefined);
+    const adapter = createAdapter("opencode", structuredSession);
+    adapter.capabilities.mcpConfigSource = "agentSettings";
+    const manager = createManager("opencode", adapter);
+    const initialCleanup = vi.fn<() => void>();
+    const reloadCleanup = vi.fn<() => void>();
+    let preparation = 0;
+    const prepareMcpToolFilters = vi.fn<(servers: McpServer[]) => Promise<McpServer[]>>(
+      async (servers) => {
+        const cleanup = preparation++ === 0 ? initialCleanup : reloadCleanup;
+        return attachMcpToolFilterCleanup([...servers], cleanup);
+      },
+    );
+    const internals = manager as unknown as {
+      options: { prepareMcpToolFilters: typeof prepareMcpToolFilters; settingsPath: string };
+    };
+    internals.options.prepareMcpToolFilters = prepareMcpToolFilters;
+    const initialServer = disabledToolServer("initial-filter");
+    const reloadedServer = disabledToolServer("reloaded-filter");
+
+    await manager.startThread({
+      threadId: "thread-wsl-filter-reload",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/repo",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\repo",
+      },
+      agentKind: "opencode",
+      config: { model: "opencode/model" },
+      prompt: "",
+      initialSize: { cols: 80, rows: 24 },
+      presentationMode: "gui",
+      mcpServers: [initialServer],
+      disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+    });
+    writeFileSync(internals.options.settingsPath, JSON.stringify({ mcpServers: [reloadedServer] }));
+
+    await manager.reloadAgentMcpServers({ agentKind: "opencode" });
+
+    expect(initialCleanup).not.toHaveBeenCalled();
+    expect(reloadCleanup).not.toHaveBeenCalled();
+    await manager.closeThread({ threadId: "thread-wsl-filter-reload" });
+    expect(initialCleanup).toHaveBeenCalledOnce();
+    expect(reloadCleanup).toHaveBeenCalledOnce();
   });
 
   it("keeps Personal Pipedream out of the live-reload pre-relay tool filter", async () => {

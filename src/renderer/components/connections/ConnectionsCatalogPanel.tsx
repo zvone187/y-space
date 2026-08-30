@@ -1,12 +1,12 @@
-import type { RefObject } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { Input } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { ChevronDown, CircleAlert, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, CircleAlert, Search } from "lucide-react";
 import { Button } from "@/renderer/components/common/Button";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import type { PipedreamAppSummary } from "@/shared/contracts";
 import { ConnectionAppIcon } from "./ConnectionAppIcon";
-import type { CatalogState } from "./connectionsDialogModel";
+import { CATALOG_PAGE_SIZE, type CatalogState } from "./connectionsDialogModel";
 
 interface ConnectionsCatalogPanelProps {
   readonly busy: string | null;
@@ -21,6 +21,46 @@ interface ConnectionsCatalogPanelProps {
 
 export function ConnectionsCatalogPanel(props: ConnectionsCatalogPanelProps) {
   const { t } = useLingui();
+  const listId = useId();
+  const nextButtonId = useId();
+  const loadMoreButtonId = useId();
+  const restoreFocusAfterLoadMore = useRef(false);
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(props.catalog.apps.length / CATALOG_PAGE_SIZE));
+  const visiblePageIndex = Math.min(pageIndex, pageCount - 1);
+  const visibleStartIndex = visiblePageIndex * CATALOG_PAGE_SIZE;
+  const visibleApps = props.catalog.apps.slice(
+    visibleStartIndex,
+    visibleStartIndex + CATALOG_PAGE_SIZE,
+  );
+  const visibleEndIndex = visibleStartIndex + visibleApps.length;
+  const hasPreviousPage = visiblePageIndex > 0;
+  const hasNextLoadedPage = visibleEndIndex < props.catalog.apps.length;
+
+  useEffect(() => setPageIndex(0), [props.query]);
+  useEffect(() => {
+    setPageIndex((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
+  useEffect(() => {
+    if (!restoreFocusAfterLoadMore.current || props.catalog.loading) return;
+    restoreFocusAfterLoadMore.current = false;
+    queueMicrotask(() => {
+      const preferred = hasNextLoadedPage
+        ? document.getElementById(nextButtonId)
+        : props.catalog.nextCursor
+          ? document.getElementById(loadMoreButtonId)
+          : null;
+      (preferred instanceof HTMLElement ? preferred : props.searchRef.current)?.focus();
+    });
+  }, [
+    hasNextLoadedPage,
+    loadMoreButtonId,
+    nextButtonId,
+    props.catalog.loading,
+    props.catalog.nextCursor,
+    props.searchRef,
+  ]);
+
   return (
     <div className="min-w-0 space-y-3">
       <div>
@@ -70,46 +110,89 @@ export function ConnectionsCatalogPanel(props: ConnectionsCatalogPanelProps) {
             <Trans>No integrations match this search.</Trans>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--hairline)]">
-            {props.catalog.apps.map((app) => (
-              <div key={app.id} className="flex min-h-14 items-center gap-3 px-3 py-2">
-                <ConnectionAppIcon app={app} />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                  {app.name}
-                </span>
-                <Button
-                  size="sm"
-                  variant="tertiary"
-                  aria-label={t`Connect ${app.name}`}
-                  isPending={props.busy === `connect:${app.slug}`}
-                  isDisabled={props.busy !== null}
-                  onPress={() => props.onConnect(app)}
+          <>
+            <div
+              id={listId}
+              role="list"
+              aria-label={t`Integrations`}
+              className="divide-y divide-[var(--hairline)]"
+            >
+              {visibleApps.map((app, index) => (
+                <div
+                  key={app.id}
+                  role="listitem"
+                  aria-posinset={visibleStartIndex + index + 1}
+                  aria-setsize={props.catalog.apps.length}
+                  className="flex min-h-14 items-center gap-3 px-3 py-2"
                 >
-                  <Trans>Connect</Trans>
-                </Button>
-              </div>
-            ))}
-            {props.catalog.nextCursor ? (
-              <div className="p-2">
+                  <ConnectionAppIcon app={app} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                    {app.name}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    aria-label={t`Connect ${app.name}`}
+                    isPending={props.busy === `connect:${app.slug}`}
+                    isDisabled={props.busy !== null}
+                    onPress={() => props.onConnect(app)}
+                  >
+                    <Trans>Connect</Trans>
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {pageCount > 1 || props.catalog.nextCursor ? (
+              <div className="flex items-center justify-end gap-2 border-t border-[var(--hairline)] p-2">
                 <Button
-                  className="w-full"
                   size="sm"
                   variant="ghost"
-                  aria-label={t`Load more integrations`}
-                  isPending={props.catalog.loading}
-                  onPress={() => props.onLoadMore(props.catalog.nextCursor!)}
+                  aria-label={t`Previous integrations`}
+                  aria-controls={listId}
+                  isDisabled={!hasPreviousPage}
+                  onPress={() => setPageIndex((current) => Math.max(0, current - 1))}
                 >
-                  <ChevronDown className="size-3.5" />
-                  <Trans>Load more</Trans>
+                  <ChevronLeft className="size-3.5" />
+                  <Trans>Previous</Trans>
                 </Button>
+                <Button
+                  id={nextButtonId}
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t`Next integrations`}
+                  aria-controls={listId}
+                  isDisabled={!hasNextLoadedPage}
+                  onPress={() => setPageIndex((current) => Math.min(pageCount - 1, current + 1))}
+                >
+                  <Trans>Next</Trans>
+                  <ChevronRight className="size-3.5" />
+                </Button>
+                {props.catalog.nextCursor && !hasNextLoadedPage ? (
+                  <Button
+                    id={loadMoreButtonId}
+                    size="sm"
+                    variant="ghost"
+                    aria-label={t`Load more integrations`}
+                    aria-controls={listId}
+                    isPending={props.catalog.loading}
+                    onPress={() => {
+                      restoreFocusAfterLoadMore.current = true;
+                      props.onLoadMore(props.catalog.nextCursor!);
+                    }}
+                  >
+                    <ChevronDown className="size-3.5" />
+                    <Trans>Load more</Trans>
+                  </Button>
+                ) : null}
               </div>
             ) : null}
-          </div>
+          </>
         )}
       </div>
-      <p className="px-1 text-[11px] text-muted">
+      <p aria-live="polite" aria-atomic="true" className="px-1 text-[11px] text-muted">
         <Trans>
-          {props.catalog.apps.length} of {props.catalog.totalCount} integrations shown
+          Showing {visibleApps.length === 0 ? 0 : visibleStartIndex + 1}–{visibleEndIndex} of{" "}
+          {props.catalog.apps.length} loaded integrations · {props.catalog.totalCount} total
         </Trans>
       </p>
     </div>

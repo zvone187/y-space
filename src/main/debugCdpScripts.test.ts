@@ -39,6 +39,32 @@ describe("managed CDP scripts", () => {
     expect(devLaunchSource).toContain('execSync("electronmon .", { stdio: "inherit", env })');
   });
 
+  it("requests a literal mock keychain switch for every managed macOS smoke mode", async () => {
+    const [runnerSource, devLaunchSource] = await Promise.all([
+      readFile(runnerScript, "utf8"),
+      readFile(join(repoRoot, "scripts/dev-launch.mjs"), "utf8"),
+    ]);
+    const identityStart = runnerSource.indexOf("const identityEnv =");
+    const launchStart = runnerSource.indexOf("appProcess = spawn");
+    const launchEnd = runnerSource.indexOf("sessionManifest.appPid", launchStart);
+
+    expect(identityStart).toBeGreaterThanOrEqual(0);
+    expect(launchStart).toBeGreaterThan(identityStart);
+    expect(launchEnd).toBeGreaterThan(launchStart);
+
+    const identitySource = runnerSource.slice(identityStart, launchStart);
+    const launchSource = runnerSource.slice(launchStart, launchEnd);
+    expect(identitySource).toMatch(/mode === "real"\s*\?\s*\{\}\s*:/u);
+    expect(identitySource).not.toContain("PORACODE_USE_MOCK_KEYCHAIN");
+    expect(launchSource).toContain("PORACODE_BASE_DIR: dataDir");
+    expect(launchSource).toMatch(
+      /process\.platform === "darwin"[\s\S]*PORACODE_USE_MOCK_KEYCHAIN: "1"/u,
+    );
+    expect(devLaunchSource).toMatch(
+      /if \(process\.env\.PORACODE_USE_MOCK_KEYCHAIN === "1"\) \{[\s\S]*electronArgs\.push\("--use-mock-keychain"\);[\s\S]*const app = spawn\(electronPath, electronArgs,/u,
+    );
+  });
+
   it("reports readiness from renderer and CDP state only", async () => {
     const { isCdpWindowReady } = await cdpTargetModule;
     const state = {

@@ -63,6 +63,7 @@ function makeStubbedManager(opts: {
   onSpawn?: (
     opts: Parameters<NonNullable<ConstructorParameters<typeof WslBridgeServer>[0]["spawn"]>>[0],
   ) => void;
+  cleanup?: () => void;
 }): { manager: WslBridgeServer; child: FakeChild; children: FakeChild[] } {
   const child = opts.child ?? new FakeChild();
   const children: FakeChild[] = [];
@@ -77,7 +78,11 @@ function makeStubbedManager(opts: {
       nodeVersion: "22.11.0",
       source: "user-installed",
     }),
-    deploy: () => ({ home: "/home/me", linuxBaseDir: "/home/me/.poracode" }),
+    deploy: () => ({
+      home: "/home/me",
+      linuxBaseDir: "/home/me/.poracode",
+      cleanup: opts.cleanup ?? (() => undefined),
+    }),
     spawn: (childOpts) => {
       const spawnedChild = opts.childFactory?.() ?? child;
       children.push(spawnedChild);
@@ -182,6 +187,47 @@ describe("WslBridgeServer", () => {
     await manager.dispose();
   });
 
+  it("cleans a private deployment only after a disposed bridge child exits", async () => {
+    const helpersDir = makeHelpersDir();
+    const cleanup = vi.fn<() => void>();
+    const { manager, child } = makeStubbedManager({
+      helpersDir,
+      onEvent: () => undefined,
+      cleanup,
+    });
+
+    await manager.ensureBridge("Ubuntu");
+    await manager.dispose();
+
+    expect(cleanup).not.toHaveBeenCalled();
+    child.emit("exit", 0, null);
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
+  it("cleans a deployment immediately when the bridge child cannot spawn", async () => {
+    const helpersDir = makeHelpersDir();
+    const cleanup = vi.fn<() => void>();
+    const manager = new WslBridgeServer({
+      helpersDir,
+      onEvent: () => undefined,
+      onError: () => undefined,
+      secret: "s",
+      protocolVersion: 1,
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "22.11.0",
+        source: "user-installed",
+      }),
+      deploy: () => ({ linuxBaseDir: "/tmp/private-bridge", cleanup }),
+      spawn: () => {
+        throw new Error("spawn failed");
+      },
+    });
+
+    await expect(manager.ensureBridge("Ubuntu")).resolves.toBeUndefined();
+    expect(cleanup).toHaveBeenCalledOnce();
+  });
+
   it("releases a bridge that is still booting", async () => {
     const helpersDir = makeHelpersDir();
     const { manager, children } = makeStubbedManager({
@@ -246,7 +292,11 @@ describe("WslBridgeServer", () => {
       secret: "s",
       protocolVersion: 1,
       resolveNode: async () => null,
-      deploy: () => ({ home: "/h", linuxBaseDir: "/h/.poracode" }),
+      deploy: () => ({
+        home: "/h",
+        linuxBaseDir: "/h/.poracode",
+        cleanup: () => undefined,
+      }),
       spawn: () => {
         throw new Error("should not spawn");
       },
@@ -315,7 +365,11 @@ describe("WslBridgeServer", () => {
         nodeVersion: "22.11.0",
         source: "user-installed",
       }),
-      deploy: () => ({ home: "/h", linuxBaseDir: "/h/.poracode" }),
+      deploy: () => ({
+        home: "/h",
+        linuxBaseDir: "/h/.poracode",
+        cleanup: () => undefined,
+      }),
       spawn: () => {
         // Schedule the early exit AFTER spawn returns so the manager has
         // already attached its `once("exit")` handler.
@@ -350,7 +404,11 @@ describe("WslBridgeServer", () => {
         nodeVersion: "22.11.0",
         source: "user-installed",
       }),
-      deploy: () => ({ home: "/h", linuxBaseDir: "/h/.poracode" }),
+      deploy: () => ({
+        home: "/h",
+        linuxBaseDir: "/h/.poracode",
+        cleanup: () => undefined,
+      }),
       spawn: () => {
         const child = new FakeChild();
         const version = versions[children.length] ?? "2.0.0";
@@ -391,7 +449,11 @@ describe("WslBridgeServer", () => {
         nodeVersion: "22.11.0",
         source: "user-installed",
       }),
-      deploy: () => ({ home: "/h", linuxBaseDir: "/h/.poracode" }),
+      deploy: () => ({
+        home: "/h",
+        linuxBaseDir: "/h/.poracode",
+        cleanup: () => undefined,
+      }),
       spawn: () => {
         const child = new FakeChild();
         const version = children.length === 0 ? "2.0.0" : "2.0.1";
@@ -435,7 +497,11 @@ describe("WslBridgeServer", () => {
         nodeVersion: "22.11.0",
         source: "user-installed",
       }),
-      deploy: () => ({ home: "/h", linuxBaseDir: "/h/.poracode" }),
+      deploy: () => ({
+        home: "/h",
+        linuxBaseDir: "/h/.poracode",
+        cleanup: () => undefined,
+      }),
       spawn: () => {
         const child = new FakeChild();
         children.push(child);
@@ -472,7 +538,11 @@ describe("WslBridgeServer", () => {
         nodeVersion: "22.11.0",
         source: "user-installed",
       }),
-      deploy: () => ({ home: "/h", linuxBaseDir: "/h/.poracode" }),
+      deploy: () => ({
+        home: "/h",
+        linuxBaseDir: "/h/.poracode",
+        cleanup: () => undefined,
+      }),
       spawn: () => {
         const child = new FakeChild();
         setImmediate(() => {

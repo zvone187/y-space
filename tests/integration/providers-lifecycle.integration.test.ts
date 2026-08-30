@@ -347,9 +347,12 @@ beforeEach((testCtx) => {
     JSON.stringify(isolatedLiveProviderRuntimeSettings(disableHooks)),
   );
   ctx.events = [];
-  ctx.runtime = new SupervisorRuntime((event) => {
-    ctx.events.push(event);
-  });
+  ctx.runtime = new SupervisorRuntime(
+    (event) => {
+      ctx.events.push(event);
+    },
+    { allowPipedreamOauthPersistence: false },
+  );
 });
 
 afterEach(() => {

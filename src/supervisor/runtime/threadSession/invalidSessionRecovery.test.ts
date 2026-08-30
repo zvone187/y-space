@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ThreadConfig } from "@/shared/contracts";
 import type { AgentAdapter, StructuredSessionHandle } from "../../agents/base";
 import type { SessionRuntime } from "../sessionTypes";
+import { attachMcpToolFilterCleanup } from "../../mcp/McpToolFilterService";
 import {
   InvalidSessionRecoveryCoordinator,
   type InvalidSessionRecoveryContext,
@@ -238,6 +239,27 @@ describe("InvalidSessionRecoveryCoordinator", () => {
     expect(resolvedIdentity.launchId).not.toBe("stale-launch");
     expect(authorization.identity).toBe(resolvedIdentity);
     expect(spawnedIdentity).toBe(resolvedIdentity);
+  });
+
+  it("moves old and replacement MCP filter leases to the recovered runtime", async () => {
+    const harness = createHarness();
+    const oldCleanup = vi.fn<() => void>();
+    const replacementCleanup = vi.fn<() => void>();
+    harness.session.mcpToolFilterCleanup = oldCleanup;
+    harness.resolveMcpServersForLaunch.mockResolvedValue(
+      attachMcpToolFilterCleanup([], replacementCleanup),
+    );
+
+    await harness.coordinator.recover(harness.session);
+
+    const spawnCleanup = harness.spawnThread.mock.calls[0]![0].mcpToolFilterCleanup;
+    expect(spawnCleanup).toBeTypeOf("function");
+    expect(harness.session.mcpToolFilterCleanup).toBeUndefined();
+    expect(oldCleanup).not.toHaveBeenCalled();
+    expect(replacementCleanup).not.toHaveBeenCalled();
+    spawnCleanup?.();
+    expect(oldCleanup).toHaveBeenCalledOnce();
+    expect(replacementCleanup).toHaveBeenCalledOnce();
   });
 
   it("returns the same in-flight recovery when the banner repeats", async () => {

@@ -43,7 +43,7 @@ export function prepareSubagentRun(
   const selections: SpawnAgentSelection[] = [request, ...(request.fallbacks ?? [])];
   const runName = request.name?.trim();
   const attempts = selections.map((selection) =>
-    resolveAttempt(deps, parent.config, selection, runName),
+    resolveAttempt(deps, parent.projectLocation, parent.config, selection, runName),
   );
 
   return {
@@ -57,6 +57,7 @@ export function prepareSubagentRun(
 
 function resolveAttempt(
   deps: SpawnPlanDeps,
+  projectLocation: ProjectLocation,
   parentConfig: ThreadConfig,
   selection: SpawnAgentSelection,
   runName: string | undefined,
@@ -67,6 +68,16 @@ function resolveAttempt(
   const execution = resolveSubagentExecution(adapter);
   if (!execution) {
     throw new SubagentSpawnError(`Provider ${selection.agent} cannot be spawned as a subagent`);
+  }
+  if (execution === "one-shot" && projectLocation.kind === "wsl") {
+    throw new SubagentSpawnError(
+      `One-shot subagents are unavailable for WSL projects because Y Space cannot safely reap their full process trees inside the WSL distribution. Use a provider with structured subagent support, or open the project outside WSL.`,
+    );
+  }
+  if (execution === "one-shot" && projectLocation.kind === "windows") {
+    throw new SubagentSpawnError(
+      `One-shot subagents are unavailable for native Windows projects because Y Space cannot safely prove that daemonized descendants exited after their command leader. Use a provider with structured subagent support.`,
+    );
   }
   if (
     parentConfig.browserMcp === true &&

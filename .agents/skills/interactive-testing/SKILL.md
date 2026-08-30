@@ -54,8 +54,14 @@ cross-cutting, IPC/app-shell, or cross-provider changes.
 Choose exactly one launch path per test run. Never use raw `pnpm run dev` or
 `pnpm run dev:test` for CDP work: those commands do not allocate a managed
 session and make wrong ports, shared state, and duplicate launches possible.
-The smoke runner owns and tears down its app. The managed launcher keeps one app
-alive for repeated manual actions, and its owner process performs every stop.
+The smoke runner owns and tears down its app. Each run keeps one main app process
+alive across all automated or manual cases, and its owner process performs every
+stop. Do not stop and relaunch the app between cases.
+
+These managed commands exercise the development build. Packaged QA must instead
+launch the exact executable inside the bundle under test with an isolated
+`PORACODE_BASE_DIR` and literal `--use-mock-keychain`, then keep that same
+packaged main process alive across every case in the run.
 
 The one-command runner below allocates its own free ports, so each invocation spawns a fully isolated dev app. Runs from multiple worktrees can execute side by side without colliding on the Vite or CDP port.
 
@@ -76,7 +82,7 @@ native update flow is required for the default mock run.
 **`HOME` and provider detection — no drift between test and app.** Poracode's own state is always isolated via `PORACODE_BASE_DIR`, independent of `HOME`. Provider _detection_, however, resolves each CLI through the login-shell `command -v` (e.g. `kimi` → `~/.kimi-code/bin/kimi`) and reads credentials under the home dir — so it only matches the real app when `HOME` is the real home. Therefore:
 
 - **Mock mode** sandboxes `HOME`/`APPDATA` and uses a mock keychain (deterministic isolation; providers are mocked). Real providers legitimately show **"Not found"** here — that is expected, not a bug, and mock gates never depend on real credentials.
-- **Real mode** (`--mode real`) keeps the **real `HOME`**, so authenticated providers (Kimi, Qwen, …) can detect as in the shipped app. Always verify a provider-dependent surface in real mode; never diagnose a real detection issue from a mock-mode "Not found".
+- **Real mode** (`--mode real`) keeps the **real `HOME`**, so authenticated providers (Kimi, Qwen, …) can detect as in the shipped app. On macOS it still uses the explicit test-only mock keychain; “real” refers to provider discovery and credentials under `HOME`, not Y Space credential storage. Always verify a provider-dependent surface in real mode; never diagnose a real detection issue from a mock-mode "Not found".
 
 Real `HOME` is necessary but not always sufficient: detection probes `command -v <binary>` in a login+interactive shell with **`cwd: homedir()`**, so a CLI whose bin dir is on `PATH` only via a _project-scoped_ mechanism (direnv `.envrc`, `asdf` local, `mise`, a per-repo `.env`) is invisible to the detector even though it works inside the project — direnv unloads at the home cwd. Symptom: the app log prints `direnv: unloading` and the provider shows "Not found". Fix in the environment, not the app: put the binary on a globally-resolvable `PATH` (e.g. symlink into `~/.local/bin`, as qwen/grok are). This is why `~/.kimi-code/bin/kimi` (direnv-only) can miss while `~/.local/bin`-installed providers detect fine.
 

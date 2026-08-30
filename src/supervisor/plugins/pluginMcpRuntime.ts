@@ -170,6 +170,23 @@ function buildTransport(
   };
 }
 
+function bundledStdioNeedsPackageFiles(entry: PluginMcpStdioEntry): boolean {
+  if (entry.command.startsWith("./") || entry.command.startsWith(".\\")) return true;
+  const values = [entry.cwd, ...entry.args, ...Object.values(entry.env)].filter(
+    (value): value is string => typeof value === "string",
+  );
+  if (values.some((value) => value.includes("${PLUGIN_ROOT}"))) return true;
+  if (
+    entry.cwd !== undefined &&
+    entry.cwd !== "${PLUGIN_DATA}" &&
+    !entry.cwd.startsWith("${PLUGIN_DATA}/") &&
+    !entry.cwd.startsWith("${PLUGIN_DATA}\\")
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Builds the MCP servers contributed by enabled plugins.
  *
@@ -253,9 +270,26 @@ export function resolvePluginMcpServers(
           );
           continue;
         }
+        if (plugin.source === "bundled" && bundledStdioNeedsPackageFiles(declaration.entry)) {
+          diagnostics.push(
+            pluginDiagnostic(
+              "error",
+              "mcp-server",
+              "mcp-entry-bundled-assets-unavailable",
+              `Skipping server '${declaration.name}': packaged stdio servers cannot execute mutable copies of bundled package files`,
+              declaration.name,
+            ),
+          );
+          continue;
+        }
       }
 
-      const built = buildTransport(declaration.entry, plugin.root, data);
+      // Bundled manifests are parsed directly from the integrity-checked ASAR.
+      // External providers cannot chdir into that virtual path, so asset-free
+      // bundled stdio servers run from their persistent PLUGIN_DATA directory.
+      // User plugins retain the specification's package-root semantics.
+      const runtimeRoot = plugin.source === "bundled" ? data : plugin.root;
+      const built = buildTransport(declaration.entry, runtimeRoot, data);
       if ("error" in built) {
         diagnostics.push(
           pluginDiagnostic(

@@ -12,6 +12,8 @@ function isRunnablePid(pid: number): boolean {
 export interface TerminateProcessTreeOptions {
   /** The child was launched detached and owns its POSIX process group. */
   ownedProcessGroup?: boolean;
+  /** POSIX signal to send. Windows taskkill remains an immediate forced tree kill. */
+  signal?: NodeJS.Signals;
 }
 
 export function terminateProcessTree(pid: number, options?: TerminateProcessTreeOptions): void {
@@ -36,8 +38,9 @@ export function terminateProcessTree(pid: number, options?: TerminateProcessTree
   }
 
   if (options?.ownedProcessGroup) {
+    const signal = options.signal ?? "SIGKILL";
     try {
-      process.kill(-pid, "SIGKILL");
+      process.kill(-pid, signal);
       return;
     } catch {
       // The group may already be gone; fall back to the immediate process.
@@ -46,7 +49,9 @@ export function terminateProcessTree(pid: number, options?: TerminateProcessTree
 
   try {
     if (options?.ownedProcessGroup) {
-      process.kill(pid, "SIGKILL");
+      process.kill(pid, options.signal ?? "SIGKILL");
+    } else if (options?.signal) {
+      process.kill(pid, options.signal);
     } else {
       process.kill(pid);
     }

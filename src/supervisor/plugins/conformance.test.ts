@@ -319,7 +319,7 @@ describe("mcp runtime", () => {
       manifest: manifest(name),
       mcp: { $schema: AGENT_PLUGINS_MCP_SCHEMA_URL, mcpServers: servers },
     });
-    const plugin = loadPluginFromDirectory(dir, "bundled").plugin;
+    const plugin = loadPluginFromDirectory(dir, "user").plugin;
     if (!plugin) throw new Error("plugin failed to load");
     return plugin;
   }
@@ -373,6 +373,49 @@ describe("mcp runtime", () => {
       PLUGIN_ROOT: plugin.root,
       PLUGIN_DATA: join(pluginDataRoot, "env-precedence"),
     });
+  });
+
+  it("runs asset-free bundled stdio servers from PLUGIN_DATA, never an ASAR cwd", async () => {
+    const parsed = await loadWithServers("packed-stdio", {
+      main: {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "@example/server", "--cache", "${PLUGIN_DATA}"],
+        env: { CACHE: "${PLUGIN_DATA}" },
+      },
+    });
+    const plugin = {
+      ...parsed,
+      source: "bundled" as const,
+      root: "/Applications/Y Space.app/Contents/Resources/app.asar/resources/plugins/packed-stdio",
+    };
+    const pluginDataRoot = join(root, "plugin-data");
+    const result = resolvePluginMcpServers([plugin], installed("packed-stdio"), {
+      pluginDataRoot,
+    });
+    const data = join(pluginDataRoot, "packed-stdio");
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.servers[0]?.transport).toMatchObject({
+      type: "stdio",
+      command: "npx",
+      cwd: data,
+      args: ["-y", "@example/server", "--cache", data],
+      env: { CACHE: data, PLUGIN_ROOT: data, PLUGIN_DATA: data },
+    });
+  });
+
+  it("rejects bundled stdio declarations that require mutable package assets", async () => {
+    const parsed = await loadWithServers("packed-assets", {
+      main: { type: "stdio", command: "./bin/server", cwd: "${PLUGIN_ROOT}" },
+    });
+    const plugin = { ...parsed, source: "bundled" as const };
+    const result = resolvePluginMcpServers([plugin], installed("packed-assets"), {
+      pluginDataRoot: join(root, "plugin-data"),
+    });
+
+    expect(result.servers).toEqual([]);
+    expect(codes(result.diagnostics)).toEqual(["mcp-entry-bundled-assets-unavailable"]);
   });
 
   it("does not expand placeholders in remote headers", async () => {
@@ -474,8 +517,8 @@ describe("mcp runtime", () => {
       throw error;
     }
 
-    const commandPlugin = loadPluginFromDirectory(commandDir, "bundled").plugin;
-    const cwdPlugin = loadPluginFromDirectory(cwdDir, "bundled").plugin;
+    const commandPlugin = loadPluginFromDirectory(commandDir, "user").plugin;
+    const cwdPlugin = loadPluginFromDirectory(cwdDir, "user").plugin;
     if (!commandPlugin || !cwdPlugin) throw new Error("plugin failed to load");
     const result = resolvePluginMcpServers(
       [commandPlugin, cwdPlugin],

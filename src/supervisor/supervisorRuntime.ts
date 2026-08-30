@@ -155,6 +155,10 @@ function toPublicExperimentSnapshot(
   };
 }
 
+export interface SupervisorRuntimeOptions {
+  readonly allowPipedreamOauthPersistence: boolean;
+}
+
 export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
   private readonly baseDir: string;
@@ -191,6 +195,7 @@ export class SupervisorRuntime {
   private readonly pluginDataDir: string;
   private readonly crossagentMcpIngress: CrossagentMcpIngress;
   private readonly subagentRunManager: SubagentRunManager;
+  private disposal: Promise<void> | undefined;
   private readonly routingOverridePersistence: RoutingOverridePersistence;
   private readonly disposeWslCredentialProjectScope: () => void;
   private readonly disposeWindowsPowerShellPreference: () => void;
@@ -218,7 +223,10 @@ export class SupervisorRuntime {
 
   private wslBridgeClient: WslBridgeClient | undefined;
 
-  constructor(private readonly emit: (event: SupervisorEvent) => void) {
+  constructor(
+    private readonly emit: (event: SupervisorEvent) => void,
+    options: SupervisorRuntimeOptions,
+  ) {
     // Defensive: `process.env.X = undefined` coerces to the literal string
     // "undefined" in Node, and we've been bitten by that path creating
     // `./undefined/settings.json` in cwd. Also reject bare relative paths —
@@ -229,7 +237,16 @@ export class SupervisorRuntime {
       rawBaseDir && rawBaseDir !== "undefined" && isAbsolute(rawBaseDir) ? rawBaseDir : undefined;
     const baseDir = envBaseDir ?? join(homedir(), ".poracode");
     this.baseDir = baseDir;
-    this.mcpOAuthService = new McpOAuthService({ baseDir });
+    this.mcpOAuthService = new McpOAuthService({
+      baseDir,
+      persistCredentialsForServer: (serverUrl) =>
+        options.allowPipedreamOauthPersistence || !isPipedreamPersonalMcpUrl(serverUrl),
+      persistPersonalCredentials: options.allowPipedreamOauthPersistence,
+      // Any existing unreadable store may contain recoverable Personal or
+      // generic credentials. Never downgrade it to an empty cache: doing so
+      // would let the next otherwise-valid OAuth save overwrite the only copy.
+      failClosedOnStoreLoadError: true,
+    });
     this.mcpProbeService = new McpProbeService({
       applyAuthorization: (server) => this.mcpOAuthService.applyAuthorizationToServer(server),
     });
@@ -423,8 +440,8 @@ export class SupervisorRuntime {
             targetAgentKind,
             childConfig,
           ),
-        releaseParentMcpAccess: (parentThreadId, childThreadId) =>
-          this.threadSessionManager.releaseSubagentParentMcpAccess(parentThreadId, childThreadId),
+        revokeParentMcpAccess: (parentThreadId, childThreadId) =>
+          this.threadSessionManager.revokeSubagentParentMcpAccess(parentThreadId, childThreadId),
         appendRuntimeEvent: (parentThreadId, event) =>
           this.threadSessionManager.appendSubagentRuntimeEvent(parentThreadId, event),
       },
@@ -594,6 +611,9 @@ export class SupervisorRuntime {
           console.warn("[skills] failed to rewrite terminal skill segments:", error);
           return [...input.segments];
         }
+      },
+      releaseTerminalSkillCopies: async (leaseId) => {
+        await this.skillsService.releaseTerminalSkillCopies(leaseId);
       },
     });
     this.sessions = this.threadSessionManager.sessions;
@@ -1089,6 +1109,15 @@ export class SupervisorRuntime {
   }
 
   async disposeAsync(): Promise<void> {
+    this.disposal ??= this.disposeServices();
+    await this.disposal;
+  }
+
+  private async disposeServices(): Promise<void> {
+    // Close external admission first, then reap every child while the parent
+    // thread manager still owns the launch-scoped MCP/filter cleanup leases.
+    this.crossagentMcpIngress.dispose();
+    await this.subagentRunManager.dispose();
     this.disposeWindowsPowerShellPreference();
     this.disposeWslCredentialProjectScope();
     this.routingOverridePersistence.dispose();
@@ -1099,7 +1128,7 @@ export class SupervisorRuntime {
     this.lspManager.dispose();
     await this._projectWatcher?.dispose();
     await this.threadSessionManager.dispose();
-    this.crossagentMcpIngress.dispose();
+    await this.skillsService.dispose();
     this.sharedSettingsCache.dispose();
     await this.cliHookPluginCoordinator.dispose().catch((error) => {
       console.warn("[supervisor] CLI hook plugin coordinator dispose failed:", error);

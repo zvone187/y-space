@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +83,7 @@ describe("spawnCursorSdkWorker", () => {
         source: "user-installed",
       }),
     );
+    const cleanupDeployment = vi.fn<() => void>();
 
     try {
       const client = await spawnCursorSdkWorker(
@@ -108,11 +109,11 @@ describe("spawnCursorSdkWorker", () => {
             expect(baseName).toMatch(/^poracode-cursor-sdk-/);
             expect(files).toEqual([
               {
-                src: fixture.path,
+                content: readFileSync(fixture.path),
                 relDest: "cursor-sdk/cursor-sdk-worker.mjs",
               },
             ]);
-            return { linuxBaseDir: "/tmp/poracode-test" };
+            return { linuxBaseDir: "/tmp/poracode-test", cleanup: cleanupDeployment };
           },
         },
       );
@@ -131,16 +132,17 @@ describe("spawnCursorSdkWorker", () => {
       expect(script).toContain("__y_space_launch_env_file");
       expect(script).toContain('/bin/rm -f -- "$1"');
       expect(script).toContain('/bin/rmdir -- "$2"');
-      expect(script).toContain(
-        "exec '/home/user/.nvm/node' '/tmp/poracode-test/cursor-sdk/cursor-sdk-worker.mjs'",
-      );
+      expect(script).toContain("exec '/home/user/.nvm/node' '--input-type=module' '--eval'");
+      expect(script).toContain("Y Space helper integrity check failed");
       expect(call!.options.env?.CURSOR_API_KEY).toBeUndefined();
       expect(call!.options.env?.PIPEDREAM_CLIENT_SECRET).toBeUndefined();
       expect(call!.options.env?.PIPEDREAM_PROJECT_ID).toBeUndefined();
       expect(resolveNode).toHaveBeenCalledExactlyOnceWith("Ubuntu", {
         minimumVersion: "22.13.0",
       });
+      expect(cleanupDeployment).not.toHaveBeenCalled();
       await client.dispose();
+      await vi.waitFor(() => expect(cleanupDeployment).toHaveBeenCalledOnce());
     } finally {
       if (originalApiKey === undefined) delete process.env.CURSOR_API_KEY;
       else process.env.CURSOR_API_KEY = originalApiKey;
@@ -181,6 +183,37 @@ describe("spawnCursorSdkWorker", () => {
         bootTimeoutMs: 2_000,
       }),
     ).rejects.toThrow("protocol 99 is not supported");
+  });
+
+  it("cleans a private WSL deployment immediately when worker spawn fails", async () => {
+    const fixture = makeProtocolFixture();
+    const cleanup = vi.fn<() => void>();
+
+    await expect(
+      spawnCursorSdkWorker(
+        {
+          projectLocation: {
+            kind: "wsl",
+            distro: "Ubuntu",
+            linuxPath: "/work/repo",
+            uncPath: "\\\\wsl.localhost\\Ubuntu\\work\\repo",
+          },
+          workerPath: fixture.path,
+        },
+        {
+          resolveNode: async () => ({
+            nodePath: "/usr/bin/node",
+            nodeVersion: "24.10.0",
+            source: "user-installed",
+          }),
+          deploy: () => ({ linuxBaseDir: "/tmp/private-cursor-worker", cleanup }),
+          spawnProcess: () => {
+            throw new Error("spawn failed");
+          },
+        },
+      ),
+    ).rejects.toThrow("spawn failed");
+    expect(cleanup).toHaveBeenCalledOnce();
   });
 
   it("rejects pending requests when the worker exits", async () => {

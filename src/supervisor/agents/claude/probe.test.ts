@@ -30,6 +30,42 @@ const mockBase = vi.hoisted(() => ({
     vi.fn<typeof import("../base").readWslLoginShellCommandOutputAsync>(),
 }));
 
+const mockWslDeployCleanup = vi.hoisted(() => vi.fn<() => void>());
+
+const mockWslDeploy = vi.hoisted(() => ({
+  buildVerifiedWslEsmArgv: vi.fn<
+    (path: string, content: Buffer, args?: readonly string[]) => string[]
+  >((path: string, _content: Buffer, args: readonly string[] = []) => [
+    "--verified-worker",
+    path,
+    ...args,
+  ]),
+  deployFilesToWslTempBase: vi.fn<
+    (
+      distro: string,
+      baseName: string,
+      files: readonly unknown[],
+    ) => { linuxBaseDir: string; cleanup: () => void }
+  >(() => ({
+    linuxBaseDir: "/tmp/y-space-claude-sdk-test",
+    cleanup: mockWslDeployCleanup,
+  })),
+}));
+
+vi.mock("node:fs", async () => {
+  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  return {
+    ...actual,
+    readFileSync: ((path: Parameters<typeof actual.readFileSync>[0], ...args: unknown[]) =>
+      String(path).endsWith("claudeSdkProbeWorker.mjs")
+        ? Buffer.from("// self-contained WSL worker fixture\n")
+        : (actual.readFileSync as (...values: unknown[]) => unknown)(
+            path,
+            ...args,
+          )) as typeof actual.readFileSync,
+  };
+});
+
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: mockSdk.query,
 }));
@@ -51,6 +87,8 @@ vi.mock("../base", async () => {
     readWslLoginShellCommandOutputAsync: mockBase.readWslLoginShellCommandOutputAsync,
   };
 });
+
+vi.mock("../../wsl/wslDeploy", () => mockWslDeploy);
 
 import {
   claudeCapabilitiesFromCliVersion,
@@ -125,6 +163,8 @@ beforeEach(() => {
   mockChildProcess.spawn.mockImplementation(() => makeSpawnedProcess());
   mockProcessTree.terminateChildProcessTree.mockReset();
   mockBase.readWslLoginShellCommandOutputAsync.mockReset();
+  mockWslDeploy.deployFilesToWslTempBase.mockClear();
+  mockWslDeployCleanup.mockReset();
 });
 
 afterEach(() => {
@@ -414,6 +454,17 @@ describe("Claude SDK probe process handling", () => {
       expect.arrayContaining(["/home/demo/.local/bin/claude"]),
       expect.objectContaining({ env }),
     );
+    expect(mockWslDeploy.deployFilesToWslTempBase).toHaveBeenCalledWith(
+      "Ubuntu",
+      expect.stringMatching(/^y-space-claude-sdk-/),
+      [
+        expect.objectContaining({
+          content: expect.any(Buffer),
+          relDest: "claude-sdk/claude-sdk-probe-worker.mjs",
+        }),
+      ],
+    );
+    expect(mockWslDeployCleanup).toHaveBeenCalledOnce();
   });
 
   it("does not hide unrelated probe stdin errors", () => {

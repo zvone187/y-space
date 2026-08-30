@@ -93,6 +93,17 @@ const deps = {
   ],
 };
 
+// This worker is copied into a bare WSL temp directory, so it cannot resolve
+// dependencies from Y Space's packaged node_modules at runtime. Bundle the
+// Claude SDK into this one worker while keeping it external everywhere else.
+const claudeProbeDeps = {
+  ...deps,
+  alwaysBundle: [...deps.alwaysBundle, "@anthropic-ai/claude-agent-sdk"],
+  neverBundle: deps.neverBundle.filter(
+    (dependency) => dependency !== "@anthropic-ai/claude-agent-sdk",
+  ),
+};
+
 const shared = {
   outDir: "dist/main",
   platform: "node" as const,
@@ -165,7 +176,7 @@ export default defineConfig([
     dts: false,
     minify: false,
     define: buildDefines,
-    deps,
+    deps: claudeProbeDeps,
   },
   {
     // Self-contained transport shell. The user-installed @cursor/sdk entry is
@@ -189,6 +200,7 @@ export default defineConfig([
     // Self-contained so it can be staged and executed inside a WSL distro.
     entry: { mcpProbeWorker: "src/supervisor/mcp/probeMcpWorker.ts" },
     clean: false,
+    plugins: [sshRuntimeManifest("mcpProbeWorker")],
     outDir: "dist/main",
     platform: "node" as const,
     format: "esm" as const,
@@ -206,6 +218,7 @@ export default defineConfig([
     // Separate build prevents shared chunks; this worker is deployed alone into WSL.
     entry: { mcpToolFilterWorker: "src/supervisor/mcp/mcpToolFilterWorker.ts" },
     clean: false,
+    plugins: [sshRuntimeManifest("mcpToolFilterWorker")],
     outDir: "dist/main",
     platform: "node" as const,
     format: "esm" as const,

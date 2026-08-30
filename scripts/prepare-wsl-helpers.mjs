@@ -1,41 +1,24 @@
 /**
  * Stages every Node helper that we run *inside* a WSL distro into
- * `resources/wsl-helpers/` so electron-builder can bundle them as
- * extraResources. Five artefacts ride this pipeline:
+ * `resources/wsl-helpers/`. Executable JavaScript stays packed in ASAR:
  *
- *   1. `watcher.node` — @parcel/watcher Linux x64 native binding,
- *      downloaded via `npm pack`. Loaded by `bridge.mjs` for watch
- *      subscriptions.
- *   2. `bridge.mjs` — the in-distro server (hook ingress + /v1/fs/*
+ *   1. `bridge.mjs` — the in-distro server (hook ingress + /v1/fs/*
  *      + /v1/watch/*). Copied from `src/supervisor/wsl/bridge/bridge.mjs`.
- *   3. `mcp-probe.mjs` — self-contained MCP client used to verify workspace
- *      servers in the same distro where providers run.
- *   4. `mcp-filter.mjs` — same-environment MCP proxy that removes disabled tools.
- *   5. `cursor-sdk-worker.mjs` — isolated transport shell that dynamically
- *      imports a Cursor SDK installed inside the target distro.
+ *   2. The MCP probe/filter and Cursor workers stay adjacent to the supervisor
+ *      in packed `dist/main`; this script verifies they are self-contained but
+ *      never creates a mutable packaged copy.
  *
- * Idempotency: presence + non-zero size on `watcher.node` skips the
- * `npm pack` download. Other helpers are compared byte-for-byte before copy,
- * avoiding redundant writes without the stale-resource risk of size/mtime
- * heuristics.
+ * The separately deployed `claudeSdkProbeWorker.mjs` is also verified here;
+ * it stays in the packed ASAR and is read through Electron before deployment.
+ *
+ * Helpers are compared byte-for-byte before copy, avoiding redundant writes
+ * without the stale-resource risk of size/mtime heuristics.
  */
 
-import { execSync } from "node:child_process";
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-} from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
 import { dirname, join } from "node:path";
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-
-const PARCEL_WATCHER_PKG = "@parcel/watcher-linux-x64-glibc";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
@@ -43,46 +26,11 @@ const destDir = join(repoRoot, "resources", "wsl-helpers");
 
 mkdirSync(destDir, { recursive: true });
 
-stageWatcherBinary();
 stageHookBridge();
-stageMcpProbe();
-stageMcpFilter();
-stageCursorSdkWorker();
-
-function stageWatcherBinary() {
-  const dest = join(destDir, "watcher.node");
-  if (existsSync(dest) && statSync(dest).size > 0) {
-    console.log("[prepare-wsl-helpers] watcher.node already present, skipping");
-    return;
-  }
-
-  const tmp = join(tmpdir(), `wsl-helpers-watcher-${Date.now()}`);
-  mkdirSync(tmp, { recursive: true });
-
-  try {
-    execSync(`npm pack ${PARCEL_WATCHER_PKG} --pack-destination .`, {
-      cwd: tmp,
-      stdio: "pipe",
-    });
-
-    const tgz = readdirSync(tmp).find((f) => f.endsWith(".tgz"));
-    if (!tgz) {
-      throw new Error(`Failed to download ${PARCEL_WATCHER_PKG}`);
-    }
-
-    execSync(`tar -xf "${tgz}"`, { cwd: tmp, stdio: "pipe" });
-
-    const src = join(tmp, "package", "watcher.node");
-    if (!existsSync(src)) {
-      throw new Error("watcher.node not found in extracted package");
-    }
-
-    copyFileSync(src, dest);
-    console.log(`[prepare-wsl-helpers] ${PARCEL_WATCHER_PKG} -> ${dest}`);
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-  }
-}
+verifyMcpProbe();
+verifyMcpFilter();
+verifyCursorSdkWorker();
+verifyClaudeSdkProbeWorker();
 
 function stageHookBridge() {
   const src = join(repoRoot, "src", "supervisor", "wsl", "bridge", "bridge.mjs");
@@ -93,34 +41,40 @@ function stageHookBridge() {
   copyIfChanged(src, dest, "bridge.mjs");
 }
 
-function stageMcpProbe() {
+function verifyMcpProbe() {
   const src = join(repoRoot, "dist", "main", "mcpProbeWorker.mjs");
   if (!existsSync(src)) {
     throw new Error(`MCP probe worker missing; run build:electron first: ${src}`);
   }
   assertSelfContainedWorker(src);
-  const dest = join(destDir, "mcp-probe.mjs");
-  copyIfChanged(src, dest, "mcpProbeWorker.mjs");
+  console.log("[prepare-wsl-helpers] verified self-contained MCP probe worker");
 }
 
-function stageMcpFilter() {
+function verifyMcpFilter() {
   const src = join(repoRoot, "dist", "main", "mcpToolFilterWorker.mjs");
   if (!existsSync(src)) {
     throw new Error(`MCP filter worker missing; run build:electron first: ${src}`);
   }
   assertSelfContainedWorker(src);
-  const dest = join(destDir, "mcp-filter.mjs");
-  copyIfChanged(src, dest, "mcpToolFilterWorker.mjs");
+  console.log("[prepare-wsl-helpers] verified self-contained MCP filter worker");
 }
 
-function stageCursorSdkWorker() {
+function verifyCursorSdkWorker() {
   const src = join(repoRoot, "dist", "main", "cursorSdkWorker.mjs");
   if (!existsSync(src)) {
     throw new Error(`Cursor SDK worker missing; run build:electron first: ${src}`);
   }
   assertSelfContainedWorker(src, "Cursor SDK worker");
-  const dest = join(destDir, "cursor-sdk-worker.mjs");
-  copyIfChanged(src, dest, "cursorSdkWorker.mjs");
+  console.log("[prepare-wsl-helpers] verified self-contained Cursor SDK worker");
+}
+
+function verifyClaudeSdkProbeWorker() {
+  const src = join(repoRoot, "dist", "main", "claudeSdkProbeWorker.mjs");
+  if (!existsSync(src)) {
+    throw new Error(`Claude SDK probe worker missing; run build:electron first: ${src}`);
+  }
+  assertSelfContainedWorker(src, "Claude SDK probe worker");
+  console.log("[prepare-wsl-helpers] verified self-contained Claude SDK probe worker");
 }
 
 function copyIfChanged(src, dest, label) {
