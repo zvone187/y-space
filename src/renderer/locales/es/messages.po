@@ -3675,6 +3675,16 @@ msgstr "No se pudo crear la carpeta del proyecto."
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "No se pudo desconectar {0}. Se revocó el acceso de los agentes."
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "No se pudo desconectar {0}. El acceso de los agentes sigue activado. Inténtalo de nuevo."
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "No se pudo desconectar {0}. Comprueba el acceso de los agentes e inténtalo de nuevo."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

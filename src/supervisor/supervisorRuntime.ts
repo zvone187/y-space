@@ -19,12 +19,13 @@ import type {
   JudgeExperimentSnapshotResult,
   PipedreamSnapshot,
   ProjectLocation,
+  ResolvedMcpServer,
   RemoveExperimentWorktreesPayload,
   RemoveExperimentWorktreesResult,
   RelocateProjectPayload,
   RelocateProjectResult,
 } from "@/shared/contracts";
-import { PIPEDREAM_PERSONAL_MCP_URL } from "@/shared/contracts";
+import { isPipedreamPersonalMcpUrl } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { crossagentRankingPreferences } from "@/shared/crossagentRanking";
 import type { CrossagentRoutingState } from "@/shared/crossagentRanking";
@@ -67,6 +68,7 @@ import { AgentRegistryService } from "./runtime/agentRegistryService";
 import { GenerationService } from "./runtime/generationService";
 import { type SessionRuntime, type ShellSessionRuntime } from "./runtime/sessionTypes";
 import { ThreadSessionManager, writeSubmittedPrompt } from "./runtime/threadSessionManager";
+import { resolvePipedreamProviderBindingId } from "./runtime/threadSession/spawnPipeline";
 import { CliHookPluginCoordinator } from "./runtime/cliHookPluginCoordinator";
 import { CrossagentMcpIngress } from "./crossagentMcp/CrossagentMcpIngress";
 import { SubagentRunManager } from "./crossagentMcp/SubagentRunManager";
@@ -99,6 +101,50 @@ import type { PipedreamPrivilegedBootstrapPayload } from "@/shared/pipedreamPriv
 import { PipedreamSupervisorService } from "./pipedream/PipedreamSupervisorService";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
+
+interface RuntimePipedreamResolverInput {
+  readonly threadId: string;
+  readonly providerBindingId?: string;
+  readonly projectLocation: ProjectLocation;
+  readonly personalMcpServers?: readonly ResolvedMcpServer[];
+}
+
+interface RuntimePipedreamResolverDependencies {
+  readonly resolveConnect: (input: RuntimePipedreamResolverInput) => Promise<ResolvedMcpServer[]>;
+  readonly resolvePersonal: (input: {
+    readonly servers: readonly ResolvedMcpServer[];
+    readonly threadId: string;
+    readonly providerBindingId: string;
+    readonly advertisedHost?: string;
+  }) => Promise<ResolvedMcpServer[]>;
+  readonly resolveWslHostAccess: (
+    distro: string,
+  ) => Promise<Awaited<ReturnType<typeof resolveWslHostAccess>>>;
+}
+
+export async function resolveRuntimePipedreamMcpServers(
+  input: RuntimePipedreamResolverInput,
+  dependencies: RuntimePipedreamResolverDependencies,
+): Promise<ResolvedMcpServer[]> {
+  const connect = dependencies.resolveConnect(input);
+  let personalMcpServers = input.personalMcpServers ?? [];
+  let advertisedHost: string | undefined;
+  if (input.projectLocation.kind === "wsl") {
+    const access = await dependencies
+      .resolveWslHostAccess(input.projectLocation.distro)
+      .catch(() => undefined);
+    if (!access) personalMcpServers = [];
+    else if (access.kind === "gateway") advertisedHost = access.ip;
+  }
+  const personal = dependencies.resolvePersonal({
+    servers: personalMcpServers,
+    threadId: input.threadId,
+    providerBindingId: input.providerBindingId ?? `thread:${input.threadId}`,
+    ...(advertisedHost ? { advertisedHost } : {}),
+  });
+  const [connectServers, personalServers] = await Promise.all([connect, personal]);
+  return [...connectServers, ...personalServers];
+}
 
 function toPublicExperimentSnapshot(
   snapshot: CapturedExperimentSnapshot,
@@ -458,8 +504,28 @@ export class SupervisorRuntime {
       },
       applyMcpServerAuthorization: (servers) => this.mcpOAuthService.applyAuthorization(servers),
       resolvePipedreamMcpServers: (input) =>
-        this.pipedreamService.resolveMcpServersForLaunch(input),
-      releasePipedreamMcpBindings: (threadId) => this.pipedreamService.releaseMcpBindings(threadId),
+        resolveRuntimePipedreamMcpServers(input, {
+          resolveConnect: (candidate) =>
+            this.pipedreamService.resolveMcpServersForLaunch(candidate),
+          resolvePersonal: (candidate) =>
+            this.mcpOAuthService.resolvePersonalMcpServersForLaunch(candidate),
+          resolveWslHostAccess,
+        }),
+      releasePipedreamMcpBindings: (threadId) => {
+        try {
+          this.mcpOAuthService.releasePersonalMcpBindings(threadId);
+        } finally {
+          this.pipedreamService.releaseMcpBindings(threadId);
+        }
+      },
+      releasePipedreamMcpLaunchBindings: ({ threadId, launchId }) => {
+        const providerBindingId = resolvePipedreamProviderBindingId(threadId, launchId);
+        try {
+          this.mcpOAuthService.releasePersonalMcpProviderBindings(threadId, providerBindingId);
+        } finally {
+          this.pipedreamService.releaseMcpProviderBindings(threadId, providerBindingId);
+        }
+      },
       prepareMcpToolFilters,
       resolvePluginLaunchContributions: async (projectLocation, agentKind) => {
         const adapter = this.adapters.get(agentKind);
@@ -684,11 +750,11 @@ export class SupervisorRuntime {
       if (!server.enabled) return false;
       const transport = server.transport;
       if (transport.type !== "http" && transport.type !== "sse") return false;
-      return normalizeUrl(transport.url) === PIPEDREAM_PERSONAL_MCP_URL;
+      return isPipedreamPersonalMcpUrl(transport.url);
     });
     const authenticated = this.mcpOAuthService
       .status()
-      .authenticatedUrls.some((url) => normalizeUrl(url) === PIPEDREAM_PERSONAL_MCP_URL);
+      .authenticatedUrls.some(isPipedreamPersonalMcpUrl);
     return { enabled, authenticated };
   }
 
@@ -1052,16 +1118,5 @@ export class SupervisorRuntime {
     return this.threadSessionManager.spawnThreadForTests(
       input as Parameters<typeof this.threadSessionManager.spawnThreadForTests>[0],
     );
-  }
-}
-
-function normalizeUrl(value: string): string {
-  try {
-    const url = new URL(value);
-    url.hash = "";
-    url.search = "";
-    return url.toString().replace(/\/$/u, "");
-  } catch {
-    return "";
   }
 }

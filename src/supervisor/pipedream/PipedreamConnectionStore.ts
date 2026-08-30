@@ -127,6 +127,22 @@ export class PipedreamConnectionStore {
     this.#commit({ ...(this.#scopeHash ? { scopeHash: this.#scopeHash } : {}), accounts: next });
   }
 
+  /**
+   * First durable phase of disconnect. Persist access-off and rotate the local
+   * relay identity before either removing the row or issuing an upstream DELETE.
+   */
+  beginDisconnect(accountId: string): void {
+    const index = this.#accounts.findIndex((account) => account.id === accountId);
+    if (index < 0) throw new Error("Pipedream account is not connected.");
+    const account = this.#accounts[index]!;
+    const next = this.#accounts.map((candidate, candidateIndex) =>
+      candidateIndex === index
+        ? { ...account, agentAccess: false, localAccountId: randomUUID() }
+        : candidate,
+    );
+    this.#commit({ ...(this.#scopeHash ? { scopeHash: this.#scopeHash } : {}), accounts: next });
+  }
+
   remove(accountId: string): void {
     const next = this.#accounts.filter((account) => account.id !== accountId);
     if (next.length === this.#accounts.length) return;

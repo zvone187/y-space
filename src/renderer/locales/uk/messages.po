@@ -3675,6 +3675,16 @@ msgstr "Не вдалося створити папку проєкту."
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "Не вдалося відключити {0}. Доступ агентів відкликано."
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "Не вдалося відключити {0}. Доступ агентів усе ще ввімкнено. Спробуйте ще раз."
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "Не вдалося відключити {0}. Перевірте доступ агентів і спробуйте ще раз."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

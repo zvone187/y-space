@@ -12,6 +12,7 @@ import type {
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useComposerInputInbox } from "@/renderer/state/composerInputInbox";
+import { useConnectionsDialogStore } from "@/renderer/state/connectionsDialogStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { ThreadDraftComposerArea } from "./ThreadDraftComposerArea";
 import type { ComposerControl } from "./ThreadComposer";
@@ -204,6 +205,7 @@ describe("ThreadSlashCommands", () => {
     useAppStore.getState().clearDraftContent(draftProject.id);
     useAppStore.setState({ draftContentDiscardRequests: {} });
     useComposerInputInbox.setState({ itemsByComposer: {} });
+    useConnectionsDialogStore.setState({ isOpen: false, source: null, revision: 0 });
     useSharedSettings.setState({
       collapseTerminalComposer: false,
       disabledBuiltInMcpServers: {},
@@ -211,6 +213,18 @@ describe("ThreadSlashCommands", () => {
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
       value: scrollIntoView,
+    });
+  });
+
+  it("opens the single global Connections dialog store from the draft composer menu", async () => {
+    await renderDraftComposer(makeAgentStatus(), vi.fn(), "gui");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add attachment or capability" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Integrations" }));
+
+    expect(useConnectionsDialogStore.getState()).toMatchObject({
+      isOpen: true,
+      source: "composer",
     });
   });
 

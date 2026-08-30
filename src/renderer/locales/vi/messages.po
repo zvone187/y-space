@@ -3675,6 +3675,16 @@ msgstr "Không thể tạo thư mục dự án."
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "Không thể ngắt kết nối {0}. Quyền truy cập của tác nhân đã bị thu hồi."
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "Không thể ngắt kết nối {0}. Quyền truy cập của tác nhân vẫn đang bật. Hãy thử lại."
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "Không thể ngắt kết nối {0}. Hãy kiểm tra quyền truy cập của tác nhân rồi thử lại."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

@@ -158,6 +158,39 @@ describe("PipedreamConnectionStore", () => {
     expect(store.listGrantedForRelay()[0]?.localAccountId).not.toBe(previousLocalAccountId);
   });
 
+  it("persists a restart-safe access-off tombstone before removing a disconnected account", async () => {
+    const { filePath, store } = await makeStore();
+    store.configureScope("project-a-user-a");
+    store.replaceRemoteAccounts([ACCOUNT]);
+    store.setAgentAccess(ACCOUNT.id, true);
+    const previousLocalAccountId = store.listGrantedForRelay()[0]?.localAccountId;
+
+    store.beginDisconnect(ACCOUNT.id);
+
+    const reopened = new PipedreamConnectionStore({ filePath });
+    reopened.configureScope("project-a-user-a");
+    expect(reopened.list()).toEqual([{ ...ACCOUNT, agentAccess: false }]);
+    expect(reopened.listGrantedForRelay()).toEqual([]);
+    reopened.setAgentAccess(ACCOUNT.id, true);
+    expect(reopened.listGrantedForRelay()[0]?.localAccountId).not.toBe(previousLocalAccountId);
+  });
+
+  it("does not publish or claim a disconnect tombstone when its atomic write fails", async () => {
+    const { filePath, store, setWritesFail } = await makeFallibleStore();
+    store.configureScope("project-a-user-a");
+    store.replaceRemoteAccounts([ACCOUNT]);
+    store.setAgentAccess(ACCOUNT.id, true);
+    const enabledFile = readFileSync(filePath, "utf8");
+
+    setWritesFail(true);
+    expect(() => store.beginDisconnect(ACCOUNT.id)).toThrow("simulated atomic write failure");
+
+    expect(store.list()).toEqual([{ ...ACCOUNT, agentAccess: true }]);
+    expect(store.listGrantedForRelay()).toHaveLength(1);
+    expect(readFileSync(filePath, "utf8")).toBe(enabledFile);
+    expect(new PipedreamConnectionStore({ filePath }).listGrantedForRelay()).toHaveLength(1);
+  });
+
   it("publishes enable, disable, replace, remove, and restore only after the atomic write succeeds", async () => {
     const { filePath, store, setWritesFail } = await makeFallibleStore();
     store.configureScope("project-a-user-a");

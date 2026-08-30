@@ -3675,6 +3675,16 @@ msgstr "프로젝트 폴더를 만들 수 없습니다."
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "{0} 연결을 해제할 수 없습니다. 에이전트 액세스는 취소되었습니다."
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "{0} 연결을 해제할 수 없습니다. 에이전트 액세스가 아직 켜져 있습니다. 다시 시도하세요."
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "{0} 연결을 해제할 수 없습니다. 에이전트 액세스를 확인하고 다시 시도하세요."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

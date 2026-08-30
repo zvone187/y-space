@@ -299,6 +299,10 @@ export function ConnectionsDialogHost() {
           settle("cancelled");
           return;
         }
+        if (flowStatus.state === "expired") {
+          settle("timed-out");
+          return;
+        }
         await reconcileTrustedSuccess();
       } catch {
         // OAuth propagation and short network outages are retried only until
@@ -461,12 +465,25 @@ export function ConnectionsDialogHost() {
         setNotice({ message: t`${account.app.name} disconnected.`, tone: "success" });
       }
     } catch {
-      setError(t`Could not disconnect ${account.app.name}. Agent access has been revoked.`);
+      let refreshedAccount: PipedreamAccountSummary | undefined;
       try {
-        publishSnapshot(await readBridge().pipedreamGetSnapshot());
+        const refreshed = await readBridge().pipedreamGetSnapshot();
+        publishSnapshot(refreshed);
+        if (refreshed.connect.state === "ready") {
+          refreshedAccount = refreshed.connect.accounts.find(
+            (candidate) => candidate.id === account.id,
+          );
+        }
       } catch {
         // Keep the last renderer-safe snapshot; the supervisor remains the
         // authorization boundary even when its follow-up snapshot is offline.
+      }
+      if (refreshedAccount?.agentAccess === false) {
+        setError(t`Could not disconnect ${account.app.name}. Agent access has been revoked.`);
+      } else if (refreshedAccount?.agentAccess === true) {
+        setError(t`Could not disconnect ${account.app.name}. Agent access is still on. Try again.`);
+      } else {
+        setError(t`Could not disconnect ${account.app.name}. Check agent access and try again.`);
       }
     } finally {
       setBusy(null);

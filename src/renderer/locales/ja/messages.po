@@ -3674,6 +3674,16 @@ msgstr "プロジェクトフォルダーを作成できませんでした。"
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "{0} の接続を解除できませんでした。エージェントアクセスは取り消されました。"
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "{0} の接続を解除できませんでした。エージェントアクセスは引き続きオンです。もう一度お試しください。"
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "{0} の接続を解除できませんでした。エージェントアクセスを確認して、もう一度お試しください。"
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

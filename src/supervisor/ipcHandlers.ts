@@ -56,6 +56,14 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     mutation: () => PipedreamSnapshot | Promise<PipedreamSnapshot>,
   ): Promise<PipedreamSnapshot> => {
     const before = relayGrantSignature(pipedream.getSnapshot());
+    // Unit/integration runtimes may provide a deliberately reduced service
+    // double; production always exposes this supervisor-internal revision.
+    const readAuthorizationRevision = (): number | undefined => {
+      const read = (pipedream as unknown as { getAgentAuthorizationRevision?: () => number })
+        .getAgentAuthorizationRevision;
+      return typeof read === "function" ? read.call(pipedream) : undefined;
+    };
+    const authorizationRevisionBefore = readAuthorizationRevision();
     try {
       const result = await mutation();
       if (relayGrantSignature(result) !== before) {
@@ -73,7 +81,16 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
       } catch {
         // Fail closed when the safe snapshot cannot be read after a mutation.
       }
-      if (changed) await reloadLivePipedreamMcpServers();
+      // A failed first disconnect write truthfully leaves the durable snapshot
+      // enabled, yet the service has already quarantined and released its live
+      // relay. The internal revision catches that case without churning agents
+      // for validation failures that occur before local revocation begins.
+      const authorizationRevisionAfter = readAuthorizationRevision();
+      const authorizationChanged =
+        authorizationRevisionBefore !== undefined &&
+        authorizationRevisionAfter !== undefined &&
+        authorizationRevisionAfter !== authorizationRevisionBefore;
+      if (authorizationChanged || changed) await reloadLivePipedreamMcpServers();
       throw error;
     }
   };
@@ -420,19 +437,19 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
       withLivePipedreamMcpReload(() => pipedream.setAccountAgentAccess(payload)),
     pipedreamInternalBeginPersonalMcpOauth: async () => {
       const result = await mcpOAuth.begin({ server: personalPipedreamMcpServer });
-      if (result.status === "authorized") await reloadLivePipedreamMcpServers();
+      if (result.status === "authorized") void reloadLivePipedreamMcpServers();
       return result;
     },
     pipedreamInternalWaitPersonalMcpOauth: async (payload) => {
       const result = await mcpOAuth.wait(payload);
-      if (result.status === "authorized") await reloadLivePipedreamMcpServers();
+      if (result.status === "authorized") void reloadLivePipedreamMcpServers();
       return result;
     },
     pipedreamInternalCancelPersonalMcpOauth: (payload) => mcpOAuth.cancel(payload),
     pipedreamInternalClearPersonalMcpOauth: async () => {
       let persistenceError: Error | undefined;
       try {
-        mcpOAuth.clear({ url: PIPEDREAM_PERSONAL_MCP_URL }, { strictPersistence: true });
+        mcpOAuth.clearPersonalCredentials({ strictPersistence: true });
       } catch (error) {
         persistenceError =
           error instanceof Error

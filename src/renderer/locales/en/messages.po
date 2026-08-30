@@ -3675,6 +3675,16 @@ msgstr "Could not create the project folder."
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "Could not disconnect {0}. Agent access has been revoked."
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "Could not disconnect {0}. Agent access is still on. Try again."
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "Could not disconnect {0}. Check agent access and try again."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

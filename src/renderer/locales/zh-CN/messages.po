@@ -3675,6 +3675,16 @@ msgstr "无法创建项目文件夹。"
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "无法断开与 {0} 的连接。智能体访问权限已撤销。"
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "无法断开与 {0} 的连接。智能体访问权限仍处于开启状态。请重试。"
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "无法断开与 {0} 的连接。请检查智能体访问权限后重试。"
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

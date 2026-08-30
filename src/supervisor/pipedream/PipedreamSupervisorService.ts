@@ -86,6 +86,16 @@ interface PendingRelayBinding {
   readonly promise: Promise<SharedRelayBinding | undefined>;
 }
 
+interface ProviderResolutionCapability {
+  readonly threadId: string;
+  readonly providerBindingId: string;
+  readonly scopeKey: string;
+  readonly threadEpoch: number;
+  readonly providerEpoch: number;
+  readonly serviceGeneration: number;
+  readonly ready: ReadyRuntime;
+}
+
 /** Owns Pipedream's secret-bearing server-side clients and projects only safe data outward. */
 export class PipedreamSupervisorService {
   readonly #options: PipedreamSupervisorServiceOptions;
@@ -94,8 +104,13 @@ export class PipedreamSupervisorService {
   readonly #pendingBindings = new Map<string, PendingRelayBinding>();
   readonly #bindingKeysByThread = new Map<string, Set<string>>();
   readonly #accountIdByBindingKey = new Map<string, string>();
+  readonly #threadResolutionEpochs = new Map<string, number>();
+  readonly #providerBindingEpochs = new Map<string, number>();
+  readonly #pendingThreadResolutions = new Map<string, number>();
+  readonly #pendingProviderResolutions = new Map<string, number>();
   readonly #relayDisposals = new Set<Promise<void>>();
   readonly #revokedAccounts = new Map<string, PipedreamAccountSummary>();
+  readonly #nonDurableRevocationAccountIds = new Set<string>();
   readonly #pendingDisconnectAccountIds = new Set<string>();
   #bootstrap: PipedreamPrivilegedBootstrapPayload["bootstrap"] = { state: "absent" };
   #ready: ReadyRuntime | undefined;
@@ -104,6 +119,7 @@ export class PipedreamSupervisorService {
   #configurationError: "configuration-invalid" | undefined;
   #authorizationRevision = 0;
   #accountMutationRevision = 0;
+  #serviceGeneration = 0;
 
   constructor(options: PipedreamSupervisorServiceOptions) {
     this.#options = options;
@@ -114,6 +130,7 @@ export class PipedreamSupervisorService {
   }
 
   configure(payload: PipedreamPrivilegedBootstrapPayload): void {
+    this.#serviceGeneration += 1;
     this.#authorizationRevision += 1;
     this.#accountMutationRevision += 1;
     const previousRelay = this.#ready?.relay;
@@ -122,7 +139,12 @@ export class PipedreamSupervisorService {
     this.#pendingBindings.clear();
     this.#bindingKeysByThread.clear();
     this.#accountIdByBindingKey.clear();
+    this.#threadResolutionEpochs.clear();
+    this.#providerBindingEpochs.clear();
+    this.#pendingThreadResolutions.clear();
+    this.#pendingProviderResolutions.clear();
     this.#revokedAccounts.clear();
+    this.#nonDurableRevocationAccountIds.clear();
     this.#pendingDisconnectAccountIds.clear();
     this.#accountsRefresh = undefined;
     this.#projectName = "Pipedream Connect";
@@ -215,6 +237,15 @@ export class PipedreamSupervisorService {
     });
   }
 
+  /**
+   * Supervisor-internal revision of the effective agent grant set. IPC reload
+   * orchestration uses this to distinguish a quarantined disconnect failure
+   * from validation errors that never touched live authorization.
+   */
+  getAgentAuthorizationRevision(): number {
+    return this.#authorizationRevision;
+  }
+
   async listApps(payload: PipedreamListAppsPayload): Promise<PipedreamListAppsResult> {
     const input = pipedreamListAppsPayloadSchema.parse(payload);
     const result = await this.#withReadyRequest((ready) =>
@@ -266,11 +297,24 @@ export class PipedreamSupervisorService {
     this.#revokedAccounts.set(accountId, { ...account, agentAccess: false });
     this.#releaseBindingsUsingAccount(accountId);
     try {
+      // Phase one is a durable deny. If a later cleanup write, remote request,
+      // process exit, or restart interrupts the disconnect, this row remains
+      // access-off and cannot silently become an agent grant again.
+      this.#store.beginDisconnect(accountId);
+      this.#nonDurableRevocationAccountIds.delete(accountId);
+    } catch {
+      // The in-process quarantine still blocks every relay, but the persisted
+      // grant remains on. Keep that distinction visible so the UI never claims
+      // a restart-safe revocation that did not reach disk.
+      this.#nonDurableRevocationAccountIds.add(accountId);
+      this.#finishPendingDisconnect(accountId, false);
+      throw new Error("Pipedream request failed.");
+    }
+    try {
       this.#store.remove(accountId);
     } catch {
-      // The failed write left the durable grant unchanged. Keep the account
-      // quarantined in this process, expose it as access-off for retry, and do
-      // not risk deleting the remote account without a durable local revoke.
+      // The durable access-off tombstone remains. Keep the account quarantined
+      // and do not issue the upstream DELETE until local cleanup can advance.
       this.#finishPendingDisconnect(accountId, false);
       throw new Error("Pipedream request failed.");
     }
@@ -344,6 +388,7 @@ export class PipedreamSupervisorService {
     const previousGrantSignature = this.#grantedRelaySignature();
     this.#store.setAgentAccess(accountId, enabled);
     this.#revokedAccounts.delete(accountId);
+    this.#nonDurableRevocationAccountIds.delete(accountId);
     const nextGrantSignature = this.#grantedRelaySignature();
     if (previousGrantSignature !== nextGrantSignature) {
       this.#authorizationRevision += 1;
@@ -359,91 +404,220 @@ export class PipedreamSupervisorService {
   }): Promise<ResolvedMcpServer[]> {
     const ready = this.#ready;
     if (!ready) return [];
-    try {
-      // The remote account set is an authorization input, so every launch
-      // reconciles it. #refreshAllAccounts shares one in-flight read across
-      // concurrent launches without allowing a completed read to stay cached.
-      await this.#refreshAllAccounts();
-    } catch {
-      this.releaseMcpBindings(input.threadId);
-      return [];
-    }
-
-    const reachability = await this.#resolveReachability(input.projectLocation);
-    if (!reachability) {
-      this.releaseMcpBindings(input.threadId);
-      return [];
-    }
-
-    const accounts = this.#grantedAccountsForRelay();
-    const authorizationRevision = this.#authorizationRevision;
     const providerBindingId = input.providerBindingId?.trim() || `thread:${input.threadId}`;
-    const desiredKeys = new Set(
-      accounts.map(({ localAccountId }) =>
-        sharedBindingKey(providerBindingId, localAccountId, reachability.key),
-      ),
-    );
-    this.#releaseObsoleteThreadBindings(input.threadId, desiredKeys);
-    if (desiredKeys.size > 0) {
-      const threadKeys = this.#bindingKeysByThread.get(input.threadId) ?? new Set<string>();
-      for (const key of desiredKeys) threadKeys.add(key);
-      this.#bindingKeysByThread.set(input.threadId, threadKeys);
-      for (const { account, localAccountId } of accounts) {
-        this.#accountIdByBindingKey.set(
-          sharedBindingKey(providerBindingId, localAccountId, reachability.key),
-          account.id,
-        );
-      }
-    }
-    if (accounts.length === 0) return [];
-
-    const resolved = await Promise.all(
-      accounts.map(async ({ account, localAccountId }): Promise<ResolvedMcpServer | undefined> => {
-        const key = sharedBindingKey(providerBindingId, localAccountId, reachability.key);
-        const shared = await this.#getOrCreateSharedBinding({
-          ready,
-          key,
-          threadId: input.threadId,
-          providerBindingId,
-          upstreamAccountId: account.id,
-          localAccountId,
-          appSlug: account.app.slug,
-          authorizationRevision,
-          ...(reachability.advertisedHost ? { advertisedHost: reachability.advertisedHost } : {}),
-        });
-        if (
-          !shared ||
-          this.#authorizationRevision !== authorizationRevision ||
-          this.#sharedBindings.get(key) !== shared ||
-          !this.#bindingKeysByThread.get(input.threadId)?.has(key) ||
-          !this.#isGrantCurrent(account.id, localAccountId, account.app.slug)
-        ) {
-          return undefined;
+    const resolution = this.#beginProviderResolution(input.threadId, providerBindingId, ready);
+    try {
+      try {
+        // The remote account set is an authorization input, so every launch
+        // reconciles it. #refreshAllAccounts shares one in-flight read across
+        // concurrent launches without allowing a completed read to stay cached.
+        await this.#refreshAllAccounts();
+      } catch {
+        if (this.#isProviderResolutionCurrent(resolution)) {
+          this.releaseMcpProviderBindings(input.threadId, providerBindingId);
         }
-        shared.memberThreadIds.add(input.threadId);
-        return {
-          id: `pipedream:${localAccountId}`,
-          name: `pipedream-${account.app.slug}-${opaqueNameSuffix(localAccountId)}`,
-          timeoutMs: 30_000,
-          transport: { type: "http", url: shared.info.url, headers: { ...shared.info.headers } },
-        };
-      }),
-    );
-    return resolved.filter((server): server is ResolvedMcpServer => server !== undefined);
+        return [];
+      }
+
+      if (!this.#isProviderResolutionCurrent(resolution)) return [];
+      const reachability = await this.#resolveReachability(input.projectLocation);
+      if (!this.#isProviderResolutionCurrent(resolution)) return [];
+      if (!reachability) {
+        this.releaseMcpProviderBindings(input.threadId, providerBindingId);
+        return [];
+      }
+
+      const accounts = this.#grantedAccountsForRelay();
+      const authorizationRevision = this.#authorizationRevision;
+      const desiredKeys = new Set(
+        accounts.map(({ localAccountId }) =>
+          sharedBindingKey(providerBindingId, localAccountId, reachability.key),
+        ),
+      );
+      if (!this.#isProviderResolutionCurrent(resolution)) return [];
+      this.#releaseObsoleteThreadBindings(input.threadId, desiredKeys);
+      if (desiredKeys.size > 0) {
+        const threadKeys = this.#bindingKeysByThread.get(input.threadId) ?? new Set<string>();
+        for (const key of desiredKeys) threadKeys.add(key);
+        this.#bindingKeysByThread.set(input.threadId, threadKeys);
+        for (const { account, localAccountId } of accounts) {
+          this.#accountIdByBindingKey.set(
+            sharedBindingKey(providerBindingId, localAccountId, reachability.key),
+            account.id,
+          );
+        }
+      }
+      if (accounts.length === 0) return [];
+
+      const resolved = await Promise.all(
+        accounts.map(
+          async ({ account, localAccountId }): Promise<ResolvedMcpServer | undefined> => {
+            const key = sharedBindingKey(providerBindingId, localAccountId, reachability.key);
+            const shared = await this.#getOrCreateSharedBinding({
+              ready,
+              key,
+              threadId: input.threadId,
+              providerBindingId,
+              upstreamAccountId: account.id,
+              localAccountId,
+              appSlug: account.app.slug,
+              authorizationRevision,
+              ...(reachability.advertisedHost
+                ? { advertisedHost: reachability.advertisedHost }
+                : {}),
+            });
+            if (
+              !shared ||
+              !this.#isProviderResolutionCurrent(resolution) ||
+              this.#authorizationRevision !== authorizationRevision ||
+              this.#sharedBindings.get(key) !== shared ||
+              !this.#bindingKeysByThread.get(input.threadId)?.has(key) ||
+              !this.#isGrantCurrent(account.id, localAccountId, account.app.slug)
+            ) {
+              return undefined;
+            }
+            shared.memberThreadIds.add(input.threadId);
+            return {
+              id: `pipedream:${localAccountId}`,
+              name: `pipedream-${account.app.slug}-${opaqueNameSuffix(localAccountId)}`,
+              timeoutMs: 30_000,
+              transport: {
+                type: "http",
+                url: shared.info.url,
+                headers: { ...shared.info.headers },
+              },
+            };
+          },
+        ),
+      );
+      if (!this.#isProviderResolutionCurrent(resolution)) return [];
+      return resolved.filter((server): server is ResolvedMcpServer => server !== undefined);
+    } finally {
+      this.#finishProviderResolution(resolution);
+    }
   }
 
   releaseMcpBindings(threadId: string): void {
+    this.#threadResolutionEpochs.set(
+      threadId,
+      (this.#threadResolutionEpochs.get(threadId) ?? 0) + 1,
+    );
+    for (const [scopeKey, epoch] of this.#providerBindingEpochs) {
+      const scope = parseProviderResolutionScopeKey(scopeKey);
+      if (scope?.threadId !== threadId) continue;
+      this.#providerBindingEpochs.set(scopeKey, epoch + 1);
+    }
     const keys = this.#bindingKeysByThread.get(threadId);
-    if (!keys) return;
-    for (const key of [...keys]) this.#releaseThreadBinding(threadId, key);
+    if (keys) {
+      for (const key of [...keys]) this.#releaseThreadBinding(threadId, key);
+    }
+    this.#pruneProviderResolutionState(threadId);
+  }
+
+  releaseMcpProviderBindings(threadId: string, providerBindingId: string): void {
+    const normalizedProviderBindingId = providerBindingId.trim();
+    if (!normalizedProviderBindingId) return;
+    const scopeKey = providerResolutionScopeKey(threadId, normalizedProviderBindingId);
+    this.#providerBindingEpochs.set(scopeKey, (this.#providerBindingEpochs.get(scopeKey) ?? 0) + 1);
+    const keys = this.#bindingKeysByThread.get(threadId);
+    if (keys) {
+      for (const key of [...keys]) {
+        if (providerBindingIdFromSharedBindingKey(key) === normalizedProviderBindingId) {
+          this.#releaseThreadBinding(threadId, key);
+        }
+      }
+    }
+    this.#pruneProviderResolutionState(threadId, normalizedProviderBindingId);
+  }
+
+  #beginProviderResolution(
+    threadId: string,
+    providerBindingId: string,
+    ready: ReadyRuntime,
+  ): ProviderResolutionCapability {
+    const scopeKey = providerResolutionScopeKey(threadId, providerBindingId);
+    const threadEpoch = (this.#threadResolutionEpochs.get(threadId) ?? 0) + 1;
+    const providerEpoch = this.#providerBindingEpochs.get(scopeKey) ?? 0;
+    this.#threadResolutionEpochs.set(threadId, threadEpoch);
+    this.#providerBindingEpochs.set(scopeKey, providerEpoch);
+    this.#pendingThreadResolutions.set(
+      threadId,
+      (this.#pendingThreadResolutions.get(threadId) ?? 0) + 1,
+    );
+    this.#pendingProviderResolutions.set(
+      scopeKey,
+      (this.#pendingProviderResolutions.get(scopeKey) ?? 0) + 1,
+    );
+    return {
+      threadId,
+      providerBindingId,
+      scopeKey,
+      threadEpoch,
+      providerEpoch,
+      serviceGeneration: this.#serviceGeneration,
+      ready,
+    };
+  }
+
+  #isProviderResolutionCurrent(capability: ProviderResolutionCapability): boolean {
+    return (
+      this.#serviceGeneration === capability.serviceGeneration &&
+      this.#ready === capability.ready &&
+      this.#threadResolutionEpochs.get(capability.threadId) === capability.threadEpoch &&
+      this.#providerBindingEpochs.get(capability.scopeKey) === capability.providerEpoch
+    );
+  }
+
+  #finishProviderResolution(capability: ProviderResolutionCapability): void {
+    if (
+      this.#serviceGeneration !== capability.serviceGeneration ||
+      this.#ready !== capability.ready
+    ) {
+      return;
+    }
+    const threadPending = (this.#pendingThreadResolutions.get(capability.threadId) ?? 1) - 1;
+    if (threadPending <= 0) this.#pendingThreadResolutions.delete(capability.threadId);
+    else this.#pendingThreadResolutions.set(capability.threadId, threadPending);
+    const providerPending = (this.#pendingProviderResolutions.get(capability.scopeKey) ?? 1) - 1;
+    if (providerPending <= 0) this.#pendingProviderResolutions.delete(capability.scopeKey);
+    else this.#pendingProviderResolutions.set(capability.scopeKey, providerPending);
+    this.#pruneProviderResolutionState(capability.threadId, capability.providerBindingId);
+  }
+
+  #pruneProviderResolutionState(threadId: string, providerBindingId?: string): void {
+    const threadKeys = this.#bindingKeysByThread.get(threadId);
+    if ((this.#pendingThreadResolutions.get(threadId) ?? 0) === 0 && !threadKeys?.size) {
+      this.#threadResolutionEpochs.delete(threadId);
+    }
+    const providerBindingIds = providerBindingId
+      ? [providerBindingId]
+      : [...this.#providerBindingEpochs.keys()]
+          .map(parseProviderResolutionScopeKey)
+          .filter((scope) => scope?.threadId === threadId)
+          .map((scope) => scope!.providerBindingId);
+    for (const candidate of providerBindingIds) {
+      const scopeKey = providerResolutionScopeKey(threadId, candidate);
+      const hasBinding = [...(threadKeys ?? [])].some(
+        (key) => providerBindingIdFromSharedBindingKey(key) === candidate,
+      );
+      if ((this.#pendingProviderResolutions.get(scopeKey) ?? 0) === 0 && !hasBinding) {
+        this.#providerBindingEpochs.delete(scopeKey);
+      }
+    }
   }
 
   async dispose(): Promise<void> {
+    this.#serviceGeneration += 1;
     this.#bindingKeysByThread.clear();
     this.#sharedBindings.clear();
     this.#pendingBindings.clear();
     this.#accountIdByBindingKey.clear();
+    this.#threadResolutionEpochs.clear();
+    this.#providerBindingEpochs.clear();
+    this.#pendingThreadResolutions.clear();
+    this.#pendingProviderResolutions.clear();
     this.#revokedAccounts.clear();
+    this.#nonDurableRevocationAccountIds.clear();
     this.#pendingDisconnectAccountIds.clear();
     this.#accountsRefresh = undefined;
     this.#authorizationRevision += 1;
@@ -712,13 +886,17 @@ export class PipedreamSupervisorService {
   #finishPendingDisconnect(accountId: string, clearQuarantine: boolean): void {
     this.#accountMutationRevision += 1;
     this.#pendingDisconnectAccountIds.delete(accountId);
-    if (clearQuarantine) this.#revokedAccounts.delete(accountId);
+    if (clearQuarantine) {
+      this.#revokedAccounts.delete(accountId);
+      this.#nonDurableRevocationAccountIds.delete(accountId);
+    }
   }
 
   #accountsForSnapshot(): PipedreamAccountSummary[] {
     const accounts = this.#store.list();
     const indexById = new Map(accounts.map((account, index) => [account.id, index]));
     for (const revoked of this.#revokedAccounts.values()) {
+      if (this.#nonDurableRevocationAccountIds.has(revoked.id)) continue;
       const safe = { ...revoked, agentAccess: false, app: { ...revoked.app } };
       const index = indexById.get(revoked.id);
       if (index === undefined) {
@@ -770,6 +948,38 @@ function sharedBindingKey(
   reachabilityKey: string,
 ): string {
   return JSON.stringify([providerBindingId, localAccountId, reachabilityKey]);
+}
+
+function providerResolutionScopeKey(threadId: string, providerBindingId: string): string {
+  return JSON.stringify([threadId, providerBindingId]);
+}
+
+function parseProviderResolutionScopeKey(
+  scopeKey: string,
+): { threadId: string; providerBindingId: string } | undefined {
+  try {
+    const parsed: unknown = JSON.parse(scopeKey);
+    if (
+      !Array.isArray(parsed) ||
+      parsed.length !== 2 ||
+      typeof parsed[0] !== "string" ||
+      typeof parsed[1] !== "string"
+    ) {
+      return undefined;
+    }
+    return { threadId: parsed[0], providerBindingId: parsed[1] };
+  } catch {
+    return undefined;
+  }
+}
+
+function providerBindingIdFromSharedBindingKey(key: string): string | undefined {
+  try {
+    const parsed: unknown = JSON.parse(key);
+    return Array.isArray(parsed) && typeof parsed[0] === "string" ? parsed[0] : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function opaqueNameSuffix(localAccountId: string): string {

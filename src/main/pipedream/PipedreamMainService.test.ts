@@ -66,7 +66,7 @@ interface PipedreamConnectLifecycle {
   }>;
   getConnectFlowStatus(payload: {
     flowId: string;
-  }): Promise<{ state: "open" | "closed" | "succeeded" | "failed" }>;
+  }): Promise<{ state: "open" | "closed" | "succeeded" | "failed" | "expired" }>;
   finishConnect(payload: { flowId: string }): Promise<void>;
   cancelConnect(payload: { flowId: string }): Promise<void>;
   dispose(): Promise<void>;
@@ -388,7 +388,7 @@ describe("PipedreamMainService", () => {
     await service.dispose();
   });
 
-  it("does not complete Personal OAuth clear while exact-tab cleanup is nonterminal", async () => {
+  it("revokes Personal OAuth and returns while exact-tab cleanup retries in quarantine", async () => {
     const retryClose = deferred<void>();
     const openTabs = new Set(["personal-clear-pending"]);
     const clearPersonalMcpOauth = vi.fn<() => Promise<void>>(async () => undefined);
@@ -425,24 +425,353 @@ describe("PipedreamMainService", () => {
     });
     await service.beginPersonalMcpOauth();
 
-    let clearSettled = false;
-    const clear = service.clearPersonalMcpOauth().finally(() => {
-      clearSettled = true;
-    });
+    const clear = service.clearPersonalMcpOauth();
     await vi.waitFor(() => expect(closeConnectTab).toHaveBeenCalledOnce());
-    expect(clearPersonalMcpOauth).not.toHaveBeenCalled();
-    expect(clearSettled).toBe(false);
+    await expect(clear).resolves.toBeUndefined();
+    expect(clearPersonalMcpOauth).toHaveBeenCalledOnce();
+    expect(openTabs).toEqual(new Set(["personal-clear-pending"]));
 
     await vi.advanceTimersByTimeAsync(250);
     await vi.waitFor(() => expect(closeConnectTab).toHaveBeenCalledTimes(2));
-    expect(clearPersonalMcpOauth).not.toHaveBeenCalled();
-    expect(clearSettled).toBe(false);
+    expect(clearPersonalMcpOauth).toHaveBeenCalledOnce();
 
     retryClose.resolve();
-    await clear;
-    expect(openTabs).toEqual(new Set());
+    await vi.waitFor(() => expect(openTabs).toEqual(new Set()));
     expect(clearPersonalMcpOauth).toHaveBeenCalledOnce();
   });
+
+  it("revokes Personal OAuth even while an earlier status inspection is stuck", async () => {
+    const inspection = deferred<boolean>();
+    const clearPersonalMcpOauth = vi.fn<() => Promise<void>>(async () => undefined);
+    const isConnectTabOpen = vi.fn<(tabId: string) => Promise<boolean>>(
+      async () => inspection.promise,
+    );
+    const service = new PipedreamMainService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=slack",
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      beginPersonalMcpOauth: async () => ({
+        status: "redirect",
+        flowId: "supervisor-stuck-status",
+        authorizationUrl: "https://pipedream.com/oauth/authorize?flow=stuck-status",
+      }),
+      waitPersonalMcpOauth: () => new Promise(() => undefined),
+      cancelPersonalMcpOauth: async () => undefined,
+      clearPersonalMcpOauth,
+      openConnectUrl: async (_url, ownership) => {
+        ownership.onTabOpened("personal-stuck-status");
+        return { tabId: "personal-stuck-status" };
+      },
+      closeConnectTab: async () => undefined,
+      isConnectTabOpen,
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    const begin = await service.beginPersonalMcpOauth();
+    if (begin.state !== "open") throw new Error("expected an open Personal OAuth flow");
+
+    let statusSettled = false;
+    const status = service.getPersonalMcpOauthFlowStatus({ flowId: begin.flowId }).finally(() => {
+      statusSettled = true;
+    });
+    await vi.waitFor(() => expect(isConnectTabOpen).toHaveBeenCalledOnce());
+
+    await expect(service.clearPersonalMcpOauth()).resolves.toBeUndefined();
+    expect(clearPersonalMcpOauth).toHaveBeenCalledOnce();
+    expect(statusSettled).toBe(false);
+
+    inspection.resolve(false);
+    await expect(status).resolves.toEqual({ state: "closed" });
+  });
+
+  it("allows a new Personal OAuth begin after clear without waiting for a stuck status", async () => {
+    const inspection = deferred<boolean>();
+    let supervisorBeginCount = 0;
+    const beginPersonalMcpOauth = vi.fn<
+      NonNullable<PipedreamMainServiceOptions["beginPersonalMcpOauth"]>
+    >(async () => {
+      supervisorBeginCount += 1;
+      return {
+        status: "redirect" as const,
+        flowId: `supervisor-reconnect-${supervisorBeginCount}`,
+        authorizationUrl: `https://pipedream.com/oauth/authorize?flow=reconnect-${supervisorBeginCount}`,
+      };
+    });
+    const service = new PipedreamMainService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=slack",
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      beginPersonalMcpOauth,
+      waitPersonalMcpOauth: () => new Promise(() => undefined),
+      cancelPersonalMcpOauth: async () => undefined,
+      clearPersonalMcpOauth: async () => undefined,
+      openConnectUrl: async (_url, ownership) => {
+        const tabId = `personal-reconnect-${supervisorBeginCount}`;
+        ownership.onTabOpened(tabId);
+        return { tabId };
+      },
+      closeConnectTab: async () => undefined,
+      isConnectTabOpen: async () => inspection.promise,
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    const first = await service.beginPersonalMcpOauth();
+    if (first.state !== "open") throw new Error("expected first OAuth flow to open");
+    const status = service.getPersonalMcpOauthFlowStatus({ flowId: first.flowId });
+    await Promise.resolve();
+
+    await service.clearPersonalMcpOauth();
+    const reconnect = service.beginPersonalMcpOauth();
+    await Promise.resolve();
+    await Promise.resolve();
+    const reconnectStartedBeforeInspectionSettled = beginPersonalMcpOauth.mock.calls.length === 2;
+
+    inspection.resolve(false);
+    void status.catch(() => undefined);
+    void reconnect.catch(() => undefined);
+    expect(reconnectStartedBeforeInspectionSettled).toBe(true);
+  });
+
+  it("lets a Personal OAuth reconnect complete while the revoked flow is still opening its tab", async () => {
+    const firstOpen = deferred<{ tabId: string }>();
+    let supervisorBeginCount = 0;
+    const beginPersonalMcpOauth = vi.fn<
+      NonNullable<PipedreamMainServiceOptions["beginPersonalMcpOauth"]>
+    >(async () => {
+      supervisorBeginCount += 1;
+      return {
+        status: "redirect" as const,
+        flowId: `supervisor-opening-reconnect-${supervisorBeginCount}`,
+        authorizationUrl: `https://pipedream.com/oauth/authorize?flow=opening-reconnect-${supervisorBeginCount}`,
+      };
+    });
+    const cancelPersonalMcpOauth = vi.fn<(flowId: string) => Promise<void>>(async () => undefined);
+    const clearPersonalMcpOauth = vi.fn<() => Promise<void>>(async () => undefined);
+    const openTabs = new Set<string>();
+    const openConnectUrl = vi.fn<PipedreamMainServiceOptions["openConnectUrl"]>(
+      async (_url, ownership) => {
+        if (openConnectUrl.mock.calls.length === 1) return firstOpen.promise;
+        const tabId = "personal-opening-reconnect-current";
+        ownership.onTabOpened(tabId);
+        openTabs.add(tabId);
+        return { tabId };
+      },
+    );
+    const closeConnectTab = vi.fn<(tabId: string) => Promise<void>>(async (tabId) => {
+      openTabs.delete(tabId);
+    });
+    const service = new PipedreamMainService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=slack",
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      beginPersonalMcpOauth,
+      waitPersonalMcpOauth: () => new Promise(() => undefined),
+      cancelPersonalMcpOauth,
+      clearPersonalMcpOauth,
+      openConnectUrl,
+      closeConnectTab,
+      isConnectTabOpen: async (tabId) => openTabs.has(tabId),
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+
+    let firstSettled = false;
+    const first = service.beginPersonalMcpOauth();
+    void first
+      .finally(() => {
+        firstSettled = true;
+      })
+      .catch(() => undefined);
+    await vi.waitFor(() => expect(openConnectUrl).toHaveBeenCalledOnce());
+
+    await expect(service.clearPersonalMcpOauth()).resolves.toBeUndefined();
+    const reconnect = service.beginPersonalMcpOauth();
+    await vi.waitFor(() => expect(beginPersonalMcpOauth).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(openConnectUrl).toHaveBeenCalledTimes(2));
+    await expect(reconnect).resolves.toMatchObject({ state: "open" });
+    expect(firstSettled).toBe(false);
+    expect(openTabs).toEqual(new Set(["personal-opening-reconnect-current"]));
+    expect(cancelPersonalMcpOauth).toHaveBeenCalledExactlyOnceWith(
+      "supervisor-opening-reconnect-1",
+    );
+    expect(clearPersonalMcpOauth).toHaveBeenCalledOnce();
+
+    openTabs.add("personal-opening-reconnect-stale");
+    firstOpen.resolve({ tabId: "personal-opening-reconnect-stale" });
+    await expect(first).rejects.toThrow(/superseded/i);
+    await vi.waitFor(() =>
+      expect(closeConnectTab).toHaveBeenCalledWith("personal-opening-reconnect-stale"),
+    );
+    expect(openTabs).toEqual(new Set(["personal-opening-reconnect-current"]));
+    await service.dispose();
+  });
+
+  it("allows a new Personal OAuth begin after cancel without waiting for a stuck status", async () => {
+    const inspection = deferred<boolean>();
+    let supervisorBeginCount = 0;
+    const beginPersonalMcpOauth = vi.fn<
+      NonNullable<PipedreamMainServiceOptions["beginPersonalMcpOauth"]>
+    >(async () => {
+      supervisorBeginCount += 1;
+      return {
+        status: "redirect" as const,
+        flowId: `supervisor-cancel-reconnect-${supervisorBeginCount}`,
+        authorizationUrl: `https://pipedream.com/oauth/authorize?flow=cancel-reconnect-${supervisorBeginCount}`,
+      };
+    });
+    const cancelPersonalMcpOauth = vi.fn<(flowId: string) => Promise<void>>(async () => undefined);
+    const openTabs = new Set<string>();
+    const isConnectTabOpen = vi.fn<(tabId: string) => Promise<boolean>>(
+      async () => inspection.promise,
+    );
+    const service = new PipedreamMainService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=slack",
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      beginPersonalMcpOauth,
+      waitPersonalMcpOauth: () => new Promise(() => undefined),
+      cancelPersonalMcpOauth,
+      clearPersonalMcpOauth: async () => undefined,
+      openConnectUrl: async (_url, ownership) => {
+        const tabId = `personal-cancel-reconnect-${supervisorBeginCount}`;
+        ownership.onTabOpened(tabId);
+        openTabs.add(tabId);
+        return { tabId };
+      },
+      closeConnectTab: async (tabId) => {
+        openTabs.delete(tabId);
+      },
+      isConnectTabOpen,
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    const first = await service.beginPersonalMcpOauth();
+    if (first.state !== "open") throw new Error("expected first OAuth flow to open");
+    let statusSettled = false;
+    const status = service.getPersonalMcpOauthFlowStatus({ flowId: first.flowId }).finally(() => {
+      statusSettled = true;
+    });
+    await vi.waitFor(() => expect(isConnectTabOpen).toHaveBeenCalledOnce());
+
+    await expect(service.cancelPersonalMcpOauth({ flowId: first.flowId })).resolves.toBeUndefined();
+    expect(cancelPersonalMcpOauth).toHaveBeenCalledExactlyOnceWith("supervisor-cancel-reconnect-1");
+    expect(statusSettled).toBe(false);
+    const reconnect = service.beginPersonalMcpOauth();
+    await Promise.resolve();
+    await Promise.resolve();
+    const reconnectStartedBeforeInspectionSettled = beginPersonalMcpOauth.mock.calls.length === 2;
+
+    inspection.resolve(false);
+    await expect(status).resolves.toEqual({ state: "closed" });
+    await expect(reconnect).resolves.toMatchObject({ state: "open" });
+    expect(reconnectStartedBeforeInspectionSettled).toBe(true);
+    await service.dispose();
+  });
+
+  it("reports a strict Personal OAuth clear failure without waiting for tab cleanup", async () => {
+    const openTabs = new Set(["personal-clear-failure"]);
+    const service = new PipedreamMainService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=slack",
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      beginPersonalMcpOauth: async () => ({
+        status: "redirect",
+        flowId: "supervisor-clear-failure",
+        authorizationUrl: "https://pipedream.com/oauth/authorize?flow=clear-failure",
+      }),
+      waitPersonalMcpOauth: () => new Promise(() => undefined),
+      cancelPersonalMcpOauth: async () => undefined,
+      clearPersonalMcpOauth: async () => {
+        throw new Error("strict credential-store clear failed");
+      },
+      openConnectUrl: async (_url, ownership) => {
+        ownership.onTabOpened("personal-clear-failure");
+        return { tabId: "personal-clear-failure" };
+      },
+      closeConnectTab: async () => {
+        throw new Error("exact sensitive tab is still open");
+      },
+      isConnectTabOpen: async (tabId) => openTabs.has(tabId),
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    await service.beginPersonalMcpOauth();
+
+    await expect(service.clearPersonalMcpOauth()).rejects.toThrow(
+      "strict credential-store clear failed",
+    );
+    expect(openTabs).toEqual(new Set(["personal-clear-failure"]));
+  });
+
+  it.each(["cancel", "dispose"] as const)(
+    "lets Personal OAuth %s return while exact-tab cleanup retries in quarantine",
+    async (operation) => {
+      const retryClose = deferred<void>();
+      const openTabs = new Set([`personal-${operation}-pending`]);
+      const closeConnectTab = vi
+        .fn<(tabId: string) => Promise<void>>()
+        .mockRejectedValueOnce(new Error("exact sensitive tab is still open"))
+        .mockImplementationOnce(async (tabId) => {
+          await retryClose.promise;
+          openTabs.delete(tabId);
+        });
+      const service = new PipedreamMainService({
+        createConnectLink: async () => ({
+          connectLinkUrl: "https://pipedream.com/connect?app=slack",
+          expiresAt: "2026-08-27T12:10:00.000Z",
+        }),
+        beginPersonalMcpOauth: async () => ({
+          status: "redirect",
+          flowId: `supervisor-${operation}-pending`,
+          authorizationUrl: `https://pipedream.com/oauth/authorize?flow=${operation}-pending`,
+        }),
+        waitPersonalMcpOauth: () => new Promise(() => undefined),
+        cancelPersonalMcpOauth: async () => undefined,
+        clearPersonalMcpOauth: async () => undefined,
+        openConnectUrl: async (_url, ownership) => {
+          const tabId = `personal-${operation}-pending`;
+          ownership.onTabOpened(tabId);
+          return { tabId };
+        },
+        closeConnectTab,
+        isConnectTabOpen: async (tabId) => openTabs.has(tabId),
+        persistEnvFilePath: () => undefined,
+        clearEnvFilePath: () => undefined,
+        fallbackBootstrap: () => ({ state: "absent" }),
+        configureBootstrap: async () => ({}) as never,
+      });
+      const begin = await service.beginPersonalMcpOauth();
+      if (begin.state !== "open") throw new Error("expected an open Personal OAuth flow");
+
+      const lifecycle =
+        operation === "cancel"
+          ? service.cancelPersonalMcpOauth({ flowId: begin.flowId })
+          : service.dispose();
+      await vi.waitFor(() => expect(closeConnectTab).toHaveBeenCalledOnce());
+      await expect(lifecycle).resolves.toBeUndefined();
+      expect(openTabs).toEqual(new Set([`personal-${operation}-pending`]));
+
+      await vi.advanceTimersByTimeAsync(250);
+      await vi.waitFor(() => expect(closeConnectTab).toHaveBeenCalledTimes(2));
+      retryClose.resolve();
+      await vi.waitFor(() => expect(openTabs).toEqual(new Set()));
+    },
+  );
 
   it("accepts failed close as terminal only after the exact sensitive tab is confirmed gone", async () => {
     const openTabs = new Set(["personal-confirmed-gone"]);
@@ -483,7 +812,7 @@ describe("PipedreamMainService", () => {
   });
 
   it.each(["clear", "dispose"] as const)(
-    "orders %s behind a pending Personal OAuth begin",
+    "lets %s supersede a pending Personal OAuth begin without opening a tab",
     async (operation) => {
       const beginGate = deferred<{
         status: "redirect";
@@ -525,22 +854,15 @@ describe("PipedreamMainService", () => {
 
       const begin = service.beginPersonalMcpOauth();
       await vi.waitFor(() => expect(beginPersonalMcpOauth).toHaveBeenCalledOnce());
-      let lifecycleSettled = false;
-      const lifecycle = (
-        operation === "clear" ? service.clearPersonalMcpOauth() : service.dispose()
-      ).finally(() => {
-        lifecycleSettled = true;
-      });
-      await Promise.resolve();
-      expect(lifecycleSettled).toBe(false);
+      const lifecycle = operation === "clear" ? service.clearPersonalMcpOauth() : service.dispose();
+      await lifecycle;
 
       beginGate.resolve({
         status: "redirect",
         flowId: `supervisor-${operation}`,
         authorizationUrl: `https://pipedream.com/oauth/authorize?flow=${operation}`,
       });
-      await begin;
-      await lifecycle;
+      await expect(begin).rejects.toThrow(/superseded/i);
 
       expect(openTabs).toEqual(new Set());
       expect(cancelPersonalMcpOauth).toHaveBeenCalledWith(`supervisor-${operation}`);
@@ -915,7 +1237,32 @@ describe("PipedreamMainService", () => {
     await vi.advanceTimersByTimeAsync(250);
 
     expect(closeConnectTab).toHaveBeenCalledTimes(2);
-    await expect(service.getConnectFlowStatus({ flowId })).resolves.toEqual({ state: "closed" });
+    await expect(service.getConnectFlowStatus({ flowId })).resolves.toEqual({ state: "expired" });
+  });
+
+  it("reports expiry when a status poll reaches the deadline before the timer callback", async () => {
+    const closeConnectTab = vi.fn<(tabId: string) => Promise<void>>(async () => undefined);
+    const service = makeConnectLifecycleService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=gmail&token=private",
+        expiresAt: "2026-08-27T12:00:05.000Z",
+      }),
+      openConnectUrl: async () => ({ tabId: "sensitive-direct-deadline" }),
+      closeConnectTab,
+      isConnectTabOpen: async () => true,
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    const { flowId } = await service.beginConnect({ appSlug: "gmail" });
+
+    // Move wall time without executing the scheduled expiry callback. The
+    // status read itself must preserve timeout semantics when it wins the race.
+    vi.setSystemTime("2026-08-27T12:00:05.000Z");
+
+    await expect(service.getConnectFlowStatus({ flowId })).resolves.toEqual({ state: "expired" });
+    expect(closeConnectTab).toHaveBeenCalledWith("sensitive-direct-deadline");
   });
 
   it.each(["finishConnect", "cancelConnect"] as const)(
@@ -1034,7 +1381,7 @@ describe("PipedreamMainService", () => {
       new Set(["sensitive-root", "sensitive-popup"]),
     );
     expect(ownership?.canOpenTab()).toBe(false);
-    await expect(service.getConnectFlowStatus({ flowId })).resolves.toEqual({ state: "closed" });
+    await expect(service.getConnectFlowStatus({ flowId })).resolves.toEqual({ state: "expired" });
   });
 
   it("caps a far-future upstream expiry at the five-minute main-owned flow lifetime", async () => {
@@ -1132,6 +1479,52 @@ describe("PipedreamMainService", () => {
       new Set(["sensitive-root", "sensitive-popup"]),
     );
     await expect(service.beginConnect({ appSlug: "slack" })).rejects.toThrow(/disposed/i);
+  });
+
+  it("dispose does not wait for a superseded tab opener", async () => {
+    const releaseOpen = deferred<void>();
+    const openTabs = new Set<string>();
+    const closeConnectTab = vi.fn<(tabId: string) => Promise<void>>(async (tabId) => {
+      openTabs.delete(tabId);
+    });
+    const service = makeConnectLifecycleService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=gmail&token=private",
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      openConnectUrl: async (_url, ownership) => {
+        ownership.onTabOpened("sensitive-dispose-stuck-open");
+        openTabs.add("sensitive-dispose-stuck-open");
+        await releaseOpen.promise;
+        return { tabId: "sensitive-dispose-stuck-open" };
+      },
+      closeConnectTab,
+      isConnectTabOpen: async (tabId) => openTabs.has(tabId),
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    const stale = service.beginConnect({ appSlug: "gmail" });
+    const staleOutcome = stale.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    await vi.waitFor(() => expect(openTabs).toContain("sensitive-dispose-stuck-open"));
+
+    let disposed = false;
+    const disposal = service.dispose().then(() => {
+      disposed = true;
+    });
+    try {
+      await vi.waitFor(() => expect(disposed).toBe(true));
+      expect(openTabs).toEqual(new Set());
+      expect(closeConnectTab).toHaveBeenCalledExactlyOnceWith("sensitive-dispose-stuck-open");
+    } finally {
+      releaseOpen.resolve();
+      await disposal;
+      await staleOutcome;
+    }
   });
 
   it("dispose destroys idle client sockets held against the ephemeral redirect receiver", async () => {
@@ -1358,6 +1751,128 @@ describe("PipedreamMainService", () => {
     expect(openConnectUrl).toHaveBeenCalledTimes(1);
     expect(openConnectUrl.mock.calls[0]?.[0]).toContain("app=slack");
     await service.cancelConnect({ flowId: newestFlow.flowId });
+  });
+
+  it("cleans an active stale Connect flow when its superseding request fails early", async () => {
+    const releaseStaleOpen = deferred<void>();
+    const openTabs = new Set<string>();
+    let staleSuccessRedirectUrl = "";
+    const createConnectLink = vi.fn<PipedreamMainServiceOptions["createConnectLink"]>(
+      async (appSlug, redirects) => {
+        if (appSlug === "gmail") {
+          staleSuccessRedirectUrl = redirects.successRedirectUrl;
+          return {
+            connectLinkUrl:
+              "https://pipedream.com/_static/connect.html?token=stale-private&connectLink=true&app=gmail",
+            expiresAt: "2026-08-27T12:10:00.000Z",
+          };
+        }
+        return {
+          connectLinkUrl: "https://attacker.invalid/connect?app=slack&token=private",
+          expiresAt: "2026-08-27T12:10:00.000Z",
+        };
+      },
+    );
+    const closeConnectTab = vi.fn<(tabId: string) => Promise<void>>(async (tabId) => {
+      openTabs.delete(tabId);
+    });
+    const service = makeConnectLifecycleService({
+      createConnectLink,
+      openConnectUrl: async (_url, ownership) => {
+        ownership.onTabOpened("sensitive-stale-active");
+        openTabs.add("sensitive-stale-active");
+        await releaseStaleOpen.promise;
+        throw new Error("stale open failed");
+      },
+      closeConnectTab,
+      isConnectTabOpen: async (tabId) => openTabs.has(tabId),
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    const stale = service.beginConnect({ appSlug: "gmail" });
+    const staleOutcome = stale.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    await vi.waitFor(() => expect(openTabs).toEqual(new Set(["sensitive-stale-active"])));
+
+    await expect(service.beginConnect({ appSlug: "slack" })).rejects.toThrow(
+      /invalid Connect Link/i,
+    );
+
+    try {
+      await vi.waitFor(() =>
+        expect(closeConnectTab).toHaveBeenCalledExactlyOnceWith("sensitive-stale-active"),
+      );
+      expect(openTabs).toEqual(new Set());
+      await expect(requestLoopback(staleSuccessRedirectUrl)).rejects.toThrow(/connect|socket/i);
+
+      releaseStaleOpen.resolve();
+      expect(await staleOutcome).toEqual(
+        expect.objectContaining({ message: expect.stringMatching(/superseded/i) }),
+      );
+    } finally {
+      releaseStaleOpen.resolve();
+      await service.dispose();
+    }
+  });
+
+  it("opens a valid replacement without waiting for the superseded tab opener", async () => {
+    const releaseStaleOpen = deferred<void>();
+    const openTabs = new Set<string>();
+    const openConnectUrl = vi.fn<PipedreamMainServiceOptions["openConnectUrl"]>(
+      async (url, ownership) => {
+        const appSlug = new URL(url).searchParams.get("app")!;
+        const tabId = `sensitive-${appSlug}`;
+        ownership.onTabOpened(tabId);
+        openTabs.add(tabId);
+        if (appSlug === "gmail") await releaseStaleOpen.promise;
+        return { tabId };
+      },
+    );
+    const closeConnectTab = vi.fn<(tabId: string) => Promise<void>>(async (tabId) => {
+      openTabs.delete(tabId);
+    });
+    const service = makeConnectLifecycleService({
+      createConnectLink: async (appSlug) => ({
+        connectLinkUrl: `https://pipedream.com/connect?app=${appSlug}&token=${appSlug}-private`,
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      openConnectUrl,
+      closeConnectTab,
+      isConnectTabOpen: async (tabId) => openTabs.has(tabId),
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap: async () => ({}) as never,
+    });
+    const stale = service.beginConnect({ appSlug: "gmail" });
+    const staleOutcome = stale.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    await vi.waitFor(() => expect(openTabs).toContain("sensitive-gmail"));
+
+    const replacement = service.beginConnect({ appSlug: "slack" });
+    try {
+      await vi.waitFor(() =>
+        expect(openConnectUrl.mock.calls.some(([url]) => url.includes("app=slack"))).toBe(true),
+      );
+      const replacementFlow = await replacement;
+      expect(openTabs).toEqual(new Set(["sensitive-slack"]));
+
+      releaseStaleOpen.resolve();
+      expect(await staleOutcome).toEqual(
+        expect.objectContaining({ message: expect.stringMatching(/superseded/i) }),
+      );
+      expect(openTabs).toEqual(new Set(["sensitive-slack"]));
+      await service.cancelConnect({ flowId: replacementFlow.flowId });
+    } finally {
+      releaseStaleOpen.resolve();
+      await service.dispose();
+    }
   });
 
   it("revalidates request generation after asynchronous cleanup before opening a tab", async () => {
@@ -1588,6 +2103,56 @@ describe("PipedreamMainService", () => {
     );
     expect(openConnectUrl).not.toHaveBeenCalled();
     expect(configureBootstrap).toHaveBeenCalledExactlyOnceWith({ state: "absent" });
+  });
+
+  it("reconfigures without waiting for a superseded active tab opener", async () => {
+    const releaseOpen = deferred<void>();
+    const openTabs = new Set<string>();
+    const configureBootstrap = vi.fn<PipedreamMainServiceOptions["configureBootstrap"]>(
+      async () =>
+        ({
+          personalMcp: { enabled: false, authenticated: false, serverName: "pd" },
+          connect: { state: "absent" },
+        }) as never,
+    );
+    const service = new PipedreamMainService({
+      createConnectLink: async () => ({
+        connectLinkUrl: "https://pipedream.com/connect?app=gmail&token=private",
+        expiresAt: "2026-08-27T12:10:00.000Z",
+      }),
+      openConnectUrl: async (_url, ownership) => {
+        ownership.onTabOpened("sensitive-reconfigure-stuck-open");
+        openTabs.add("sensitive-reconfigure-stuck-open");
+        await releaseOpen.promise;
+        return { tabId: "sensitive-reconfigure-stuck-open" };
+      },
+      closeConnectTab: async (tabId) => {
+        openTabs.delete(tabId);
+      },
+      isConnectTabOpen: async (tabId) => openTabs.has(tabId),
+      persistEnvFilePath: () => undefined,
+      clearEnvFilePath: () => undefined,
+      fallbackBootstrap: () => ({ state: "absent" }),
+      configureBootstrap,
+    });
+    const stale = service.beginConnect({ appSlug: "gmail" });
+    const staleOutcome = stale.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    await vi.waitFor(() => expect(openTabs).toContain("sensitive-reconfigure-stuck-open"));
+
+    const reconfiguration = service.clearEnvironmentFile();
+    try {
+      await vi.waitFor(() => expect(configureBootstrap).toHaveBeenCalledOnce());
+      await expect(reconfiguration).resolves.toMatchObject({ connect: { state: "absent" } });
+      expect(openTabs).toEqual(new Set());
+    } finally {
+      releaseOpen.resolve();
+      await reconfiguration;
+      await staleOutcome;
+      await service.dispose();
+    }
   });
 
   it("closes an active Connect tab before importing and reconfiguring the environment", async () => {

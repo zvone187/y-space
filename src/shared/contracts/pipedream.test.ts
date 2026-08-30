@@ -147,6 +147,9 @@ describe("Pipedream public contracts", () => {
     expect(pipedreamConnectFlowStatusSchema.parse({ state: "failed" })).toEqual({
       state: "failed",
     });
+    expect(pipedreamConnectFlowStatusSchema.parse({ state: "expired" })).toEqual({
+      state: "expired",
+    });
 
     for (const forbidden of [
       { flowId, tabId: "sensitive-tab-private" },

@@ -48,6 +48,7 @@ import { TranscriptBuffer } from "@/shared/transcriptBuffer";
 import {
   type AgentAdapter,
   type AgentNativePlugin,
+  type StructuredSessionHandle,
   createKnownSessionRef,
   defaultFormatPromptSegments,
   getRefreshedWindowsPath,
@@ -81,7 +82,10 @@ import { buildShellCommand } from "./threadSession/shellCommand";
 import {
   type McpLaunchAuthorization,
   type McpLaunchIdentity,
+  McpLaunchConfigurationChangedError,
   SpawnPipeline,
+  isPersonalPipedreamMcpServer,
+  stripResolvedAuthorizationHeader,
   workspaceLaunchConfig,
   type SpawnThreadInput,
 } from "./threadSession/spawnPipeline";
@@ -100,6 +104,10 @@ interface PipedreamMcpReloadOptions {
   revokePersonalOauth?: boolean;
   /** Internal generation captured when the reload request is accepted. */
   personalMcpCredentialEpoch?: number;
+  /** Supersedes detached or timed-out reload work, including non-Personal grants. */
+  reloadEpoch?: number;
+  /** Global launch-config revision captured for an accepted turn's restart. */
+  mcpLaunchConfigurationEpoch?: number;
 }
 
 function mergePipedreamMcpReloadOutcome(
@@ -117,6 +125,9 @@ function mergePipedreamMcpReloadOutcome(
 
 const RECENTLY_REMOVED_THREAD_LIMIT = 256;
 const PERSONAL_MCP_REVOCATION_TEARDOWN_TIMEOUT_MS = 250;
+const PERSONAL_MCP_REVOCATION_RELOAD_TIMEOUT_MS = 250;
+const MCP_LIVE_UPDATE_TIMEOUT_MS = 250;
+const MCP_RELOAD_OPERATION_TIMEOUT_MS = 30_000;
 
 type RootMcpLaunchAuthority =
   | { phase: "pending"; authorization: McpLaunchAuthorization }
@@ -132,6 +143,12 @@ interface SubagentMcpLaunchAuthority {
   authorization: McpLaunchAuthorization;
 }
 
+interface SubagentMcpResolutionRequest {
+  readonly token: symbol;
+  readonly parentThreadId: string;
+  readonly parentSessionInstanceId: string;
+}
+
 interface BrowserEvidenceTurnLedger {
   launchId: string;
   turnId: string;
@@ -141,12 +158,33 @@ interface BrowserEvidenceTurnLedger {
   failureItemId?: string;
 }
 
+interface PendingStartMcpSettings {
+  agentKind: AgentKind;
+  usesAgentSettings: boolean;
+  snapshot: McpLaunchSnapshot;
+}
+
+interface McpReloadSessionOwnership {
+  readonly token: symbol;
+  readonly structuredSession: StructuredSessionHandle | undefined;
+}
+
+type AcceptedTurnReloadOutcome = "handled" | "superseded";
+
 export class ThreadSessionManager {
   readonly sessions = new Map<string, SessionRuntime>();
   readonly shellSessions = new Map<string, ShellSessionRuntime>();
   /** Reverse index: agent-native session id → SessionRuntime, for CLI hook routing fallback. */
   readonly sessionsBySessionId = new Map<string, SessionRuntime>();
   private readonly startLocks = new Map<string, Promise<void>>();
+  /** Launch inputs captured before async preparation reaches MCP authority registration. */
+  private readonly pendingStartMcpSettings = new Map<string, PendingStartMcpSettings>();
+  /** Settings-removal cancellation that must also gate pre-authority launch work. */
+  private readonly removedPersonalPendingStarts = new Set<string>();
+  /** Exact threads whose latest desired user/project settings include Personal Pipedream. */
+  private readonly agentSettingsPersonalMcpThreads = new Set<string>();
+  /** Provider settings revision; older async resolutions must never publish after a newer save. */
+  private readonly agentMcpSettingsReloadEpochs = new Map<AgentKind, number>();
   private readonly pendingStartInterrupts = new Set<string>();
   private readonly pendingStartAborts = new Set<string>();
   private readonly ptyLifecycle = new PtyLifecycle();
@@ -165,18 +203,31 @@ export class ThreadSessionManager {
   private readonly rootMcpLaunchAuthorities = new Map<string, RootMcpLaunchAuthority>();
   /** Ephemeral structured-child authority, tied to the exact live parent. */
   private readonly subagentMcpLaunchAuthorities = new Map<string, SubagentMcpLaunchAuthority>();
+  /** Latest same-id child resolution, retained across an epoch-safe retry rebuild. */
+  private readonly subagentMcpResolutionRequests = new Map<string, SubagentMcpResolutionRequest>();
   /** App-owned proof for only the latest accepted user turn of each live task. */
   private readonly browserEvidenceTurns = new Map<string, BrowserEvidenceTurnLedger>();
   /** Orders all live MCP mutations so an older resolution can never apply last. */
   private mcpReloadQueue: Promise<void> = Promise.resolve();
   /** Invalidates launch work that captured Personal credentials before clear. */
   private personalMcpCredentialEpoch = 0;
+  /** Invalidates any detached Pipedream reload after a queue timeout or newer request. */
+  private pipedreamMcpReloadEpoch = 0;
+  /** Invalidates provider creation whenever any launch-visible MCP source changes. */
+  private mcpLaunchConfigurationEpoch = 0;
   /** Deduplicates immediate security teardown with the queued replacement. */
   private readonly personalOauthRevocationStops = new WeakMap<SessionRuntime, Promise<void>>();
   /** One provider restart at a time for each GUI session without live MCP updates. */
   private readonly pipedreamMcpRestarts = new WeakMap<
     SessionRuntime,
     Promise<PipedreamMcpReloadOutcome>
+  >();
+  /** Provider handles currently mutating MCP state; clear retires these before queue detachment. */
+  private readonly liveMcpUpdateSessions = new Set<SessionRuntime>();
+  /** Latest cross-source reload operation that owns each exact provider handle. */
+  private readonly mcpReloadSessionOwners = new WeakMap<
+    SessionRuntime,
+    McpReloadSessionOwnership
   >();
   private disposed = false;
 
@@ -262,6 +313,8 @@ export class ThreadSessionManager {
       assertMcpLaunchAuthorizationCurrent: (identity) =>
         this.assertMcpLaunchAuthorizationCurrent(identity),
       getPersonalMcpCredentialEpoch: () => this.personalMcpCredentialEpoch,
+      getMcpLaunchConfigurationEpoch: () => this.mcpLaunchConfigurationEpoch,
+      refreshPendingMcpLaunchSnapshot: (input) => this.refreshPendingMcpLaunchSnapshot(input),
       revokeMcpLaunchAuthorization: (identity) => this.revokeMcpLaunchAuthorization(identity),
       emitOptimisticUserMessage: (threadId, prompt, segments, requestedItemId) =>
         this.structuredTurnQueue.emitOptimisticUserMessage(
@@ -282,6 +335,7 @@ export class ThreadSessionManager {
         this.beginMcpLaunchAuthorization(authorization),
       revokeMcpLaunchAuthorization: (identity) => this.revokeMcpLaunchAuthorization(identity),
       getPersonalMcpCredentialEpoch: () => this.personalMcpCredentialEpoch,
+      getMcpLaunchConfigurationEpoch: () => this.mcpLaunchConfigurationEpoch,
       settleAfterStructuredDispose: () => sleep(150),
       primeProjectShellEnv,
       resolveLaunchSpec,
@@ -341,6 +395,16 @@ export class ThreadSessionManager {
       !childAuthority ||
       !this.isExactMcpLaunch(childAuthority.authorization.identity, payload.launchId)
     ) {
+      return undefined;
+    }
+    const pendingChildResolution = this.subagentMcpResolutionRequests.get(payload.threadId);
+    if (
+      pendingChildResolution?.parentThreadId === childAuthority.parentThreadId &&
+      pendingChildResolution.parentSessionInstanceId === childAuthority.parentSessionInstanceId
+    ) {
+      // No child provider exists until resolution returns. This also makes a
+      // security-revoked attempt unusable while its exact record is retained
+      // solely to arbitrate one current-state retry.
       return undefined;
     }
     const parent = this.sessions.get(childAuthority.parentThreadId);
@@ -427,14 +491,23 @@ export class ThreadSessionManager {
   }
 
   private beginMcpLaunchAuthorization(authorization: McpLaunchAuthorization): void {
+    if (this.removedPersonalPendingStarts.has(authorization.identity.threadId)) {
+      throw new Error("MCP launch authorization was revoked after agent settings changed.");
+    }
     const credentialEpoch =
       authorization.personalMcpCredentialEpoch ?? this.personalMcpCredentialEpoch;
     if (credentialEpoch !== this.personalMcpCredentialEpoch) {
       throw new Error("MCP launch authorization was revoked before launch.");
     }
+    const configurationEpoch =
+      authorization.mcpLaunchConfigurationEpoch ?? this.mcpLaunchConfigurationEpoch;
+    if (configurationEpoch !== this.mcpLaunchConfigurationEpoch) {
+      throw new McpLaunchConfigurationChangedError();
+    }
     const currentAuthorization: McpLaunchAuthorization = {
       ...authorization,
       personalMcpCredentialEpoch: credentialEpoch,
+      mcpLaunchConfigurationEpoch: configurationEpoch,
     };
     // Pipedream relays carry their own launch bearer, so rotate those alongside
     // the built-in capability nonce before a restart/recovery can begin.
@@ -460,6 +533,9 @@ export class ThreadSessionManager {
       current.authorization.identity.launchId === identity.launchId &&
       current.authorization.personalMcpCredentialEpoch === this.personalMcpCredentialEpoch
     ) {
+      if (current.authorization.mcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch) {
+        throw new McpLaunchConfigurationChangedError();
+      }
       return;
     }
     throw new Error("MCP launch authorization was revoked before process creation.");
@@ -470,10 +546,19 @@ export class ThreadSessionManager {
     if (!identity?.threadId || !identity.launchId) return;
     const current = this.rootMcpLaunchAuthorities.get(identity.threadId);
     if (
+      current?.phase === "pending" &&
+      current.authorization.identity.launchId === identity.launchId &&
+      current.authorization.personalMcpCredentialEpoch === this.personalMcpCredentialEpoch &&
+      current.authorization.mcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch
+    ) {
+      throw new McpLaunchConfigurationChangedError();
+    }
+    if (
       !current ||
       current.phase !== "pending" ||
       current.authorization.identity.launchId !== identity.launchId ||
-      current.authorization.personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch
+      current.authorization.personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+      current.authorization.mcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch
     ) {
       throw new Error("MCP launch authorization was revoked before runtime publication.");
     }
@@ -485,6 +570,7 @@ export class ThreadSessionManager {
         config: session.config,
         launchConfig: session.launchConfig ?? current.authorization.launchConfig,
         mcpLaunchSnapshot: session.mcpLaunchSnapshot,
+        mcpLaunchConfigurationEpoch: this.mcpLaunchConfigurationEpoch,
       },
       sessionInstanceId: session.instanceId,
     });
@@ -510,6 +596,7 @@ export class ThreadSessionManager {
         config: session.config,
         launchConfig: session.launchConfig ?? current.authorization.launchConfig,
         mcpLaunchSnapshot: session.mcpLaunchSnapshot,
+        mcpLaunchConfigurationEpoch: this.mcpLaunchConfigurationEpoch,
       },
     });
   }
@@ -523,6 +610,7 @@ export class ThreadSessionManager {
       !identity?.threadId ||
       !identity.launchId ||
       !this.isCurrentSession(session) ||
+      session.ignoreExit === true ||
       personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch
     ) {
       return;
@@ -536,6 +624,7 @@ export class ThreadSessionManager {
         launchConfig: session.launchConfig ?? session.config,
         mcpLaunchSnapshot: session.mcpLaunchSnapshot,
         personalMcpCredentialEpoch,
+        mcpLaunchConfigurationEpoch: this.mcpLaunchConfigurationEpoch,
       },
       sessionInstanceId: session.instanceId,
     });
@@ -549,12 +638,18 @@ export class ThreadSessionManager {
     ) {
       this.rootMcpLaunchAuthorities.delete(identity.threadId);
       this.clearBrowserEvidenceTurn(identity.threadId, identity.launchId);
-      this.options.releasePipedreamMcpBindings?.(identity.threadId);
+      this.releasePipedreamMcpIdentityBindingsBestEffort(identity);
       return;
     }
-    // Close/dispose can remove the authority while async launch resolution is
-    // still unwinding. Release any relay created after that earlier cleanup.
-    if (!current) this.options.releasePipedreamMcpBindings?.(identity.threadId);
+    if (
+      current?.phase === "active" &&
+      current.authorization.identity.launchId === identity.launchId
+    ) {
+      return;
+    }
+    // Always revoke the exact launch scope. A newer same-thread authority may
+    // already be current, so stale unwind must never fall back to deleting it.
+    this.releasePipedreamMcpIdentityBindingsBestEffort(identity);
   }
 
   private revokeMcpAccessForThread(threadId: string): void {
@@ -573,6 +668,7 @@ export class ThreadSessionManager {
       current.sessionInstanceId !== session.instanceId ||
       current.authorization.identity.launchId !== identity.launchId
     ) {
+      this.releasePipedreamMcpIdentityBindingsBestEffort(identity);
       return;
     }
     this.options.releasePipedreamMcpBindings?.(session.threadId);
@@ -584,6 +680,11 @@ export class ThreadSessionManager {
       if (authority.parentThreadId === parentThreadId) {
         this.subagentMcpLaunchAuthorities.delete(childThreadId);
         this.options.releasePipedreamMcpBindings?.(childThreadId);
+      }
+    }
+    for (const [childThreadId, request] of this.subagentMcpResolutionRequests) {
+      if (request.parentThreadId === parentThreadId) {
+        this.subagentMcpResolutionRequests.delete(childThreadId);
       }
     }
   }
@@ -832,76 +933,263 @@ export class ThreadSessionManager {
     targetAgentKind: AgentKind,
     childConfig: ThreadConfig,
   ): Promise<{ mcpServers?: ResolvedMcpServer[] }> {
-    const session = this.sessions.get(threadId);
-    if (!session || !this.isCurrentSession(session) || session.ignoreExit === true) return {};
-    const personalMcpCredentialEpoch = this.personalMcpCredentialEpoch;
     const targetAdapter = this.options.adapters.get(targetAgentKind);
     if (!targetAdapter || !identity.threadId) return {};
-    const mcpLaunchSnapshot = session.mcpLaunchSnapshot;
-    const launchConfig = this.spawnPipeline.resolveMcpLaunchConfig(
-      workspaceLaunchConfig(
-        session.projectLocation,
-        childConfig,
-        targetAdapter,
-        mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
-        mcpLaunchSnapshot.pluginBuiltInMcpServerIds,
-      ),
-      mcpLaunchSnapshot,
-      targetAdapter,
-      identity.threadId,
-    );
-    const childIdentity: McpLaunchIdentity = {
-      ...identity,
-      threadId: identity.threadId,
-      launchId: randomUUID(),
-      ...(this.browserEvidenceTurns.get(threadId)?.turnId
-        ? { browserEvidenceTurnId: this.browserEvidenceTurns.get(threadId)!.turnId }
-        : {}),
-    };
-    const authorization: McpLaunchAuthorization = {
-      identity: childIdentity,
-      adapter: targetAdapter,
-      config: childConfig,
-      launchConfig,
-      mcpLaunchSnapshot,
-      personalMcpCredentialEpoch,
-    };
-    this.subagentMcpLaunchAuthorities.set(childIdentity.threadId, {
+    const initialSession = this.sessions.get(threadId);
+    if (
+      !initialSession ||
+      !this.isCurrentSession(initialSession) ||
+      initialSession.ignoreExit === true
+    ) {
+      return {};
+    }
+
+    const childThreadId = identity.threadId;
+    const resolutionRequest: SubagentMcpResolutionRequest = {
+      token: Symbol("subagent-mcp-resolution"),
       parentThreadId: threadId,
-      parentSessionInstanceId: session.instanceId,
-      authorization,
-    });
-    try {
-      const mcpServers = await this.spawnPipeline.resolveMcpServersForLaunch({
-        location: session.projectLocation,
-        config: launchConfig,
+      parentSessionInstanceId: initialSession.instanceId,
+    };
+    // Publish same-id ordering before the first await. A later request owns the
+    // id immediately, including while this one is rebuilding after an epoch.
+    this.subagentMcpResolutionRequests.set(childThreadId, resolutionRequest);
+
+    const isRequestCurrent = (): boolean =>
+      this.subagentMcpResolutionRequests.get(childThreadId)?.token === resolutionRequest.token;
+    const finishRequest = (): void => {
+      if (isRequestCurrent()) this.subagentMcpResolutionRequests.delete(childThreadId);
+    };
+    const readOriginalLiveParent = (): SessionRuntime | undefined => {
+      const current = this.sessions.get(threadId);
+      if (
+        !current ||
+        current.instanceId !== resolutionRequest.parentSessionInstanceId ||
+        !this.isCurrentSession(current) ||
+        current.ignoreExit === true
+      ) {
+        return undefined;
+      }
+      return current;
+    };
+    const beginAttempt = (
+      session: SessionRuntime,
+      mcpLaunchSnapshot: McpLaunchSnapshot,
+      personalMcpCredentialEpoch: number,
+      mcpLaunchConfigurationEpoch: number,
+    ) => {
+      const launchConfig = this.spawnPipeline.resolveMcpLaunchConfig(
+        workspaceLaunchConfig(
+          session.projectLocation,
+          childConfig,
+          targetAdapter,
+          mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
+          mcpLaunchSnapshot.pluginBuiltInMcpServerIds,
+        ),
         mcpLaunchSnapshot,
+        targetAdapter,
+        childThreadId,
+      );
+      const childIdentity: McpLaunchIdentity = {
+        ...identity,
+        threadId: childThreadId,
+        launchId: randomUUID(),
+        ...(this.browserEvidenceTurns.get(threadId)?.turnId
+          ? { browserEvidenceTurnId: this.browserEvidenceTurns.get(threadId)!.turnId }
+          : {}),
+      };
+      const authorization: McpLaunchAuthorization = {
         identity: childIdentity,
         adapter: targetAdapter,
-        presentationMode: "gui",
-      });
-      if (
-        !this.isCurrentSession(session) ||
-        Boolean(session.ignoreExit) ||
-        personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch
-      ) {
-        this.releaseSubagentParentMcpAccess(threadId, childIdentity.threadId);
-        return {};
+        config: childConfig,
+        launchConfig,
+        mcpLaunchSnapshot,
+        personalMcpCredentialEpoch,
+        mcpLaunchConfigurationEpoch,
+      };
+      const previousChildAuthority = this.subagentMcpLaunchAuthorities.get(childThreadId);
+      if (previousChildAuthority) {
+        this.releasePipedreamMcpIdentityBindingsBestEffort(
+          previousChildAuthority.authorization.identity,
+        );
       }
-      return mcpServers.length > 0 || targetAdapter.capabilities.mcpConfigSource === "agentSettings"
-        ? { mcpServers }
-        : {};
+      this.subagentMcpLaunchAuthorities.set(childThreadId, {
+        parentThreadId: threadId,
+        parentSessionInstanceId: session.instanceId,
+        authorization,
+      });
+      return {
+        session,
+        mcpLaunchSnapshot,
+        launchConfig,
+        childIdentity,
+        personalMcpCredentialEpoch,
+        mcpLaunchConfigurationEpoch,
+      };
+    };
+
+    let attempt: ReturnType<typeof beginAttempt>;
+    try {
+      attempt = beginAttempt(
+        initialSession,
+        initialSession.mcpLaunchSnapshot,
+        this.personalMcpCredentialEpoch,
+        this.mcpLaunchConfigurationEpoch,
+      );
     } catch (error) {
-      this.releaseSubagentParentMcpAccess(threadId, childIdentity.threadId);
+      finishRequest();
       throw error;
     }
+    for (let attemptIndex = 0; attemptIndex < 2; attemptIndex += 1) {
+      let resolution:
+        | { status: "resolved"; mcpServers: ResolvedMcpServer[] }
+        | { status: "rejected"; error: unknown };
+      try {
+        resolution = {
+          status: "resolved",
+          mcpServers: await this.spawnPipeline.resolveMcpServersForLaunch({
+            location: attempt.session.projectLocation,
+            config: attempt.launchConfig,
+            mcpLaunchSnapshot: attempt.mcpLaunchSnapshot,
+            identity: attempt.childIdentity,
+            adapter: targetAdapter,
+            presentationMode: "gui",
+          }),
+        };
+      } catch (error) {
+        resolution = { status: "rejected", error };
+      }
+
+      const currentChildAuthority = this.subagentMcpLaunchAuthorities.get(childThreadId);
+      const exactAuthorityIsCurrent =
+        currentChildAuthority?.parentThreadId === threadId &&
+        currentChildAuthority.parentSessionInstanceId === attempt.session.instanceId &&
+        currentChildAuthority.authorization.identity.launchId === attempt.childIdentity.launchId;
+      const epochCrossed =
+        attempt.personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+        attempt.mcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch;
+      const liveParent = readOriginalLiveParent();
+      if (!liveParent || !isRequestCurrent()) {
+        this.revokeExactSubagentMcpAccess(threadId, attempt.childIdentity);
+        finishRequest();
+        return {};
+      }
+      if (!epochCrossed) {
+        if (!exactAuthorityIsCurrent) {
+          this.revokeExactSubagentMcpAccess(threadId, attempt.childIdentity);
+          finishRequest();
+          return {};
+        }
+        if (resolution.status === "rejected") {
+          this.revokeExactSubagentMcpAccess(threadId, attempt.childIdentity);
+          finishRequest();
+          throw resolution.error;
+        }
+        finishRequest();
+        return resolution.mcpServers.length > 0 ||
+          targetAdapter.capabilities.mcpConfigSource === "agentSettings"
+          ? { mcpServers: resolution.mcpServers }
+          : {};
+      }
+
+      // Attempt A may have minted a localhost relay from stale settings. Revoke
+      // only that launch before rebuilding; a same-id B remains authoritative.
+      this.revokeExactSubagentMcpAccess(threadId, attempt.childIdentity);
+      if (!exactAuthorityIsCurrent) {
+        finishRequest();
+        return {};
+      }
+      if (attemptIndex === 1) {
+        finishRequest();
+        throw new McpLaunchConfigurationChangedError();
+      }
+
+      const retryPersonalMcpCredentialEpoch = this.personalMcpCredentialEpoch;
+      const retryMcpLaunchConfigurationEpoch = this.mcpLaunchConfigurationEpoch;
+      let refreshed: Awaited<ReturnType<ThreadSessionManager["resolveCurrentMcpLaunchSnapshot"]>>;
+      try {
+        refreshed = await this.resolveCurrentMcpLaunchSnapshot(liveParent);
+      } catch (error) {
+        if (!readOriginalLiveParent() || !isRequestCurrent()) {
+          finishRequest();
+          return {};
+        }
+        if (
+          retryPersonalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+          retryMcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch
+        ) {
+          finishRequest();
+          throw new McpLaunchConfigurationChangedError();
+        }
+        finishRequest();
+        throw error;
+      }
+      const retrySession = readOriginalLiveParent();
+      if (!retrySession || !isRequestCurrent()) {
+        finishRequest();
+        return {};
+      }
+      if (
+        retryPersonalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+        retryMcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch
+      ) {
+        finishRequest();
+        throw new McpLaunchConfigurationChangedError();
+      }
+      try {
+        attempt = beginAttempt(
+          retrySession,
+          refreshed.snapshot,
+          retryPersonalMcpCredentialEpoch,
+          retryMcpLaunchConfigurationEpoch,
+        );
+      } catch (error) {
+        finishRequest();
+        throw error;
+      }
+    }
+
+    finishRequest();
+    return {};
   }
 
   releaseSubagentParentMcpAccess(parentThreadId: string, childThreadId: string): void {
     const authority = this.subagentMcpLaunchAuthorities.get(childThreadId);
     if (authority && authority.parentThreadId !== parentThreadId) return;
+    const request = this.subagentMcpResolutionRequests.get(childThreadId);
+    if (!authority && request && request.parentThreadId !== parentThreadId) return;
     this.subagentMcpLaunchAuthorities.delete(childThreadId);
+    if (request?.parentThreadId === parentThreadId) {
+      this.subagentMcpResolutionRequests.delete(childThreadId);
+    }
     this.options.releasePipedreamMcpBindings?.(childThreadId);
+  }
+
+  private revokeExactSubagentMcpAccess(parentThreadId: string, identity: McpLaunchIdentity): void {
+    const current = this.subagentMcpLaunchAuthorities.get(identity.threadId);
+    if (
+      current?.parentThreadId === parentThreadId &&
+      current.authorization.identity.launchId === identity.launchId
+    ) {
+      this.subagentMcpLaunchAuthorities.delete(identity.threadId);
+    }
+    this.releasePipedreamMcpIdentityBindingsBestEffort(identity);
+  }
+
+  private invalidateSubagentMcpAuthorityForEpochChange(
+    childThreadId: string,
+    authority: SubagentMcpLaunchAuthority,
+  ): void {
+    const pendingRequest = this.subagentMcpResolutionRequests.get(childThreadId);
+    if (
+      pendingRequest?.parentThreadId !== authority.parentThreadId ||
+      pendingRequest.parentSessionInstanceId !== authority.parentSessionInstanceId
+    ) {
+      this.subagentMcpLaunchAuthorities.delete(childThreadId);
+    }
+    // Pending attempts retain only their exact ordering record. The route is
+    // synchronously gone, and resolveMcpCallerIdentity denies the record until
+    // a current-state attempt completes and clears its request token.
+    this.releasePipedreamMcpBindingsBestEffort(childThreadId);
   }
 
   /**
@@ -910,35 +1198,218 @@ export class ThreadSessionManager {
    * declare `mcpConfigSource: "agentSettings"` — their MCP set is re-resolved
    * from the freshly saved settings and each structured session that exposes
    * `updateMcpServers` applies the new set to its directory instance. Terminal
-   * threads and sessions without the hook pick the change up on next launch.
+   * threads and sessions without the hook pick ordinary changes up on next
+   * launch. Removing Personal Pipedream is stricter: pending launches are
+   * cancelled and live launch-bound processes are stopped before the queued
+   * refresh, so a stale localhost capability cannot survive the settings save.
    * Per-session failures are logged, never fatal: one broken directory update
    * must not strand the remaining sessions on the old set.
    */
   async reloadAgentMcpServers(payload: ReloadAgentMcpServersPayload): Promise<void> {
+    this.mcpLaunchConfigurationEpoch += 1;
+    const agentMcpSettingsReloadEpoch =
+      (this.agentMcpSettingsReloadEpochs.get(payload.agentKind) ?? 0) + 1;
+    this.agentMcpSettingsReloadEpochs.set(payload.agentKind, agentMcpSettingsReloadEpoch);
+    const personalRevocations = this.beginRemovedPersonalAgentMcpRevocation(payload);
     const personalMcpCredentialEpoch = this.personalMcpCredentialEpoch;
-    await this.enqueueMcpReload(() =>
-      this.applyAgentMcpReload(payload, personalMcpCredentialEpoch),
+    const timeoutParticipants = new Map<SessionRuntime, McpReloadSessionOwnership>();
+    try {
+      await this.enqueueMcpReload(
+        () =>
+          this.applyAgentMcpReload(
+            payload,
+            personalMcpCredentialEpoch,
+            agentMcpSettingsReloadEpoch,
+            timeoutParticipants,
+          ),
+        {
+          onTimeout: () => {
+            if (
+              this.isAgentMcpSettingsReloadCurrent(payload.agentKind, agentMcpSettingsReloadEpoch)
+            ) {
+              this.agentMcpSettingsReloadEpochs.set(
+                payload.agentKind,
+                agentMcpSettingsReloadEpoch + 1,
+              );
+            }
+            this.retireTimedOutMcpReloadSessions((session) => {
+              const ownership = timeoutParticipants.get(session);
+              return Boolean(
+                ownership && this.isCurrentMcpReloadSessionOperation(session, ownership),
+              );
+            });
+          },
+        },
+      );
+    } catch {
+      console.warn(`[supervisor] timed out reloading ${payload.agentKind} MCP settings.`);
+    }
+    await Promise.allSettled(personalRevocations);
+  }
+
+  /**
+   * Agent-settings reloads are normally eventual for providers without a live
+   * MCP update hook. A removed Personal descriptor cannot be eventual because
+   * the already-translated provider config contains an opaque relay bearer.
+   * Revoke that exact authority synchronously, then let bounded process cleanup
+   * settle independently of the serialized settings refresh.
+   */
+  private beginRemovedPersonalAgentMcpRevocation(
+    payload: ReloadAgentMcpServersPayload,
+  ): Promise<void>[] {
+    const currentGlobalMcpServers = readSupervisorSharedSettings(
+      this.options.settingsPath,
+    ).mcpServers;
+    const currentPersonalByThread = new Map<string, boolean>();
+    const personalWasRemoved = (threadId: string, snapshot: McpLaunchSnapshot): boolean => {
+      let currentHasPersonal = currentPersonalByThread.get(threadId);
+      if (currentHasPersonal === undefined) {
+        const currentMcpServers = resolveEnabledMcpServers(
+          mergeMcpServers(currentGlobalMcpServers, snapshot.projectMcpServers ?? []),
+        );
+        currentHasPersonal = currentMcpServers.some(isPersonalPipedreamMcpServer);
+        currentPersonalByThread.set(threadId, currentHasPersonal);
+      }
+      return this.agentSettingsPersonalMcpThreads.has(threadId) && !currentHasPersonal;
+    };
+
+    const affectedParentThreadIds = new Set<string>();
+    for (const [threadId, pending] of this.pendingStartMcpSettings) {
+      if (pending.agentKind !== payload.agentKind || !pending.usesAgentSettings) continue;
+      if (!personalWasRemoved(threadId, pending.snapshot)) continue;
+      this.pendingStartAborts.add(threadId);
+      this.removedPersonalPendingStarts.add(threadId);
+      affectedParentThreadIds.add(threadId);
+    }
+
+    for (const [threadId, authority] of this.rootMcpLaunchAuthorities) {
+      if (authority.phase !== "pending") continue;
+      if (authority.authorization.adapter.kind !== payload.agentKind) continue;
+      if (authority.authorization.adapter.capabilities.mcpConfigSource !== "agentSettings") {
+        continue;
+      }
+      if (!personalWasRemoved(threadId, authority.authorization.mcpLaunchSnapshot)) continue;
+
+      // The relay may already have been minted, but publication still passes
+      // through the pending-start abort and exact launch-authority checks.
+      if (this.startLocks.has(threadId)) this.pendingStartAborts.add(threadId);
+      this.rootMcpLaunchAuthorities.delete(threadId);
+      this.clearBrowserEvidenceTurn(threadId, authority.authorization.identity.launchId);
+      affectedParentThreadIds.add(threadId);
+    }
+
+    const sessionsToStop: SessionRuntime[] = [];
+    const teardowns: Promise<void>[] = [];
+    for (const session of this.sessions.values()) {
+      if (session.agentKind !== payload.agentKind) continue;
+      if (session.adapter.capabilities.mcpConfigSource !== "agentSettings") continue;
+      if (!personalWasRemoved(session.threadId, session.mcpLaunchSnapshot)) continue;
+
+      affectedParentThreadIds.add(session.threadId);
+      session.mcpLaunchSnapshot = {
+        ...session.mcpLaunchSnapshot,
+        mcpServers: session.mcpLaunchSnapshot.mcpServers.filter(
+          (server) => !isPersonalPipedreamMcpServer(server),
+        ),
+      };
+      this.refreshActiveMcpLaunchAuthorization(session);
+      if (session.structuredSession?.updateMcpServers) continue;
+
+      const presentation =
+        session.presentationMode ?? session.adapter.capabilities.presentationMode;
+      if (presentation === "gui") session.pendingPipedreamMcpReload = true;
+      sessionsToStop.push(session);
+    }
+
+    const childTeardowns: Promise<unknown>[] = [];
+    for (const [threadId, currentHasPersonal] of currentPersonalByThread) {
+      if (currentHasPersonal) this.agentSettingsPersonalMcpThreads.add(threadId);
+      else this.agentSettingsPersonalMcpThreads.delete(threadId);
+    }
+    for (const parentThreadId of affectedParentThreadIds) {
+      // Release every already-minted root route before this method reaches its
+      // first await. The queued provider update may be blocked indefinitely.
+      this.releasePipedreamMcpBindingsBestEffort(parentThreadId);
+      for (const [childThreadId, childAuthority] of this.subagentMcpLaunchAuthorities) {
+        if (childAuthority.parentThreadId !== parentThreadId) continue;
+        this.invalidateSubagentMcpAuthorityForEpochChange(childThreadId, childAuthority);
+      }
+      try {
+        const childTeardown = this.options.crossagentMcp?.cancelAll(parentThreadId);
+        if (childTeardown) childTeardowns.push(Promise.resolve(childTeardown));
+      } catch {
+        // Relay and supervisor authority are already gone; process cleanup is best effort.
+      }
+    }
+    if (childTeardowns.length > 0) {
+      teardowns.push(this.settleBestEffortWithin(childTeardowns));
+    }
+    for (const session of sessionsToStop) {
+      teardowns.push(this.stopSessionProcessForPersonalOauthRevocation(session));
+    }
+    return teardowns;
+  }
+
+  private isAgentMcpSettingsReloadCurrent(agentKind: AgentKind, epoch: number): boolean {
+    return (this.agentMcpSettingsReloadEpochs.get(agentKind) ?? 0) === epoch;
+  }
+
+  private installRefreshedMcpLaunchSnapshot(
+    session: SessionRuntime,
+    refreshed: {
+      snapshot: McpLaunchSnapshot;
+      agentSettingsHasPersonalPipedream: boolean;
+    },
+  ): void {
+    session.mcpLaunchSnapshot = refreshed.snapshot;
+    if (refreshed.agentSettingsHasPersonalPipedream) {
+      this.agentSettingsPersonalMcpThreads.add(session.threadId);
+    } else {
+      this.agentSettingsPersonalMcpThreads.delete(session.threadId);
+    }
+  }
+
+  private isCurrentStructuredMcpHandle(
+    session: SessionRuntime,
+    structuredSession: NonNullable<SessionRuntime["structuredSession"]>,
+  ): boolean {
+    return (
+      this.isCurrentSession(session) &&
+      session.ignoreExit !== true &&
+      session.structuredSession === structuredSession
     );
   }
 
   private async applyAgentMcpReload(
     payload: ReloadAgentMcpServersPayload,
     personalMcpCredentialEpoch: number,
+    agentMcpSettingsReloadEpoch: number,
+    timeoutParticipants: Map<SessionRuntime, McpReloadSessionOwnership>,
   ): Promise<void> {
-    if (personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch) return;
+    if (
+      personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+      !this.isAgentMcpSettingsReloadCurrent(payload.agentKind, agentMcpSettingsReloadEpoch)
+    ) {
+      return;
+    }
     const reloads: Promise<void>[] = [];
     for (const session of this.sessions.values()) {
       if (session.agentKind !== payload.agentKind) continue;
       if (session.adapter.capabilities.mcpConfigSource !== "agentSettings") continue;
-      const update = session.structuredSession?.updateMcpServers?.bind(session.structuredSession);
-      if (!update) continue;
+      const structuredSession = session.structuredSession;
+      const update = structuredSession?.updateMcpServers?.bind(structuredSession);
+      if (!structuredSession || !update) continue;
       reloads.push(
-        (async () => {
+        this.runMcpReloadSessionOperation(session, timeoutParticipants, async () => {
           try {
             const refreshed = await this.resolveCurrentMcpLaunchSnapshot(session);
+            if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+              this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+              return;
+            }
             if (
-              !this.isCurrentSession(session) ||
-              personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch
+              personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+              !this.isAgentMcpSettingsReloadCurrent(payload.agentKind, agentMcpSettingsReloadEpoch)
             ) {
               return;
             }
@@ -963,30 +1434,57 @@ export class ThreadSessionManager {
               adapter: session.adapter,
               ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
             });
+            if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+              this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+              return;
+            }
             if (
-              !this.isCurrentSession(session) ||
-              personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch
+              personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+              !this.isAgentMcpSettingsReloadCurrent(payload.agentKind, agentMcpSettingsReloadEpoch)
             ) {
               return;
             }
-            await update(mcpServers);
-            if (!this.isCurrentSession(session)) return;
-            if (personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch) {
+            const updateResult = await this.settleProviderMcpUpdateWithin(
+              session,
+              update(mcpServers),
+            );
+            if (updateResult === "failed") throw new Error("Provider MCP update failed.");
+            if (updateResult === "timed-out") {
+              if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+                this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+                return;
+              }
+              session.pendingPipedreamMcpReload = true;
+              this.releasePipedreamMcpBindingsBestEffort(session.threadId);
               await this.stopSessionProcessForPersonalOauthRevocation(session);
               return;
             }
-            session.mcpLaunchSnapshot = refreshed.snapshot;
+            if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+              this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+              return;
+            }
+            if (
+              personalMcpCredentialEpoch !== this.personalMcpCredentialEpoch ||
+              !this.isAgentMcpSettingsReloadCurrent(payload.agentKind, agentMcpSettingsReloadEpoch)
+            ) {
+              return;
+            }
+            this.installRefreshedMcpLaunchSnapshot(session, refreshed);
             session.nativePlugins = refreshed.nativePlugins;
             session.launchConfig = launchConfig;
             this.refreshActiveMcpLaunchAuthorization(session);
             this.outputPipeline.emitState(session);
           } catch (error) {
+            if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+              this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+              return;
+            }
             console.warn(
               `[supervisor] failed to reload MCP servers for thread ${session.threadId}:`,
               error,
             );
           }
-        })(),
+        }),
       );
     }
     await Promise.all(reloads);
@@ -996,17 +1494,75 @@ export class ThreadSessionManager {
   async reloadPipedreamMcpServers(
     options: PipedreamMcpReloadOptions = {},
   ): Promise<PipedreamMcpReloadOutcome> {
+    this.mcpLaunchConfigurationEpoch += 1;
+    this.noteDesiredPersonalMcpFromCurrentAgentSettings();
+    // OAuth begin/wait intentionally returns an authorized result without
+    // awaiting provider reconfiguration. Gate every live GUI handle before
+    // the first queue await so an immediate submit cannot use the old grants
+    // while this reload is waiting behind unrelated MCP work.
+    for (const session of this.sessions.values()) {
+      const presentation =
+        session.presentationMode ?? session.adapter.capabilities.presentationMode;
+      if (presentation === "gui") session.pendingPipedreamMcpReload = true;
+    }
     let childTermination: Promise<void> | undefined;
     const personalMcpCredentialEpoch = options.revokePersonalOauth
       ? ++this.personalMcpCredentialEpoch
       : this.personalMcpCredentialEpoch;
     if (options.revokePersonalOauth) {
       childTermination = this.beginPersonalOauthRevocation();
+      // Clear already invalidated every older credential capability. Detach a
+      // poisoned queue so revocation and the next reconnect can still advance.
+      this.mcpReloadQueue = Promise.resolve();
     }
-    const reloadOptions = { ...options, personalMcpCredentialEpoch };
-    const outcome = await this.enqueueMcpReload(() => this.applyPipedreamMcpReload(reloadOptions));
+    const timeoutParticipants = new Map<SessionRuntime, McpReloadSessionOwnership>();
+    const reloadEpoch = ++this.pipedreamMcpReloadEpoch;
+    const reloadOptions = { ...options, personalMcpCredentialEpoch, reloadEpoch };
+    const queuedOutcome = this.enqueueMcpReload(
+      () => this.applyPipedreamMcpReload(reloadOptions, timeoutParticipants),
+      {
+        timeoutMs: options.revokePersonalOauth
+          ? PERSONAL_MCP_REVOCATION_RELOAD_TIMEOUT_MS
+          : MCP_RELOAD_OPERATION_TIMEOUT_MS,
+        onTimeout: () => {
+          if (this.pipedreamMcpReloadEpoch === reloadEpoch) {
+            this.pipedreamMcpReloadEpoch += 1;
+          }
+          this.retireTimedOutMcpReloadSessions((session) => {
+            const ownership = timeoutParticipants.get(session);
+            return Boolean(
+              ownership &&
+              this.isCurrentMcpReloadSessionOperation(session, ownership) &&
+              session.pendingPipedreamMcpReload === true,
+            );
+          });
+        },
+      },
+    );
+    const outcome = await queuedOutcome.catch(
+      (): PipedreamMcpReloadOutcome => ({ state: "failed-pending" }),
+    );
     await childTermination;
     return outcome;
+  }
+
+  /**
+   * OAuth completion can start a Pipedream reload immediately after the
+   * canonical descriptor is saved. Record that desired source before any
+   * asynchronous relay resolution so a concurrent settings removal can revoke
+   * a partially minted route even before the provider update completes.
+   */
+  private noteDesiredPersonalMcpFromCurrentAgentSettings(): void {
+    const globalMcpServers = readSupervisorSharedSettings(this.options.settingsPath).mcpServers;
+    for (const session of this.sessions.values()) {
+      if (session.adapter.capabilities.mcpConfigSource !== "agentSettings") continue;
+      const currentMcpServers = resolveEnabledMcpServers(
+        mergeMcpServers(globalMcpServers, session.mcpLaunchSnapshot.projectMcpServers ?? []),
+      );
+      if (currentMcpServers.some(isPersonalPipedreamMcpServer)) {
+        this.agentSettingsPersonalMcpThreads.add(session.threadId);
+      }
+    }
   }
 
   /**
@@ -1029,8 +1585,14 @@ export class ThreadSessionManager {
     }
     for (const [childThreadId, authority] of this.subagentMcpLaunchAuthorities) {
       parentThreadIds.add(authority.parentThreadId);
-      this.subagentMcpLaunchAuthorities.delete(childThreadId);
-      this.releasePipedreamMcpBindingsBestEffort(childThreadId);
+      this.invalidateSubagentMcpAuthorityForEpochChange(childThreadId, authority);
+    }
+
+    // A queue reset may detach an update that has already crossed into the
+    // provider. Retire that exact handle before any replacement can reuse the
+    // thread; a late completion then has no authority over the new session.
+    for (const session of [...this.liveMcpUpdateSessions]) {
+      void this.stopSessionProcessForPersonalOauthRevocation(session).catch(() => {});
     }
 
     const childTeardowns: Promise<unknown>[] = [];
@@ -1043,9 +1605,9 @@ export class ThreadSessionManager {
       }
     }
 
-    // Providers without live MCP replacement retain launch-time headers in
-    // their process. Start killing those processes now, outside the reload
-    // queue; the queued phase will resume them with current credentials.
+    // Providers without live MCP replacement retain the revoked localhost
+    // capability in their process. Start replacing those processes now,
+    // outside the reload queue; the queued phase resumes them without it.
     for (const session of this.sessions.values()) {
       if ((session.presentationMode ?? session.adapter.capabilities.presentationMode) === "gui") {
         session.pendingPipedreamMcpReload = true;
@@ -1059,13 +1621,38 @@ export class ThreadSessionManager {
 
   private isMcpReloadEpochCurrent(options: PipedreamMcpReloadOptions): boolean {
     return (
-      options.personalMcpCredentialEpoch === undefined ||
-      options.personalMcpCredentialEpoch === this.personalMcpCredentialEpoch
+      (options.personalMcpCredentialEpoch === undefined ||
+        options.personalMcpCredentialEpoch === this.personalMcpCredentialEpoch) &&
+      (options.reloadEpoch === undefined || options.reloadEpoch === this.pipedreamMcpReloadEpoch)
     );
   }
 
-  private enqueueMcpReload<T>(reload: () => Promise<T>): Promise<T> {
-    const queued = this.mcpReloadQueue.then(reload);
+  private enqueueMcpReload<T>(
+    reload: () => Promise<T>,
+    options: { timeoutMs?: number; onTimeout?: () => void } = {},
+  ): Promise<T> {
+    let expired = false;
+    const operation = this.mcpReloadQueue.then(() => {
+      if (expired) throw new Error("MCP reload operation timed out before it started.");
+      return reload();
+    });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<T>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        expired = true;
+        try {
+          options.onTimeout?.();
+        } catch {
+          // Timeout must still advance the queue even if best-effort retirement fails.
+        } finally {
+          reject(new Error("MCP reload operation timed out."));
+        }
+      }, options.timeoutMs ?? MCP_RELOAD_OPERATION_TIMEOUT_MS);
+      timeout.unref?.();
+    });
+    const queued = Promise.race([operation, deadline]).finally(() => {
+      if (timeout) clearTimeout(timeout);
+    });
     this.mcpReloadQueue = queued.then(
       () => undefined,
       () => undefined,
@@ -1073,8 +1660,80 @@ export class ThreadSessionManager {
     return queued;
   }
 
+  private beginMcpReloadSessionOperation(
+    session: SessionRuntime,
+    participants: Map<SessionRuntime, McpReloadSessionOwnership>,
+  ): McpReloadSessionOwnership {
+    const ownership: McpReloadSessionOwnership = {
+      token: Symbol("mcp-reload-session"),
+      structuredSession: session.structuredSession,
+    };
+    this.mcpReloadSessionOwners.set(session, ownership);
+    participants.set(session, ownership);
+    return ownership;
+  }
+
+  private isCurrentMcpReloadSessionOperation(
+    session: SessionRuntime,
+    ownership: McpReloadSessionOwnership,
+  ): boolean {
+    return (
+      this.mcpReloadSessionOwners.get(session)?.token === ownership.token &&
+      session.structuredSession === ownership.structuredSession
+    );
+  }
+
+  private finishMcpReloadSessionOperation(
+    session: SessionRuntime,
+    ownership: McpReloadSessionOwnership,
+    participants: Map<SessionRuntime, McpReloadSessionOwnership>,
+  ): void {
+    // Keep the latest-start marker after the work settles. A queue reset can
+    // let a newer reload start and finish while an older accepted-turn reload
+    // is still queued behind a detached promise. The persistent token is the
+    // only evidence that the older timeout must not fail the repaired session.
+    if (participants.get(session)?.token === ownership.token) participants.delete(session);
+  }
+
+  private invalidateMcpReloadSessionOperation(
+    session: SessionRuntime,
+    ownership: McpReloadSessionOwnership,
+  ): boolean {
+    if (!this.isCurrentMcpReloadSessionOperation(session, ownership)) return false;
+    this.mcpReloadSessionOwners.set(session, {
+      token: Symbol("mcp-reload-session-invalidated"),
+      structuredSession: session.structuredSession,
+    });
+    return true;
+  }
+
+  private async runMcpReloadSessionOperation<T>(
+    session: SessionRuntime,
+    participants: Map<SessionRuntime, McpReloadSessionOwnership>,
+    operation: (ownership: McpReloadSessionOwnership) => Promise<T>,
+  ): Promise<T> {
+    const ownership = this.beginMcpReloadSessionOperation(session, participants);
+    try {
+      return await operation(ownership);
+    } finally {
+      this.finishMcpReloadSessionOperation(session, ownership, participants);
+    }
+  }
+
+  private retireTimedOutMcpReloadSessions(predicate: (session: SessionRuntime) => boolean): void {
+    for (const session of this.sessions.values()) {
+      if (!predicate(session) || !this.isCurrentSession(session)) continue;
+      const presentation =
+        session.presentationMode ?? session.adapter.capabilities.presentationMode;
+      if (presentation === "gui") session.pendingPipedreamMcpReload = true;
+      this.pipedreamMcpRestarts.delete(session);
+      void this.stopSessionProcessForPersonalOauthRevocation(session).catch(() => {});
+    }
+  }
+
   private async applyPipedreamMcpReload(
     options: PipedreamMcpReloadOptions,
+    timeoutParticipants: Map<SessionRuntime, McpReloadSessionOwnership>,
   ): Promise<PipedreamMcpReloadOutcome> {
     if (!this.isMcpReloadEpochCurrent(options)) return { state: "applied" };
     const reloads: Promise<PipedreamMcpReloadOutcome>[] = [];
@@ -1089,14 +1748,20 @@ export class ThreadSessionManager {
         if (options.revokePersonalOauth) {
           if (presentation === "gui" && session.sessionRef) {
             reloads.push(
-              this.restartSessionForPipedreamMcpReload(
-                session,
-                { prompt: "", config: session.config },
-                options,
+              this.runMcpReloadSessionOperation(session, timeoutParticipants, () =>
+                this.restartSessionForPipedreamMcpReload(
+                  session,
+                  { prompt: "", config: session.config },
+                  options,
+                ),
               ),
             );
           } else {
-            reloads.push(this.stopUnresumableSessionForPersonalOauthRevocation(session));
+            reloads.push(
+              this.runMcpReloadSessionOperation(session, timeoutParticipants, () =>
+                this.stopUnresumableSessionForPersonalOauthRevocation(session),
+              ),
+            );
           }
           continue;
         }
@@ -1112,7 +1777,11 @@ export class ThreadSessionManager {
         session.pendingPipedreamMcpReload = true;
         if (!session.sessionRef) {
           if (options.revokePersonalOauth) {
-            reloads.push(this.stopUnresumableSessionForPersonalOauthRevocation(session));
+            reloads.push(
+              this.runMcpReloadSessionOperation(session, timeoutParticipants, () =>
+                this.stopUnresumableSessionForPersonalOauthRevocation(session),
+              ),
+            );
             continue;
           }
           outcome = mergePipedreamMcpReloadOutcome(outcome, { state: "restart-required" });
@@ -1123,19 +1792,25 @@ export class ThreadSessionManager {
           continue;
         }
         reloads.push(
-          this.restartSessionForPipedreamMcpReload(
-            session,
-            {
-              prompt: "",
-              config: session.config,
-            },
-            options,
+          this.runMcpReloadSessionOperation(session, timeoutParticipants, () =>
+            this.restartSessionForPipedreamMcpReload(
+              session,
+              {
+                prompt: "",
+                config: session.config,
+              },
+              options,
+            ),
           ),
         );
         continue;
       }
       session.pendingPipedreamMcpReload = true;
-      reloads.push(this.updatePipedreamMcpServersForSession(session, options));
+      reloads.push(
+        this.runMcpReloadSessionOperation(session, timeoutParticipants, () =>
+          this.updatePipedreamMcpServersForSession(session, options),
+        ),
+      );
     }
     for (const reloadOutcome of await Promise.all(reloads)) {
       outcome = mergePipedreamMcpReloadOutcome(outcome, reloadOutcome);
@@ -1155,34 +1830,57 @@ export class ThreadSessionManager {
     const inFlight = this.pipedreamMcpRestarts.get(session);
     if (inFlight) return inFlight;
 
+    const agentMcpSettingsReloadEpoch =
+      this.agentMcpSettingsReloadEpochs.get(session.agentKind) ?? 0;
+    const mcpLaunchConfigurationEpoch = this.mcpLaunchConfigurationEpoch;
     let restart!: Promise<PipedreamMcpReloadOutcome>;
     restart = Promise.resolve()
-      .then(async () => {
-        if (!this.isMcpReloadEpochCurrent(options)) return;
+      .then(async (): Promise<boolean> => {
+        if (!this.isMcpReloadEpochCurrent(options)) return false;
         if (options.revokePersonalOauth) {
           await this.stopSessionProcessForPersonalOauthRevocation(session);
-          if (!this.isCurrentSession(session) || !this.isMcpReloadEpochCurrent(options)) return;
+          if (!this.isCurrentSession(session) || !this.isMcpReloadEpochCurrent(options)) {
+            return false;
+          }
         }
         const refreshed = await this.resolveCurrentMcpLaunchSnapshot(session);
-        if (!this.isCurrentSession(session) || !this.isMcpReloadEpochCurrent(options)) return;
+        if (!this.isCurrentSession(session)) return false;
+        if (
+          !this.isMcpReloadEpochCurrent(options) ||
+          !this.isAgentMcpSettingsReloadCurrent(session.agentKind, agentMcpSettingsReloadEpoch)
+        ) {
+          this.releasePipedreamMcpBindingsBestEffort(session.threadId);
+          return false;
+        }
         // Restart from current shared settings and current OAuth storage. The
         // launch-time snapshot may still contain a bearer that was just
         // cleared, so it must not cross into the replacement authority.
-        session.mcpLaunchSnapshot = refreshed.snapshot;
+        this.installRefreshedMcpLaunchSnapshot(session, refreshed);
         session.nativePlugins = refreshed.nativePlugins;
         await this.spawnPipeline.restartThread(session, turn);
+        if (!this.isAgentMcpSettingsReloadCurrent(session.agentKind, agentMcpSettingsReloadEpoch)) {
+          this.releasePipedreamMcpBindingsBestEffort(session.threadId);
+          return false;
+        }
+        return true;
       })
       .then(
-        (): PipedreamMcpReloadOutcome => {
-          if (this.isCurrentSession(session) && this.isMcpReloadEpochCurrent(options)) {
-            session.pendingPipedreamMcpReload = undefined;
+        (applied): PipedreamMcpReloadOutcome => {
+          const currentSession = this.sessions.get(session.threadId);
+          if (applied && currentSession && this.isMcpReloadEpochCurrent(options)) {
+            currentSession.pendingPipedreamMcpReload = undefined;
           }
-          return { state: "applied" };
+          return { state: applied ? "applied" : "failed-pending" };
         },
         (error): PipedreamMcpReloadOutcome => {
           if (this.isCurrentSession(session)) {
             session.pendingPipedreamMcpReload = true;
-            this.failStructuredSession(session, error);
+            const launchConfigurationWasSuperseded =
+              error instanceof McpLaunchConfigurationChangedError &&
+              mcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch;
+            if (!launchConfigurationWasSuperseded) {
+              this.failStructuredSession(session, error);
+            }
             return { state: "failed-pending" };
           }
           return { state: "applied" };
@@ -1198,9 +1896,9 @@ export class ThreadSessionManager {
   }
 
   /**
-   * A launch-bound provider process owns a copied remote OAuth bearer. Local
-   * credential deletion cannot revoke that copy, so sign-out first terminates
-   * the old process and its supervisor authority before resolving a restart.
+   * A launch-bound provider process owns an opaque localhost capability. The
+   * OAuth service revokes it synchronously; providers without live MCP update
+   * still need replacement so their stale route is removed before another turn.
    */
   private async stopSessionProcessForPersonalOauthRevocation(
     session: SessionRuntime,
@@ -1263,6 +1961,34 @@ export class ThreadSessionManager {
     }
   }
 
+  private releasePipedreamMcpIdentityBindingsBestEffort(identity: McpThreadIdentity): void {
+    if (identity.threadId && identity.launchId && this.options.releasePipedreamMcpLaunchBindings) {
+      try {
+        this.options.releasePipedreamMcpLaunchBindings({
+          threadId: identity.threadId,
+          launchId: identity.launchId,
+        });
+        return;
+      } catch {
+        // Fall through to thread-wide fail-closed cleanup when scoped teardown fails.
+      }
+    }
+    if (!identity.threadId) return;
+    const liveLaunchId =
+      this.rootMcpLaunchAuthorities.get(identity.threadId)?.authorization.identity.launchId ??
+      this.subagentMcpLaunchAuthorities.get(identity.threadId)?.authorization.identity.launchId;
+    // A thread-wide fallback would revoke a newer replacement. It is safe only
+    // when this launch is still the sole authority (or no authority remains).
+    if (liveLaunchId && liveLaunchId !== identity.launchId) return;
+    this.releasePipedreamMcpBindingsBestEffort(identity.threadId);
+  }
+
+  private releasePipedreamMcpLaunchBindingsBestEffort(session: SessionRuntime): void {
+    const identity = session.mcpIdentity;
+    if (identity) this.releasePipedreamMcpIdentityBindingsBestEffort(identity);
+    else this.releasePipedreamMcpBindingsBestEffort(session.threadId);
+  }
+
   private settleBestEffortWithin(tasks: readonly Promise<unknown>[]): Promise<void> {
     if (tasks.length === 0) return Promise.resolve();
     const settled = Promise.allSettled(tasks).then(() => undefined);
@@ -1274,6 +2000,28 @@ export class ThreadSessionManager {
     return Promise.race([settled, deadline]).finally(() => {
       if (timeout) clearTimeout(timeout);
     });
+  }
+
+  private async settleProviderMcpUpdateWithin(
+    session: SessionRuntime,
+    update: Promise<void>,
+  ): Promise<"applied" | "failed" | "timed-out"> {
+    this.liveMcpUpdateSessions.add(session);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const settled = update.then(
+      () => "applied" as const,
+      () => "failed" as const,
+    );
+    const deadline = new Promise<"timed-out">((resolve) => {
+      timeout = setTimeout(() => resolve("timed-out"), MCP_LIVE_UPDATE_TIMEOUT_MS);
+      timeout.unref?.();
+    });
+    try {
+      return await Promise.race([settled, deadline]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
+      this.liveMcpUpdateSessions.delete(session);
+    }
   }
 
   private async stopUnresumableSessionForPersonalOauthRevocation(
@@ -1306,12 +2054,24 @@ export class ThreadSessionManager {
     const identity = session.mcpIdentity;
     const update = structuredSession?.updateMcpServers?.bind(structuredSession);
     if (!structuredSession || !identity || !update) return { state: "applied" };
+    const agentMcpSettingsReloadEpoch =
+      this.agentMcpSettingsReloadEpochs.get(session.agentKind) ?? 0;
     try {
-      if (!this.isCurrentSession(session) || !this.isMcpReloadEpochCurrent(options)) {
+      if (
+        !this.isCurrentStructuredMcpHandle(session, structuredSession) ||
+        !this.isMcpReloadEpochCurrent(options)
+      ) {
         return { state: "applied" };
       }
       const refreshed = await this.resolveCurrentMcpLaunchSnapshot(session);
-      if (!this.isCurrentSession(session) || !this.isMcpReloadEpochCurrent(options)) {
+      if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+        this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+        return { state: "applied" };
+      }
+      if (
+        !this.isMcpReloadEpochCurrent(options) ||
+        !this.isAgentMcpSettingsReloadCurrent(session.agentKind, agentMcpSettingsReloadEpoch)
+      ) {
         return { state: "applied" };
       }
       const launchConfig = this.spawnPipeline.resolveMcpLaunchConfig(
@@ -1335,16 +2095,39 @@ export class ThreadSessionManager {
         adapter: session.adapter,
         ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
       });
-      if (!this.isCurrentSession(session) || !this.isMcpReloadEpochCurrent(options)) {
+      if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+        this.releasePipedreamMcpLaunchBindingsBestEffort(session);
         return { state: "applied" };
       }
-      await update(mcpServers);
-      if (!this.isCurrentSession(session)) return { state: "applied" };
-      if (!this.isMcpReloadEpochCurrent(options)) {
+      if (
+        !this.isMcpReloadEpochCurrent(options) ||
+        !this.isAgentMcpSettingsReloadCurrent(session.agentKind, agentMcpSettingsReloadEpoch)
+      ) {
+        return { state: "applied" };
+      }
+      const updateResult = await this.settleProviderMcpUpdateWithin(session, update(mcpServers));
+      if (updateResult === "failed") throw new Error("Provider MCP update failed.");
+      if (updateResult === "timed-out") {
+        if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+          this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+          return { state: "applied" };
+        }
+        this.releasePipedreamMcpBindingsBestEffort(session.threadId);
+        session.pendingPipedreamMcpReload = true;
         await this.stopSessionProcessForPersonalOauthRevocation(session);
+        return { state: "failed-pending" };
+      }
+      if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+        this.releasePipedreamMcpLaunchBindingsBestEffort(session);
         return { state: "applied" };
       }
-      session.mcpLaunchSnapshot = refreshed.snapshot;
+      if (
+        !this.isMcpReloadEpochCurrent(options) ||
+        !this.isAgentMcpSettingsReloadCurrent(session.agentKind, agentMcpSettingsReloadEpoch)
+      ) {
+        return { state: "applied" };
+      }
+      this.installRefreshedMcpLaunchSnapshot(session, refreshed);
       session.nativePlugins = refreshed.nativePlugins;
       session.launchConfig = launchConfig;
       if (options.revokePersonalOauth) {
@@ -1359,9 +2142,11 @@ export class ThreadSessionManager {
       this.outputPipeline.emitState(session);
       return { state: "applied" };
     } catch {
-      if (!this.isCurrentSession(session)) return { state: "applied" };
+      if (!this.isCurrentStructuredMcpHandle(session, structuredSession)) {
+        this.releasePipedreamMcpLaunchBindingsBestEffort(session);
+        return { state: "applied" };
+      }
       if (!this.isMcpReloadEpochCurrent(options)) {
-        await this.stopSessionProcessForPersonalOauthRevocation(session);
         return { state: "applied" };
       }
       console.warn(
@@ -1389,44 +2174,149 @@ export class ThreadSessionManager {
   private startStructuredTurn(session: SessionRuntime, turn: QueuedStructuredTurn): void {
     const presentation = session.presentationMode ?? session.adapter.capabilities.presentationMode;
     if (session.pendingPipedreamMcpReload === true && presentation === "gui") {
-      void this.enqueueMcpReload(() =>
-        this.startStructuredTurnAfterPipedreamReload(session.threadId, turn),
-      ).catch((error) => {
+      const reloadEpoch = this.pipedreamMcpReloadEpoch;
+      const agentMcpSettingsReloadEpoch =
+        this.agentMcpSettingsReloadEpochs.get(session.agentKind) ?? 0;
+      const mcpLaunchConfigurationEpoch = this.mcpLaunchConfigurationEpoch;
+      const timeoutParticipants = new Map<SessionRuntime, McpReloadSessionOwnership>();
+      const latestOwnerAtEnqueue = this.mcpReloadSessionOwners.get(session);
+      const structuredSessionAtEnqueue = session.structuredSession;
+      const timedOutOwnedParticipants = new Set<SessionRuntime>();
+      let startedOwnership: McpReloadSessionOwnership | undefined;
+      let operationStarted = false;
+      let turnRerouted = false;
+      const rerouteAcceptedTurn = (): void => {
+        if (turnRerouted) return;
         const current = this.sessions.get(session.threadId);
-        if (current) this.failStructuredSession(current, error);
-      });
+        if (!current) return;
+        turnRerouted = true;
+        this.startStructuredTurn(current, turn);
+      };
+      void this.enqueueMcpReload(
+        () => {
+          operationStarted = true;
+          const current = this.sessions.get(session.threadId);
+          if (!current) return Promise.resolve<AcceptedTurnReloadOutcome>("handled");
+          return this.runMcpReloadSessionOperation(current, timeoutParticipants, (ownership) => {
+            startedOwnership = ownership;
+            return this.startStructuredTurnAfterPipedreamReload(
+              current,
+              turn,
+              reloadEpoch,
+              agentMcpSettingsReloadEpoch,
+              mcpLaunchConfigurationEpoch,
+              ownership,
+            );
+          });
+        },
+        {
+          onTimeout: () => {
+            if (this.pipedreamMcpReloadEpoch === reloadEpoch) {
+              this.pipedreamMcpReloadEpoch += 1;
+            }
+            for (const [participant, ownership] of timeoutParticipants) {
+              if (!this.isCurrentSession(participant)) continue;
+              if (!this.invalidateMcpReloadSessionOperation(participant, ownership)) continue;
+              timedOutOwnedParticipants.add(participant);
+            }
+            this.retireTimedOutMcpReloadSessions((candidate) =>
+              timedOutOwnedParticipants.has(candidate),
+            );
+          },
+        },
+      )
+        .then((outcome) => {
+          if (outcome === "superseded") rerouteAcceptedTurn();
+        })
+        .catch((error) => {
+          let failedParticipant = false;
+          for (const participant of timedOutOwnedParticipants) {
+            if (this.isCurrentSession(participant)) {
+              this.failStructuredSession(participant, error);
+              failedParticipant = true;
+            }
+          }
+          if (failedParticipant) return;
+
+          const current = this.sessions.get(session.threadId);
+          if (!current) return;
+          const latestOwner = this.mcpReloadSessionOwners.get(current);
+          const wasSupersededAfterStart = Boolean(
+            operationStarted &&
+            startedOwnership &&
+            (current !== session ||
+              latestOwner?.token !== startedOwnership.token ||
+              current.structuredSession !== startedOwnership.structuredSession),
+          );
+          if (wasSupersededAfterStart || current !== session) {
+            // A newer cross-source reload superseded the detached operation.
+            // Route the already-accepted turn through current state exactly once;
+            // the old callback is fenced by its invalid ownership token.
+            rerouteAcceptedTurn();
+            return;
+          }
+
+          if (operationStarted) {
+            this.failStructuredSession(current, error);
+            return;
+          }
+
+          if (
+            latestOwner?.token !== latestOwnerAtEnqueue?.token ||
+            current.structuredSession !== structuredSessionAtEnqueue
+          ) {
+            rerouteAcceptedTurn();
+            return;
+          }
+          this.failStructuredSession(current, error);
+        });
       return;
     }
     this.structuredTurnQueue.start(session, turn);
   }
 
   private async startStructuredTurnAfterPipedreamReload(
-    threadId: string,
+    session: SessionRuntime,
     turn: QueuedStructuredTurn,
-  ): Promise<void> {
-    const session = this.sessions.get(threadId);
-    if (!session) return;
+    reloadEpoch: number,
+    agentMcpSettingsReloadEpoch: number,
+    mcpLaunchConfigurationEpoch: number,
+    ownership: McpReloadSessionOwnership,
+  ): Promise<AcceptedTurnReloadOutcome> {
+    const isOwned = (): boolean =>
+      this.isCurrentSession(session) && this.isCurrentMcpReloadSessionOperation(session, ownership);
+    const agentSettingsAreCurrent = (): boolean =>
+      this.isAgentMcpSettingsReloadCurrent(session.agentKind, agentMcpSettingsReloadEpoch);
+    if (!isOwned() || !agentSettingsAreCurrent()) return "superseded";
     const presentation = session.presentationMode ?? session.adapter.capabilities.presentationMode;
     if (session.pendingPipedreamMcpReload !== true || presentation !== "gui") {
       this.structuredTurnQueue.start(session, turn);
-      return;
+      return "handled";
     }
     const reloadOptions: PipedreamMcpReloadOptions = {
       personalMcpCredentialEpoch: this.personalMcpCredentialEpoch,
+      reloadEpoch,
+      mcpLaunchConfigurationEpoch,
     };
 
     if (session.structuredSession?.updateMcpServers) {
       await this.updatePipedreamMcpServersForSession(session, reloadOptions);
-      if (!this.isCurrentSession(session)) return;
+      if (
+        !isOwned() ||
+        !this.isMcpReloadEpochCurrent(reloadOptions) ||
+        !agentSettingsAreCurrent()
+      ) {
+        return "superseded";
+      }
       if (session.pendingPipedreamMcpReload === true) {
         this.failStructuredSession(
           session,
           new Error("Could not refresh integration access before starting the turn."),
         );
-        return;
+        return "handled";
       }
       this.structuredTurnQueue.start(session, turn);
-      return;
+      return "handled";
     }
 
     if (!session.sessionRef) {
@@ -1436,25 +2326,95 @@ export class ThreadSessionManager {
           "Could not refresh integration access before starting the turn because this provider session is not resumable yet.",
         ),
       );
-      return;
+      return "handled";
     }
-    await this.restartSessionForPipedreamMcpReload(session, turn, reloadOptions);
+    if (!isOwned()) return "superseded";
+    const restartOutcome = await this.restartSessionForPipedreamMcpReload(
+      session,
+      turn,
+      reloadOptions,
+    );
+    if (
+      restartOutcome.state !== "applied" &&
+      (!isOwned() ||
+        !this.isMcpReloadEpochCurrent(reloadOptions) ||
+        !agentSettingsAreCurrent() ||
+        reloadOptions.mcpLaunchConfigurationEpoch !== this.mcpLaunchConfigurationEpoch)
+    ) {
+      // A newer ordinary, same-agent, or global launch-config reload can
+      // advance its epoch while remaining queued behind this exact per-session
+      // owner. The stale restart then reports failed-pending without losing
+      // ownership; reroute the accepted turn after the queued repair finishes.
+      return "superseded";
+    }
+    return "handled";
   }
 
   /** Re-read provider-level custom MCPs instead of replaying launch-time settings. */
   private async resolveCurrentMcpLaunchSnapshot(session: SessionRuntime): Promise<{
     snapshot: McpLaunchSnapshot;
     nativePlugins: readonly AgentNativePlugin[];
+    agentSettingsHasPersonalPipedream: boolean;
+  }> {
+    return this.resolveCurrentMcpLaunchSnapshotFor({
+      threadId: session.threadId,
+      agentKind: session.agentKind,
+      adapter: session.adapter,
+      projectLocation: session.projectLocation,
+      config: session.config,
+      mcpLaunchSnapshot: session.mcpLaunchSnapshot,
+    });
+  }
+
+  private async refreshPendingMcpLaunchSnapshot(input: {
+    threadId: string;
+    agentKind: AgentKind;
+    adapter: AgentAdapter;
+    projectLocation: ProjectLocation;
+    config: ThreadConfig;
+    mcpLaunchSnapshot: McpLaunchSnapshot;
+  }): Promise<{
+    mcpLaunchSnapshot: McpLaunchSnapshot;
+    nativePlugins: readonly AgentNativePlugin[];
+  }> {
+    const refreshed = await this.resolveCurrentMcpLaunchSnapshotFor(input);
+    const pending = this.pendingStartMcpSettings.get(input.threadId);
+    if (pending) pending.snapshot = refreshed.snapshot;
+    if (refreshed.agentSettingsHasPersonalPipedream) {
+      this.agentSettingsPersonalMcpThreads.add(input.threadId);
+    } else {
+      this.agentSettingsPersonalMcpThreads.delete(input.threadId);
+    }
+    return {
+      mcpLaunchSnapshot: refreshed.snapshot,
+      nativePlugins: refreshed.nativePlugins,
+    };
+  }
+
+  private async resolveCurrentMcpLaunchSnapshotFor(input: {
+    threadId: string;
+    agentKind: AgentKind;
+    adapter: AgentAdapter;
+    projectLocation: ProjectLocation;
+    config: ThreadConfig;
+    mcpLaunchSnapshot: McpLaunchSnapshot;
+  }): Promise<{
+    snapshot: McpLaunchSnapshot;
+    nativePlugins: readonly AgentNativePlugin[];
+    agentSettingsHasPersonalPipedream: boolean;
   }> {
     const settings = readSupervisorSharedSettings(this.options.settingsPath);
     const pluginContributions = (await this.options.resolvePluginLaunchContributions?.(
-      session.projectLocation,
-      session.agentKind,
+      input.projectLocation,
+      input.agentKind,
     )) ?? { mcpServers: [], builtInMcpServerIds: [], nativePlugins: [] };
 
     const userMcpServers = mergeMcpServers(
       settings.mcpServers,
-      session.mcpLaunchSnapshot.projectMcpServers ?? [],
+      input.mcpLaunchSnapshot.projectMcpServers ?? [],
+    );
+    const agentSettingsHasPersonalPipedream = resolveEnabledMcpServers(userMcpServers).some(
+      isPersonalPipedreamMcpServer,
     );
     const userMcpServerNames = new Set(userMcpServers.map((server) => server.name));
     const pluginMcpServers = pluginContributions.mcpServers.filter(
@@ -1466,36 +2426,48 @@ export class ThreadSessionManager {
     }
     if (this.options.prepareMcpToolFilters) {
       const candidateSnapshot: McpLaunchSnapshot = {
-        ...session.mcpLaunchSnapshot,
+        ...input.mcpLaunchSnapshot,
         mcpServers,
         pluginBuiltInMcpServerIds: pluginContributions.builtInMcpServerIds,
       };
       const effectiveConfig = this.spawnPipeline.resolveMcpLaunchConfig(
         workspaceLaunchConfig(
-          session.projectLocation,
-          session.config,
-          session.adapter,
+          input.projectLocation,
+          input.config,
+          input.adapter,
           candidateSnapshot.disabledBuiltInMcpServerIds,
           candidateSnapshot.pluginBuiltInMcpServerIds,
         ),
         candidateSnapshot,
-        session.adapter,
-        session.threadId,
+        input.adapter,
+        input.threadId,
       );
-      mcpServers = await this.options.prepareMcpToolFilters(
-        mcpServers,
-        session.projectLocation,
+      // Keep Personal Pipedream recognizable until the privileged resolver
+      // replaces it with a launch-scoped localhost capability. The initial
+      // launch follows the same ordering; live/restart reloads must not wrap
+      // the upstream URL (or bearer) in a generic stdio filter first.
+      const personalMcpServers = mcpServers
+        .filter(isPersonalPipedreamMcpServer)
+        .map(stripResolvedAuthorizationHeader);
+      const filterableServers = mcpServers.filter(
+        (server) => !isPersonalPipedreamMcpServer(server),
+      );
+      const filteredServers = await this.options.prepareMcpToolFilters(
+        filterableServers,
+        input.projectLocation,
         effectiveConfig.browserMcp === true,
       );
+      mcpServers = [...filteredServers, ...personalMcpServers];
     }
 
     return {
       snapshot: {
-        ...session.mcpLaunchSnapshot,
+        ...input.mcpLaunchSnapshot,
         mcpServers,
         pluginBuiltInMcpServerIds: pluginContributions.builtInMcpServerIds,
       },
       nativePlugins: pluginContributions.nativePlugins,
+      agentSettingsHasPersonalPipedream,
     };
   }
 
@@ -1588,6 +2560,29 @@ export class ThreadSessionManager {
     }
     this.recentlyRemovedThreadIds.delete(threadId);
 
+    const adapter = this.options.adapters.get(payload.agentKind);
+    const pendingMcpSettings: PendingStartMcpSettings = {
+      agentKind: payload.agentKind,
+      usesAgentSettings: adapter?.capabilities.mcpConfigSource === "agentSettings",
+      snapshot: {
+        mcpServers: resolveEnabledMcpServers(payload.mcpServers ?? []),
+        ...(payload.projectMcpServers?.length
+          ? { projectMcpServers: [...payload.projectMcpServers] }
+          : {}),
+        disabledBuiltInMcpServerIds: payload.disabledBuiltInMcpServerIds ?? [],
+        disabledBuiltInMcpTools: payload.disabledBuiltInMcpTools ?? {},
+      },
+    };
+    this.pendingStartMcpSettings.set(threadId, pendingMcpSettings);
+    if (
+      pendingMcpSettings.usesAgentSettings &&
+      pendingMcpSettings.snapshot.mcpServers.some(isPersonalPipedreamMcpServer)
+    ) {
+      this.agentSettingsPersonalMcpThreads.add(threadId);
+    } else {
+      this.agentSettingsPersonalMcpThreads.delete(threadId);
+    }
+
     const run = this.spawnPipeline.startThreadInner({ ...payload, threadId });
     this.startLocks.set(
       threadId,
@@ -1598,9 +2593,15 @@ export class ThreadSessionManager {
     );
     try {
       return await run;
+    } catch (error) {
+      if (this.removedPersonalPendingStarts.has(threadId)) return { threadId };
+      throw error;
     } finally {
       this.startLocks.delete(threadId);
+      this.pendingStartMcpSettings.delete(threadId);
+      this.removedPersonalPendingStarts.delete(threadId);
       if (!this.sessions.has(threadId)) {
+        this.agentSettingsPersonalMcpThreads.delete(threadId);
         this.pendingStartInterrupts.delete(threadId);
         this.pendingStartAborts.delete(threadId);
       }
@@ -2019,6 +3020,9 @@ export class ThreadSessionManager {
     // Revoke before any asynchronous provider teardown so a bearer cannot race
     // close, restart, or a pending-start abort.
     this.revokeMcpAccessForThread(payload.threadId);
+    if (!this.pendingStartMcpSettings.has(payload.threadId)) {
+      this.agentSettingsPersonalMcpThreads.delete(payload.threadId);
+    }
     const shell = this.shellSessions.get(payload.threadId);
     if (shell) {
       shell.ignoreExit = true;
@@ -2238,8 +3242,11 @@ export class ThreadSessionManager {
     );
     this.sessions.clear();
     this.sessionsBySessionId.clear();
+    this.agentSettingsPersonalMcpThreads.clear();
+    this.agentMcpSettingsReloadEpochs.clear();
     this.rootMcpLaunchAuthorities.clear();
     this.subagentMcpLaunchAuthorities.clear();
+    this.subagentMcpResolutionRequests.clear();
     this.browserEvidenceTurns.clear();
 
     for (const shell of this.shellSessions.values()) {

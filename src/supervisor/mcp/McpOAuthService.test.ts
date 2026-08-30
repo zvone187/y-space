@@ -3,9 +3,22 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { McpServer } from "@/shared/contracts";
+import {
+  PIPEDREAM_PERSONAL_MCP_URL,
+  type McpServer,
+  type ResolvedMcpServer,
+} from "@/shared/contracts";
 import { encryptSecret } from "@/shared/secretStorage";
+import {
+  buildClaudeMcpLaunchConfig,
+  buildCodexMcp,
+  buildOpenCodeMcpLaunchConfig,
+} from "@/supervisor/agents/userMcp/translate";
 import { McpOAuthService } from "./McpOAuthService";
+import type {
+  PersonalMcpLoopbackRelay,
+  PersonalMcpRelayBindingInfo,
+} from "./PersonalMcpLoopbackRelay";
 
 interface FakeAuthServer {
   url: string;
@@ -13,6 +26,7 @@ interface FakeAuthServer {
   readonly registrationRequests: number;
   releaseNextRegistrationResponse: () => void;
   releaseNextTokenResponse: () => void;
+  releaseAllTokenResponses: () => void;
   close: () => void;
 }
 
@@ -138,6 +152,9 @@ async function startFakeAuthServer(options: {
       if (!respond) throw new Error("No deferred token response is pending.");
       respond();
     },
+    releaseAllTokenResponses: () => {
+      for (const respond of pendingTokenResponses.splice(0)) respond();
+    },
     close: () => server.close(),
   };
   cleanups.push(fake.close);
@@ -224,6 +241,609 @@ describe("McpOAuthService", () => {
     ).toBe("Bearer at-2");
     expect(fake.tokenRequests.at(-1)?.get("grant_type")).toBe("refresh_token");
     expect(fake.tokenRequests.at(-1)?.get("refresh_token")).toBe("rt-1");
+  });
+
+  it("coalesces concurrent refreshes for one server and credential epoch", async () => {
+    const fake = await startFakeAuthServer({ expiresIn: 1, deferRefresh: true });
+    const service = makeService();
+    const server = httpServer(fake.url);
+
+    const begin = await service.begin({ server });
+    if (begin.status !== "redirect") throw new Error("expected redirect");
+    const wait = service.wait({ flowId: begin.flowId });
+    await completeBrowserLeg(begin.authorizationUrl);
+    await expect(wait).resolves.toEqual({ status: "authorized" });
+
+    const first = service.applyAuthorizationToServer(server);
+    const second = service.applyAuthorizationToServer(server);
+    await vi.waitFor(() => expect(fake.tokenRequests.length).toBeGreaterThanOrEqual(2));
+    await flushNetworkContinuation();
+    const refreshRequests = fake.tokenRequests.filter(
+      (request) => request.get("grant_type") === "refresh_token",
+    ).length;
+    fake.releaseAllTokenResponses();
+    await Promise.all([first, second]);
+
+    expect(refreshRequests).toBe(1);
+  });
+
+  it("keeps the managed Personal bearer behind a launch-scoped loopback capability", async () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-relay-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    const upstreamBearer = "personal-upstream-bearer-must-stay-supervisor-only";
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: upstreamBearer, token_type: "Bearer" }),
+            ),
+            tokensSavedAt: Date.now(),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    let upstreamAuthorization: string | null = null;
+    let upstreamSignal: AbortSignal | undefined;
+    let releaseUpstream!: () => void;
+    const upstreamPending = new Promise<Response>((resolve) => {
+      releaseUpstream = () =>
+        resolve(
+          new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { tools: [] } }), {
+            headers: { "content-type": "application/json" },
+          }),
+        );
+    });
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      fetch: vi.fn<typeof fetch>(async (_input, init) => {
+        upstreamAuthorization = new Headers(init?.headers).get("authorization");
+        upstreamSignal = init?.signal ?? undefined;
+        return upstreamPending;
+      }),
+    });
+    cleanups.push(() => service.dispose());
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: `${PIPEDREAM_PERSONAL_MCP_URL}/?legacy=1`,
+        headers: { Authorization: `Bearer ${upstreamBearer}` },
+      },
+    };
+
+    const launchInput = await service.applyAuthorization([personal]);
+    expect(JSON.stringify(launchInput)).not.toContain(upstreamBearer);
+    const [relayServer] = await service.resolvePersonalMcpServersForLaunch({
+      servers: launchInput,
+      threadId: "thread-personal-relay",
+      providerBindingId: "thread:thread-personal-relay:launch:launch-a",
+    });
+    expect(relayServer).toBeDefined();
+    const serializedProviders = JSON.stringify({
+      codex: buildCodexMcp([relayServer as ResolvedMcpServer]),
+      claude: buildClaudeMcpLaunchConfig([relayServer as ResolvedMcpServer]),
+      opencode: buildOpenCodeMcpLaunchConfig([relayServer as ResolvedMcpServer]),
+    });
+    expect(serializedProviders).not.toContain(upstreamBearer);
+    expect(serializedProviders).toContain("127.0.0.1");
+
+    if (relayServer?.transport.type !== "http") throw new Error("expected HTTP relay");
+    const relayRequest = fetch(relayServer.transport.url, {
+      method: "POST",
+      headers: {
+        ...relayServer.transport.headers,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+    });
+    await vi.waitFor(() => expect(upstreamAuthorization).toBe(`Bearer ${upstreamBearer}`));
+
+    service.clearPersonalCredentials({ strictPersistence: true });
+    expect(upstreamSignal?.aborted).toBe(true);
+    releaseUpstream();
+    await expect(relayRequest).resolves.toMatchObject({ status: 404 });
+    await expect(
+      fetch(relayServer.transport.url, { headers: relayServer.transport.headers }),
+    ).resolves.toMatchObject({ status: 404 });
+  });
+
+  it("revokes an obsolete live-reload binding without disturbing a sibling provider binding", async () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-live-reload-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "personal-token", token_type: "Bearer" }),
+            ),
+            tokensSavedAt: Date.now(),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      fetch: vi.fn<typeof fetch>(async () =>
+        Response.json({ jsonrpc: "2.0", id: 1, result: { tools: [] } }),
+      ),
+    });
+    cleanups.push(() => service.dispose());
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+    };
+    const threadId = "thread-personal-live-reload";
+    const removedProviderBindingId = `thread:${threadId}:launch:removed`;
+    const siblingProviderBindingId = `thread:${threadId}:launch:sibling`;
+    const [removed] = await service.resolvePersonalMcpServersForLaunch({
+      servers: [personal],
+      threadId,
+      providerBindingId: removedProviderBindingId,
+    });
+    const [sibling] = await service.resolvePersonalMcpServersForLaunch({
+      servers: [personal],
+      threadId,
+      providerBindingId: siblingProviderBindingId,
+    });
+    if (removed?.transport.type !== "http" || sibling?.transport.type !== "http") {
+      throw new Error("expected HTTP relays");
+    }
+    const requestRelay = (transport: Extract<ResolvedMcpServer["transport"], { type: "http" }>) =>
+      fetch(transport.url, {
+        method: "POST",
+        headers: { ...transport.headers, "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+      });
+
+    await expect(requestRelay(removed.transport)).resolves.toMatchObject({ status: 200 });
+    await service.resolvePersonalMcpServersForLaunch({
+      servers: [],
+      threadId,
+      providerBindingId: removedProviderBindingId,
+    });
+
+    await expect(requestRelay(removed.transport)).resolves.toMatchObject({ status: 404 });
+    await expect(requestRelay(sibling.transport)).resolves.toMatchObject({ status: 200 });
+  });
+
+  it("revokes a removed binding even when its live-reload replacement cannot register", async () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-failed-replacement-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "personal-token", token_type: "Bearer" }),
+            ),
+            tokensSavedAt: Date.now(),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      fetch: vi.fn<typeof fetch>(async () =>
+        Response.json({ jsonrpc: "2.0", id: 1, result: { tools: [] } }),
+      ),
+    });
+    cleanups.push(() => service.dispose());
+    const threadId = "thread-personal-failed-replacement";
+    const providerBindingId = `thread:${threadId}:launch:live`;
+    const removed: McpServer = {
+      id: "pipedream-personal-removed",
+      name: "removed",
+      description: "Removed Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+    };
+    const replacement: McpServer = {
+      ...removed,
+      id: "pipedream-personal-replacement",
+      name: "replacement",
+      description: "Replacement Personal Pipedream tools",
+    };
+    const [oldRelay] = await service.resolvePersonalMcpServersForLaunch({
+      servers: [removed],
+      threadId,
+      providerBindingId,
+    });
+    if (oldRelay?.transport.type !== "http") throw new Error("expected HTTP relay");
+    const relay = Reflect.get(service, "personalRelay") as PersonalMcpLoopbackRelay;
+    vi.spyOn(relay, "registerBinding").mockRejectedValueOnce(
+      new Error("replacement relay could not bind"),
+    );
+
+    await expect(
+      service.resolvePersonalMcpServersForLaunch({
+        servers: [replacement],
+        threadId,
+        providerBindingId,
+      }),
+    ).rejects.toThrow("replacement relay could not bind");
+
+    await expect(
+      fetch(oldRelay.transport.url, {
+        method: "POST",
+        headers: { ...oldRelay.transport.headers, "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+      }),
+    ).resolves.toMatchObject({ status: 404 });
+  });
+
+  it("replaces a live binding when its advertised WSL gateway changes", async () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-gateway-change-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "personal-token", token_type: "Bearer" }),
+            ),
+            tokensSavedAt: Date.now(),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      fetch: vi.fn<typeof fetch>(async () =>
+        Response.json({ jsonrpc: "2.0", id: 1, result: { tools: [] } }),
+      ),
+    });
+    cleanups.push(() => service.dispose());
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+    };
+    const input = {
+      servers: [personal],
+      threadId: "thread-personal-gateway-change",
+      providerBindingId: "thread:thread-personal-gateway-change:launch:live",
+    } as const;
+    const [oldRelay] = await service.resolvePersonalMcpServersForLaunch({
+      ...input,
+      advertisedHost: "192.0.2.10",
+    });
+    const [newRelay] = await service.resolvePersonalMcpServersForLaunch({
+      ...input,
+      advertisedHost: "192.0.2.11",
+    });
+    if (oldRelay?.transport.type !== "http" || newRelay?.transport.type !== "http") {
+      throw new Error("expected HTTP relays");
+    }
+
+    expect(new URL(oldRelay.transport.url).hostname).toBe("192.0.2.10");
+    expect(new URL(newRelay.transport.url).hostname).toBe("192.0.2.11");
+    const revokedLoopbackUrl = new URL(oldRelay.transport.url);
+    revokedLoopbackUrl.hostname = "127.0.0.1";
+    await expect(
+      fetch(revokedLoopbackUrl, {
+        method: "POST",
+        headers: { ...oldRelay.transport.headers, "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+      }),
+    ).resolves.toMatchObject({ status: 404 });
+  });
+
+  it("revokes every raced registration when identical live reloads overlap", async () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-overlap-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "personal-token", token_type: "Bearer" }),
+            ),
+            tokensSavedAt: Date.now(),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({
+      baseDir,
+      storePath,
+      fetch: vi.fn<typeof fetch>(async () =>
+        Response.json({ jsonrpc: "2.0", id: 1, result: { tools: [] } }),
+      ),
+    });
+    cleanups.push(() => service.dispose());
+    const relay = Reflect.get(service, "personalRelay") as PersonalMcpLoopbackRelay;
+    const originalRegisterBinding = relay.registerBinding.bind(relay);
+    const registrations: PersonalMcpRelayBindingInfo[] = [];
+    let releaseFirstRegistration!: () => void;
+    const firstRegistrationGate = new Promise<void>((resolve) => {
+      releaseFirstRegistration = resolve;
+    });
+    let reportFirstRegistration!: () => void;
+    const firstRegistration = new Promise<void>((resolve) => {
+      reportFirstRegistration = resolve;
+    });
+    vi.spyOn(relay, "registerBinding").mockImplementation(async (input) => {
+      const info = await originalRegisterBinding(input);
+      registrations.push(info);
+      if (registrations.length === 1) {
+        reportFirstRegistration();
+        await firstRegistrationGate;
+      }
+      return info;
+    });
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+    };
+    const input = {
+      servers: [personal],
+      threadId: "thread-personal-overlap",
+      providerBindingId: "thread:thread-personal-overlap:launch:live",
+    } as const;
+
+    const staleResolve = service.resolvePersonalMcpServersForLaunch(input);
+    await firstRegistration;
+    const currentResolve = service.resolvePersonalMcpServersForLaunch(input);
+    await expect(currentResolve).resolves.toHaveLength(1);
+    releaseFirstRegistration();
+    await expect(staleResolve).resolves.toEqual([]);
+    expect(registrations).toHaveLength(2);
+
+    await expect(
+      service.resolvePersonalMcpServersForLaunch({
+        ...input,
+        servers: [personal, { ...personal }],
+      }),
+    ).resolves.toHaveLength(1);
+    expect(registrations).toHaveLength(2);
+
+    await service.resolvePersonalMcpServersForLaunch({ ...input, servers: [] });
+    for (const registration of registrations) {
+      await expect(
+        fetch(registration.url, {
+          method: "POST",
+          headers: { ...registration.headers, "content-type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+        }),
+      ).resolves.toMatchObject({ status: 404 });
+    }
+    expect(
+      (Reflect.get(service, "personalProviderBindingResolutionEpochs") as Map<string, number>).size,
+    ).toBe(0);
+    expect(
+      (Reflect.get(service, "pendingPersonalProviderBindingResolutions") as Map<string, number>)
+        .size,
+    ).toBe(0);
+  });
+
+  it("retains a thread revocation tombstone only until an overlapping relay resolve settles", async () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-release-race-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "personal-token", token_type: "Bearer" }),
+            ),
+            tokensSavedAt: Date.now(),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({ baseDir, storePath });
+    cleanups.push(() => service.dispose());
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+    };
+
+    const staleResolve = service.resolvePersonalMcpServersForLaunch({
+      servers: [personal],
+      threadId: "thread-release-race",
+      providerBindingId: "thread:thread-release-race:launch:stale",
+    });
+    service.releasePersonalMcpBindings("thread-release-race");
+
+    await expect(staleResolve).resolves.toEqual([]);
+    const threadEpochs = Reflect.get(service, "personalThreadBindingEpochs") as Map<string, number>;
+    expect(threadEpochs.size).toBe(0);
+
+    const replacement = await service.resolvePersonalMcpServersForLaunch({
+      servers: [personal],
+      threadId: "thread-release-race",
+      providerBindingId: "thread:thread-release-race:launch:replacement",
+    });
+    expect(replacement).toHaveLength(1);
+    service.releasePersonalMcpBindings("thread-release-race");
+    expect(threadEpochs.size).toBe(0);
+  });
+
+  it("revokes only one launch-scoped Personal relay without touching its replacement", async () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-scoped-release-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          [PIPEDREAM_PERSONAL_MCP_URL]: {
+            tokens: encryptSecret(
+              baseDir,
+              JSON.stringify({ access_token: "personal-token", token_type: "Bearer" }),
+            ),
+            tokensSavedAt: Date.now(),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({ baseDir, storePath });
+    cleanups.push(() => service.dispose());
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+    };
+    const threadId = "thread-scoped-personal-release";
+    const staleProviderBindingId = `thread:${threadId}:launch:stale`;
+    const replacementProviderBindingId = `thread:${threadId}:launch:replacement`;
+    const [stale] = await service.resolvePersonalMcpServersForLaunch({
+      servers: [personal],
+      threadId,
+      providerBindingId: staleProviderBindingId,
+    });
+    const [replacement] = await service.resolvePersonalMcpServersForLaunch({
+      servers: [personal],
+      threadId,
+      providerBindingId: replacementProviderBindingId,
+    });
+
+    service.releasePersonalMcpProviderBindings(threadId, staleProviderBindingId);
+
+    const post = async (server: ResolvedMcpServer | undefined) =>
+      fetch(server?.transport.type === "http" ? server.transport.url : "", {
+        method: "POST",
+        headers:
+          server?.transport.type === "http"
+            ? { ...server.transport.headers, "content-type": "application/json" }
+            : {},
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+      });
+    await expect(post(stale)).resolves.toMatchObject({ status: 404 });
+    await expect(post(replacement)).resolves.not.toMatchObject({ status: 404 });
+  });
+
+  it("atomically clears every canonical Personal URL variant", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-personal-mcp-alias-clear-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    const personalUrls = [
+      PIPEDREAM_PERSONAL_MCP_URL,
+      `${PIPEDREAM_PERSONAL_MCP_URL}/`,
+      `${PIPEDREAM_PERSONAL_MCP_URL}?legacy=1`,
+      `${PIPEDREAM_PERSONAL_MCP_URL}#legacy`,
+    ];
+    const sealedTokens = Object.fromEntries(
+      personalUrls.map((url, index) => [
+        url,
+        {
+          tokens: encryptSecret(
+            baseDir,
+            JSON.stringify({ access_token: `legacy-personal-token-${index}` }),
+          ),
+        },
+      ]),
+    );
+    writeFileSync(
+      storePath,
+      JSON.stringify({
+        servers: {
+          ...sealedTokens,
+          "https://generic.example.test/mcp": {
+            tokens: encryptSecret(baseDir, JSON.stringify({ access_token: "generic-token" })),
+          },
+        },
+      }),
+      { mode: 0o600 },
+    );
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({ baseDir, storePath });
+    cleanups.push(() => service.dispose());
+
+    service.clearPersonalCredentials({ strictPersistence: true });
+
+    expect(service.status().authenticatedUrls).toEqual(["https://generic.example.test/mcp"]);
+    const persisted = JSON.parse(readFileSync(storePath, "utf8")) as {
+      servers: Record<string, unknown>;
+    };
+    expect(Object.keys(persisted.servers)).toEqual(["https://generic.example.test/mcp"]);
+  });
+
+  it("invalidates a Personal URL alias while its sign-in listener is still opening", async () => {
+    const service = makeService();
+    const personalAlias = "https://legacy-user@mcp.pipedream.net./v2/?pending=1";
+    const server: McpServer = {
+      id: "personal-pending-alias",
+      name: "pd-pending-alias",
+      description: "",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: { type: "http", url: personalAlias, headers: {} },
+    };
+    let openListener!: (listener: Server) => void;
+    const listenerOpening = new Promise<Server>((resolve) => {
+      openListener = resolve;
+    });
+    const internals = service as unknown as {
+      credentialEpochs: Map<string, number>;
+      openLoopbackListener(): Promise<Server>;
+    };
+    vi.spyOn(internals, "openLoopbackListener").mockReturnValue(listenerOpening);
+
+    const pendingBegin = service.begin({ server });
+    expect(internals.credentialEpochs.get(personalAlias)).toBe(1);
+
+    service.clearPersonalCredentials({ strictPersistence: true });
+
+    expect(internals.credentialEpochs.get(personalAlias)).toBe(2);
+    openListener({ close: vi.fn<() => void>() } as unknown as Server);
+    await expect(pendingBegin).resolves.toEqual({
+      status: "error",
+      message: "The sign-in flow is no longer active.",
+    });
   });
 
   it("rejects stdio servers and leaves user-provided Authorization headers alone", async () => {
@@ -373,6 +993,45 @@ describe("McpOAuthService", () => {
     );
     expect(service.status().authenticatedUrls).toEqual([]);
     expect(readdirSync(baseDir).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+  });
+
+  it("retries a pending strict Personal clear until the durable store matches", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "poracode-mcp-oauth-strict-retry-"));
+    const storePath = join(baseDir, "mcp-oauth.json");
+    const persistedCredentialStore = `${JSON.stringify({
+      servers: {
+        [PIPEDREAM_PERSONAL_MCP_URL]: {
+          tokens: encryptSecret(
+            baseDir,
+            JSON.stringify({ access_token: "personal-token", token_type: "Bearer" }),
+          ),
+          tokensSavedAt: Date.now(),
+        },
+      },
+    })}\n`;
+    writeFileSync(storePath, persistedCredentialStore, { mode: 0o600 });
+    cleanups.push(() => rmSync(baseDir, { recursive: true, force: true }));
+    const service = new McpOAuthService({ baseDir, storePath });
+    cleanups.push(() => service.dispose());
+    expect(service.status().authenticatedUrls).toContain(PIPEDREAM_PERSONAL_MCP_URL);
+
+    rmSync(storePath);
+    mkdirSync(storePath);
+    expect(() => service.clearPersonalCredentials({ strictPersistence: true })).toThrow(
+      /persist|credential/i,
+    );
+    expect(service.status().authenticatedUrls).toEqual([]);
+    expect(() => service.clearPersonalCredentials({ strictPersistence: true })).toThrow(
+      /persist|credential/i,
+    );
+
+    rmSync(storePath, { recursive: true });
+    writeFileSync(storePath, persistedCredentialStore, { mode: 0o600 });
+    expect(() => service.clearPersonalCredentials({ strictPersistence: true })).not.toThrow();
+    const durableStore = JSON.parse(readFileSync(storePath, "utf8")) as {
+      servers: Record<string, unknown>;
+    };
+    expect(durableStore.servers[PIPEDREAM_PERSONAL_MCP_URL]).toBeUndefined();
   });
 
   it("does not report strict clear success when the durable store cannot be read", () => {

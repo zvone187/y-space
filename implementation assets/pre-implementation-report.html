@@ -716,6 +716,89 @@
       <section class="board-section">
         <div class="section-title">
           <span class="pin"></span>
+          <h2>Pipedream Hardening Follow-Up</h2>
+        </div>
+        <div class="grid three">
+          <div class="sticky bg-green">
+            <span class="pill pass">Ready for hardening</span>
+            <h3>Exact continuation point</h3>
+            <p>
+              Work continues on <code>y-space-pipedream-live</code> from
+              <code>0dfeda90f5588520b5b6bab06e1a9d03152353b4</code>. The committed baseline was
+              clean before these follow-up tests were added; no repository branch was switched.
+            </p>
+          </div>
+          <div class="sticky bg-yellow">
+            <h3>Fail-first result</h3>
+            <p>
+              Four focused files collected 106 tests: 102 passed and four failed at the intended
+              expiry-semantics gaps. Contract validation rejects <code>expired</code>, main expiry
+              reports <code>closed</code> twice, and the renderer treats expiry as success. The
+              positive saved-grant restart and first reconciled relay test already passes.
+            </p>
+          </div>
+          <div class="sticky bg-blue">
+            <h3>Required release gates</h3>
+            <p>
+              Expiry must remain distinct from cancellation; raw Personal Pipedream bearer tokens
+              must stay supervisor-owned; sign-out must be bounded; refresh must be single-flight;
+              every Personal URL alias must clear atomically; and, after the durable access-off
+              write succeeds, disconnect denial must survive later cleanup-write faults and restart.
+              An initial denial-write failure must be reported as still on and remain quarantined
+              only in the current process.
+            </p>
+          </div>
+        </div>
+        <details open>
+          <summary>Hardening end-to-end verification plan</summary>
+          <div class="detail-body">
+            <ul>
+              <li>
+                <strong>H-E2E-001:</strong> let the main-owned Connect deadline elapse and verify
+                the shared popup reports timeout, never cancellation or success.
+              </li>
+              <li>
+                <strong>H-E2E-002:</strong> restart against a healthy saved grant and verify the
+                first agent launch receives one reconciled relay without a duplicate connection.
+              </li>
+              <li>
+                <strong>H-E2E-003:</strong> sign out of Personal Pipedream while a provider update
+                is stalled and verify capability revocation completes within its bound and no raw
+                bearer remains in agent configuration.
+              </li>
+              <li>
+                <strong>H-E2E-004:</strong> persist the access-off denial, inject a later cleanup
+                persistence failure, restart, and verify the account remains denied. Separately,
+                fail the initial denial write and verify the UI reports access as still on while the
+                current process quarantines the relay.
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details>
+          <summary>Final hardening outcome</summary>
+          <div class="detail-body">
+            All four fail-first expiry expectations now pass. The final implementation keeps raw
+            Personal Pipedream OAuth bearers behind a launch-scoped loopback relay, revokes and
+            aborts live authority on clear or teardown, refreshes once per server and credential
+            epoch, clears every equivalent Personal URL alias atomically, and persists local
+            disconnect denial before remote deletion. The final high-risk matrix passed 437 tests
+            with one intentional skip; independent review lanes passed 289/289, 217/217, 305/305,
+            and 104/104 tests with no remaining concrete P1/P2 finding. The complete Node 24 suite
+            passed 925 files and 10,880 tests. Typecheck, standard and type-aware lint, formatting,
+            localization, production packaging, ARM64 native-binary inspection, and deep/strict
+            code-sign verification passed. One exact fresh package process was kept open with an
+            isolated profile and <code>--use-mock-keychain</code> for hands-on Connections, global
+            Browser-tab, Codex, and OpenCode QA. Live Gmail OAuth, explicit agent access, read-only
+            Gmail use, and disconnect remain at the user-confirmation boundary and are not claimed
+            by this pre-implementation report.
+          </div>
+        </details>
+      </section>
+
+      <section class="board-section">
+        <div class="section-title">
+          <span class="pin"></span>
           <h2>Open The Cards</h2>
         </div>
         <details open>

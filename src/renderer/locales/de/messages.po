@@ -3675,6 +3675,16 @@ msgstr "Der Projektordner konnte nicht erstellt werden."
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "Die Verbindung mit {0} konnte nicht getrennt werden. Der Agentenzugriff wurde entzogen."
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "Die Verbindung mit {0} konnte nicht getrennt werden. Der Agentenzugriff ist weiterhin aktiviert. Versuche es erneut."
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "Die Verbindung mit {0} konnte nicht getrennt werden. Prüfe den Agentenzugriff und versuche es erneut."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

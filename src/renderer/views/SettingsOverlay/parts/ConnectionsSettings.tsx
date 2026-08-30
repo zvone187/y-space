@@ -9,6 +9,7 @@ import {
   waitForPendingSharedSettings,
 } from "@/renderer/state/sharedSettingsStore";
 import {
+  isPipedreamPersonalMcpUrl,
   PIPEDREAM_PERSONAL_MCP_SERVER_ID,
   PIPEDREAM_PERSONAL_MCP_SERVER_NAME,
   PIPEDREAM_PERSONAL_MCP_URL,
@@ -43,7 +44,7 @@ function withPersonalMcpServer(
       server.name.toLowerCase() === "pd" &&
       !(
         (server.transport.type === "http" || server.transport.type === "sse") &&
-        server.transport.url === PIPEDREAM_PERSONAL_MCP_URL
+        isPipedreamPersonalMcpUrl(server.transport.url)
       ),
   );
   if (collision) throw new Error("The MCP server name pd is already in use.");
@@ -53,7 +54,7 @@ function withPersonalMcpServer(
     if (server.id === PIPEDREAM_PERSONAL_MCP_SERVER_ID) return false;
     return !(
       (server.transport.type === "http" || server.transport.type === "sse") &&
-      server.transport.url === PIPEDREAM_PERSONAL_MCP_URL
+      isPipedreamPersonalMcpUrl(server.transport.url)
     );
   });
   return { server: canonical, servers: [...next, canonical] };

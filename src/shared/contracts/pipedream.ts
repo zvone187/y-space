@@ -169,7 +169,7 @@ export type PipedreamConnectFlowPayload = z.infer<typeof pipedreamConnectFlowPay
  * succeeded state must never be used to infer or auto-grant a refreshed account.
  */
 export const pipedreamConnectFlowStatusSchema = z
-  .object({ state: z.enum(["open", "closed", "succeeded", "failed"]) })
+  .object({ state: z.enum(["open", "closed", "expired", "succeeded", "failed"]) })
   .strict();
 export type PipedreamConnectFlowStatus = z.infer<typeof pipedreamConnectFlowStatusSchema>;
 

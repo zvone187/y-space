@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   McpLaunchSnapshot,
+  McpServer,
   ProjectLocation,
   ResolvedMcpServer,
   ThreadConfig,
 } from "@/shared/contracts";
+import { PIPEDREAM_PERSONAL_MCP_URL } from "@/shared/contracts";
 import { verifyMcpLaunchContextToken } from "@/shared/mcpLaunchContext";
 import type { AgentAdapter } from "@/supervisor/agents/base";
 import {
@@ -655,6 +657,96 @@ describe("resolveMcpServersForLaunch — provider-owned MCP identity", () => {
     expect(second?.providerBindingId).toBe("thread:thread-b:launch:launch-b");
     expect(restarted?.providerBindingId).toBe("thread:thread-a:launch:launch-a-restarted");
   });
+
+  it("replaces every Personal Pipedream bearer with only the exact launch relay capability", async () => {
+    const upstreamBearer = "personal-upstream-token-must-not-reach-provider";
+    const relayBearer = "opaque-launch-scoped-relay-capability";
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      disabledTools: ["dangerous_personal_action"],
+      transport: {
+        type: "http",
+        url: `${PIPEDREAM_PERSONAL_MCP_URL}?legacy=1`,
+        headers: { Authorization: `Bearer ${upstreamBearer}` },
+      },
+    };
+    const resolvePipedreamMcpServers = vi.fn<
+      (input: {
+        threadId: string;
+        providerBindingId?: string;
+        projectLocation: ProjectLocation;
+        personalMcpServers?: readonly ResolvedMcpServer[];
+      }) => Promise<ResolvedMcpServer[]>
+    >(async (input) => {
+      expect(JSON.stringify(input.personalMcpServers)).not.toContain(upstreamBearer);
+      return [
+        {
+          ...personal,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:43199/mcp/personal-launch-a",
+            headers: { authorization: `Bearer ${relayBearer}` },
+          },
+        },
+      ];
+    });
+    const prepareMcpToolFilters = vi.fn<
+      (
+        servers: readonly McpServer[],
+        location: ProjectLocation,
+        browserExclusive?: boolean,
+      ) => Promise<McpServer[]>
+    >(async (servers) => [...servers]);
+    const pipeline = new SpawnPipeline({
+      options: { resolvePipedreamMcpServers, prepareMcpToolFilters },
+      resolveAgentSettings: () => ({}),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+
+    const servers = await pipeline.resolveMcpServersForLaunch({
+      location: { kind: "posix", path: "/repo" },
+      config: { model: "codex/model" },
+      mcpLaunchSnapshot: {
+        mcpServers: [personal],
+        disabledBuiltInMcpServerIds: ["browser", "crossagents", "computer-use", "app-controls"],
+      },
+      identity: { threadId: "thread-personal", launchId: "launch-a" },
+    });
+
+    expect(resolvePipedreamMcpServers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threadId: "thread-personal",
+        providerBindingId: "thread:thread-personal:launch:launch-a",
+        personalMcpServers: [
+          expect.objectContaining({
+            id: personal.id,
+            transport: expect.objectContaining({ headers: {} }),
+          }),
+        ],
+      }),
+    );
+    expect(JSON.stringify(servers)).not.toContain(upstreamBearer);
+    expect(JSON.stringify(servers)).toContain(relayBearer);
+    expect(servers.filter((server) => server.id === personal.id)).toHaveLength(1);
+    expect(prepareMcpToolFilters).toHaveBeenCalledExactlyOnceWith(
+      [
+        expect.objectContaining({
+          id: personal.id,
+          disabledTools: ["dangerous_personal_action"],
+          transport: expect.objectContaining({
+            type: "http",
+            url: "http://127.0.0.1:43199/mcp/personal-launch-a",
+            headers: { authorization: `Bearer ${relayBearer}` },
+          }),
+        }),
+      ],
+      { kind: "posix", path: "/repo" },
+      false,
+    );
+  });
 });
 
 describe("composeResolvedMcpServers", () => {
@@ -831,6 +923,70 @@ describe("composeResolvedMcpServers", () => {
 });
 
 describe("launch-resource cleanup", () => {
+  it("keeps Personal Pipedream descriptors out of the pre-relay tool-filter process", async () => {
+    const stopBeforeLaunch = new Error("stop after snapshot preparation");
+    const personal: McpServer = {
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      description: "Personal Pipedream tools",
+      enabled: true,
+      timeoutMs: 30_000,
+      transport: {
+        type: "http",
+        url: PIPEDREAM_PERSONAL_MCP_URL,
+        headers: { Authorization: "Bearer must-not-enter-filter-config" },
+      },
+    };
+    const prepareMcpToolFilters = vi.fn<
+      (
+        servers: readonly McpServer[],
+        location: ProjectLocation,
+        browserExclusive?: boolean,
+      ) => Promise<McpServer[]>
+    >(async (servers) => [...servers]);
+    const adapter = {
+      kind: "codex",
+      label: "Codex",
+      capabilities: { presentationMode: "terminal", liveInputMode: "terminal" },
+    } as unknown as AgentAdapter;
+    const pipeline = new SpawnPipeline({
+      options: {
+        adapters: new Map([["codex", adapter]]),
+        prepareMcpToolFilters,
+      },
+      sessions: new Map(),
+      pendingStartInterrupts: new Set(),
+      pendingStartAborts: new Set(),
+      closeThread: vi.fn<() => Promise<void>>(async () => {}),
+      resolveAgentSettings: () => ({}),
+      beginMcpLaunchAuthorization: vi.fn<() => never>(() => {
+        throw stopBeforeLaunch;
+      }),
+      revokeMcpLaunchAuthorization: vi.fn<() => void>(),
+      emitOptimisticUserMessage: vi.fn<() => string>(() => "unused"),
+    } as unknown as ConstructorParameters<typeof SpawnPipeline>[0]);
+
+    await expect(
+      pipeline.startThreadInner({
+        threadId: "thread-personal-pre-filter",
+        agentKind: "codex",
+        projectLocation: { kind: "windows", path: "C:\\repo" },
+        config: { model: "codex/model", browserMcp: true },
+        prompt: "",
+        initialSize: { cols: 120, rows: 30 },
+        presentationMode: "terminal",
+        mcpServers: [personal],
+        disabledBuiltInMcpServerIds: ["crossagents", "computer-use", "app-controls"],
+      }),
+    ).rejects.toBe(stopBeforeLaunch);
+
+    expect(prepareMcpToolFilters).toHaveBeenCalledExactlyOnceWith(
+      [],
+      { kind: "windows", path: "C:\\repo" },
+      true,
+    );
+  });
+
   it("cleans argv-owned resources when hook-extra resolution rejects before spawn", async () => {
     const cleanup = vi.fn<() => void>();
     const hookError = new Error("hook extras failed");

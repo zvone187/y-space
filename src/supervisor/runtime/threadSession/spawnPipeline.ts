@@ -23,6 +23,7 @@ import {
   type ResolvedMcpServer,
   BUILT_IN_MCP_SERVER_NAMES,
   DEFAULT_MCP_SERVER_TIMEOUT_MS,
+  isPipedreamPersonalMcpUrl,
   resolveEnabledMcpServers,
 } from "@/shared/contracts";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
@@ -128,11 +129,25 @@ export interface McpLaunchAuthorization {
   launchConfig: ThreadConfig;
   mcpLaunchSnapshot: McpLaunchSnapshot;
   /**
-   * Supervisor-owned generation for credentials copied into this launch.
-   * Personal OAuth clear advances the generation so an already-resolving
-   * launch cannot publish a process containing the cleared bearer.
+   * Supervisor-owned generation for the Personal localhost capability.
+   * Sign-out advances it so an already-resolving launch cannot publish a
+   * process containing a capability minted before credential revocation.
    */
   personalMcpCredentialEpoch?: number;
+  /**
+   * Supervisor-owned revision for any MCP launch configuration that can change
+   * while a provider is being created (Pipedream grants or agent settings).
+   */
+  mcpLaunchConfigurationEpoch?: number;
+}
+
+export class McpLaunchConfigurationChangedError extends Error {
+  constructor() {
+    super(
+      "Integration settings changed while this agent was starting; retrying with current access.",
+    );
+    this.name = "McpLaunchConfigurationChangedError";
+  }
 }
 
 /**
@@ -307,6 +322,20 @@ export interface SpawnPipelineContext {
   assertMcpLaunchAuthorizationCurrent?(identity: McpLaunchIdentity): void;
   /** Capture the credential generation before any asynchronous launch work. */
   getPersonalMcpCredentialEpoch?(): number;
+  /** Capture the shared MCP launch revision before asynchronous provider work. */
+  getMcpLaunchConfigurationEpoch?(): number;
+  /** Rebuild current settings/plugin inputs before retrying a superseded launch. */
+  refreshPendingMcpLaunchSnapshot?(input: {
+    threadId: string;
+    agentKind: AgentKind;
+    adapter: AgentAdapter;
+    projectLocation: ProjectLocation;
+    config: ThreadConfig;
+    mcpLaunchSnapshot: McpLaunchSnapshot;
+  }): Promise<{
+    mcpLaunchSnapshot: McpLaunchSnapshot;
+    nativePlugins: readonly AgentNativePlugin[];
+  }>;
   revokeMcpLaunchAuthorization(identity: McpLaunchIdentity): void;
   emitOptimisticUserMessage(
     threadId: string,
@@ -315,6 +344,8 @@ export interface SpawnPipelineContext {
     requestedItemId?: string,
   ): string;
 }
+
+const MAX_MCP_LAUNCH_CONFIGURATION_RETRIES = 2;
 
 /**
  * Spawn orchestration for agent threads: initial launches, restarts of
@@ -329,7 +360,8 @@ export class SpawnPipeline {
     payload: StartThreadPayload & { threadId: string },
   ): Promise<StartThreadResult> {
     const ctx = this.ctx;
-    const personalMcpCredentialEpoch = ctx.getPersonalMcpCredentialEpoch?.() ?? 0;
+    let personalMcpCredentialEpoch = ctx.getPersonalMcpCredentialEpoch?.() ?? 0;
+    let mcpLaunchConfigurationEpoch = ctx.getMcpLaunchConfigurationEpoch?.() ?? 0;
     await ctx.closeThread({ threadId: payload.threadId });
     if (ctx.pendingStartAborts.delete(payload.threadId)) {
       ctx.pendingStartInterrupts.delete(payload.threadId);
@@ -348,7 +380,7 @@ export class SpawnPipeline {
       payload.projectLocation,
       payload.agentKind,
     )) ?? { mcpServers: [], builtInMcpServerIds: [], nativePlugins: [] };
-    const nativePlugins = pluginContributions.nativePlugins;
+    let nativePlugins: readonly AgentNativePlugin[] = pluginContributions.nativePlugins;
     const wslSegments = payload.segments
       ? await rewriteSegmentsForWsl(payload.segments, payload.projectLocation, {
           preserveImageAttachments: useStructuredFlow,
@@ -454,7 +486,7 @@ export class SpawnPipeline {
     }
     await this.ctx.options.prepareSkillsForLaunch?.(payload.projectLocation, payload.agentKind);
 
-    const mcpIdentity: McpLaunchIdentity = {
+    let mcpIdentity: McpLaunchIdentity = {
       threadId: payload.threadId,
       launchId: randomUUID(),
       browserEvidenceTurnId: randomUUID(),
@@ -478,17 +510,28 @@ export class SpawnPipeline {
       // will govern the real launch. The raw composer payload may explicitly
       // say false even though Browser is intentionally default-on.
       const browserExclusive = optimisticLaunchConfig.browserMcp === true;
-      mcpServers = await this.ctx.options.prepareMcpToolFilters(
-        mcpServers,
+      // Personal Pipedream must remain recognizable until the trusted resolver
+      // replaces it with a localhost capability. Wrapping the upstream URL in
+      // a stdio filter here would both bypass that resolver and serialize any
+      // caller-supplied Authorization header into the filter process config.
+      const personalMcpServers = mcpServers
+        .filter(isPersonalPipedreamMcpServer)
+        .map(stripResolvedAuthorizationHeader);
+      const filterableServers = mcpServers.filter(
+        (server) => !isPersonalPipedreamMcpServer(server),
+      );
+      const filteredServers = await this.ctx.options.prepareMcpToolFilters(
+        filterableServers,
         payload.projectLocation,
         browserExclusive,
       );
+      mcpServers = [...filteredServers, ...personalMcpServers];
     }
-    const mcpLaunchSnapshot: McpLaunchSnapshot = {
+    let mcpLaunchSnapshot: McpLaunchSnapshot = {
       mcpServers,
       ...mcpLaunchSnapshotBase,
     };
-    const launchConfig = this.resolveMcpLaunchConfig(
+    let launchConfig = this.resolveMcpLaunchConfig(
       workspaceLaunchConfig(
         payload.projectLocation,
         payload.config,
@@ -500,291 +543,380 @@ export class SpawnPipeline {
       adapter,
       payload.threadId,
     );
-    return await this.withMcpLaunchAuthorization(
-      {
-        identity: mcpIdentity,
-        adapter,
-        config: payload.config,
-        launchConfig,
-        mcpLaunchSnapshot,
-        personalMcpCredentialEpoch,
-      },
-      async () => {
-        const resolvedMcpServers = await this.resolveMcpServersForLaunch({
-          location: payload.projectLocation,
-          config: launchConfig,
+    // closeThread can arrive while any of the asynchronous launch-preparation
+    // hooks above are running. Keep its abort marker sticky until startThread's
+    // outer finally unwinds; peeking here prevents relay authority from being
+    // minted, and there is no await between this gate and synchronous
+    // authorization registration.
+    if (ctx.pendingStartAborts.has(payload.threadId)) {
+      return { threadId: payload.threadId };
+    }
+    let retryCount = 0;
+    while (true) {
+      // A configuration retry awaits a fresh shared/plugin snapshot. Close can
+      // land during that refresh, after attempt A was revoked; keep the abort
+      // marker sticky and gate every attempt before it can remint authority.
+      if (ctx.pendingStartAborts.has(payload.threadId)) {
+        return { threadId: payload.threadId };
+      }
+      try {
+        return await this.withMcpLaunchAuthorization(
+          {
+            identity: mcpIdentity,
+            adapter,
+            config: payload.config,
+            launchConfig,
+            mcpLaunchSnapshot,
+            personalMcpCredentialEpoch,
+            mcpLaunchConfigurationEpoch,
+          },
+          async () => {
+            const resolvedMcpServers = await this.resolveMcpServersForLaunch({
+              location: payload.projectLocation,
+              config: launchConfig,
+              mcpLaunchSnapshot,
+              identity: mcpIdentity,
+              crossagentThreadId: payload.threadId,
+              adapter,
+              presentationMode: requestedPresentation,
+            });
+            // Resolution can traverse WSL reachability and privileged relay setup.
+            // Re-check the exact launch authority before any stale descriptor can
+            // cross into provider creation after a concurrent settings removal.
+            ctx.assertMcpLaunchAuthorizationCurrent?.(mcpIdentity);
+            const structuredSession = await this.createStructuredSession(
+              adapter,
+              payload.threadId,
+              payload.agentKind,
+              payload.projectLocation,
+              launchConfig,
+              resolvedMcpServers,
+              mcpIdentity,
+              payload.sessionRef,
+              requestedPresentation,
+            );
+            if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+              return { threadId: payload.threadId };
+            }
+            await this.assertMcpLaunchAuthorizationCurrentOrDispose(mcpIdentity, structuredSession);
+
+            if (structuredSession?.activate) {
+              try {
+                await structuredSession.activate();
+              } catch (error) {
+                await structuredSession.dispose();
+                if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
+                  return { threadId: payload.threadId };
+                }
+                throw error;
+              }
+            }
+            if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+              return { threadId: payload.threadId };
+            }
+            await this.assertMcpLaunchAuthorizationCurrentOrDispose(mcpIdentity, structuredSession);
+
+            let openedStructuredThreadId: string | undefined;
+            if (structuredSession?.openThread) {
+              try {
+                openedStructuredThreadId = await structuredSession.openThread(
+                  launchConfig,
+                  payload.sessionRef,
+                );
+              } catch (error) {
+                await structuredSession.dispose();
+                if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
+                  return { threadId: payload.threadId };
+                }
+                throw error;
+              }
+            }
+            if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+              return { threadId: payload.threadId };
+            }
+            await this.assertMcpLaunchAuthorizationCurrentOrDispose(mcpIdentity, structuredSession);
+
+            if (!usesTerminalPresentation) {
+              if (!structuredSession) {
+                throw new Error(
+                  `Agent ${payload.agentKind} does not support ${requestedPresentation} presentation.`,
+                );
+              }
+              const resolvedSessionRef =
+                payload.sessionRef ??
+                (openedStructuredThreadId
+                  ? createKnownSessionRef(openedStructuredThreadId)
+                  : undefined);
+              const startInterrupted = ctx.pendingStartInterrupts.delete(payload.threadId);
+              const session = this.spawnThread({
+                threadId: payload.threadId,
+                adapter,
+                agentKind: payload.agentKind,
+                projectLocation: payload.projectLocation,
+                config: payload.config,
+                initialSize: payload.initialSize,
+                launchPrompt: "",
+                structuredSession,
+                ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
+                presentationMode: requestedPresentation,
+                initialStatus:
+                  optimisticUserMessageItemId && !startInterrupted ? "working" : "idle",
+                initialAttention:
+                  optimisticUserMessageItemId && !startInterrupted ? "working" : "none",
+                suppressInitialStructuredIdle:
+                  optimisticUserMessageItemId !== undefined && !startInterrupted,
+                mcpLaunchSnapshot,
+                launchConfig,
+                nativePlugins,
+                mcpIdentity,
+              });
+              if (
+                !startInterrupted &&
+                !payload.sessionRef &&
+                initialPrompt.length > 0 &&
+                structuredSession.startTurn
+              ) {
+                const startOptions = {
+                  ...(optimisticUserMessageItemId
+                    ? { userMessageItemId: optimisticUserMessageItemId }
+                    : {}),
+                  ...(inlineSkillInstructions
+                    ? { inlineInstructions: inlineSkillInstructions }
+                    : {}),
+                };
+                void structuredSession
+                  .startTurn(
+                    initialPrompt,
+                    launchConfig,
+                    effectiveSegments,
+                    Object.keys(startOptions).length > 0 ? startOptions : undefined,
+                  )
+                  .catch((error) => {
+                    if (ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+                      return;
+                    }
+                    ctx.failStructuredSession(session, error);
+                  });
+              }
+              return { threadId: payload.threadId };
+            }
+
+            if (
+              !payload.sessionRef &&
+              useStructuredFlow &&
+              initialPrompt.length > 0 &&
+              !shouldQueueInitialPrompt &&
+              structuredSession?.startTurn
+            ) {
+              void structuredSession
+                .startTurn(
+                  initialPrompt,
+                  launchConfig,
+                  effectiveSegments,
+                  inlineSkillInstructions
+                    ? { inlineInstructions: inlineSkillInstructions }
+                    : undefined,
+                )
+                .catch((error) => {
+                  console.error("[supervisor] initial turn failed:", error);
+                  const activeSession = ctx.sessions.get(payload.threadId);
+                  if (!activeSession) {
+                    return;
+                  }
+                  ctx.failStructuredSession(activeSession, error);
+                });
+            }
+
+            if (shouldQueueInitialPrompt) {
+              await structuredSession?.ensureResumeArtifacts?.();
+            }
+
+            const deferToTerminal = adapter.shouldDeferPromptToTerminal?.(payload.config) ?? false;
+            // Use `initialPrompt` (the adapter-formatted version with `~/` shortening
+            // and WSL path rewriting) so attachments hand off cleanly as the launch
+            // arg instead of being staged for a deferred PTY-write.
+            const launchPrompt = useStructuredFlow || deferToTerminal ? "" : initialPrompt;
+            const launchOptionsWithMcp = this.composeLaunchOptions(
+              adapter,
+              structuredSession?.launchOptions,
+              resolvedMcpServers,
+            );
+            const argv = payload.sessionRef
+              ? adapter.buildResumeArgv(
+                  payload.projectLocation,
+                  launchConfig,
+                  launchPrompt,
+                  payload.sessionRef,
+                  launchOptionsWithMcp,
+                )
+              : adapter.buildLaunchArgv(
+                  payload.projectLocation,
+                  launchConfig,
+                  launchPrompt,
+                  payload.sessionRef,
+                  launchOptionsWithMcp,
+                );
+            const cleanupArgv = onceLaunchCleanup(argv.cleanup);
+            if (cleanupArgv) argv.cleanup = cleanupArgv;
+            let argvTransferred = false;
+            try {
+              // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
+              // (`PORACODE_HOOK_URL`, `PORACODE_HOOK_SECRET`, `PORACODE_THREAD_ID`,
+              // `PORACODE_AGENT_KIND`, `PORACODE_HOOK_PROTOCOL_VERSION`) flow through
+              // `spawnThread` → `agentEnv` so they end up in the PTY env on every
+              // platform (WSL, win32, posix). Failure to resolve plugin extras normally
+              // degrades to L2. A Codex terminal connected to the canonical Browser is
+              // the exception: it requires the app-owned PreToolUse command gate and
+              // fails closed before spawn when that gate cannot be staged.
+              const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
+                payload.threadId,
+                payload.agentKind,
+                payload.projectLocation,
+                resolvedMcpServers,
+              );
+              if (cliHookExtras.extraArgs.length > 0) {
+                argv.args = mergeCliHookExtraArgs(
+                  adapter,
+                  argv.args,
+                  cliHookExtras.extraArgs,
+                  launchPrompt,
+                  payload.sessionRef,
+                );
+              }
+              argv.args = await applyLaunchArgsConfigRewrite(
+                adapter,
+                argv.args,
+                payload.config,
+                payload.projectLocation,
+              );
+              if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
+                await primeProjectShellEnv(payload.projectLocation.path);
+              }
+              const keepStructuredSession = structuredSession && useStructuredFlow;
+              if (structuredSession && !keepStructuredSession) {
+                try {
+                  await structuredSession.dispose();
+                } catch (error) {
+                  argv.cleanup?.();
+                  throw error;
+                }
+              }
+              if (ctx.pendingStartAborts.delete(payload.threadId)) {
+                ctx.pendingStartInterrupts.delete(payload.threadId);
+                try {
+                  if (structuredSession && keepStructuredSession) {
+                    await structuredSession.dispose();
+                  }
+                } finally {
+                  argv.cleanup?.();
+                }
+                return { threadId: payload.threadId };
+              }
+
+              // Materialize WSL launch files only after every awaited pre-launch
+              // operation has settled, keeping the credential-file lifetime minimal.
+              const command = resolveLaunchSpec(payload.projectLocation, argv);
+              const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
+              this.spawnThread({
+                threadId: payload.threadId,
+                adapter,
+                agentKind: payload.agentKind,
+                projectLocation: payload.projectLocation,
+                config: payload.config,
+                initialSize: payload.initialSize,
+                launchPrompt,
+                command,
+                ...(Object.keys(cliHookExtras.env).length > 0
+                  ? { extraEnv: cliHookExtras.env }
+                  : {}),
+                ...(keepStructuredSession ? { structuredSession } : {}),
+                ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
+                mcpLaunchSnapshot,
+                launchConfig,
+                mcpIdentity,
+                nativePlugins,
+                ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
+                presentationMode: requestedPresentation,
+                ...(deferToTerminal && !useStructuredFlow
+                  ? (() => {
+                      const preInputs = adapter.buildTerminalPreInputs?.(payload.config);
+                      return {
+                        ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
+                        pendingTerminalPrompt: initialPrompt,
+                        ...(effectiveSegments
+                          ? { pendingTerminalSegments: effectiveSegments }
+                          : {}),
+                      };
+                    })()
+                  : {}),
+              });
+              argvTransferred = true;
+
+              return { threadId: payload.threadId };
+            } finally {
+              if (!argvTransferred) cleanupArgv?.();
+            }
+          },
+        );
+      } catch (error) {
+        if (
+          !(error instanceof McpLaunchConfigurationChangedError) ||
+          !ctx.refreshPendingMcpLaunchSnapshot
+        ) {
+          throw error;
+        }
+        let refreshed:
+          | {
+              mcpLaunchSnapshot: McpLaunchSnapshot;
+              nativePlugins: readonly AgentNativePlugin[];
+            }
+          | undefined;
+        while (retryCount < MAX_MCP_LAUNCH_CONFIGURATION_RETRIES) {
+          retryCount += 1;
+          const refreshEpoch = ctx.getMcpLaunchConfigurationEpoch?.() ?? 0;
+          const candidate = await ctx.refreshPendingMcpLaunchSnapshot({
+            threadId: payload.threadId,
+            agentKind: payload.agentKind,
+            adapter,
+            projectLocation: payload.projectLocation,
+            config: payload.config,
+            mcpLaunchSnapshot,
+          });
+          if ((ctx.getMcpLaunchConfigurationEpoch?.() ?? 0) !== refreshEpoch) continue;
+          refreshed = candidate;
+          mcpLaunchConfigurationEpoch = refreshEpoch;
+          break;
+        }
+        if (!refreshed) throw error;
+        personalMcpCredentialEpoch = ctx.getPersonalMcpCredentialEpoch?.() ?? 0;
+        mcpLaunchSnapshot = refreshed.mcpLaunchSnapshot;
+        nativePlugins = refreshed.nativePlugins;
+        mcpIdentity = {
+          threadId: payload.threadId,
+          launchId: randomUUID(),
+          browserEvidenceTurnId: randomUUID(),
+          title: initialPrompt.split("\n", 1)[0]?.trim() ?? "",
+        };
+        launchConfig = this.resolveMcpLaunchConfig(
+          workspaceLaunchConfig(
+            payload.projectLocation,
+            payload.config,
+            adapter,
+            mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
+            mcpLaunchSnapshot.pluginBuiltInMcpServerIds,
+          ),
           mcpLaunchSnapshot,
-          identity: mcpIdentity,
-          crossagentThreadId: payload.threadId,
-          adapter,
-          presentationMode: requestedPresentation,
-        });
-        const structuredSession = await this.createStructuredSession(
           adapter,
           payload.threadId,
-          payload.agentKind,
-          payload.projectLocation,
-          launchConfig,
-          resolvedMcpServers,
-          mcpIdentity,
-          payload.sessionRef,
-          requestedPresentation,
         );
-        if (await this.abortPendingStart(payload.threadId, structuredSession)) {
-          return { threadId: payload.threadId };
-        }
-
-        if (structuredSession?.activate) {
-          try {
-            await structuredSession.activate();
-          } catch (error) {
-            await structuredSession.dispose();
-            if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
-              return { threadId: payload.threadId };
-            }
-            throw error;
-          }
-        }
-        if (await this.abortPendingStart(payload.threadId, structuredSession)) {
-          return { threadId: payload.threadId };
-        }
-
-        let openedStructuredThreadId: string | undefined;
-        if (structuredSession?.openThread) {
-          try {
-            openedStructuredThreadId = await structuredSession.openThread(
-              launchConfig,
-              payload.sessionRef,
-            );
-          } catch (error) {
-            await structuredSession.dispose();
-            if (ctx.pendingStartInterrupts.delete(payload.threadId)) {
-              return { threadId: payload.threadId };
-            }
-            throw error;
-          }
-        }
-        if (await this.abortPendingStart(payload.threadId, structuredSession)) {
-          return { threadId: payload.threadId };
-        }
-
-        if (!usesTerminalPresentation) {
-          if (!structuredSession) {
-            throw new Error(
-              `Agent ${payload.agentKind} does not support ${requestedPresentation} presentation.`,
-            );
-          }
-          const resolvedSessionRef =
-            payload.sessionRef ??
-            (openedStructuredThreadId
-              ? createKnownSessionRef(openedStructuredThreadId)
-              : undefined);
-          const startInterrupted = ctx.pendingStartInterrupts.delete(payload.threadId);
-          const session = this.spawnThread({
-            threadId: payload.threadId,
-            adapter,
-            agentKind: payload.agentKind,
-            projectLocation: payload.projectLocation,
-            config: payload.config,
-            initialSize: payload.initialSize,
-            launchPrompt: "",
-            structuredSession,
-            ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
-            presentationMode: requestedPresentation,
-            initialStatus: optimisticUserMessageItemId && !startInterrupted ? "working" : "idle",
-            initialAttention: optimisticUserMessageItemId && !startInterrupted ? "working" : "none",
-            suppressInitialStructuredIdle:
-              optimisticUserMessageItemId !== undefined && !startInterrupted,
-            mcpLaunchSnapshot,
-            launchConfig,
-            nativePlugins,
-            mcpIdentity,
-          });
-          if (
-            !startInterrupted &&
-            !payload.sessionRef &&
-            initialPrompt.length > 0 &&
-            structuredSession.startTurn
-          ) {
-            const startOptions = {
-              ...(optimisticUserMessageItemId
-                ? { userMessageItemId: optimisticUserMessageItemId }
-                : {}),
-              ...(inlineSkillInstructions ? { inlineInstructions: inlineSkillInstructions } : {}),
-            };
-            void structuredSession
-              .startTurn(
-                initialPrompt,
-                launchConfig,
-                effectiveSegments,
-                Object.keys(startOptions).length > 0 ? startOptions : undefined,
-              )
-              .catch((error) => {
-                if (ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-                  return;
-                }
-                ctx.failStructuredSession(session, error);
-              });
-          }
-          return { threadId: payload.threadId };
-        }
-
-        if (
-          !payload.sessionRef &&
-          useStructuredFlow &&
-          initialPrompt.length > 0 &&
-          !shouldQueueInitialPrompt &&
-          structuredSession?.startTurn
-        ) {
-          void structuredSession
-            .startTurn(
-              initialPrompt,
-              launchConfig,
-              effectiveSegments,
-              inlineSkillInstructions ? { inlineInstructions: inlineSkillInstructions } : undefined,
-            )
-            .catch((error) => {
-              console.error("[supervisor] initial turn failed:", error);
-              const activeSession = ctx.sessions.get(payload.threadId);
-              if (!activeSession) {
-                return;
-              }
-              ctx.failStructuredSession(activeSession, error);
-            });
-        }
-
-        if (shouldQueueInitialPrompt) {
-          await structuredSession?.ensureResumeArtifacts?.();
-        }
-
-        const deferToTerminal = adapter.shouldDeferPromptToTerminal?.(payload.config) ?? false;
-        // Use `initialPrompt` (the adapter-formatted version with `~/` shortening
-        // and WSL path rewriting) so attachments hand off cleanly as the launch
-        // arg instead of being staged for a deferred PTY-write.
-        const launchPrompt = useStructuredFlow || deferToTerminal ? "" : initialPrompt;
-        const launchOptionsWithMcp = this.composeLaunchOptions(
-          adapter,
-          structuredSession?.launchOptions,
-          resolvedMcpServers,
-        );
-        const argv = payload.sessionRef
-          ? adapter.buildResumeArgv(
-              payload.projectLocation,
-              launchConfig,
-              launchPrompt,
-              payload.sessionRef,
-              launchOptionsWithMcp,
-            )
-          : adapter.buildLaunchArgv(
-              payload.projectLocation,
-              launchConfig,
-              launchPrompt,
-              payload.sessionRef,
-              launchOptionsWithMcp,
-            );
-        const cleanupArgv = onceLaunchCleanup(argv.cleanup);
-        if (cleanupArgv) argv.cleanup = cleanupArgv;
-        let argvTransferred = false;
-        try {
-          // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
-          // (`PORACODE_HOOK_URL`, `PORACODE_HOOK_SECRET`, `PORACODE_THREAD_ID`,
-          // `PORACODE_AGENT_KIND`, `PORACODE_HOOK_PROTOCOL_VERSION`) flow through
-          // `spawnThread` → `agentEnv` so they end up in the PTY env on every
-          // platform (WSL, win32, posix). Failure to resolve plugin extras normally
-          // degrades to L2. A Codex terminal connected to the canonical Browser is
-          // the exception: it requires the app-owned PreToolUse command gate and
-          // fails closed before spawn when that gate cannot be staged.
-          const cliHookExtras = await ctx.cliHookPlugin.resolveCliHookPluginExtras(
-            payload.threadId,
-            payload.agentKind,
-            payload.projectLocation,
-            resolvedMcpServers,
-          );
-          if (cliHookExtras.extraArgs.length > 0) {
-            argv.args = mergeCliHookExtraArgs(
-              adapter,
-              argv.args,
-              cliHookExtras.extraArgs,
-              launchPrompt,
-              payload.sessionRef,
-            );
-          }
-          argv.args = await applyLaunchArgsConfigRewrite(
-            adapter,
-            argv.args,
-            payload.config,
-            payload.projectLocation,
-          );
-          if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
-            await primeProjectShellEnv(payload.projectLocation.path);
-          }
-          const keepStructuredSession = structuredSession && useStructuredFlow;
-          if (structuredSession && !keepStructuredSession) {
-            try {
-              await structuredSession.dispose();
-            } catch (error) {
-              argv.cleanup?.();
-              throw error;
-            }
-          }
-          if (ctx.pendingStartAborts.delete(payload.threadId)) {
-            ctx.pendingStartInterrupts.delete(payload.threadId);
-            try {
-              if (structuredSession && keepStructuredSession) {
-                await structuredSession.dispose();
-              }
-            } finally {
-              argv.cleanup?.();
-            }
-            return { threadId: payload.threadId };
-          }
-
-          // Materialize WSL launch files only after every awaited pre-launch
-          // operation has settled, keeping the credential-file lifetime minimal.
-          const command = resolveLaunchSpec(payload.projectLocation, argv);
-          const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
-          this.spawnThread({
-            threadId: payload.threadId,
-            adapter,
-            agentKind: payload.agentKind,
-            projectLocation: payload.projectLocation,
-            config: payload.config,
-            initialSize: payload.initialSize,
-            launchPrompt,
-            command,
-            ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
-            ...(keepStructuredSession ? { structuredSession } : {}),
-            ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
-            mcpLaunchSnapshot,
-            launchConfig,
-            mcpIdentity,
-            nativePlugins,
-            ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
-            presentationMode: requestedPresentation,
-            ...(deferToTerminal && !useStructuredFlow
-              ? (() => {
-                  const preInputs = adapter.buildTerminalPreInputs?.(payload.config);
-                  return {
-                    ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
-                    pendingTerminalPrompt: initialPrompt,
-                    ...(effectiveSegments ? { pendingTerminalSegments: effectiveSegments } : {}),
-                  };
-                })()
-              : {}),
-          });
-          argvTransferred = true;
-
-          return { threadId: payload.threadId };
-        } finally {
-          if (!argvTransferred) cleanupArgv?.();
-        }
-      },
-    );
+      }
+    }
   }
 
   async restartThread(session: SessionRuntime, turn: QueuedStructuredTurn): Promise<void> {
     const ctx = this.ctx;
     const personalMcpCredentialEpoch = ctx.getPersonalMcpCredentialEpoch?.() ?? 0;
+    const mcpLaunchConfigurationEpoch = ctx.getMcpLaunchConfigurationEpoch?.() ?? 0;
     const { prompt, config } = turn;
     if (!session.sessionRef) {
       throw new Error("Session cannot be restarted without a known session reference.");
@@ -820,6 +952,7 @@ export class SpawnPipeline {
         launchConfig,
         mcpLaunchSnapshot,
         personalMcpCredentialEpoch,
+        mcpLaunchConfigurationEpoch,
       },
       async () => {
         const isServerControlled = session.adapter.capabilities.liveInputMode === "server";
@@ -863,6 +996,7 @@ export class SpawnPipeline {
           adapter: session.adapter,
           ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
         });
+        ctx.assertMcpLaunchAuthorizationCurrent?.(mcpIdentity);
         const structuredSession = await this.createStructuredSession(
           session.adapter,
           session.threadId,
@@ -878,6 +1012,7 @@ export class SpawnPipeline {
           await structuredSession?.dispose();
           return;
         }
+        await this.assertMcpLaunchAuthorizationCurrentOrDispose(mcpIdentity, structuredSession);
 
         if (structuredSession?.activate) {
           try {
@@ -891,6 +1026,7 @@ export class SpawnPipeline {
           await structuredSession?.dispose();
           return;
         }
+        await this.assertMcpLaunchAuthorizationCurrentOrDispose(mcpIdentity, structuredSession);
 
         if (structuredSession?.openThread) {
           try {
@@ -904,6 +1040,7 @@ export class SpawnPipeline {
           await structuredSession?.dispose();
           return;
         }
+        await this.assertMcpLaunchAuthorizationCurrentOrDispose(mcpIdentity, structuredSession);
 
         if (!usesTerminalPresentation) {
           if (!structuredSession) {
@@ -1294,12 +1431,22 @@ export class SpawnPipeline {
       mcpLaunchSnapshot,
       identity,
     );
-    const baseServers = composeResolvedMcpServers(
+    const resolvedBaseServers = composeResolvedMcpServers(
       mcpLaunchSnapshot,
       browserMcp,
       crossagentMcp,
       computerUseMcp,
       appControlsMcp,
+    );
+    // Personal Pipedream is a privileged credential boundary. Never allow a
+    // stored or user-supplied upstream Authorization value to reach provider
+    // translation; only the supervisor resolver may replace this sanitized
+    // descriptor with a launch-scoped localhost capability.
+    const personalMcpServers = resolvedBaseServers
+      .filter(isPersonalPipedreamMcpServer)
+      .map(stripResolvedAuthorizationHeader);
+    const baseServers = resolvedBaseServers.filter(
+      (server) => !isPersonalPipedreamMcpServer(server),
     );
     let pipedreamServers = pipedreamIdentity?.threadId
       ? await this.ctx.options.resolvePipedreamMcpServers?.({
@@ -1309,24 +1456,31 @@ export class SpawnPipeline {
             pipedreamIdentity.launchId,
           ),
           projectLocation: location,
+          ...(personalMcpServers.length > 0 ? { personalMcpServers } : {}),
         })
       : undefined;
-    if (
-      pipedreamServers?.length &&
-      hasYSpaceBrowserMcp(baseServers) &&
-      this.ctx.options.prepareMcpToolFilters
-    ) {
-      pipedreamServers = filterCompetingBrowserMcpServers(pipedreamServers);
-      const filtered = await this.ctx.options.prepareMcpToolFilters(
-        pipedreamServers.map((server) => ({
-          ...server,
-          description: "",
-          enabled: true,
-        })),
-        location,
-        true,
-      );
-      pipedreamServers = filtered;
+    if (pipedreamServers?.length) {
+      const browserExclusive = hasYSpaceBrowserMcp(baseServers);
+      if (browserExclusive) {
+        pipedreamServers = filterCompetingBrowserMcpServers(pipedreamServers);
+      }
+      if (
+        pipedreamServers.length > 0 &&
+        this.ctx.options.prepareMcpToolFilters &&
+        (browserExclusive ||
+          pipedreamServers.some((server) => (server.disabledTools?.length ?? 0) > 0))
+      ) {
+        const filtered = await this.ctx.options.prepareMcpToolFilters(
+          pipedreamServers.map((server) => ({
+            ...server,
+            description: "",
+            enabled: true,
+          })),
+          location,
+          browserExclusive,
+        );
+        pipedreamServers = filtered;
+      }
     }
     const combinedServers = pipedreamServers?.length
       ? [...baseServers, ...pipedreamServers]
@@ -1477,6 +1631,18 @@ export class SpawnPipeline {
     return adapter;
   }
 
+  private async assertMcpLaunchAuthorizationCurrentOrDispose(
+    identity: McpLaunchIdentity,
+    structuredSession: StructuredSessionHandle | undefined,
+  ): Promise<void> {
+    try {
+      this.ctx.assertMcpLaunchAuthorizationCurrent?.(identity);
+    } catch (error) {
+      await structuredSession?.dispose();
+      throw error;
+    }
+  }
+
   private async createStructuredSession(
     adapter: AgentAdapter,
     threadId: string,
@@ -1570,9 +1736,29 @@ function disposeRejectedSpawnInput(input: SpawnThreadInput): void {
   }
 }
 
-function resolvePipedreamProviderBindingId(threadId: string, launchId: string | undefined): string {
+export function resolvePipedreamProviderBindingId(
+  threadId: string,
+  launchId: string | undefined,
+): string {
   const threadBindingId = `thread:${threadId}`;
   return launchId ? `${threadBindingId}:launch:${launchId}` : threadBindingId;
+}
+
+export function isPersonalPipedreamMcpServer(server: ResolvedMcpServer): boolean {
+  const transport = server.transport;
+  return (
+    (transport.type === "http" || transport.type === "sse") &&
+    isPipedreamPersonalMcpUrl(transport.url)
+  );
+}
+
+export function stripResolvedAuthorizationHeader<T extends ResolvedMcpServer>(server: T): T {
+  const transport = server.transport;
+  if (transport.type !== "http" && transport.type !== "sse") return server;
+  const headers = Object.fromEntries(
+    Object.entries(transport.headers).filter(([name]) => name.toLowerCase() !== "authorization"),
+  );
+  return { ...server, transport: { ...transport, headers } } as T;
 }
 
 function onceLaunchCleanup(cleanup: (() => void) | undefined): (() => void) | undefined {

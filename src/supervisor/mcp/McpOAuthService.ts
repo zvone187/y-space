@@ -9,15 +9,22 @@ import type {
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import {
+  isPipedreamPersonalMcpUrl,
   mcpOauthBeginPayloadSchema,
+  PIPEDREAM_PERSONAL_MCP_URL,
   type McpOauthBeginPayload,
   type McpOauthBeginResult,
   type McpOauthClearPayload,
   type McpOauthStatusResult,
   type McpOauthWaitResult,
   type McpServer,
+  type ResolvedMcpServer,
 } from "@/shared/contracts";
 import { decryptSecret, encryptSecret } from "@/shared/secretStorage";
+import {
+  PersonalMcpLoopbackRelay,
+  type PersonalMcpRelayBindingInfo,
+} from "./PersonalMcpLoopbackRelay";
 
 const FLOW_TIMEOUT_MS = 5 * 60 * 1000;
 const TOKEN_EXPIRY_SLACK_MS = 60 * 1000;
@@ -64,8 +71,25 @@ interface CredentialCapability {
   readonly flow?: ActiveFlow;
 }
 
-interface ClearCredentialsOptions {
+export interface ClearCredentialsOptions {
   readonly strictPersistence?: boolean;
+}
+
+interface RefreshOperation {
+  readonly epoch: number;
+  readonly promise: Promise<string | undefined>;
+}
+
+interface PersonalRelayBindingRecord {
+  readonly bindingId: string;
+  readonly threadId: string;
+  readonly providerBindingId: string;
+  readonly serverId: string;
+  readonly credentialUrl: string;
+  readonly credentialEpoch: number;
+  readonly relayGeneration: number;
+  readonly threadBindingEpoch: number;
+  readonly info: PersonalMcpRelayBindingInfo;
 }
 
 function sanitizeMessage(value: unknown, fallback: string): string {
@@ -92,10 +116,63 @@ function hasAuthorizationHeader(headers: Record<string, string>): boolean {
   return Object.keys(headers).some((key) => key.toLowerCase() === "authorization");
 }
 
+function stripAuthorizationHeader(server: McpServer): McpServer {
+  if (!isOauthCapableTransport(server)) return server;
+  const headers = Object.fromEntries(
+    Object.entries(server.transport.headers).filter(
+      ([name]) => name.toLowerCase() !== "authorization",
+    ),
+  );
+  if (Object.keys(headers).length === Object.keys(server.transport.headers).length) return server;
+  return { ...server, transport: { ...server.transport, headers } };
+}
+
+function personalRelayBindingKey(
+  threadId: string,
+  providerBindingId: string,
+  serverId: string,
+  credentialUrl: string,
+  upstreamUrl: string,
+  advertisedHost: string | undefined,
+): string {
+  return JSON.stringify([
+    threadId,
+    providerBindingId,
+    serverId,
+    credentialUrl,
+    upstreamUrl,
+    advertisedHost?.trim() || "127.0.0.1",
+  ]);
+}
+
+function personalRelayProviderScopeKey(threadId: string, providerBindingId: string): string {
+  return JSON.stringify([threadId, providerBindingId]);
+}
+
+function personalRelayServer(
+  server: McpServer | ResolvedMcpServer,
+  info: PersonalMcpRelayBindingInfo,
+): ResolvedMcpServer {
+  return {
+    id: server.id,
+    name: server.name,
+    timeoutMs: server.timeoutMs,
+    ...(server.disabledTools ? { disabledTools: [...server.disabledTools] } : {}),
+    ...("approvalMode" in server && server.approvalMode
+      ? { approvalMode: server.approvalMode }
+      : {}),
+    transport: { type: "http", url: info.url, headers: { ...info.headers } },
+  };
+}
+
 export interface McpOAuthServiceOptions {
   baseDir: string;
   /** Test seam: overrides where the sealed credential store is written. */
   storePath?: string;
+  /** Test seam for Personal Pipedream's supervisor-owned upstream hop. */
+  fetch?: typeof globalThis.fetch;
+  /** Test/deployment override. Windows defaults to all interfaces for WSL. */
+  personalRelayBindHost?: "127.0.0.1" | "0.0.0.0";
 }
 
 /**
@@ -111,12 +188,26 @@ export class McpOAuthService {
   private readonly flows = new Map<string, ActiveFlow>();
   private readonly flowsByServer = new Map<string, ActiveFlow>();
   private readonly credentialEpochs = new Map<string, number>();
+  private readonly refreshOperations = new Map<string, RefreshOperation>();
+  private readonly personalRelay: PersonalMcpLoopbackRelay;
+  private readonly personalRelayBindings = new Map<string, PersonalRelayBindingRecord>();
+  private readonly personalThreadBindingEpochs = new Map<string, number>();
+  private readonly pendingPersonalRelayResolutions = new Map<string, number>();
+  private readonly personalProviderBindingResolutionEpochs = new Map<string, number>();
+  private readonly pendingPersonalProviderBindingResolutions = new Map<string, number>();
+  private personalRelayGeneration = 0;
   private storeCache: StoreFile | undefined;
   private storeLoadError: unknown;
+  private storePersistencePending = false;
 
   constructor(options: McpOAuthServiceOptions) {
     this.baseDir = options.baseDir;
     this.storePath = options.storePath ?? join(options.baseDir, STORE_FILE_NAME);
+    this.personalRelay = new PersonalMcpLoopbackRelay({
+      getAccessToken: async (serverUrl) => (await this.accessToken(serverUrl))?.accessToken,
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+      ...(options.personalRelayBindHost ? { bindHost: options.personalRelayBindHost } : {}),
+    });
   }
 
   async begin(input: McpOauthBeginPayload): Promise<McpOauthBeginResult> {
@@ -179,6 +270,10 @@ export class McpOAuthService {
   }
 
   clear(payload: McpOauthClearPayload, options: ClearCredentialsOptions = {}): void {
+    if (isPipedreamPersonalMcpUrl(payload.url)) {
+      this.clearPersonalCredentials(options);
+      return;
+    }
     this.invalidateCredentialOperations(payload.url);
     this.cancelFlowForServer(payload.url);
     const current = this.readStore();
@@ -187,10 +282,57 @@ export class McpOAuthService {
         cause: this.storeLoadError,
       });
     }
-    if (current.servers[payload.url] === undefined) return;
+    if (current.servers[payload.url] === undefined) {
+      if (this.storePersistencePending) this.writeStore(current, options);
+      return;
+    }
     const store: StoreFile = { servers: { ...current.servers } };
     delete store.servers[payload.url];
     this.writeStore(store, options);
+  }
+
+  /**
+   * Privileged Personal sign-out. All equivalent persisted URL keys are one
+   * credential identity and are invalidated before one atomic store rewrite.
+   */
+  clearPersonalCredentials(options: ClearCredentialsOptions = {}): void {
+    const current = this.readStore();
+    const personalUrls = new Set<string>([PIPEDREAM_PERSONAL_MCP_URL]);
+    for (const url of Object.keys(current.servers)) {
+      if (isPipedreamPersonalMcpUrl(url)) personalUrls.add(url);
+    }
+    for (const url of this.flowsByServer.keys()) {
+      if (isPipedreamPersonalMcpUrl(url)) personalUrls.add(url);
+    }
+    // A begin can be blocked opening its loopback listener before it reaches
+    // flowsByServer. Credential epochs are installed before that first await,
+    // so include them to keep every equivalent Personal identity fail-closed.
+    for (const url of this.credentialEpochs.keys()) {
+      if (isPipedreamPersonalMcpUrl(url)) personalUrls.add(url);
+    }
+    // Refreshes currently also own a credential epoch, but retain their exact
+    // keys here so a future refresh implementation cannot reopen this gap.
+    for (const url of this.refreshOperations.keys()) {
+      if (isPipedreamPersonalMcpUrl(url)) personalUrls.add(url);
+    }
+    for (const url of personalUrls) {
+      this.invalidateCredentialOperations(url);
+      this.cancelFlowForServer(url);
+    }
+    this.revokeAllPersonalRelayBindings();
+    if (options.strictPersistence && this.storeLoadError) {
+      throw new Error("Could not persist the OAuth credential change.", {
+        cause: this.storeLoadError,
+      });
+    }
+    const store: StoreFile = { servers: { ...current.servers } };
+    let changed = false;
+    for (const url of Object.keys(store.servers)) {
+      if (!isPipedreamPersonalMcpUrl(url)) continue;
+      delete store.servers[url];
+      changed = true;
+    }
+    if (changed || this.storePersistencePending) this.writeStore(store, options);
   }
 
   status(): McpOauthStatusResult {
@@ -212,6 +354,9 @@ export class McpOAuthService {
 
   async applyAuthorizationToServer(server: McpServer): Promise<McpServer> {
     if (!isOauthCapableTransport(server)) return server;
+    if (isPipedreamPersonalMcpUrl(server.transport.url)) {
+      return stripAuthorizationHeader(server);
+    }
     if (hasAuthorizationHeader(server.transport.headers)) return server;
     const credential = await this.accessToken(server.transport.url);
     if (!credential || !this.isCredentialCapabilityCurrent(credential.capability)) return server;
@@ -227,6 +372,187 @@ export class McpOAuthService {
     };
   }
 
+  async resolvePersonalMcpServersForLaunch(input: {
+    readonly servers: readonly (McpServer | ResolvedMcpServer)[];
+    readonly threadId: string;
+    readonly providerBindingId: string;
+    readonly advertisedHost?: string;
+  }): Promise<ResolvedMcpServer[]> {
+    const providerScopeKey = personalRelayProviderScopeKey(input.threadId, input.providerBindingId);
+    this.pendingPersonalRelayResolutions.set(
+      input.threadId,
+      (this.pendingPersonalRelayResolutions.get(input.threadId) ?? 0) + 1,
+    );
+    this.pendingPersonalProviderBindingResolutions.set(
+      providerScopeKey,
+      (this.pendingPersonalProviderBindingResolutions.get(providerScopeKey) ?? 0) + 1,
+    );
+    const providerBindingResolutionEpoch =
+      (this.personalProviderBindingResolutionEpochs.get(providerScopeKey) ?? 0) + 1;
+    this.personalProviderBindingResolutionEpochs.set(
+      providerScopeKey,
+      providerBindingResolutionEpoch,
+    );
+    const relayGeneration = this.personalRelayGeneration;
+    const threadBindingEpoch = this.currentPersonalThreadBindingEpoch(input.threadId);
+    const isCurrentResolution = (): boolean =>
+      relayGeneration === this.personalRelayGeneration &&
+      threadBindingEpoch === this.currentPersonalThreadBindingEpoch(input.threadId) &&
+      providerBindingResolutionEpoch ===
+        this.personalProviderBindingResolutionEpochs.get(providerScopeKey);
+    try {
+      const configuredBindingKeys = new Set<string>();
+      for (const server of input.servers) {
+        const transport = server.transport;
+        if (
+          (transport.type !== "http" && transport.type !== "sse") ||
+          !isPipedreamPersonalMcpUrl(transport.url)
+        ) {
+          continue;
+        }
+        const credentialUrl = this.personalCredentialUrlFor(transport.url);
+        if (!credentialUrl) continue;
+        configuredBindingKeys.add(
+          personalRelayBindingKey(
+            input.threadId,
+            input.providerBindingId,
+            server.id,
+            credentialUrl,
+            transport.url,
+            input.advertisedHost,
+          ),
+        );
+      }
+      if (!isCurrentResolution()) return [];
+      this.releaseObsoletePersonalRelayBindings(
+        input.threadId,
+        input.providerBindingId,
+        configuredBindingKeys,
+      );
+
+      const resolved: ResolvedMcpServer[] = [];
+      const desiredBindingKeys = new Set<string>();
+      for (const server of input.servers) {
+        const transport = server.transport;
+        if (
+          (transport.type !== "http" && transport.type !== "sse") ||
+          !isPipedreamPersonalMcpUrl(transport.url)
+        ) {
+          continue;
+        }
+        const credentialUrl = this.personalCredentialUrlFor(transport.url);
+        if (!credentialUrl) continue;
+        const credential = await this.accessToken(credentialUrl);
+        if (
+          !credential ||
+          !isCurrentResolution() ||
+          !this.isCredentialCapabilityCurrent(credential.capability)
+        ) {
+          continue;
+        }
+        const bindingKey = personalRelayBindingKey(
+          input.threadId,
+          input.providerBindingId,
+          server.id,
+          credentialUrl,
+          transport.url,
+          input.advertisedHost,
+        );
+        if (desiredBindingKeys.has(bindingKey)) continue;
+        desiredBindingKeys.add(bindingKey);
+        const existing = this.personalRelayBindings.get(bindingKey);
+        if (
+          existing?.relayGeneration === relayGeneration &&
+          existing.threadBindingEpoch === threadBindingEpoch &&
+          existing.credentialEpoch === credential.capability.epoch
+        ) {
+          resolved.push(personalRelayServer(server, existing.info));
+          continue;
+        }
+        if (existing) {
+          this.personalRelay.unregisterBinding(existing.bindingId);
+          this.personalRelayBindings.delete(bindingKey);
+        }
+        const info = await this.personalRelay.registerBinding({
+          threadId: input.threadId,
+          providerBindingId: input.providerBindingId,
+          upstreamUrl: transport.url,
+          credentialUrl,
+          ...(input.advertisedHost ? { advertisedHost: input.advertisedHost } : {}),
+        });
+        if (!isCurrentResolution() || !this.isCredentialCapabilityCurrent(credential.capability)) {
+          this.personalRelay.unregisterBinding(info.bindingId);
+          continue;
+        }
+        this.personalRelayBindings.set(bindingKey, {
+          bindingId: info.bindingId,
+          threadId: input.threadId,
+          providerBindingId: input.providerBindingId,
+          serverId: server.id,
+          credentialUrl,
+          credentialEpoch: credential.capability.epoch,
+          relayGeneration,
+          threadBindingEpoch,
+          info,
+        });
+        resolved.push(personalRelayServer(server, info));
+      }
+      if (!isCurrentResolution()) return [];
+      this.releaseObsoletePersonalRelayBindings(
+        input.threadId,
+        input.providerBindingId,
+        desiredBindingKeys,
+      );
+      return resolved;
+    } finally {
+      const pending = (this.pendingPersonalRelayResolutions.get(input.threadId) ?? 1) - 1;
+      if (pending <= 0) this.pendingPersonalRelayResolutions.delete(input.threadId);
+      else this.pendingPersonalRelayResolutions.set(input.threadId, pending);
+      const pendingProviderResolutions =
+        (this.pendingPersonalProviderBindingResolutions.get(providerScopeKey) ?? 1) - 1;
+      if (pendingProviderResolutions <= 0) {
+        this.pendingPersonalProviderBindingResolutions.delete(providerScopeKey);
+        this.personalProviderBindingResolutionEpochs.delete(providerScopeKey);
+      } else {
+        this.pendingPersonalProviderBindingResolutions.set(
+          providerScopeKey,
+          pendingProviderResolutions,
+        );
+      }
+      this.prunePersonalThreadBindingEpoch(input.threadId);
+    }
+  }
+
+  releasePersonalMcpBindings(threadId: string): void {
+    this.personalThreadBindingEpochs.set(
+      threadId,
+      this.currentPersonalThreadBindingEpoch(threadId) + 1,
+    );
+    this.personalRelay.unregisterThread(threadId);
+    for (const [key, binding] of this.personalRelayBindings) {
+      if (binding.threadId === threadId) this.personalRelayBindings.delete(key);
+    }
+    this.prunePersonalThreadBindingEpoch(threadId);
+  }
+
+  releasePersonalMcpProviderBindings(threadId: string, providerBindingId: string): void {
+    const providerScopeKey = personalRelayProviderScopeKey(threadId, providerBindingId);
+    this.personalProviderBindingResolutionEpochs.set(
+      providerScopeKey,
+      (this.personalProviderBindingResolutionEpochs.get(providerScopeKey) ?? 0) + 1,
+    );
+    for (const [key, binding] of this.personalRelayBindings) {
+      if (binding.threadId !== threadId || binding.providerBindingId !== providerBindingId)
+        continue;
+      this.personalRelay.unregisterBinding(binding.bindingId);
+      this.personalRelayBindings.delete(key);
+    }
+    if ((this.pendingPersonalProviderBindingResolutions.get(providerScopeKey) ?? 0) === 0) {
+      this.personalProviderBindingResolutionEpochs.delete(providerScopeKey);
+    }
+    this.prunePersonalThreadBindingEpoch(threadId);
+  }
+
   dispose(): void {
     for (const serverUrl of this.credentialEpochs.keys()) {
       this.invalidateCredentialOperations(serverUrl);
@@ -234,6 +560,8 @@ export class McpOAuthService {
     for (const flow of [...this.flows.values()]) {
       this.settleFlow(flow, { status: "error", message: "The sign-in flow was canceled." });
     }
+    this.revokeAllPersonalRelayBindings();
+    void this.personalRelay.dispose();
   }
 
   private async accessToken(serverUrl: string): Promise<
@@ -250,17 +578,82 @@ export class McpOAuthService {
       return { accessToken: tokens.access_token, capability };
     }
     if (!tokens.refresh_token) return undefined;
+    let operation = this.refreshOperations.get(serverUrl);
+    if (!operation || operation.epoch !== capability.epoch) {
+      let promise!: Promise<string | undefined>;
+      promise = this.refreshAccessToken(capability).finally(() => {
+        if (this.refreshOperations.get(serverUrl)?.promise === promise) {
+          this.refreshOperations.delete(serverUrl);
+        }
+      });
+      operation = { epoch: capability.epoch, promise };
+      this.refreshOperations.set(serverUrl, operation);
+    }
+    const accessToken = await operation.promise;
+    if (!accessToken || !this.isCredentialCapabilityCurrent(capability)) return undefined;
+    return { accessToken, capability };
+  }
+
+  private async refreshAccessToken(capability: CredentialCapability): Promise<string | undefined> {
     try {
       const provider = this.createProvider(capability);
-      const result = await auth(provider, { serverUrl });
+      const result = await auth(provider, { serverUrl: capability.serverUrl });
       if (result !== "AUTHORIZED" || !this.isCredentialCapabilityCurrent(capability)) {
         return undefined;
       }
-      const refreshed = this.readTokensForCapability(capability);
-      return refreshed ? { accessToken: refreshed.access_token, capability } : undefined;
+      return this.readTokensForCapability(capability)?.access_token;
     } catch {
       return undefined;
     }
+  }
+
+  private currentPersonalThreadBindingEpoch(threadId: string): number {
+    return this.personalThreadBindingEpochs.get(threadId) ?? 0;
+  }
+
+  private prunePersonalThreadBindingEpoch(threadId: string): void {
+    if ((this.pendingPersonalRelayResolutions.get(threadId) ?? 0) > 0) return;
+    for (const binding of this.personalRelayBindings.values()) {
+      if (binding.threadId === threadId) return;
+    }
+    this.personalThreadBindingEpochs.delete(threadId);
+  }
+
+  private personalCredentialUrlFor(serverUrl: string): string | undefined {
+    if (!isPipedreamPersonalMcpUrl(serverUrl)) return undefined;
+    if (this.readTokens(serverUrl)) return serverUrl;
+    if (serverUrl !== PIPEDREAM_PERSONAL_MCP_URL && this.readTokens(PIPEDREAM_PERSONAL_MCP_URL)) {
+      return PIPEDREAM_PERSONAL_MCP_URL;
+    }
+    return Object.keys(this.readStore().servers).find(
+      (candidate) => isPipedreamPersonalMcpUrl(candidate) && this.readTokens(candidate),
+    );
+  }
+
+  private releaseObsoletePersonalRelayBindings(
+    threadId: string,
+    providerBindingId: string,
+    desiredBindingKeys: ReadonlySet<string>,
+  ): void {
+    for (const [key, binding] of this.personalRelayBindings) {
+      if (
+        binding.threadId !== threadId ||
+        binding.providerBindingId !== providerBindingId ||
+        desiredBindingKeys.has(key)
+      ) {
+        continue;
+      }
+      this.personalRelay.unregisterBinding(binding.bindingId);
+      this.personalRelayBindings.delete(key);
+    }
+  }
+
+  private revokeAllPersonalRelayBindings(): void {
+    this.personalRelayGeneration += 1;
+    this.personalRelayBindings.clear();
+    this.personalThreadBindingEpochs.clear();
+    this.personalProviderBindingResolutionEpochs.clear();
+    this.personalRelay.revokeAllBindings();
   }
 
   private tokensExpired(capability: CredentialCapability, tokens: OAuthTokens): boolean {
@@ -546,6 +939,7 @@ export class McpOAuthService {
             : {},
       };
       this.storeLoadError = undefined;
+      this.storePersistencePending = false;
     } catch (error) {
       const missing =
         error instanceof Error &&
@@ -553,12 +947,14 @@ export class McpOAuthService {
         (error as NodeJS.ErrnoException).code === "ENOENT";
       this.storeLoadError = missing ? undefined : error;
       this.storeCache = { servers: {} };
+      this.storePersistencePending = false;
     }
     return this.storeCache;
   }
 
   private writeStore(store: StoreFile, options: ClearCredentialsOptions = {}): void {
     this.storeCache = store;
+    this.storePersistencePending = true;
     const temporaryPath = `${this.storePath}.${randomUUID()}.tmp`;
     try {
       mkdirSync(dirname(this.storePath), { recursive: true });
@@ -568,6 +964,7 @@ export class McpOAuthService {
       });
       renameSync(temporaryPath, this.storePath);
       this.storeLoadError = undefined;
+      this.storePersistencePending = false;
     } catch (cause) {
       try {
         rmSync(temporaryPath, { force: true });

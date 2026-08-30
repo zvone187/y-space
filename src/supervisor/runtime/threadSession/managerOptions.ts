@@ -83,9 +83,13 @@ export interface ThreadSessionManagerOptions {
     threadId: string;
     providerBindingId?: string;
     projectLocation: ProjectLocation;
+    /** Personal descriptors are sanitized and must be replaced by local relays. */
+    personalMcpServers?: readonly ResolvedMcpServer[];
   }): Promise<ResolvedMcpServer[]>;
   /** Revokes every relay bearer minted for a thread when it closes. */
   releasePipedreamMcpBindings?(threadId: string): void;
+  /** Revokes only one superseded launch without disturbing its replacement. */
+  releasePipedreamMcpLaunchBindings?(identity: { threadId: string; launchId: string }): void;
   /** Skills and MCPs contributed by enabled Agent Plugins for one provider launch. */
   resolvePluginLaunchContributions?(
     projectLocation: ProjectLocation,

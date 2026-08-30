@@ -92,6 +92,7 @@ interface ActivePersonalMcpOauthFlow {
   readonly supervisorFlowId: string;
   readonly nativeSessionPartitionLease: SensitiveSessionPartitionPoolLease;
   readonly tabIds: Set<string>;
+  openingTab: boolean;
   acceptingTabs: boolean;
   state: PipedreamPersonalMcpOauthFlowStatus["state"];
   expiryTimer: ReturnType<typeof setTimeout> | null;
@@ -124,6 +125,7 @@ export class PipedreamMainService {
   #connectLifecycleQueue: Promise<void> = Promise.resolve();
   #personalMcpOauthLifecycleQueue: Promise<void> = Promise.resolve();
   #connectRequestGeneration = 0;
+  #personalMcpOauthRevocationGeneration = 0;
   readonly #pendingRedirectReceivers = new Map<number, PipedreamConnectRedirectReceiver>();
   #configurationMutationInProgress = false;
   #disposed = false;
@@ -133,23 +135,39 @@ export class PipedreamMainService {
   }
 
   beginPersonalMcpOauth(): Promise<PipedreamPersonalMcpOauthBeginResult> {
-    return this.#withPersonalMcpOauthLifecycleLock(() => this.#beginPersonalMcpOauth());
+    const revocationGeneration = this.#personalMcpOauthRevocationGeneration;
+    return this.#withPersonalMcpOauthLifecycleLock(() =>
+      this.#beginPersonalMcpOauth(revocationGeneration),
+    );
   }
 
-  async #beginPersonalMcpOauth(): Promise<PipedreamPersonalMcpOauthBeginResult> {
-    if (this.#disposed) throw new Error("Pipedream Connect service is disposed.");
+  async #beginPersonalMcpOauth(
+    revocationGeneration: number,
+  ): Promise<PipedreamPersonalMcpOauthBeginResult> {
+    if (this.#disposed || revocationGeneration !== this.#personalMcpOauthRevocationGeneration) {
+      throw new Error("Pipedream Connect request was superseded.");
+    }
     const beginOauth = this.#options.beginPersonalMcpOauth;
     const waitOauth = this.#options.waitPersonalMcpOauth;
     if (!beginOauth || !waitOauth) return { state: "error" };
 
     const previous = this.#activePersonalMcpOauthFlow;
-    if (previous) await this.#closePersonalMcpOauthFlow(previous, true);
+    if (previous) await this.#retirePersonalMcpOauthFlowForReplacement(previous);
+    if (this.#disposed || revocationGeneration !== this.#personalMcpOauthRevocationGeneration) {
+      throw new Error("Pipedream Connect request was superseded.");
+    }
 
     let begin: McpOauthBeginResult;
     try {
       begin = await beginOauth();
     } catch {
       return { state: "error" };
+    }
+    if (this.#disposed || revocationGeneration !== this.#personalMcpOauthRevocationGeneration) {
+      if (begin.status === "redirect") {
+        await this.#options.cancelPersonalMcpOauth?.(begin.flowId).catch(() => undefined);
+      }
+      throw new Error("Pipedream Connect request was superseded.");
     }
     if (begin.status === "authorized") return { state: "authorized" };
     if (begin.status !== "redirect") return { state: "error" };
@@ -168,6 +186,7 @@ export class PipedreamMainService {
       supervisorFlowId: begin.flowId,
       nativeSessionPartitionLease,
       tabIds: new Set<string>(),
+      openingTab: true,
       acceptingTabs: true,
       state: "open",
       expiryTimer: null,
@@ -184,13 +203,22 @@ export class PipedreamMainService {
       const opened = await this.#options.openConnectUrl(authorizationUrl, ownership);
       ownership.onTabOpened(requireMainOwnedSensitiveTabId(opened.tabId));
     } catch {
-      await this.#closePersonalMcpOauthFlow(flow, true);
+      flow.openingTab = false;
+      await this.#closePersonalMcpOauthFlow(flow, true, true);
       return { state: "error" };
+    }
+    flow.openingTab = false;
+    if (
+      revocationGeneration !== this.#personalMcpOauthRevocationGeneration ||
+      !ownership.canOpenTab()
+    ) {
+      await this.#closePersonalMcpOauthFlow(flow, true, true);
+      throw new Error("Pipedream Connect request was superseded.");
     }
 
     flow.expiryTimer = setTimeout(() => {
       void this.#withPersonalMcpOauthLifecycleLock(() =>
-        this.#closePersonalMcpOauthFlow(flow, true),
+        this.#closePersonalMcpOauthFlow(flow, true, false),
       );
     }, MAX_CONNECT_FLOW_LIFETIME_MS);
     flow.expiryTimer.unref?.();
@@ -222,27 +250,45 @@ export class PipedreamMainService {
           if (await this.#options.isConnectTabOpen(tabId)) hasOpenTab = true;
           else flow.tabIds.delete(tabId);
         }
-        if (!hasOpenTab) await this.#closePersonalMcpOauthFlow(flow, true);
+        if (!hasOpenTab) await this.#closePersonalMcpOauthFlow(flow, true, false);
       }
       return pipedreamPersonalMcpOauthFlowStatusSchema.parse({ state: flow.state });
     });
   }
 
   async cancelPersonalMcpOauth(payload: PipedreamPersonalMcpOauthFlowPayload): Promise<void> {
-    await this.#withPersonalMcpOauthLifecycleLock(async () => {
-      const { flowId } = pipedreamPersonalMcpOauthFlowPayloadSchema.parse(payload);
-      const flow = this.#activePersonalMcpOauthFlow;
-      if (!flow || flow.flowId !== flowId) return;
-      await this.#closePersonalMcpOauthFlow(flow, true);
-    });
+    const { flowId } = pipedreamPersonalMcpOauthFlowPayloadSchema.parse(payload);
+    const flow = this.#activePersonalMcpOauthFlow;
+    if (!flow || flow.flowId !== flowId) return;
+    this.#personalMcpOauthRevocationGeneration += 1;
+    await this.#closePersonalMcpOauthFlow(flow, true, false);
+    // Revocation superseded the old flow and its supervisor mutation has
+    // settled. Detach from a stale status-read tail so reconnect can proceed;
+    // the retired flow keeps its own exact-tab cleanup quarantine.
+    this.#personalMcpOauthLifecycleQueue = Promise.resolve();
   }
 
   async clearPersonalMcpOauth(): Promise<void> {
-    await this.#withPersonalMcpOauthLifecycleLock(async () => {
-      const flow = this.#activePersonalMcpOauthFlow;
-      if (flow) await this.#closePersonalMcpOauthFlow(flow, true);
-      await this.#options.clearPersonalMcpOauth?.();
-    });
+    this.#personalMcpOauthRevocationGeneration += 1;
+    let clearOperation: Promise<void>;
+    try {
+      clearOperation = this.#options.clearPersonalMcpOauth?.() ?? Promise.resolve();
+    } catch (error) {
+      clearOperation = Promise.reject(error);
+    }
+
+    const flow = this.#activePersonalMcpOauthFlow;
+    if (flow) void this.#closePersonalMcpOauthFlow(flow, true, false);
+
+    // Replace, rather than append to, the lifecycle tail. Revocation already
+    // superseded every older flow, so a stuck tab-status read must not prevent
+    // a later reconnect; the new tail still orders that reconnect after the
+    // privileged credential mutation settles.
+    this.#personalMcpOauthLifecycleQueue = clearOperation.then(
+      () => undefined,
+      () => undefined,
+    );
+    await clearOperation;
   }
 
   async beginConnect(payload: PipedreamBeginConnectPayload): Promise<PipedreamBeginConnectResult> {
@@ -253,6 +299,7 @@ export class PipedreamMainService {
     const { appSlug } = pipedreamBeginConnectPayloadSchema.parse(payload);
     const requestGeneration = ++this.#connectRequestGeneration;
     this.#disposeSupersededRedirectReceivers(requestGeneration);
+    await this.#supersedeActiveConnectFlowForRequest();
 
     let ownedFlow: ActiveConnectFlow | null = null;
     let pendingTerminalState: PipedreamConnectTerminalState | null = null;
@@ -345,6 +392,18 @@ export class PipedreamMainService {
         }
         return safeResult;
       });
+    } catch (error) {
+      const failedFlow = ownedFlow as ActiveConnectFlow | null;
+      if (failedFlow && this.#activeConnectFlow === failedFlow) {
+        failedFlow.releaseAfterCleanup = true;
+        this.#settleConnectFlow(failedFlow, "closed");
+        await Promise.all([
+          failedFlow.redirectReceiver.dispose().catch(() => undefined),
+          this.#attemptConnectCleanup(failedFlow).catch(() => undefined),
+        ]);
+        this.#releaseConnectFlow(failedFlow);
+      }
+      throw error;
     } finally {
       this.#pendingRedirectReceivers.delete(requestGeneration);
       if (!ownedFlow) await redirectReceiver.dispose();
@@ -364,8 +423,8 @@ export class PipedreamMainService {
         return pipedreamConnectFlowStatusSchema.parse({ state: activeFlow.state });
       }
       if (Date.now() >= activeFlow.expiresAtMs) {
-        this.#settleConnectFlow(activeFlow, "closed");
-        return pipedreamConnectFlowStatusSchema.parse({ state: "closed" });
+        this.#settleConnectFlow(activeFlow, "expired");
+        return pipedreamConnectFlowStatusSchema.parse({ state: "expired" });
       }
 
       let hasOpenTab = false;
@@ -400,18 +459,23 @@ export class PipedreamMainService {
   async dispose(): Promise<void> {
     this.#disposed = true;
     this.#connectRequestGeneration += 1;
+    this.#personalMcpOauthRevocationGeneration += 1;
     const pendingReceivers = [...this.#pendingRedirectReceivers.values()];
     this.#pendingRedirectReceivers.clear();
     const activeFlow = this.#activeConnectFlow;
     if (activeFlow) {
       activeFlow.releaseAfterCleanup = true;
       this.#settleConnectFlow(activeFlow, "closed");
+      // Disposal revoked the exact flow synchronously. Do not wait behind an
+      // openConnectUrl call that may never return before finishing cleanup.
+      this.#connectLifecycleQueue = Promise.resolve();
     }
-    await this.#withPersonalMcpOauthLifecycleLock(async () => {
-      const personalOauthFlow = this.#activePersonalMcpOauthFlow;
-      if (personalOauthFlow) await this.#closePersonalMcpOauthFlow(personalOauthFlow, true);
-    });
+    const personalOauthFlow = this.#activePersonalMcpOauthFlow;
+    const personalOauthClose = personalOauthFlow
+      ? this.#closePersonalMcpOauthFlow(personalOauthFlow, true, false)
+      : Promise.resolve();
     await Promise.all([
+      personalOauthClose,
       ...pendingReceivers.map((receiver) => receiver.dispose()),
       ...(activeFlow ? [activeFlow.redirectReceiver.dispose()] : []),
     ]);
@@ -517,8 +581,9 @@ export class PipedreamMainService {
         flow.acceptingTabs &&
         flow.state === "open",
       onTabOpened: (value: string) => {
-        if (!flow.acceptingTabs) return;
-        flow.tabIds.add(requireMainOwnedSensitiveTabId(value));
+        const tabId = requireMainOwnedSensitiveTabId(value);
+        flow.tabIds.add(tabId);
+        if (!flow.acceptingTabs) void this.#attemptPersonalMcpOauthCleanup(flow);
       },
       onTabClosed: (value: string) => {
         flow.tabIds.delete(value);
@@ -546,6 +611,7 @@ export class PipedreamMainService {
   async #closePersonalMcpOauthFlow(
     flow: ActivePersonalMcpOauthFlow,
     cancelSupervisor: boolean,
+    waitForCleanup: boolean,
   ): Promise<void> {
     const shouldCancelSupervisor = cancelSupervisor && flow.state === "open";
     flow.releaseAfterCleanup = true;
@@ -559,12 +625,35 @@ export class PipedreamMainService {
       clearTimeout(flow.retentionTimer);
       flow.retentionTimer = null;
     }
-    if (shouldCancelSupervisor) {
-      await this.#options.cancelPersonalMcpOauth?.(flow.supervisorFlowId).catch(() => undefined);
-    }
-    const cleanup = await this.#attemptPersonalMcpOauthCleanup(flow);
-    if (cleanup === "pending") await this.#waitForPersonalMcpOauthCleanup(flow);
+    const cancel = shouldCancelSupervisor
+      ? (this.#options.cancelPersonalMcpOauth?.(flow.supervisorFlowId).catch(() => undefined) ??
+        Promise.resolve())
+      : Promise.resolve();
+    const cleanup = this.#attemptPersonalMcpOauthCleanup(flow);
+    await cancel;
+    if (!waitForCleanup) return;
+    if ((await cleanup) === "pending") await this.#waitForPersonalMcpOauthCleanup(flow);
     this.#releasePersonalMcpOauthFlow(flow);
+  }
+
+  async #retirePersonalMcpOauthFlowForReplacement(flow: ActivePersonalMcpOauthFlow): Promise<void> {
+    if (!flow.openingTab || flow.acceptingTabs) {
+      await this.#closePersonalMcpOauthFlow(flow, true, true);
+      return;
+    }
+
+    // Clear/cancel already revoked this flow, but its Browser open may never
+    // settle. Quarantine that exact ownership object and detach it from the
+    // active slot so a reconnect can use a fresh partition. A late tab is
+    // still registered on `flow` and closed by its existing cleanup path.
+    await this.#closePersonalMcpOauthFlow(flow, true, false);
+    if (flow.cleanupTimer) {
+      clearTimeout(flow.cleanupTimer);
+      flow.cleanupTimer = null;
+    }
+    if (this.#activePersonalMcpOauthFlow === flow) {
+      this.#activePersonalMcpOauthFlow = null;
+    }
   }
 
   #schedulePersonalMcpOauthRetirement(flow: ActivePersonalMcpOauthFlow): void {
@@ -593,9 +682,13 @@ export class PipedreamMainService {
       clearTimeout(flow.cleanupTimer);
       flow.cleanupTimer = null;
     }
-    if (flow.tabIds.size === 0) {
+    if (!flow.openingTab && flow.tabIds.size === 0) {
       this.#completePersonalMcpOauthCleanup(flow);
       return Promise.resolve("complete");
+    }
+    if (flow.openingTab && flow.tabIds.size === 0) {
+      this.#schedulePersonalMcpOauthCleanupRetry(flow);
+      return Promise.resolve("pending");
     }
     const cleanup = this.#closePersonalMcpOauthTabs(flow).then((result) => {
       if (result === "complete") this.#completePersonalMcpOauthCleanup(flow);
@@ -641,7 +734,7 @@ export class PipedreamMainService {
   }
 
   #completePersonalMcpOauthCleanup(flow: ActivePersonalMcpOauthFlow): void {
-    if (flow.cleanupComplete || flow.tabIds.size > 0) return;
+    if (flow.cleanupComplete || flow.openingTab || flow.tabIds.size > 0) return;
     flow.cleanupComplete = true;
     if (flow.cleanupTimer) {
       clearTimeout(flow.cleanupTimer);
@@ -698,7 +791,7 @@ export class PipedreamMainService {
         this.#scheduleConnectExpiry(flow);
         return;
       }
-      this.#settleConnectFlow(flow, "closed");
+      this.#settleConnectFlow(flow, "expired");
     }, delayMs);
     flow.expiryTimer.unref?.();
   }
@@ -737,6 +830,29 @@ export class PipedreamMainService {
     }
   }
 
+  /**
+   * A newer request owns cancellation immediately, before remote link
+   * creation or URL validation. The older request may still be stuck inside
+   * openConnectUrl while holding the lifecycle queue, so teardown cannot wait
+   * for that queue. Revoke tab ownership, close known tabs, and dispose the
+   * exact loopback receiver now; late tabs are quarantined by the settled
+   * ownership object and cleaned by the same retry path.
+   */
+  async #supersedeActiveConnectFlowForRequest(): Promise<void> {
+    const activeFlow = this.#activeConnectFlow;
+    if (!activeFlow) return;
+    activeFlow.releaseAfterCleanup = true;
+    this.#settleConnectFlow(activeFlow, "closed");
+    // The prior request may be indefinitely suspended inside openConnectUrl
+    // while owning the serialized tail. Its generation and exact flow
+    // authority are already revoked, so detach that poisoned tail and let the
+    // replacement establish its own independently ordered lifecycle.
+    this.#connectLifecycleQueue = Promise.resolve();
+    const receiverDisposal = activeFlow.redirectReceiver.dispose().catch(() => undefined);
+    void this.#attemptConnectCleanup(activeFlow).catch(() => undefined);
+    await receiverDisposal;
+  }
+
   async #withConfigurationMutation<T>(operation: () => Promise<T>): Promise<T> {
     if (this.#disposed) throw new Error("Pipedream Connect service is disposed.");
     if (this.#configurationMutationInProgress) {
@@ -759,6 +875,9 @@ export class PipedreamMainService {
     if (activeFlow) {
       activeFlow.releaseAfterCleanup = true;
       this.#settleConnectFlow(activeFlow, "closed");
+      // Configuration replacement already invalidated the active generation;
+      // detach a stale tab-opening tail so the privileged mutation can finish.
+      this.#connectLifecycleQueue = Promise.resolve();
     }
     await Promise.all([
       ...pendingReceivers.map((receiver) => receiver.dispose()),

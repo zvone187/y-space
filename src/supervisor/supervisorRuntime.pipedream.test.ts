@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PipedreamAgentReloadOutcome, PipedreamSnapshot } from "@/shared/contracts";
+import {
+  PIPEDREAM_PERSONAL_MCP_URL,
+  type PipedreamAgentReloadOutcome,
+  type PipedreamSnapshot,
+  type ResolvedMcpServer,
+} from "@/shared/contracts";
 import type { PipedreamPrivilegedBootstrapPayload } from "@/shared/pipedreamPrivilegedIpc";
-import { SupervisorRuntime } from "./supervisorRuntime";
+import { resolveRuntimePipedreamMcpServers, SupervisorRuntime } from "./supervisorRuntime";
 
 const PAYLOAD: PipedreamPrivilegedBootstrapPayload = {
   bootstrap: { state: "absent" },
@@ -9,6 +14,91 @@ const PAYLOAD: PipedreamPrivilegedBootstrapPayload = {
 };
 
 describe("SupervisorRuntime Pipedream configuration", () => {
+  it.each(["missing", "rejected"] as const)(
+    "revokes the exact Personal provider binding when WSL reachability is %s",
+    async (failure) => {
+      const personal: ResolvedMcpServer = {
+        id: "pipedream-personal-mcp",
+        name: "pd",
+        timeoutMs: 30_000,
+        transport: { type: "http", url: PIPEDREAM_PERSONAL_MCP_URL, headers: {} },
+      };
+      const connect: ResolvedMcpServer = {
+        id: "pipedream-connect-gmail",
+        name: "gmail",
+        timeoutMs: 30_000,
+        transport: {
+          type: "http",
+          url: "http://127.0.0.1:43123/mcp",
+          headers: { authorization: "Bearer connect-local" },
+        },
+      };
+      const resolvePersonal = vi.fn<
+        Parameters<typeof resolveRuntimePipedreamMcpServers>[1]["resolvePersonal"]
+      >(async () => [] as ResolvedMcpServer[]);
+
+      await expect(
+        resolveRuntimePipedreamMcpServers(
+          {
+            threadId: "thread-wsl-personal",
+            providerBindingId: "thread:thread-wsl-personal:launch:live",
+            projectLocation: {
+              kind: "wsl",
+              distro: "Ubuntu",
+              linuxPath: "/repo",
+              uncPath: "\\\\wsl.localhost\\Ubuntu\\repo",
+            },
+            personalMcpServers: [personal],
+          },
+          {
+            resolveConnect: async () => [connect],
+            resolvePersonal,
+            resolveWslHostAccess: async () => {
+              if (failure === "rejected") throw new Error("WSL reachability failed");
+              return undefined;
+            },
+          },
+        ),
+      ).resolves.toEqual([connect]);
+      expect(resolvePersonal).toHaveBeenCalledExactlyOnceWith({
+        servers: [],
+        threadId: "thread-wsl-personal",
+        providerBindingId: "thread:thread-wsl-personal:launch:live",
+      });
+    },
+  );
+
+  it("reports every Personal URL alias accepted by the launch boundary", () => {
+    const personalAlias = "https://ignored:ignored@mcp.pipedream.net./v2/?legacy=1";
+    const runtime = Object.assign(Object.create(SupervisorRuntime.prototype) as SupervisorRuntime, {
+      sharedSettingsCache: {
+        readFresh: () => ({
+          mcpServers: [
+            {
+              id: "pipedream-personal-alias",
+              name: "pd",
+              description: "Personal Pipedream tools",
+              enabled: true,
+              timeoutMs: 30_000,
+              transport: { type: "http" as const, url: personalAlias, headers: {} },
+            },
+          ],
+        }),
+      },
+      mcpOAuthService: {
+        status: () => ({ authenticatedUrls: [personalAlias] }),
+      },
+    });
+
+    expect(
+      (
+        runtime as unknown as {
+          readPipedreamPersonalMcpStatus(): { enabled: boolean; authenticated: boolean };
+        }
+      ).readPipedreamPersonalMcpStatus(),
+    ).toEqual({ enabled: true, authenticated: true });
+  });
+
   it.each(["applied", "restart-required", "failed-pending"] as const)(
     "acknowledges privileged configuration only after the %s live-agent reload outcome",
     async (state) => {

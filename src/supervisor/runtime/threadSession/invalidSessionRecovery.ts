@@ -29,6 +29,7 @@ export interface InvalidSessionRecoveryContext {
   beginMcpLaunchAuthorization(authorization: McpLaunchAuthorization): void;
   revokeMcpLaunchAuthorization(identity: McpLaunchIdentity): void;
   getPersonalMcpCredentialEpoch?(): number;
+  getMcpLaunchConfigurationEpoch?(): number;
   settleAfterStructuredDispose(): Promise<void>;
   primeProjectShellEnv(cwd: string): Promise<unknown>;
   resolveLaunchSpec(location: ProjectLocation, argv: AgentArgvSpec): CommandSpec;
@@ -67,6 +68,7 @@ export class InvalidSessionRecoveryCoordinator {
       return;
     }
     const personalMcpCredentialEpoch = context.getPersonalMcpCredentialEpoch?.() ?? 0;
+    const mcpLaunchConfigurationEpoch = context.getMcpLaunchConfigurationEpoch?.() ?? 0;
     const mcpLaunchSnapshot = session.mcpLaunchSnapshot;
     const mcpIdentity: McpLaunchIdentity = {
       ...session.mcpIdentity,
@@ -93,6 +95,7 @@ export class InvalidSessionRecoveryCoordinator {
       launchConfig,
       mcpLaunchSnapshot,
       personalMcpCredentialEpoch,
+      mcpLaunchConfigurationEpoch,
     });
 
     try {

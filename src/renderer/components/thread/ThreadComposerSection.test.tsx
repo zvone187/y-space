@@ -11,6 +11,7 @@ import {
   useComposerInputInbox,
   worktreeComposerInboxKey,
 } from "@/renderer/state/composerInputInbox";
+import { useConnectionsDialogStore } from "@/renderer/state/connectionsDialogStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThreadTodoDockStore } from "@/renderer/state/threadTodoDockStore";
 import { useRemoteServersStore } from "@/renderer/state/remoteServersStore";
@@ -262,6 +263,7 @@ describe("ThreadComposerSection", () => {
     });
     useGitStore.setState({ statuses: {} });
     useComposerInputInbox.setState({ itemsByComposer: {} });
+    useConnectionsDialogStore.setState({ isOpen: false, source: null, revision: 0 });
     bridgeMock.isRemoteSession.mockReturnValue(false);
     bridgeMock.clearPendingSteer.mockClear();
     bridgeMock.clearPendingSteer.mockResolvedValue(undefined);
@@ -373,6 +375,21 @@ describe("ThreadComposerSection", () => {
     const result = render(composerElement({ ...opts, onSubmitInput }));
     return { ...result, onSubmitInput };
   }
+
+  it("routes the active-thread integrations action to the single global dialog store", () => {
+    renderComposer();
+    const menuProps = composerAddMenuSpy.mock.lastCall?.[0] as {
+      onOpenIntegrations?: () => void;
+    };
+
+    expect(menuProps.onOpenIntegrations).toEqual(expect.any(Function));
+    act(() => menuProps.onOpenIntegrations?.());
+
+    expect(useConnectionsDialogStore.getState()).toMatchObject({
+      isOpen: true,
+      source: "composer",
+    });
+  });
 
   it("hides provider controls for active terminal threads", () => {
     renderComposer({

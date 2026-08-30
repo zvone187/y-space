@@ -27,7 +27,7 @@ const bridgeMock = vi.hoisted(() => ({
     vi.fn<
       (payload: {
         flowId: string;
-      }) => Promise<{ state: "open" | "closed" | "succeeded" | "failed" }>
+      }) => Promise<{ state: "open" | "closed" | "succeeded" | "failed" | "expired" }>
     >(),
   pipedreamFinishConnect: vi.fn<(payload: { flowId: string }) => Promise<void>>(),
   pipedreamCancelConnect: vi.fn<(payload: { flowId: string }) => Promise<void>>(),
@@ -755,6 +755,31 @@ describe("ConnectionsDialogHost", () => {
     ).toBeVisible();
   });
 
+  it("does not claim durable revocation when the denial write itself failed", async () => {
+    bridgeMock.pipedreamGetSnapshot.mockResolvedValue(readySnapshot([SLACK_ACCOUNT]));
+    bridgeMock.pipedreamRefreshAccounts.mockResolvedValue(readySnapshot([SLACK_ACCOUNT]));
+    bridgeMock.pipedreamDisconnectAccount.mockRejectedValue(
+      new Error("simulated denial persistence failure"),
+    );
+    const dialog = await openDialog();
+
+    fireEvent.click(
+      await within(dialog).findByRole("button", { name: "Disconnect Workspace Slack" }),
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm disconnect" }));
+
+    expect(
+      await within(dialog).findByText(
+        "Could not disconnect Slack. Agent access is still on. Try again.",
+      ),
+    ).toBeVisible();
+    expect(within(dialog).getByText("Available to agents")).toBeVisible();
+    expect(
+      within(dialog).getByRole("switch", { name: "Allow agents to use Workspace Slack" }),
+    ).toBeChecked();
+    expect(within(dialog).queryByText(/Agent access has been revoked/i)).not.toBeInTheDocument();
+  });
+
   it("stops polling at the Connect Link expiry and offers a finite retry", async () => {
     bridgeMock.pipedreamListApps.mockResolvedValue(appsPage([GMAIL_APP]));
     bridgeMock.pipedreamRefreshAccounts.mockResolvedValue(readySnapshot([SLACK_ACCOUNT]));
@@ -781,6 +806,29 @@ describe("ConnectionsDialogHost", () => {
     expect(bridgeMock.pipedreamRefreshAccounts).toHaveBeenCalledTimes(refreshesAtTimeout);
     expect(refreshesAtTimeout).toBeLessThanOrEqual(10);
     expect(within(dialog).getByRole("button", { name: "Retry Gmail connection" })).toBeEnabled();
+    expect(bridgeMock.pipedreamSetAccountAgentAccess).not.toHaveBeenCalled();
+  });
+
+  it("presents a main-owned Connect expiry as a timeout instead of a cancellation", async () => {
+    bridgeMock.pipedreamListApps.mockResolvedValue(appsPage([GMAIL_APP]));
+    bridgeMock.pipedreamBeginConnect.mockResolvedValue({
+      opened: true,
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      flowId: "33333333-3333-4333-8333-333333333333",
+    });
+    bridgeMock.pipedreamGetConnectFlowStatus.mockResolvedValue({ state: "expired" });
+    const dialog = await openDialog();
+    const connect = await within(dialog).findByRole("button", { name: "Connect Gmail" });
+
+    vi.useFakeTimers();
+    fireEvent.click(connect);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    expect(within(dialog).getByText(/Gmail connection timed out/i)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Gmail connection cancelled/i)).not.toBeInTheDocument();
+    expect(bridgeMock.pipedreamFinishConnect).toHaveBeenCalledExactlyOnceWith({
+      flowId: "33333333-3333-4333-8333-333333333333",
+    });
     expect(bridgeMock.pipedreamSetAccountAgentAccess).not.toHaveBeenCalled();
   });
 

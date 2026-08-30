@@ -3675,6 +3675,16 @@ msgstr "Proje klasörü oluşturulamadı."
 msgid "Could not disconnect {0}. Agent access has been revoked."
 msgstr "{0} bağlantısı kesilemedi. Ajan erişimi iptal edildi."
 
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Agent access is still on. Try again."
+msgstr "{0} bağlantısı kesilemedi. Ajan erişimi hâlâ açık. Tekrar deneyin."
+
+#. placeholder {0}: account.app.name
+#: src/renderer/components/connections/ConnectionsDialog.tsx
+msgid "Could not disconnect {0}. Check agent access and try again."
+msgstr "{0} bağlantısı kesilemedi. Ajan erişimini kontrol edip tekrar deneyin."
+
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/views/MainView/parts/AppContent/parts/Thread/parts/ContinueInProviderDialog.tsx
 msgid "Could not extract context."

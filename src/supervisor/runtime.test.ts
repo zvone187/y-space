@@ -2247,8 +2247,7 @@ describe("SupervisorRuntime thread input", () => {
         rows: 42,
       },
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.waitFor(() => expect(adapter.createStructuredSession).toHaveBeenCalledOnce());
 
     await runtime.threadSessionManager.interruptThread({ threadId: "thread-gui-activate-stop" });
 

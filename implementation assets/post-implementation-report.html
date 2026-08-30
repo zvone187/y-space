@@ -296,23 +296,29 @@
       <header>
         <section class="hero" aria-labelledby="title">
           <span class="tag">Combined post-implementation handoff</span>
-          <h1 id="title">Y Space is built. Two external acceptance gates remain.</h1>
+          <h1 id="title">Y Space is hardened. Live account acceptance remains.</h1>
           <p>
             The modern light shell, one global tab system, embedded agent Browser, visible trusted
-            cursor, compact conversations, and Pipedream connection architecture are implemented and
-            packaged. Final Codex and OpenCode cursor QA passed; Gmail OAuth still needs a compliant
-            user-authorized handoff, and Claude still needs local authentication.
+            cursor, compact conversations, and full Pipedream connection architecture are
+            implemented and packaged. Personal OAuth bearers now stay behind revocable launch-scoped
+            relays. Once the durable access-off write succeeds, disconnect denial survives later
+            cleanup-write failure and restart; an initial denial-write failure is reported and
+            quarantined only for the current process. Live Gmail OAuth still requires action-time
+            user confirmation, and Claude still needs local authentication.
           </p>
         </section>
         <aside class="meta-stack" aria-label="Report metadata">
           <div class="card bg-yellow">
-            <small>Status</small><strong>Implementation ready · acceptance gated</strong>
+            <small>Status</small><strong>Hardened package passed · live OAuth gated</strong>
           </div>
           <div class="card bg-blue">
             <small>Branch</small><strong>y-space-pipedream-live</strong>
           </div>
           <div class="card bg-purple">
-            <small>Base</small><strong>y-space-glass-polish · 361aab63</strong>
+            <small>Hardening start</small><strong>0dfeda90 · upstream 9fdadda</strong>
+          </div>
+          <div class="card bg-green">
+            <small>Delivery</small><strong>Local branch · no PR requested</strong>
           </div>
           <div class="card bg-orange">
             <small>Report date</small><strong>August 30, 2026</strong>
@@ -337,16 +343,17 @@
           <div class="sticky bg-yellow">
             <h3>What the final package proved</h3>
             <p>
-              Codex and OpenCode each reused the same visible Browser tab, moved the Y Space cursor
-              to the real target, and generated trusted native pointermove, pointerdown, pointerup,
-              and click events.
+              One fresh ARM64 process stayed open under <code>--use-mock-keychain</code> for the
+              entire final manual run. Computer Use verified both Connections entry points,
+              independent global Browser peers, a real Codex click/navigation, and a real OpenCode
+              inspection in the visible embedded Browser.
             </p>
           </div>
           <div class="sticky bg-pink">
             <h3>What needs the user</h3>
             <p>
-              Google/Gmail OAuth needs a compliant one-time authorization handoff followed by an
-              explicit grant on the exact visible account row. Claude also needs
+              Importing the real Pipedream setup and granting Gmail create persistent third-party
+              access, so they need confirmation immediately before the click. Claude also needs
               <code>claude auth login</code> before live inference can be accepted.
             </p>
           </div>
@@ -443,9 +450,9 @@
                 <td>Visible trusted cursor</td>
                 <td class="pass">Passed on final package</td>
                 <td>
-                  The final Codex run recorded 16 trusted native events. OpenCode added a second
-                  seven-event sequence, and its screenshot shows the orange-and-white cursor on the
-                  actual Single-click target.
+                  Packaged Codex and OpenCode cursor fixtures recorded trusted native pointer
+                  sequences, and the final fresh Codex run visibly clicked the existing embedded tab
+                  before navigating it to IANA.
                 </td>
               </tr>
               <tr>
@@ -458,12 +465,12 @@
               </tr>
               <tr>
                 <td>Pipedream popup + catalog + backend</td>
-                <td class="pass">Implemented and targeted-pass</td>
+                <td class="pass">Implemented, hardened, packaged</td>
                 <td>
                   Both UI entry points, live Gmail search, pagination, zero-result state, relay
                   isolation, exact launch cleanup, privileged configure acknowledgement, live MCP
-                  reload status, scoped disconnect, OAuth credential epochs, and secret boundaries
-                  are covered.
+                  reload status, scoped disconnect, OAuth credential epochs, Personal URL aliases,
+                  bounded sign-out, single-flight refresh, and secret boundaries are covered.
                 </td>
               </tr>
               <tr>
@@ -471,8 +478,9 @@
                 <td class="blocked">External authorization gate</td>
                 <td>
                   No OAuth grant, connected Gmail account, mailbox read, or disconnect has been
-                  performed. Google authentication must use a compliant system browser/auth session;
-                  embedded-webview-only OAuth cannot be claimed as supported.
+                  performed. Acceptance is prepared in a main-owned sensitive Y Space Browser tab;
+                  no external Browser will be used or claimed. If Google rejects the embedded user
+                  agent, that provider response will be reported rather than bypassed.
                 </td>
               </tr>
               <tr>
@@ -496,10 +504,11 @@
                 <td>Persistent test credential isolation</td>
                 <td class="pass">Passed on final package</td>
                 <td>
-                  Manual QA used one continuously open package process launched with
-                  <code>--use-mock-keychain</code>. The flag is launch-scoped to testing; an
-                  ordinary release launch continues to use the normal operating-system credential
-                  store.
+                  Final manual QA used one continuously open package process, PID 39788, launched
+                  from the exact rebuilt bundle with an isolated profile and
+                  <code>--use-mock-keychain</code>. It remained open between every final test case
+                  and is intentionally still running. The flag is launch-scoped to testing; ordinary
+                  release launches continue to use the normal operating-system credential store.
                 </td>
               </tr>
             </tbody>
@@ -516,10 +525,17 @@
           <div class="sticky bg-green">
             <h3>Passing targeted evidence</h3>
             <ul>
-              <li>Cursor, Browser ingress, and Browser evidence: 7 files / 213 tests passed.</li>
-              <li>Dynamic target drift/removal/occlusion hardening: 77 tests passed.</li>
               <li>
-                Combined high-risk Browser/Pipedream security run: 32 files / 649 tests passed.
+                Final combined high-risk Browser/Pipedream run: 15 files / 437 tests passed, with
+                one intentional skip.
+              </li>
+              <li>
+                Independent hardening review lanes passed 289 / 289 and 217 / 217 tests with no
+                remaining concrete P1/P2 finding.
+              </li>
+              <li>
+                The final security re-audit passed 305 / 305 high-risk tests and 104 / 104
+                accepted-turn/start-close tests with no remaining concrete P1/P2 finding.
               </li>
               <li>
                 OAuth epochs reject stale code exchange, refresh, dynamic registration, storage, and
@@ -539,11 +555,11 @@
             <h3>Final checks recorded</h3>
             <ul>
               <li>
-                The complete Node 24 suite passed 924 files and 10,794 tests in 115.31 seconds, with
+                The complete Node 24 suite passed 925 files and 10,880 tests in 122.85 seconds, with
                 5 files / 85 tests skipped.
               </li>
               <li>
-                Typecheck, standard/type-aware lint, formatting, 3,343-message localization with
+                Typecheck, standard/type-aware lint, formatting, 3,345-message localization with
                 zero missing translations, fixture, JSON, and diff integrity passed.
               </li>
               <li>The final unsigned ARM64 app passed deep/strict ad-hoc codesign verification.</li>
@@ -551,14 +567,15 @@
                 Computer Use captured final packaged Codex and OpenCode trusted-input results.
               </li>
               <li>
-                Exact configured Pipedream credential values had zero matches across 3,135 tracked
-                readable source files and 549 regular files in the final app bundle.
+                Exact configured Pipedream credential values had zero matches across tracked source
+                and all 549 regular files in the final hardened app bundle; no <code>.env</code>
+                file is packaged.
               </li>
               <li>
-                Final DMG: 156,367,170 bytes,
-                <code>6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0</code>;
+                Final hardened DMG: 156,281,136 bytes,
+                <code>492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb</code>;
                 packaged <code>app.asar</code>:
-                <code>153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08</code>.
+                <code>b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42</code>.
               </li>
             </ul>
           </div>
@@ -636,6 +653,40 @@
               not authorized or clicked through OAuth.
             </figcaption>
           </figure>
+          <figure>
+            <a href="qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg"
+              ><img
+                src="qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg"
+                alt="Fresh hardened Y Space Connections popup over the embedded Browser"
+            /></a>
+            <figcaption>
+              Fresh hardened bundle: the active composer opened the same light glass Connections
+              surface while the exact <code>--use-mock-keychain</code> process remained live.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/pipedream-hardening-fresh-package-global-browser-tabs.jpeg"
+              ><img
+                src="qa-screenshots/pipedream-hardening-fresh-package-global-browser-tabs.jpeg"
+                alt="Fresh hardened Y Space package with DuckDuckGo and Example Domain global Browser peers"
+            /></a>
+            <figcaption>
+              Fresh hardened bundle: DuckDuckGo and Example Domain are independent Browser peers in
+              the one global tab strip; switching and cleanup were manually verified.
+            </figcaption>
+          </figure>
+          <figure>
+            <a href="qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg"
+              ><img
+                src="qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg"
+                alt="Fresh Y Space package showing Codex browser verification beside the navigated IANA page"
+            /></a>
+            <figcaption>
+              Fresh-package agent proof: Codex 5.6 Sol reused the existing embedded tab, clicked its
+              visible link, reached the IANA page, and settled to one collapsed Worked row with
+              <code>Browser verified · 4 actions</code>.
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -649,9 +700,9 @@
           <div class="detail-body">
             <ul>
               <li>
-                Choose a compliant Google OAuth path. Recommended: allow the system browser only for
-                the one-time authorization handoff; all ordinary browsing and agent control remain
-                inside Y Space.
+                The acceptance path is the main-owned sensitive Y Space Browser tab. Keep external
+                browsers out of the workflow; if Google refuses the embedded user agent, record the
+                provider limitation instead of weakening or bypassing it.
               </li>
               <li>
                 Immediately before the Gmail grant, obtain explicit user confirmation because it
@@ -713,6 +764,11 @@
                 bindings without affecting siblings.
               </li>
               <li>
+                Personal Pipedream upstream bearers never enter Codex, Claude, or OpenCode
+                configuration. Agents receive only a local launch capability; revocation aborts
+                in-flight work and credential refresh is single-flight per server and epoch.
+              </li>
+              <li>
                 Clearing Personal Pipedream is main-owned and atomic. Deferred OAuth work, pending
                 or child agents, concurrent refresh/enable, hung disposal, and failed sensitive-tab
                 closure all fail closed under deterministic regressions.
@@ -735,7 +791,9 @@
                 <a href="glass-browser-residency-qa.json">Glass Browser residency sample</a>
               </li>
               <li>
-                <a href="../release/Y-Space-1.6.6-arm64.dmg">Final unsigned ARM64 DMG</a>
+                <a href="../release/pipedream-hardening-final/Y-Space-1.6.6-arm64.dmg"
+                  >Final hardened unsigned ARM64 DMG</a
+                >
               </li>
             </ul>
           </div>
@@ -743,17 +801,18 @@
         <details>
           <summary>Remaining live acceptance</summary>
           <div class="detail-body">
-            Gmail OAuth/read/disconnect remains gated until the user chooses a compliant OAuth
-            handoff and confirms the persistent grant at action time. Claude inference remains gated
-            until the local Claude CLI is authenticated. Neither is overstated as passed.
+            Gmail OAuth/read/disconnect remains gated until the user confirms importing the local
+            Pipedream setup and creating the persistent grant at action time. The sensitive flow is
+            prepared inside Y Space and will not use an external browser. Claude inference remains
+            gated until the local Claude CLI is authenticated. Neither is overstated as passed.
           </div>
         </details>
       </section>
 
       <p class="footer-note">
-        Worktree <code>y-space-pipedream-live</code> · base
-        <code>y-space-glass-polish@361aab63</code> · final unsigned DMG SHA-256
-        <code>6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0</code> ·
+        Worktree <code>y-space-pipedream-live</code> · hardening start <code>0dfeda90</code> ·
+        upstream comparison <code>9fdadda</code> · no PR requested · final hardened unsigned DMG
+        SHA-256 <code>492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb</code> ·
         implementation commit follows this report revision. No secret values are included.
       </p>
     </main>

@@ -5,6 +5,7 @@ import type {
   PipedreamSnapshot,
 } from "@/shared/contracts";
 import { createSupervisorIpcHandlers } from "./ipcHandlers";
+import type { McpOAuthService } from "./mcp/McpOAuthService";
 import type { SupervisorRuntime } from "./supervisorRuntime";
 
 const SNAPSHOT: PipedreamSnapshot = {
@@ -40,18 +41,6 @@ const SNAPSHOT_WITH_GRANTED_ACCOUNT: PipedreamSnapshot = {
   },
 };
 
-const SNAPSHOT_WITH_REVOKED_ACCOUNT: PipedreamSnapshot = {
-  ...SNAPSHOT,
-  connect: {
-    state: "ready",
-    credentialSource: "environment",
-    environment: "development",
-    projectIdHint: "proj_…t123",
-    projectName: "Y Space Project",
-    accounts: [{ ...GRANTED_ACCOUNT, agentAccess: false }],
-  },
-};
-
 function createRuntime(input: {
   readonly pipedreamService: object;
   readonly reloadPipedreamMcpServers: (options?: {
@@ -78,6 +67,49 @@ function createRuntime(input: {
 }
 
 describe("Pipedream supervisor IPC live MCP reloads", () => {
+  it.each(["begin", "wait"] as const)(
+    "returns an already-authorized Personal OAuth %s result before a live-agent reload settles",
+    async (operation) => {
+      let releaseReload!: (value: PipedreamAgentReloadOutcome) => void;
+      const pendingReload = new Promise<PipedreamAgentReloadOutcome>((resolve) => {
+        releaseReload = resolve;
+      });
+      const reloadPipedreamMcpServers = vi.fn<
+        (options?: { revokePersonalOauth?: boolean }) => Promise<PipedreamAgentReloadOutcome>
+      >(async () => pendingReload);
+      const handlers = createSupervisorIpcHandlers(
+        createRuntime({
+          pipedreamService: { getSnapshot: () => SNAPSHOT },
+          reloadPipedreamMcpServers,
+          mcpOAuthService: {
+            begin: vi.fn<McpOAuthService["begin"]>(async () => ({ status: "authorized" as const })),
+            wait: vi.fn<McpOAuthService["wait"]>(async () => ({ status: "authorized" as const })),
+            cancel: vi.fn<McpOAuthService["cancel"]>(),
+            clear: vi.fn<McpOAuthService["clear"]>(),
+            status: () => ({ authenticatedUrls: [] }),
+          },
+        }),
+      );
+      let settled = false;
+      const result = Promise.resolve(
+        operation === "begin"
+          ? handlers.pipedreamInternalBeginPersonalMcpOauth({})
+          : handlers.pipedreamInternalWaitPersonalMcpOauth({ flowId: "authorized-flow" }),
+      ).then((value) => {
+        settled = true;
+        return value;
+      });
+
+      try {
+        await vi.waitFor(() => expect(reloadPipedreamMcpServers).toHaveBeenCalledOnce());
+        await vi.waitFor(() => expect(settled).toBe(true), { timeout: 50 });
+      } finally {
+        releaseReload({ state: "applied" });
+      }
+      await expect(result).resolves.toEqual({ status: "authorized" });
+    },
+  );
+
   it("reserves Personal Pipedream OAuth for internal main-owned procedures", async () => {
     const authorizationUrl =
       "https://pipedream.com/oauth?state=renderer-secret-sentinel&code_challenge=private";
@@ -202,6 +234,9 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
     const clear = vi.fn<(payload: { url: string }) => void>((payload) => {
       order.push(`clear:${payload.url}`);
     });
+    const clearPersonalCredentials = vi.fn<() => void>(() => {
+      order.push("clear:personal-all");
+    });
     const reloadPipedreamMcpServers = vi.fn<
       (options?: { revokePersonalOauth?: boolean }) => Promise<PipedreamAgentReloadOutcome>
     >(async () => {
@@ -217,6 +252,7 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
           wait: vi.fn<() => never>(),
           cancel: vi.fn<(payload: { flowId: string }) => void>(),
           clear,
+          clearPersonalCredentials,
           status: () => ({ authenticatedUrls: [] }),
         },
       }),
@@ -239,16 +275,10 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
 
     expect(order).toEqual([
       "clear:https://generic.example.test/mcp",
-      "clear:https://mcp.pipedream.net/v2",
+      "clear:personal-all",
       "reload",
     ]);
-    expect(clear).toHaveBeenNthCalledWith(
-      2,
-      { url: "https://mcp.pipedream.net/v2" },
-      {
-        strictPersistence: true,
-      },
-    );
+    expect(clearPersonalCredentials).toHaveBeenCalledExactlyOnceWith({ strictPersistence: true });
     expect(reloadPipedreamMcpServers).toHaveBeenCalledExactlyOnceWith({
       revokePersonalOauth: true,
     });
@@ -256,7 +286,7 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
 
   it("surfaces a strict Personal clear failure after revoking live agent access", async () => {
     const persistenceError = new Error("Could not persist the OAuth credential change.");
-    const clear = vi.fn<(payload: { url: string }, options?: object) => void>(() => {
+    const clearPersonalCredentials = vi.fn<(options?: object) => void>(() => {
       throw persistenceError;
     });
     const reloadPipedreamMcpServers = vi.fn<
@@ -270,7 +300,8 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
           begin: vi.fn<() => never>(),
           wait: vi.fn<() => never>(),
           cancel: vi.fn<(payload: { flowId: string }) => void>(),
-          clear,
+          clear: vi.fn<() => void>(),
+          clearPersonalCredentials,
           status: () => ({ authenticatedUrls: [] }),
         },
       }),
@@ -279,10 +310,7 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
     await expect(handlers.pipedreamInternalClearPersonalMcpOauth({})).rejects.toBe(
       persistenceError,
     );
-    expect(clear).toHaveBeenCalledWith(
-      { url: "https://mcp.pipedream.net/v2" },
-      { strictPersistence: true },
-    );
+    expect(clearPersonalCredentials).toHaveBeenCalledWith({ strictPersistence: true });
     expect(reloadPipedreamMcpServers).toHaveBeenCalledWith({ revokePersonalOauth: true });
   });
 
@@ -337,14 +365,16 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
     expect(reloadPipedreamMcpServers).toHaveBeenCalledTimes(3);
   });
 
-  it("reloads after a disconnect failure because local authorization is revoked first", async () => {
+  it("reloads after a disconnect denial-write failure even when the durable grant stays visible", async () => {
     const disconnectError = new Error("Pipedream request failed.");
     let current = SNAPSHOT_WITH_GRANTED_ACCOUNT;
+    let authorizationRevision = 0;
     const pipedreamService = {
       getSnapshot: vi.fn<() => PipedreamSnapshot>(() => current),
+      getAgentAuthorizationRevision: vi.fn<() => number>(() => authorizationRevision),
       disconnectAccount: vi.fn<(payload: { accountId: string }) => Promise<PipedreamSnapshot>>(
         async () => {
-          current = SNAPSHOT_WITH_REVOKED_ACCOUNT;
+          authorizationRevision += 1;
           throw disconnectError;
         },
       ),
@@ -362,8 +392,30 @@ describe("Pipedream supervisor IPC live MCP reloads", () => {
     expect(reloadPipedreamMcpServers).toHaveBeenCalledOnce();
     expect(current.connect).toMatchObject({
       state: "ready",
-      accounts: [expect.objectContaining({ id: "apn_Account123", agentAccess: false })],
+      accounts: [expect.objectContaining({ id: "apn_Account123", agentAccess: true })],
     });
+  });
+
+  it("does not reload live agents when disconnect is rejected before local revocation", async () => {
+    const disconnectError = new Error("Pipedream account is not connected.");
+    const pipedreamService = {
+      getSnapshot: vi.fn<() => PipedreamSnapshot>(() => SNAPSHOT_WITH_GRANTED_ACCOUNT),
+      getAgentAuthorizationRevision: vi.fn<() => number>(() => 7),
+      disconnectAccount: vi.fn<() => Promise<PipedreamSnapshot>>(async () => {
+        throw disconnectError;
+      }),
+    };
+    const reloadPipedreamMcpServers = vi.fn<() => Promise<PipedreamAgentReloadOutcome>>(
+      async () => ({ state: "applied" }),
+    );
+    const handlers = createSupervisorIpcHandlers(
+      createRuntime({ pipedreamService, reloadPipedreamMcpServers }),
+    );
+
+    await expect(
+      handlers.pipedreamDisconnectAccount({ accountId: "apn_OtherUser999" }),
+    ).rejects.toBe(disconnectError);
+    expect(reloadPipedreamMcpServers).not.toHaveBeenCalled();
   });
 
   it("does not churn live provider MCP state when an account refresh is unchanged", async () => {

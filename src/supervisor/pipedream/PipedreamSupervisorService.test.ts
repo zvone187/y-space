@@ -9,6 +9,7 @@ import {
   buildCodexMcp,
   buildOpenCodeMcpLaunchConfig,
 } from "@/supervisor/agents/userMcp";
+import { PipedreamConnectionStore } from "./PipedreamConnectionStore";
 import type { PipedreamRelayBindingInfo } from "./PipedreamLoopbackRelay";
 import { PipedreamSupervisorService, type PipedreamRelay } from "./PipedreamSupervisorService";
 
@@ -315,6 +316,88 @@ describe("PipedreamSupervisorService", () => {
       }),
     ).resolves.toEqual([]);
     expect(reopened.getSnapshot().connect).toMatchObject({ state: "ready", accounts: [] });
+    await reopened.dispose();
+  });
+
+  it("reopens a healthy persisted grant and produces a reconciled relay on the first launch", async () => {
+    const baseDir = await mkdtemp(join(tmpdir(), "y-space-pipedream-positive-restart-"));
+    roots.push(baseDir);
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/oauth/token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "developer-token",
+            token_type: "Bearer",
+            expires_in: 600,
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url.pathname.endsWith("/accounts")) return accountPageResponse();
+      throw new Error("Optional project-name probe unavailable");
+    });
+    const firstRelay: PipedreamRelay = {
+      registerBinding: vi.fn<PipedreamRelay["registerBinding"]>(),
+      unregisterBinding: vi.fn<PipedreamRelay["unregisterBinding"]>(),
+      dispose: vi.fn<PipedreamRelay["dispose"]>(async () => undefined),
+    };
+    const reopenedRelay: PipedreamRelay = {
+      registerBinding: vi.fn<PipedreamRelay["registerBinding"]>(async () => ({
+        bindingId: "binding-after-restart",
+        url: "http://127.0.0.1:43125/mcp/binding-after-restart",
+        headers: { authorization: "Bearer local-after-restart" },
+      })),
+      unregisterBinding: vi.fn<PipedreamRelay["unregisterBinding"]>(),
+      dispose: vi.fn<PipedreamRelay["dispose"]>(async () => undefined),
+    };
+    const relays = [firstRelay, reopenedRelay];
+    const options = {
+      baseDir,
+      fetch: fetchMock,
+      readPersonalMcpStatus: () => ({ enabled: true, authenticated: true }),
+      createRelay: () => relays.shift()!,
+    } as const;
+    const first = new PipedreamSupervisorService(options);
+    first.configure(readyBootstrap());
+    await first.refreshAccounts();
+    first.setAccountAgentAccess({ accountId: "apn_Account123", enabled: true });
+    await first.dispose();
+
+    const reopened = new PipedreamSupervisorService(options);
+    reopened.configure(readyBootstrap());
+    expect(reopened.getSnapshot().connect).toMatchObject({
+      state: "ready",
+      accounts: [
+        expect.objectContaining({
+          id: "apn_Account123",
+          healthy: true,
+          agentAccess: true,
+        }),
+      ],
+    });
+
+    await expect(
+      reopened.resolveMcpServersForLaunch({
+        threadId: "thread-positive-restart",
+        projectLocation: { kind: "posix", path: "/workspace" },
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        id: expect.stringMatching(/^pipedream:/u),
+        transport: expect.objectContaining({
+          type: "http",
+          url: "http://127.0.0.1:43125/mcp/binding-after-restart",
+        }),
+      }),
+    ]);
+    expect(reopenedRelay.registerBinding).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        threadId: "thread-positive-restart",
+        accountId: "apn_Account123",
+        appSlug: "slack",
+      }),
+    );
     await reopened.dispose();
   });
 
@@ -688,6 +771,191 @@ describe("PipedreamSupervisorService", () => {
     await service.dispose();
   });
 
+  it("keeps a replacement launch alive when an older same-thread WSL resolve resumes", async () => {
+    const staleReachability = deferred<{ kind: "loopback" }>();
+    let reachabilityCall = 0;
+    const resolveHostAccess = vi.fn<(distro: string) => Promise<{ kind: "loopback" }>>(async () => {
+      reachabilityCall += 1;
+      return reachabilityCall === 1 ? staleReachability.promise : { kind: "loopback" as const };
+    });
+    const relay: PipedreamRelay = {
+      registerBinding: vi.fn<PipedreamRelay["registerBinding"]>(async (input) => {
+        const suffix = input.providerBindingId.endsWith(":replacement") ? "replacement" : "stale";
+        return {
+          bindingId: `binding-${suffix}`,
+          url: `http://127.0.0.1:43124/mcp/binding-${suffix}`,
+          headers: { authorization: `Bearer ${suffix}` },
+        };
+      }),
+      unregisterBinding: vi.fn<PipedreamRelay["unregisterBinding"]>(),
+      dispose: vi.fn<PipedreamRelay["dispose"]>(async () => undefined),
+    };
+    const service = await readyServiceWithGrantedSlack(resolveHostAccess, () => relay);
+    const stale = service.resolveMcpServersForLaunch({
+      threadId: "thread-same-replacement",
+      providerBindingId: "thread:thread-same-replacement:launch:stale",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/workspace",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\workspace",
+      },
+    });
+    await vi.waitFor(() => expect(resolveHostAccess).toHaveBeenCalledOnce());
+
+    const replacement = service.resolveMcpServersForLaunch({
+      threadId: "thread-same-replacement",
+      providerBindingId: "thread:thread-same-replacement:launch:replacement",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/workspace",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\workspace",
+      },
+    });
+    await expect(replacement).resolves.toEqual([
+      expect.objectContaining({
+        transport: expect.objectContaining({
+          type: "http",
+          url: "http://127.0.0.1:43124/mcp/binding-replacement",
+        }),
+      }),
+    ]);
+
+    staleReachability.resolve({ kind: "loopback" });
+    await expect(stale).resolves.toEqual([]);
+    expect(relay.unregisterBinding).not.toHaveBeenCalledWith("binding-replacement");
+    await service.dispose();
+  });
+
+  it("rejects an old resolver after reconfigure without corrupting the replacement scope", async () => {
+    const staleReachability = deferred<{ kind: "loopback" }>();
+    let reachabilityCall = 0;
+    const resolveHostAccess = vi.fn<(distro: string) => Promise<{ kind: "loopback" }>>(async () => {
+      reachabilityCall += 1;
+      return reachabilityCall === 1 ? staleReachability.promise : { kind: "loopback" as const };
+    });
+    const makeRelay = (generation: string): PipedreamRelay => ({
+      registerBinding: vi.fn<PipedreamRelay["registerBinding"]>(async () => ({
+        bindingId: `binding-${generation}`,
+        url: `http://127.0.0.1:43124/mcp/binding-${generation}`,
+        headers: { authorization: `Bearer ${generation}` },
+      })),
+      unregisterBinding: vi.fn<PipedreamRelay["unregisterBinding"]>(),
+      dispose: vi.fn<PipedreamRelay["dispose"]>(async () => undefined),
+    });
+    const staleRelay = makeRelay("stale-generation");
+    const replacementRelay = makeRelay("replacement-generation");
+    const relays = [staleRelay, replacementRelay];
+    let relayIndex = 0;
+    const service = await readyServiceWithGrantedSlack(
+      resolveHostAccess,
+      () => relays[relayIndex++]!,
+    );
+    const input = {
+      threadId: "thread-reconfigured-resolver",
+      providerBindingId: "thread:thread-reconfigured-resolver:launch:same",
+      projectLocation: {
+        kind: "wsl" as const,
+        distro: "Ubuntu",
+        linuxPath: "/workspace",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\workspace",
+      },
+    };
+    const stale = service.resolveMcpServersForLaunch(input);
+    await vi.waitFor(() => expect(resolveHostAccess).toHaveBeenCalledOnce());
+
+    service.configure(readyBootstrap());
+    const replacement = service.resolveMcpServersForLaunch(input);
+    await expect(replacement).resolves.toEqual([
+      expect.objectContaining({
+        transport: expect.objectContaining({
+          type: "http",
+          url: "http://127.0.0.1:43124/mcp/binding-replacement-generation",
+        }),
+      }),
+    ]);
+
+    staleReachability.resolve({ kind: "loopback" });
+    await expect(stale).resolves.toEqual([]);
+    expect(replacementRelay.unregisterBinding).not.toHaveBeenCalledWith(
+      "binding-replacement-generation",
+    );
+    await service.dispose();
+  });
+
+  it("does not let a stale refresh failure revoke a reconfigured replacement binding", async () => {
+    const staleAccounts = deferred<Response>();
+    let accountRequests = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/oauth/token")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "developer-token",
+            token_type: "Bearer",
+            expires_in: 600,
+          }),
+          { headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url.includes("/accounts")) {
+        accountRequests += 1;
+        return accountRequests === 2 ? staleAccounts.promise : accountPageResponse();
+      }
+      throw new Error("Optional project-name probe unavailable");
+    });
+    const makeRelay = (generation: string): PipedreamRelay => ({
+      registerBinding: vi.fn<PipedreamRelay["registerBinding"]>(async () => ({
+        bindingId: `binding-${generation}`,
+        url: `http://127.0.0.1:43124/mcp/binding-${generation}`,
+        headers: { authorization: `Bearer ${generation}` },
+      })),
+      unregisterBinding: vi.fn<PipedreamRelay["unregisterBinding"]>(),
+      dispose: vi.fn<PipedreamRelay["dispose"]>(async () => undefined),
+    });
+    const staleRelay = makeRelay("stale-refresh-generation");
+    const replacementRelay = makeRelay("replacement-refresh-generation");
+    const relays = [staleRelay, replacementRelay];
+    let relayIndex = 0;
+    const baseDir = await mkdtemp(join(tmpdir(), "y-space-pipedream-service-"));
+    roots.push(baseDir);
+    const service = new PipedreamSupervisorService({
+      baseDir,
+      fetch: fetchMock,
+      readPersonalMcpStatus: () => ({ enabled: true, authenticated: true }),
+      createRelay: () => relays[relayIndex++]!,
+    });
+    service.configure(readyBootstrap());
+    await service.refreshAccounts();
+    service.setAccountAgentAccess({ accountId: "apn_Account123", enabled: true });
+    const input = {
+      threadId: "thread-stale-refresh-reconfigure",
+      providerBindingId: "thread:thread-stale-refresh-reconfigure:launch:same",
+      projectLocation: { kind: "posix" as const, path: "/workspace" },
+    };
+    const stale = service.resolveMcpServersForLaunch(input);
+    await vi.waitFor(() => expect(accountRequests).toBe(2));
+
+    service.configure(readyBootstrap());
+    const replacement = service.resolveMcpServersForLaunch(input);
+    await expect(replacement).resolves.toEqual([
+      expect.objectContaining({
+        transport: expect.objectContaining({
+          type: "http",
+          url: "http://127.0.0.1:43124/mcp/binding-replacement-refresh-generation",
+        }),
+      }),
+    ]);
+
+    staleAccounts.reject(new Error("stale account refresh failed"));
+    await expect(stale).resolves.toEqual([]);
+    expect(replacementRelay.unregisterBinding).not.toHaveBeenCalledWith(
+      "binding-replacement-refresh-generation",
+    );
+    await service.dispose();
+  });
+
   it("isolates a new launch from a stale pending relay after revoke and re-enable", async () => {
     const staleRegistration = deferred<PipedreamRelayBindingInfo>();
     const currentRegistration = deferred<PipedreamRelayBindingInfo>();
@@ -980,8 +1248,8 @@ describe("PipedreamSupervisorService", () => {
     await service.dispose();
   });
 
-  it("revokes live bindings but never sends DELETE when durable local revocation fails", async () => {
-    let writesFail = false;
+  it("reports failed denial persistence truthfully and tombstones durably before DELETE", async () => {
+    let writesBeforeFailure: number | undefined;
     let deleteRequests = 0;
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = String(input);
@@ -1019,7 +1287,13 @@ describe("PipedreamSupervisorService", () => {
       readPersonalMcpStatus: () => ({ enabled: true, authenticated: true }),
       createRelay: () => relay,
       writeConnectionsFile: (...args) => {
-        if (writesFail) throw new Error("simulated atomic write failure");
+        if (writesBeforeFailure !== undefined) {
+          if (writesBeforeFailure === 0) {
+            writesBeforeFailure = undefined;
+            throw new Error("simulated atomic write failure");
+          }
+          writesBeforeFailure -= 1;
+        }
         writeFileAtomic(...args);
       },
     });
@@ -1033,15 +1307,34 @@ describe("PipedreamSupervisorService", () => {
       }),
     ).resolves.toHaveLength(1);
 
-    writesFail = true;
-    const failedDisconnect = service.disconnectAccount({ accountId: "apn_Account123" });
+    writesBeforeFailure = 0;
+    const failedDenial = service.disconnectAccount({ accountId: "apn_Account123" });
     expect(relay.unregisterBinding).toHaveBeenCalledWith("binding-durable-revoke");
-    await expect(failedDisconnect).rejects.toThrow("Pipedream request failed");
+    await expect(failedDenial).rejects.toThrow("Pipedream request failed");
+    expect(deleteRequests).toBe(0);
+    expect(service.getSnapshot().connect).toMatchObject({
+      state: "ready",
+      accounts: [expect.objectContaining({ id: "apn_Account123", agentAccess: true })],
+    });
+
+    // The durable denial succeeds, then removal of the tombstoned row fails.
+    // No upstream DELETE may run, but a restart must still observe access off.
+    writesBeforeFailure = 1;
+    await expect(service.disconnectAccount({ accountId: "apn_Account123" })).rejects.toThrow(
+      "Pipedream request failed",
+    );
     expect(deleteRequests).toBe(0);
     expect(service.getSnapshot().connect).toMatchObject({
       state: "ready",
       accounts: [expect.objectContaining({ id: "apn_Account123", agentAccess: false })],
     });
+    const reopened = new PipedreamConnectionStore({
+      filePath: join(baseDir, "pipedream-connections.json"),
+    });
+    expect(reopened.list()).toEqual([
+      expect.objectContaining({ id: "apn_Account123", agentAccess: false }),
+    ]);
+    expect(reopened.listGrantedForRelay()).toEqual([]);
     await expect(
       service.resolveMcpServersForLaunch({
         threadId: "thread-after-durable-revoke-failure",
@@ -1050,7 +1343,6 @@ describe("PipedreamSupervisorService", () => {
     ).resolves.toEqual([]);
     expect(relay.registerBinding).toHaveBeenCalledTimes(1);
 
-    writesFail = false;
     await expect(service.disconnectAccount({ accountId: "apn_Account123" })).resolves.toMatchObject(
       { connect: { state: "ready", accounts: [] } },
     );
@@ -1194,7 +1486,12 @@ describe("PipedreamSupervisorService", () => {
   });
 
   async function readyServiceWithGrantedSlack(
-    hostAccess: { kind: "gateway"; ip: string } | { kind: "loopback" } = { kind: "loopback" },
+    hostAccess:
+      | { kind: "gateway"; ip: string }
+      | { kind: "loopback" }
+      | ((distro: string) => Promise<{ kind: "gateway"; ip: string } | { kind: "loopback" }>) = {
+      kind: "loopback",
+    },
     createRelay?: ConstructorParameters<typeof PipedreamSupervisorService>[0]["createRelay"],
   ) {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
@@ -1241,7 +1538,10 @@ describe("PipedreamSupervisorService", () => {
       baseDir,
       fetch: fetchMock,
       readPersonalMcpStatus: () => ({ enabled: true, authenticated: true }),
-      wslHostAccess: { resolveHostAccess: async () => hostAccess },
+      wslHostAccess: {
+        resolveHostAccess: async (distro) =>
+          typeof hostAccess === "function" ? hostAccess(distro) : hostAccess,
+      },
       ...(createRelay ? { createRelay } : {}),
     });
     service.configure({

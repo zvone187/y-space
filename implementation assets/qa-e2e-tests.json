@@ -1,43 +1,43 @@
 {
-  "version": 9,
+  "version": 11,
   "project": "Y Space",
   "branch": "y-space-pipedream-live",
   "platform": "macOS Apple Silicon desktop",
   "testedOn": "2026-08-30",
-  "status": "final_hardened_package_verified_pipedream_oauth_pending",
+  "status": "final_hardened_fresh_package_verified_pipedream_oauth_confirmation_pending",
   "currentPhase": {
     "name": "Trusted visible agent cursor and Pipedream completion architecture",
     "baseBranch": "y-space-glass-polish",
     "baseCommit": "361aab63",
-    "baseline": "924 passed files, 5 skipped files, 10,794 passed tests, and 85 skipped tests under Node 24.13.0",
+    "baseline": "925 passed files, 5 skipped files, 10,880 passed tests, and 85 skipped tests under Node 24.13.0",
     "failFirst": "Cursor, native-input, sensitive presentation, guest-attachment, Pipedream relay, OAuth lifecycle, and shutdown regressions were added before their implementation fixes.",
     "implementationStatus": "complete_with_external_oauth_and_claude_auth_gates",
     "performanceBoundary": "One reusable aria-hidden cursor overlay is retained per resident page; ordinary browser guests, sensitive guests, presentation feedback, timers, and tab metadata remain explicitly bounded.",
-    "reviewStatus": "Final packaged Codex and OpenCode runs both produced trusted native pointermove, pointerdown, pointerup, and click events in the visible embedded browser. Final adversarial regressions also cover OAuth generation races, strict atomic sign-out, pending and child agent revocation, disconnect quarantine, sensitive-tab ownership, and bounded teardown. Gmail OAuth and live Claude inference remain unclaimed external authorization gates."
+    "reviewStatus": "Final packaged Codex and OpenCode runs produced visible embedded-Browser evidence, including a real Codex link click/navigation and a real OpenCode inspection of the same first-class tab. The exact rebuilt bundle was launched once with an isolated profile and --use-mock-keychain; PID 39788 stayed open across the entire final Connections, global-tab, Codex, and OpenCode run and remains open for user testing. Final adversarial regressions cover OAuth generation races, strict atomic sign-out, pending/root/child revocation, disconnect quarantine, sensitive-tab ownership, bounded teardown, cross-agent launch-configuration supersession, and raw-bearer isolation behind a revocable Personal Pipedream loopback relay. Gmail OAuth and live Claude inference remain unclaimed external authorization gates."
   },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
-    "app": "release/mac-arm64/Y Space.app",
-    "dmg": "release/Y-Space-1.6.6-arm64.dmg",
+    "app": "release/pipedream-hardening-final/mac-arm64/Y Space.app",
+    "dmg": "release/pipedream-hardening-final/Y-Space-1.6.6-arm64.dmg",
     "architecture": "arm64",
-    "sha256": "6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0",
-    "bytes": 156367170,
-    "appAsarSha256": "153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08",
-    "appAsarBytes": 136466433,
-    "executableSha256": "c2d188f17d11d1540d10b468961ad9fcdedb89d5d5010c9424748e0f2f66a820",
+    "sha256": "492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb",
+    "bytes": 156281136,
+    "appAsarSha256": "b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42",
+    "appAsarBytes": 136509365,
+    "executableSha256": "97fa83a9e03a3ae3f9a73377f13c5b953eb94f91184317d777836e243fe80f21",
     "executableBytes": 52896,
     "codesign": "codesign --verify --deep --strict passed; ad-hoc/runtime signature with no Team ID",
-    "qaLaunch": "Packaged UI tests launch with the explicit --use-mock-keychain flag and remain open between test cases; ordinary release launches do not enable the mock keychain.",
+    "qaLaunch": "The final packaged UI run launched once from the exact rebuilt bundle with an isolated PORACODE_BASE_DIR and explicit --use-mock-keychain; PID 39788 remained open between every final test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
       "status": "pass on the final reviewed source state under Node.js 24.13.0",
-      "passedFiles": 924,
+      "passedFiles": 925,
       "skippedFiles": 5,
-      "passedTests": 10794,
+      "passedTests": 10880,
       "skippedTests": 85,
-      "durationSeconds": 115.31
+      "durationSeconds": 122.85
     },
     "targetedBranding": {
       "status": "pass",
@@ -58,7 +58,7 @@
       "lint": "pass",
       "typeAwareLint": "pass",
       "format": "pass",
-      "i18n": "pass: 3,343 extracted messages and 0 missing across 12 translated catalogs",
+      "i18n": "pass: 3,345 extracted messages and 0 missing across 12 translated catalogs",
       "websiteTypecheck": "pass",
       "diffCheck": "pass"
     },
@@ -113,6 +113,75 @@
       ]
     },
     "readiness": "implemented_pre_oauth_with_external_authorization_gate"
+  },
+  "pipedreamHardeningFollowUp": {
+    "name": "Fail-closed Pipedream authority and lifecycle hardening",
+    "branch": "y-space-pipedream-live",
+    "startingCommit": "0dfeda90f5588520b5b6bab06e1a9d03152353b4",
+    "baseline": "The committed worktree was clean before the hardening regressions were added. The upstream comparison remained fork/y-space-browser-default-collapse@9fdadda30245452c6c696da43a023c6b0d9b2413.",
+    "failFirst": {
+      "status": "expected_failures_confirmed",
+      "focusedFiles": 4,
+      "collectedTests": 106,
+      "passedTests": 102,
+      "expectedFailures": 4,
+      "evidence": [
+        "The shared contract rejects the new expired Connect terminal state.",
+        "Both main-owned expiry paths still settle as closed instead of expired.",
+        "The renderer falls through from expired to a false connection-success message.",
+        "The positive saved-grant restart and first reconciled relay scenario already passes."
+      ]
+    },
+    "finalValidation": {
+      "status": "pass",
+      "focusedHardening": "4 files and 106 tests passed after the fail-first fixes.",
+      "focusedPersonalAuthority": "7 files and 142 tests passed for loopback bearer isolation, refresh, alias clear, sign-out, filtering, and lifecycle bounds.",
+      "independentReview": "Independent hardening review lanes passed 289/289 and 217/217 tests. A final security re-audit passed 305/305 high-risk tests and 104/104 accepted-turn/start-close tests; both reviewers reported no remaining concrete P1/P2 finding.",
+      "finalHighRiskMatrix": "15 files and 437 tests passed with one intentional skip.",
+      "fullSuite": "925 files and 10,880 tests passed with 5 files and 85 tests skipped.",
+      "checks": "Typecheck, standard/type-aware lint, formatting, diff integrity, production build, ARM64 native-binary inspection, and deep/strict code-sign verification passed.",
+      "localization": "3,345 messages were extracted with zero missing translations across all 12 translated catalogs.",
+      "desktopQa": "One exact fresh hardened bundle process remained open under --use-mock-keychain while Computer Use verified composer and Settings Connections entry points, independent global Browser peers, Codex 5.6 Sol browser click/navigation, OpenCode Big Pickle tab inspection, and collapsed final-answer presentation."
+    },
+    "passCriteria": [
+      "Connect expiry is distinct from user cancellation in the contract, main process, and shared popup.",
+      "Personal Pipedream bearer credentials remain supervisor-owned and agents receive only revocable launch-scoped capabilities.",
+      "Personal sign-out completes within a strict bound even if a provider MCP update never settles.",
+      "Expired Personal OAuth credentials refresh through one per-server, per-epoch single-flight operation.",
+      "A privileged Personal clear atomically removes every equivalent Personal URL alias while generic public clear remains rejected.",
+      "After the access-off denial is durably persisted, a later cleanup-write failure remains denied across restart; an initial denial-write failure is reported as still on and is quarantined only in the current process."
+    ],
+    "e2eTests": [
+      {
+        "id": "H-E2E-001",
+        "title": "Main-owned Connect expiry is visibly a timeout",
+        "status": "automated_pass",
+        "evidence": "Contract, timer-owned, direct status-poll deadline, and renderer terminal-message regressions all distinguish expiry from cancellation and success."
+      },
+      {
+        "id": "H-E2E-002",
+        "title": "Healthy saved grant rebinds once on first launch after restart",
+        "status": "automated_pass",
+        "evidence": "Restart and first-reconciliation regressions prove exactly one healthy relay rebind without duplicate grant or process reload."
+      },
+      {
+        "id": "H-E2E-003",
+        "title": "Personal sign-out revokes authority despite a stalled provider update",
+        "status": "automated_pass",
+        "evidence": "Bounded sign-out, hung provider-update, in-flight abort, root/child launch revocation, and alias-clear regressions pass."
+      },
+      {
+        "id": "H-E2E-004",
+        "title": "Durably persisted disconnect denial survives a later cleanup fault and restart",
+        "status": "automated_pass",
+        "evidence": "Local access-off persistence and relay-id rotation precede remote DELETE; later cleanup-write failure remains denied after restart while first-write failure is reported truthfully."
+      }
+    ],
+    "screenshots": [
+      "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg",
+      "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-global-browser-tabs.jpeg"
+    ],
+    "readiness": "implemented_and_fresh_package_verified_live_oauth_confirmation_pending"
   },
   "visibleAgentCursorPhase": {
     "name": "Visible agent browser control",
@@ -514,7 +583,7 @@
       "evidence": [
         "Brand-contract tests passed for owned desktop, mobile, PWA, social, and website assets.",
         "The final executable is thin arm64 and the unsigned/ad-hoc app passed deep/strict code-sign verification with no Team ID.",
-        "The final DMG is 156367170 bytes with SHA-256 6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0.",
+        "The final hardened DMG is 156281136 bytes with SHA-256 492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb.",
         "The packaged Contents/Resources/icon.icns is byte-identical to build/icon.icns (SHA-256 f597bd9d2d3917cbde3d98319a6bbcad2f5beb31eae8e16525fac2d20ae77eab).",
         "The native application menu remained Y Space and the isolated packaged process left no helper after clean quit."
       ],
@@ -889,11 +958,13 @@
         "A fail-first renderer regression proved the underlying Settings Escape handler previously won; the shared overlay stack fix now closes only Integrations and restores its Settings trigger.",
         "Computer Use repeated Settings → Connections → Manage integrations in the freshly rebuilt ARM64 package and verified both Escape and the popup close button return to the still-open Connections settings surface.",
         "The final hardened package was launched once with --use-mock-keychain and kept open across composer, compact More menu, Settings, Connections, popup-stack, and embedded-Browser checks; the same PID remained live and no credential prompt appeared.",
+        "A second clean-profile package built from the final hardening source was launched from its exact bundle path with --use-mock-keychain and left running. Computer Use opened Integrations from the active composer, opened Connections from Settings, and confirmed both routes share the same global popup state.",
         "Automated cursor regressions cover duplicate in-flight cursors, A-to-B-to-A loops, and retry after a failed page. Full manual cursor exhaustion plus narrow-window and induced-retry presentation checks are not claimed here."
       ],
       "screenshots": [
         "implementation assets/qa-screenshots/pipedream-final-composer-gmail-escape-fixed.jpeg",
-        "implementation assets/qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg"
+        "implementation assets/qa-screenshots/pipedream-final-settings-gmail-escape-fixed.jpeg",
+        "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg"
       ],
       "status": "partial_pass_packaged_catalog_narrow_retry_edges_pending"
     },
@@ -1017,8 +1088,9 @@
         "Post-quit process and route cleanup evidence"
       ],
       "evidence": [
-        "A final release scan covered 549 regular files in the app bundle and found zero exact matches for the configured Pipedream client ID, client secret, or project ID; no environment file name was packaged.",
-        "A final tracked-source scan covered 3,135 readable files and found zero exact matches for those same three configured values.",
+        "The final release scan covered 549 regular files in the rebuilt app bundle and found zero exact matches for the configured Pipedream client ID, client secret, or project ID; no environment file name was packaged.",
+        "The final tracked-source scan found zero exact matches for those same three configured values.",
+        "The exact-value scan was repeated after the last source fixes and report update; tracked source and the final app bundle remained clear.",
         "The only persisted Pipedream metadata before OAuth was a mode-0600 versioned file containing a scope hash and an empty accounts array.",
         "Native Quit removed the main process, all packaged helpers, and the QA listener; the same clean profile then relaunched successfully.",
         "Agent-provider configuration and post-OAuth sensitive-tab/relay scans remain dependent on E2E-002 and E2E-004."
@@ -1047,14 +1119,19 @@
         "Linked sanitized ledgers for every preceding Pipedream E2E"
       ],
       "evidence": [
-        "Final DMG: release/Y-Space-1.6.6-arm64.dmg, 156,367,170 bytes, SHA-256 6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0.",
-        "The packaged app.asar SHA-256 is 153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08 and its main executable SHA-256 is c2d188f17d11d1540d10b468961ad9fcdedb89d5d5010c9424748e0f2f66a820.",
+        "Final hardened DMG: release/pipedream-hardening-final/Y-Space-1.6.6-arm64.dmg, 156,281,136 bytes, SHA-256 492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb.",
+        "The hardened packaged app.asar SHA-256 is b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42 and its main executable SHA-256 is 97fa83a9e03a3ae3f9a73377f13c5b953eb94f91184317d777836e243fe80f21.",
         "The app executable is thin arm64; deep/strict codesign verification passed with an ad-hoc hardened-runtime signature and no Team ID.",
-        "Authoritative Node 24 validation passed 924 files and 10,794 tests with 5 files and 85 tests skipped, plus 32 focused files / 649 security-browser-Pipedream tests, typecheck, standard/type-aware lint, formatting, 3,343-message localization extraction with zero missing translations, fixture, JSON/diff integrity, website build, package signature, and exact-secret scans.",
+        "Authoritative Node 24 validation passed 925 files and 10,880 tests with 5 files and 85 tests skipped. The final high-risk matrix passed 15 files / 437 tests with one intentional skip; independent hardening lanes passed 289/289 and 217/217, and the final security re-audit passed 305/305 plus 104/104 accepted-turn/start-close tests. Typecheck, standard/type-aware lint, formatting, 3,345-message localization extraction with zero missing translations, JSON/diff integrity, production build, package signature, and exact-secret scans also passed.",
         "A final P1 audit found and fixed a same-directory OpenCode relay-sharing boundary: front-door bindings now rotate per thread launch, and regressions prove distinct routes/bearers plus independent 404 revocation while a sibling task remains live.",
-        "Computer Use verified both popup entry points, live pagination/search/no-results, white/orange glass presentation, stacked Escape behavior, and live packaged Codex/OpenCode trusted-input flows. The final hardened app remained one persistent --use-mock-keychain process across all last UI checks.",
+        "Computer Use verified both popup entry points, white/orange glass presentation, one global Browser strip, a real Codex 5.6 Sol click/navigation, a real OpenCode Big Pickle inspection, and collapsed final-answer presentation. The exact final app remained one persistent isolated --use-mock-keychain process across all final UI checks and is still open for user testing.",
         "A final adversarial pass added generation-safe OAuth writes/returns, strict atomic clear, main-only generic-clear rejection, pending/root/child authority revocation, bounded disposal, disconnect quarantine, and exact sensitive-tab cleanup ownership.",
         "Gmail OAuth, the explicit account grant, live agent read, connected-account persistence, and scoped disconnect remain at the explicit authorization boundary and are not claimed."
+      ],
+      "screenshots": [
+        "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-connections-popup.jpeg",
+        "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-global-browser-tabs.jpeg",
+        "implementation assets/qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg"
       ],
       "status": "partial_pass_oauth_pending"
     },
@@ -1082,7 +1159,9 @@
       "evidence": [
         "The final packaged Codex GPT-5.6 Sol task found and focused the existing cursor-b global Browser tab, clicked #cursor-click-button exactly once, and returned Browser verified.",
         "The value-free fixture ledger recorded 16 native events. Its newest pointermove, pointerdown, pointerup, and click entries all reported Trusted: yes.",
-        "Computer Use captured implementation assets/qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg with the final answer beside the visible embedded Browser."
+        "Computer Use captured implementation assets/qa-screenshots/codex-final-package-visible-cursor-trusted-click.jpeg with the final answer beside the visible embedded Browser.",
+        "In the exact final persistent --use-mock-keychain process, Codex 5.6 Sol reused the existing Example Domain tab, clicked Learn more, navigated it to https://www.iana.org/help/example-domains, reported visible H1 Example Domains, and settled to one collapsed Worked · 21 steps row with Browser verified · 4 actions.",
+        "Computer Use captured implementation assets/qa-screenshots/pipedream-hardening-fresh-package-agent-browser-control.jpeg from that fresh-package run."
       ],
       "status": "pass_final_package"
     },
@@ -1164,9 +1243,9 @@
         "Final package identity, codesign, cleanup, and post-relaunch sequence"
       ],
       "evidence": [
-        "The complete Node 24 suite passed 924 files and 10,794 tests; focused fixture tests passed 2 of 2, and typecheck, standard/type-aware lint, formatting, localization, JSON, and diff checks passed.",
+        "The complete Node 24 suite passed 925 files and 10,880 tests; focused fixture tests passed 2 of 2, and typecheck, standard/type-aware lint, formatting, localization, JSON, and diff checks passed.",
         "The final ARM64 package passed deep/strict ad-hoc codesign verification. Cursor overlay, transient feedback, animation/timer cleanup, presentation lease, guest residency, sensitive guest, and shutdown boundaries are covered by passing regressions.",
-        "Final DMG SHA-256: 6499904c49c4cf9a6dff68e4184f20669c218e4c500c6dd2a4a98868354851f0; app.asar SHA-256: 153c1ad832024385453a99864c101ccdee1e82587bca3d68ef82e1aa6f5c7c08."
+        "Final hardened DMG SHA-256: 492cd2c500043938dac322f0376e9afc49d50cb286d312b991892328dba4b9cb; app.asar SHA-256: b6f118170ca60f78b6c1bb5f29fc73af1231487e6886e2aae28b258aeb841a42."
       ],
       "status": "pass_automated_package_and_live_provider_actions"
     }

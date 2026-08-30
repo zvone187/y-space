@@ -82,6 +82,45 @@ describe("ConnectionsSettings", () => {
     expect(bridgeMock.pipedreamBeginPersonalMcpOauth).toHaveBeenCalledOnce();
   });
 
+  it("canonicalizes an equivalent Personal URL alias before sign-in", async () => {
+    const personalAlias = "https://ignored:ignored@mcp.pipedream.net./v2/?legacy=1";
+    settingsMock.mcpServers = [
+      {
+        id: "legacy-personal-alias",
+        name: "pd",
+        description: "Legacy Personal Pipedream tools",
+        enabled: true,
+        timeoutMs: 30_000,
+        transport: { type: "http", url: personalAlias, headers: {} },
+      },
+    ];
+    const authenticationRequired: PipedreamSnapshot = {
+      personalMcp: { enabled: true, authenticated: false, serverName: "pd" },
+      connect: { state: "absent" },
+    };
+    bridgeMock.pipedreamGetSnapshot
+      .mockResolvedValueOnce(authenticationRequired)
+      .mockResolvedValue({
+        ...authenticationRequired,
+        personalMcp: { enabled: true, authenticated: true, serverName: "pd" },
+      });
+
+    render(<ConnectionsSettings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => expect(settingsMock.setMcpServers).toHaveBeenCalledOnce());
+    const saved = settingsMock.setMcpServers.mock.calls[0]?.[0] ?? [];
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({
+      id: "pipedream-personal-mcp",
+      name: "pd",
+      enabled: true,
+      transport: { type: "http", url: "https://mcp.pipedream.net/v2" },
+    });
+    expect(JSON.stringify(saved)).not.toContain(personalAlias);
+    expect(bridgeMock.pipedreamBeginPersonalMcpOauth).toHaveBeenCalledOnce();
+  });
+
   it("routes managed Personal Pipedream sign-in through the URL-free main coordinator", async () => {
     const notConfigured: PipedreamSnapshot = {
       personalMcp: { enabled: false, authenticated: false, serverName: "pd" },
