@@ -1,42 +1,53 @@
 {
-  "version": 12,
+  "version": 13,
   "project": "Y Space",
-  "branch": "y-space-pipedream-live",
+  "branch": "y-space-frosted-glass",
   "platform": "macOS Apple Silicon desktop",
   "testedOn": "2026-08-30",
-  "status": "final_unsigned_arm64_package_verified_pipedream_oauth_confirmation_pending",
+  "status": "frosted_glass_core_verified_evidence_caveats_recorded",
   "currentPhase": {
-    "name": "Trusted visible agent cursor and Pipedream completion architecture",
-    "baseBranch": "y-space-glass-polish",
-    "baseCommit": "361aab63",
-    "baseline": "925 passed files, 5 skipped files, 10,880 passed tests, and 85 skipped tests under Node 24.13.0",
-    "failFirst": "Cursor, native-input, sensitive presentation, guest-attachment, Pipedream relay, OAuth lifecycle, and shutdown regressions were added before their implementation fixes.",
-    "implementationStatus": "complete_with_external_oauth_and_claude_auth_gates",
-    "performanceBoundary": "One reusable aria-hidden cursor overlay is retained per resident page; ordinary browser guests, sensitive guests, presentation feedback, timers, and tab metadata remain explicitly bounded.",
-    "reviewStatus": "Earlier packaged Codex and OpenCode runs produced visible embedded-Browser evidence, including a real Codex link click/navigation. The definitive replacement package then passed OpenCode GLM-5.3-Flash hover, native click, single fill-with-submit, final URL/title inspection, and Browser verified acceptance. The reviewed replacement bundle was launched with an isolated profile and the literal --use-mock-keychain argument; PID 3806 stayed open across the definitive OpenCode and cursor acceptance and remains open for user testing. Final adversarial regressions cover OAuth generation races, strict atomic sign-out, pending/root/child revocation, disconnect quarantine, sensitive-tab ownership, bounded teardown, cross-agent launch-configuration supersession, raw-bearer isolation behind a revocable Personal Pipedream loopback relay, and fail-closed Browser evidence freshness. Gmail OAuth and live Claude inference remain unclaimed external authorization gates."
+    "name": "Reference-matched Apple-style frosted material",
+    "baseBranch": "y-space-pipedream-live",
+    "baseCommit": "153af1429e150d11f6d53667a371a1c42673fef1",
+    "baseline": "940 passed files, 6 skipped files, 11,126 passed tests, and 86 skipped tests under Node 26.8.1",
+    "failFirst": "Native-material decisions, transparent-window construction, weak diffusion, absent optical edge layers, and unbounded filter placement were captured by focused failing tests before implementation.",
+    "implementationStatus": "complete_and_packaged",
+    "performanceBoundary": "One native macOS sidebar material and one bounded backdrop-filter per stable glass surface; no per-Browser-guest, content-plane, row, or individual-tab filters. The browser-extract auxiliary window explicitly opts out of native material.",
+    "reviewStatus": "The final unsigned ARM64 package passed deep/strict codesign verification and manual Computer Use inspection in light, dark, translucency-off, and macOS Reduce Transparency states. The same PID retained its UI state, restored the material live, opened the embedded Browser with sharp guest pixels, and remains open with the literal --use-mock-keychain argument."
+  },
+  "frostedGlassRevision": {
+    "name": "Apple-style frosted material revision",
+    "baseBranch": "y-space-pipedream-live",
+    "baseCommit": "153af1429e150d11f6d53667a371a1c42673fef1",
+    "worktree": "/Users/zvonimirsabljic/Development/y-space/y-space-frosted-glass",
+    "baseline": "After serially preparing native/server and Electron worker artifacts, the final source passed 940 files and 11,126 tests with 6 files and 86 tests skipped in 130.70 seconds under Node 26.8.1.",
+    "failFirst": "Three focused suites intentionally fail: 9 failing and 5 passing tests prove missing native material decisions, fragile transparent-window construction, insufficient 24px/152% diffusion, and absent optical rim/lens layers.",
+    "implementationStatus": "complete_and_verified",
+    "materialBoundary": "Native sidebar blur plus bounded CSS blur on stable overlapping chrome only; no filters on Browser guests, content planes, individual tabs, rows, or per-page hosts.",
+    "testLaunchInvariant": "Every packaged UI run will use one isolated process launched with the literal --use-mock-keychain argument, keep that process open between cases, and leave it open for user testing."
   },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
-    "app": "/tmp/y-space-pipedream-final-3x1rp5/mac-arm64/Y Space.app",
+    "app": "/tmp/y-space-frosted-glass-reviewed-20260830-1320/mac-arm64/Y Space.app",
     "architecture": "arm64",
-    "appDiskBytes": 456638464,
-    "appAsarSha256": "acd87e51f1a6b3d3f64d02ddf37ecc5c1212a7b3f160d281401abbc885ddab71",
-    "appAsarBytes": 164148100,
-    "executableSha256": "6e1f58cfc524a8076ff7bdb75fb482e53abf28ed92474b6f00f33c18273ace86",
+    "appDiskBytes": 456650752,
+    "appAsarSha256": "137ff0033d18c196579b1c15ccbd202f9be20a057f6d38b762389dfcdfc8046f",
+    "appAsarBytes": 164161598,
+    "executableSha256": "e34de8fca6a394fa0fe39fe6af3df69b76e5e05469719d3e5a64eef3554b8f66",
     "executableBytes": 52752,
     "codesign": "codesign --verify --deep --strict passed; ad-hoc hardened-runtime signature with no Team ID",
-    "qaLaunch": "The final packaged UI run launched from the exact rebuilt bundle with PORACODE_BASE_DIR=/tmp/y-space-pipedream-definitive-qa.qptzx8 and the literal --use-mock-keychain argument; PID 3806 remained open between every definitive test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
+    "qaLaunch": "The exact reviewed packaged UI run launched with PORACODE_BASE_DIR=/tmp/y-space-frosted-glass-reviewed-profile-20260830-1320 and the literal --use-mock-keychain argument; PID 67151 remained open between every final frosted-material test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
       "status": "pass on the final reviewed source state under Node.js 26.8.1",
-      "passedFiles": 937,
+      "passedFiles": 940,
       "skippedFiles": 6,
-      "passedTests": 11105,
+      "passedTests": 11126,
       "skippedTests": 86,
-      "durationSeconds": 85.74,
-      "focusedTimeoutStress": "The sole timing-race candidate from the preceding loaded run passed 10 of 10 sequential focused repeats before this green full-suite run."
+      "durationSeconds": 130.7,
+      "focusedTimeoutStress": "Focused native-window, IPC, provider-lifecycle, sidebar-token, contrast, and CSS material-contract suites passed before this green full-suite run."
     },
     "targetedBranding": {
       "status": "pass",
@@ -49,8 +60,8 @@
     "glassPolish": {
       "status": "pass",
       "initialFocusedPass": "10 files and 127 tests",
-      "finalReviewRegressionPass": "1 file and 11 tests",
-      "coverage": "sidebar platform defaults and floors, one global glass tab strip, bounded glass markers, content-plane blur exclusion, reduced-transparency cascade priority, dark-aware edge/elevation tokens, browser toolbar/omnibox markers, composer geometry, and the unsnapped 82% dark slider default"
+      "finalReviewRegressionPass": "7 files and 51 tests",
+      "coverage": "sidebar platform defaults and floors, one global glass tab strip, bounded glass markers, content-plane blur exclusion, reduced-transparency cascade priority, dark-aware edge/elevation tokens, browser toolbar/omnibox markers, composer geometry, and the final 64% light / 70% dark slider defaults"
     },
     "checks": {
       "typecheck": "pass",
@@ -1268,6 +1279,115 @@
         "PID 3806 remains open under the literal --use-mock-keychain argument after the definitive browser and cursor runs."
       ],
       "status": "pass_automated_package_and_live_provider_actions"
+    },
+    {
+      "id": "YS-FROST-E2E-001",
+      "title": "Native and renderer frost are visibly diffused in light and dark",
+      "userStory": "As a Y Space user, I want navigation and controls to look like real frosted material rather than translucent white panels.",
+      "setup": "Build the unsigned ARM64 app; launch one isolated persistent process with --use-mock-keychain; place a deterministic high-frequency colored stripe/checkerboard fixture behind the native sidebar and behind bounded renderer chrome.",
+      "instrumentation": "Capture the same geometry with frosting on and off, record computed material tokens and active native-material state, and sample screenshots outside versus inside the glass region.",
+      "steps": [
+        "Open a thread plus an embedded Browser peer and position the fixture beneath the sidebar/global rail/composer/menu surfaces.",
+        "Capture light mode with frosting off, turn frosting on without relaunching, and capture the same frame.",
+        "Repeat in dark mode and open the Connections popup plus a menu."
+      ],
+      "expected": [
+        "Background detail is visibly diffused and color is softly concentrated through native sidebar and bounded renderer glass, while the prior frame remains sharp with frosting off.",
+        "Rims show restrained light/dark edge concentration without a full-surface white gloss or muddy orange wash.",
+        "Thread, Browser, PDF/file/content planes and live webview pixels remain sharp and readable."
+      ],
+      "proofToCapture": [
+        "Matched light on/off screenshots",
+        "Matched dark on/off screenshots",
+        "Computed/native material ledger and pixel-detail comparison"
+      ],
+      "evidence": [
+        "Computer Use inspected the exact reviewed package at the Appearance screen and composer in light mode: the sidebar showed a warm peach/orange color field diffused through a milky grain layer, and the composer showed a bounded orange rim without blurring its text or controls.",
+        "Turning Translucent sidebar off live removed the color diffusion, grain, and frosting slider; restoring it in the same process brought the material and 64% light default back without a relaunch.",
+        "Dark mode changed the same sidebar into smoky amber glass over an opaque dark content plane, retained readable text, and reported the 70% dark default; a matched dark translucency-off capture proves the fallback is solid.",
+        "The embedded DuckDuckGo Browser remained pixel-sharp in its own global tab while the shell, tab rail, toolbar, and composer retained bounded frosted chrome.",
+        "The planned deterministic checkerboard and quantitative pixel-detail ledger were not run against this exact package, so this case records the complete core visual state matrix rather than a numerical blur comparison."
+      ],
+      "screenshots": [
+        "implementation assets/frosted-glass/qa-screenshots/final-package-light-appearance.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-translucency-off.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-dark-appearance.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-dark-translucency-off.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-light-composer.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-browser-sharp.jpeg"
+      ],
+      "status": "partial_core_visual_states_fixture_pixel_ledger_not_run"
+    },
+    {
+      "id": "YS-FROST-E2E-002",
+      "title": "Reduce Transparency switches to an opaque accessible fallback live",
+      "userStory": "As a user who reduces transparency, I want the interface to become solid and legible immediately without restarting Y Space.",
+      "setup": "Continue in the same --use-mock-keychain process with frosting active and both a native sidebar and a renderer popover visible.",
+      "instrumentation": "Observe data-sidebar-glass/data-native-material, BrowserWindow material calls, screenshot surfaces, focus ring visibility, and process continuity.",
+      "steps": [
+        "Enable macOS Reduce Transparency while Y Space remains open.",
+        "Switch light/dark appearance and open the composer, menu, and Connections surface.",
+        "Disable Reduce Transparency and confirm the material returns in the same process."
+      ],
+      "expected": [
+        "Native vibrancy and renderer blur stop immediately; all glass surfaces paint opaque and optical rim/lens layers disappear.",
+        "Theme changes cannot reactivate material while the preference remains enabled, and text/control contrast stays usable.",
+        "Restoration is clean, with no transparent flash, stale IPC reply, relaunch, or lost UI state."
+      ],
+      "proofToCapture": [
+        "Before/reduced/restored screenshots",
+        "Dataset/native-state transition ledger",
+        "Same PID and preserved active tabs/thread"
+      ],
+      "evidence": [
+        "Computer Use enabled macOS Reduce Transparency while the exact reviewed package's dark-mode Appearance view remained open. The sidebar immediately became a solid opaque surface, optical diffusion disappeared, and the in-app Translucent sidebar preference remained on.",
+        "Across two live Reduce Transparency enable/restore cycles, Computer Use captured the composer and Connections settings surface as opaque; the accessibility tree also exposed the open More menu without a translucent screenshot surface.",
+        "Computer Use then disabled Reduce Transparency and confirmed the frosted material returned in the same packaged process before restoring Y Space to light mode.",
+        "PID 67151 remained continuous across reduced, restored, light, dark, composer, Connections, menu, and Browser states; no keychain prompt or app relaunch occurred."
+      ],
+      "screenshots": [
+        "implementation assets/frosted-glass/qa-screenshots/final-package-dark-appearance.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-reduced-transparency.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-reduced-composer.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-reduced-connections.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-light-composer.jpeg",
+        "implementation assets/frosted-glass/qa-screenshots/final-package-final-restored-browser.jpeg"
+      ],
+      "artifacts": ["implementation assets/frosted-glass/manual-material-transition-ledger.json"],
+      "status": "pass_live_accessible_fallback_and_restore"
+    },
+    {
+      "id": "YS-FROST-E2E-003",
+      "title": "Glass remains bounded through Browser and global-tab stress",
+      "userStory": "As a long-running desktop user, I want modern glass without accumulating compositor layers, guests, or memory.",
+      "setup": "Continue in the same packaged process; open thread, Browser, file/PDF/spreadsheet, Git, Usage, and at least six Browser peer tabs using existing residency fixtures.",
+      "instrumentation": "Record filtered host count, Browser guest/renderers, RSS, global tabs, hit testing, and keyboard focus before peak, at peak, and after two cleanup cycles.",
+      "steps": [
+        "Repeatedly switch/reorder/resize global tabs and panes, navigate Browser peers, open menus, focus the composer, and alternate light/dark.",
+        "Toggle frosting off/on and repeat one interaction sequence.",
+        "Close disposable peers and confirm counts return to the intended baseline while leaving the app open."
+      ],
+      "expected": [
+        "Filtered hosts remain bounded to stable chrome and never appear on individual tabs, rows, Browser guests, webviews, or content planes.",
+        "Clicks, typing, focus, drag regions, resizing, Browser navigation, and menu layering remain correct.",
+        "Guest/renderer/filter counts return after cleanup and repeated cycles show no monotonic memory-growth signal."
+      ],
+      "proofToCapture": [
+        "Before/peak/cleanup process ledger",
+        "Representative interaction screenshots",
+        "Filtered-selector and hit-test evidence"
+      ],
+      "evidence": [
+        "The final CSS contract suite proves the global tab strip owns one bounded glass marker while individual tabs, BrowserHost, BrowserPanel, webviews, document/content planes, and rows own none; reduced-transparency rules remove backdrop filters, grain, specular bloom, and optical layers.",
+        "The browser-extract auxiliary window explicitly uses nativeMaterialCapability=disabled, preventing an invisible native compositor material outside the main shell.",
+        "The final packaged Browser inspection showed one main renderer and one resident Browser guest with sharp content. Opening the Browser did not add a per-tab CSS filter or a second native material.",
+        "The earlier YS-GLASS-E2E-003 live residency cycle already exercised eight global Browser tabs, observed the six-guest cap, and returned to one guest after cleanup. Its one-cycle RSS delta remained explicitly inconclusive, so this revision does not claim a proven absence of memory leaks."
+      ],
+      "screenshots": [
+        "implementation assets/frosted-glass/qa-screenshots/final-package-browser-sharp.jpeg",
+        "implementation assets/qa-screenshots/glass-polish-eight-tabs.jpeg"
+      ],
+      "status": "partial_bounded_compositor_contract_memory_trend_inconclusive"
     }
   ]
 }

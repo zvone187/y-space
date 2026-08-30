@@ -13,6 +13,10 @@ let webContentsHandlers: Record<string, (...args: never[]) => void> = {};
 let windowHandlers: Record<string, (...args: never[]) => void> = {};
 
 vi.mock("electron", () => ({
+  nativeTheme: {
+    prefersReducedTransparency: false,
+    themeSource: "system",
+  },
   BrowserWindow: class BrowserWindow {
     webContents = {
       session: {},
@@ -239,5 +243,88 @@ describe("createMainWindow", () => {
       [killed, undefined],
       [killed, "window-close"],
     ]);
+  });
+
+  it.each([true, false])(
+    "keeps macOS vibrancy capability when saved translucency is %s",
+    async (sidebarTranslucency) => {
+      const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+      Object.defineProperty(process, "platform", { configurable: true, value: "darwin" });
+      vi.resetModules();
+
+      try {
+        const { createMainWindow } = await import("./createMainWindow");
+        createMainWindow({
+          title: "Y Space",
+          isDev: false,
+          channel: "stable",
+          preloadPath: "/tmp/preload.cjs",
+          rendererHtmlPath: "/tmp/index.html",
+          appVersion: "1.2.1",
+          posthogEnableDev: false,
+          posthogEnabled: false,
+          posthogHost: "",
+          posthogKey: "",
+          sentryEnabled: false,
+          windowChromeHeight: 32,
+          browserUserAgent: "Y Space",
+          appearance: "light",
+          sidebarTranslucency,
+          onClosed: vi.fn<() => void>(),
+        });
+
+        expect(browserWindowOptions).toMatchObject({
+          titleBarStyle: "hiddenInset",
+          vibrancy: "sidebar",
+          visualEffectState: "followWindow",
+        });
+        expect(browserWindowOptions).not.toHaveProperty("backgroundColor");
+        expect(browserWindowOptions).not.toHaveProperty("transparent");
+      } finally {
+        if (platformDescriptor) Object.defineProperty(process, "platform", platformDescriptor);
+        vi.resetModules();
+      }
+    },
+  );
+
+  it("omits native material capability for an always-opaque auxiliary window", async () => {
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { configurable: true, value: "darwin" });
+    vi.resetModules();
+
+    try {
+      const { createMainWindow } = await import("./createMainWindow");
+      createMainWindow({
+        title: "Y Space",
+        isDev: false,
+        channel: "stable",
+        preloadPath: "/tmp/preload.cjs",
+        rendererHtmlPath: "/tmp/index.html",
+        appVersion: "1.2.1",
+        posthogEnableDev: false,
+        posthogEnabled: false,
+        posthogHost: "",
+        posthogKey: "",
+        sentryEnabled: false,
+        windowChromeHeight: 32,
+        browserUserAgent: "Y Space",
+        appearance: "light",
+        sidebarTranslucency: true,
+        nativeMaterialCapability: "disabled",
+        onClosed: vi.fn<() => void>(),
+      });
+
+      expect(browserWindowOptions).toMatchObject({
+        titleBarStyle: "hiddenInset",
+        backgroundColor: "#ffffff",
+      });
+      expect(browserWindowOptions).not.toHaveProperty("vibrancy");
+      expect(browserWindowOptions).not.toHaveProperty("visualEffectState");
+      expect(browserWindowOptions).not.toHaveProperty("transparent");
+      expect(browserWindowOptions).not.toHaveProperty("backgroundMaterial");
+    } finally {
+      if (platformDescriptor) Object.defineProperty(process, "platform", platformDescriptor);
+      vi.resetModules();
+    }
   });
 });

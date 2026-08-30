@@ -1,6 +1,7 @@
 import { dbGetState, dbSetState } from "../db";
 import { BrowserWindow, screen, type RenderProcessGoneDetails } from "electron";
 import type { PoracodeChannel } from "@/shared/channel";
+import type { ThemeMode } from "@/shared/contracts";
 import type { PoracodeWindowKind } from "@/shared/ipc";
 import type { RendererProcessGoneIntent } from "@/main/diagnostics/processGone";
 import {
@@ -8,7 +9,7 @@ import {
   installSessionPermissions,
   isNavigationUrlAllowed,
 } from "../browser/permissions";
-import { supportsNativeWindowMaterial, syncNativeThemeForMaterial } from "./windowMaterial";
+import { decideCurrentNativeWindowMaterial, syncNativeThemeForMaterial } from "./windowMaterial";
 import {
   buildRendererAdditionalArguments,
   installAppNavigationGuards,
@@ -82,8 +83,16 @@ export interface CreateMainWindowOptions {
   browserUserAgent: string;
   /** Saved appearance, so the native window opens matching the theme. */
   appearance: "light" | "dark";
+  /** Saved theme source, preserving Follow System for native materials. */
+  themeMode?: ThemeMode;
   /** Saved opt-in translucent ("liquid glass") sidebar, so the window opens with the material already applied. */
   sidebarTranslucency: boolean;
+  /**
+   * Whether this window needs a native material backing that can be toggled at
+   * runtime. Always-opaque auxiliary windows disable it to avoid an invisible
+   * compositor surface.
+   */
+  nativeMaterialCapability?: "toggleable" | "disabled";
   onClosed(): void;
   onClose?: (event: Electron.Event) => void;
   onRendererProcessGone?: (
@@ -105,19 +114,23 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
   // setWindowChrome values, so the first frame doesn't flash a fixed palette.
   const backgroundColor = isDark ? "#070709" : "#ffffff";
   const symbolColor = isDark ? "#fafafa" : "#181816";
-  // macOS: always create the window transparent + vibrancy-capable so the glass
-  // sidebar can be toggled live (the renderer reveals/hides it purely via CSS —
-  // with glass off the opaque content simply covers the material). macOS can't
-  // turn an opaque window transparent at runtime, so the capability has to exist
-  // from creation. Windows acrylic is applied here for a flash-free first paint
-  // when glass is already on, and toggled live via setBackgroundMaterial.
+  // macOS: main windows are always created vibrancy-capable so the glass sidebar
+  // can be toggled live (the renderer reveals/hides it purely via CSS; with glass
+  // off, opaque content covers the material). Electron gives a vibrancy-backed
+  // window a clear WebContents background at construction, without fragile
+  // `transparent: true` mode. Always-opaque auxiliary windows explicitly opt out.
+  // Windows acrylic is applied here for a flash-free first paint when glass is
+  // already on, and toggled live via setBackgroundMaterial.
   const isMacOS = process.platform === "darwin";
-  const winGlassAtStart =
-    process.platform === "win32" && options.sidebarTranslucency && supportsNativeWindowMaterial();
-  if (options.sidebarTranslucency && supportsNativeWindowMaterial()) {
+  const nativeMaterialCapable = options.nativeMaterialCapability !== "disabled";
+  const startupMaterial = decideCurrentNativeWindowMaterial(
+    nativeMaterialCapable && options.sidebarTranslucency,
+  );
+  const winGlassAtStart = startupMaterial.windowsMaterial === "acrylic";
+  if (startupMaterial.supported) {
     // Match the native appearance to the app theme so the material renders in the
     // right light/dark variant from the first frame.
-    syncNativeThemeForMaterial(options.appearance);
+    syncNativeThemeForMaterial(options.themeMode ?? options.appearance);
   }
   const window = new BrowserWindow({
     title: options.title,
@@ -127,10 +140,12 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
     ...(saved?.x != null && saved?.y != null ? { x: saved.x, y: saved.y } : {}),
     minWidth: options.minWidth ?? 540,
     minHeight: options.minHeight ?? 720,
-    backgroundColor: isMacOS || winGlassAtStart ? "#00000000" : backgroundColor,
+    ...(!isMacOS || !nativeMaterialCapable
+      ? { backgroundColor: winGlassAtStart ? "#00000000" : backgroundColor }
+      : {}),
     autoHideMenuBar: true,
-    ...(isMacOS
-      ? { vibrancy: "sidebar" as const, visualEffectState: "active" as const, transparent: true }
+    ...(isMacOS && nativeMaterialCapable
+      ? { vibrancy: "sidebar" as const, visualEffectState: "followWindow" as const }
       : {}),
     ...(winGlassAtStart ? { backgroundMaterial: "acrylic" as const } : {}),
     ...(supportsTitleBarOverlay

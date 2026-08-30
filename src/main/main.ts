@@ -326,6 +326,7 @@ function isCloseToTrayEnabled(): boolean {
  */
 function resolveWindowChromeOptions(): {
   appearance: "light" | "dark";
+  themeMode: "system" | "light" | "dark";
   sidebarTranslucency: boolean;
 } {
   let mode: "system" | "light" | "dark" = "light";
@@ -341,6 +342,7 @@ function resolveWindowChromeOptions(): {
   }
   return {
     appearance: resolveThemeMode(mode, nativeTheme.shouldUseDarkColors),
+    themeMode: mode,
     sidebarTranslucency: wantGlass,
   };
 }
@@ -564,6 +566,7 @@ function createMainAppWindow(showOnReady = true): BrowserWindow {
     ...commonAppWindowOptions(),
     windowChromeHeight: WINDOW_CHROME_HEIGHT,
     appearance: windowChrome.appearance,
+    themeMode: windowChrome.themeMode,
     sidebarTranslucency: windowChrome.sidebarTranslucency,
     showOnReady,
     onClosed: () => {
@@ -620,7 +623,9 @@ function createBrowserExtractWindow(): BrowserWindow {
     windowChromeHeight: WINDOW_CHROME_HEIGHT,
     browserUserAgent,
     appearance: windowChrome.appearance,
+    themeMode: windowChrome.themeMode,
     sidebarTranslucency: windowChrome.sidebarTranslucency,
+    nativeMaterialCapability: "disabled",
     openDevTools: false,
     ...(process.env.VITE_DEV_SERVER_URL ? { devServerUrl: process.env.VITE_DEV_SERVER_URL } : {}),
     onClosed: () => {

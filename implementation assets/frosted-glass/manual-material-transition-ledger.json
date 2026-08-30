@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "project": "Y Space",
+  "caseId": "YS-FROST-E2E-002",
+  "platform": "macOS Apple Silicon",
+  "package": {
+    "path": "/tmp/y-space-frosted-glass-reviewed-20260830-1320/mac-arm64/Y Space.app",
+    "appAsarSha256": "137ff0033d18c196579b1c15ccbd202f9be20a057f6d38b762389dfcdfc8046f",
+    "executableSha256": "e34de8fca6a394fa0fe39fe6af3df69b76e5e05469719d3e5a64eef3554b8f66",
+    "pid": 67151,
+    "startedLocal": "2026-08-30T13:21:14-07:00",
+    "baseDir": "/tmp/y-space-frosted-glass-reviewed-profile-20260830-1320",
+    "launchArgument": "--use-mock-keychain"
+  },
+  "transitions": [
+    {
+      "state": "dark_glass_active",
+      "macosReduceTransparency": "off",
+      "appTranslucencyPreference": "on",
+      "appearance": "dark",
+      "observableMaterial": "smoky amber diffusion and grain",
+      "screenshot": "qa-screenshots/final-package-dark-appearance.jpeg"
+    },
+    {
+      "state": "dark_opaque_fallback",
+      "macosReduceTransparency": "on",
+      "appTranslucencyPreference": "on",
+      "appearance": "dark",
+      "observableMaterial": "solid sidebar with diffusion and optical layers removed",
+      "screenshot": "qa-screenshots/final-package-reduced-transparency.jpeg"
+    },
+    {
+      "state": "reduced_composer",
+      "macosReduceTransparency": "on",
+      "appTranslucencyPreference": "on",
+      "appearance": "dark",
+      "observableMaterial": "solid shell and composer surroundings with controls still sharp",
+      "screenshot": "qa-screenshots/final-package-reduced-composer.jpeg"
+    },
+    {
+      "state": "light_glass_restored",
+      "macosReduceTransparency": "off",
+      "appTranslucencyPreference": "on",
+      "appearance": "light",
+      "observableMaterial": "warm diffusion, grain, and orange edge concentration restored live",
+      "screenshot": "qa-screenshots/final-package-light-composer.jpeg"
+    },
+    {
+      "state": "reduced_connections",
+      "macosReduceTransparency": "on",
+      "appTranslucencyPreference": "on",
+      "appearance": "light",
+      "observableMaterial": "solid settings navigation, cards, and content",
+      "screenshot": "qa-screenshots/final-package-reduced-connections.jpeg"
+    },
+    {
+      "state": "final_restore",
+      "macosReduceTransparency": "off",
+      "appTranslucencyPreference": "on",
+      "appearance": "light",
+      "observableMaterial": "frost restored; embedded Browser and original thread remained open",
+      "screenshot": "qa-screenshots/final-package-final-restored-browser.jpeg"
+    }
+  ],
+  "processContinuity": {
+    "samePidAcrossTransitions": true,
+    "relaunchObserved": false,
+    "keychainPromptObserved": false,
+    "activeThreadPreserved": true,
+    "embeddedBrowserPreserved": true
+  },
+  "nativeStateEvidence": {
+    "productionDebugProbeUsed": false,
+    "observableRuntimeEvidence": "The material changed live between diffused and opaque states while the app preference remained enabled and the process stayed continuous.",
+    "automatedContractEvidence": [
+      "src/main/window/windowMaterialDecision.test.ts",
+      "src/main/ipc/localHandlers.windowChrome.test.ts",
+      "src/renderer/components/ui/provider.test.tsx"
+    ],
+    "boundary": "Native decision, apply/remove order, reduced-transparency gating, and stale-reply handling are covered by focused tests; the production package was not instrumented with a private nativeActive debug overlay."
+  },
+  "finalSystemPreference": {
+    "macosReduceTransparency": "off",
+    "verifiedBeforeHandoff": true
+  },
+  "result": "pass_live_opaque_fallback_and_restore_with_process_continuity"
+}

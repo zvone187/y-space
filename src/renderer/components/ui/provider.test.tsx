@@ -6,21 +6,41 @@ import type { ThemeMode } from "@/shared/contracts";
 const settingsState: {
   themeMode: ThemeMode;
   themePreset: string;
+  locale: "system";
+  sidebarTranslucency: boolean;
   sidebarGlassTint: { light: number | null; dark: number | null };
 } = {
   themeMode: "system",
   themePreset: "default",
+  locale: "system",
+  sidebarTranslucency: true,
   sidebarGlassTint: { light: null, dark: null },
 };
+
+interface WindowChromeTestPayload {
+  materialEnabled?: boolean;
+}
+
+interface WindowChromeTestResult {
+  nativeCapable: boolean;
+  nativeActive: boolean;
+}
+
+const bridgeMocks = vi.hoisted(() => ({
+  setWindowChrome:
+    vi.fn<(payload: WindowChromeTestPayload) => Promise<WindowChromeTestResult | void>>(),
+}));
 
 vi.mock("../../state/sharedSettingsStore", () => ({
   useSharedSettings: (selector: (s: typeof settingsState) => unknown) => selector(settingsState),
 }));
 
 vi.mock("@/renderer/bridge", () => ({
+  isMac: () => true,
   isRemoteSession: () => false,
+  isWindows: () => false,
   readBridge: () => ({
-    setWindowChrome: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    setWindowChrome: bridgeMocks.setWindowChrome,
   }),
 }));
 
@@ -43,12 +63,94 @@ function setMatchMedia(prefersDark: boolean) {
   });
 }
 
+function installControllableMatchMedia(options: { prefersDark: boolean; reduced: boolean }) {
+  const mediaByQuery = new Map<
+    string,
+    {
+      matches: boolean;
+      listeners: Set<(event: MediaQueryListEvent) => void>;
+      media: MediaQueryList;
+    }
+  >();
+
+  const resolveMatches = (query: string) =>
+    query.includes("prefers-color-scheme") ? options.prefersDark : options.reduced;
+
+  const getMedia = (query: string) => {
+    const existing = mediaByQuery.get(query);
+    if (existing) return existing;
+
+    const state = {
+      matches: resolveMatches(query),
+      listeners: new Set<(event: MediaQueryListEvent) => void>(),
+      media: undefined as unknown as MediaQueryList,
+    };
+    state.media = {
+      get matches() {
+        return state.matches;
+      },
+      media: query,
+      onchange: null,
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject | null) => {
+        if (typeof listener === "function") {
+          state.listeners.add(listener as (event: MediaQueryListEvent) => void);
+        }
+      },
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject | null) => {
+        if (typeof listener === "function") {
+          state.listeners.delete(listener as (event: MediaQueryListEvent) => void);
+        }
+      },
+      addListener: (listener: ((event: MediaQueryListEvent) => void) | null) => {
+        if (listener) state.listeners.add(listener);
+      },
+      removeListener: (listener: ((event: MediaQueryListEvent) => void) | null) => {
+        if (listener) state.listeners.delete(listener);
+      },
+      dispatchEvent: () => false,
+    };
+    mediaByQuery.set(query, state);
+    return state;
+  };
+
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => getMedia(query).media,
+  });
+
+  return {
+    setReduced(matches: boolean) {
+      const query = "(prefers-reduced-transparency: reduce)";
+      const state = getMedia(query);
+      state.matches = matches;
+      const event = { matches, media: query } as MediaQueryListEvent;
+      for (const listener of state.listeners) listener(event);
+    },
+  };
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   settingsState.themeMode = "system";
   settingsState.themePreset = "default";
+  settingsState.locale = "system";
+  settingsState.sidebarTranslucency = true;
+  bridgeMocks.setWindowChrome.mockReset();
+  bridgeMocks.setWindowChrome.mockResolvedValue(undefined);
   document.documentElement.classList.remove("light", "dark");
   delete document.documentElement.dataset.theme;
   delete document.documentElement.dataset.themePreset;
+  delete document.documentElement.dataset.sidebarGlass;
+  delete document.documentElement.dataset.nativeMaterial;
+  Reflect.deleteProperty(window, "poracode");
   setMatchMedia(true);
 });
 
@@ -260,5 +362,88 @@ describe("AppProvider", () => {
       </AppProvider>,
     );
     expect(document.documentElement.dataset.theme).toBe("light");
+  });
+
+  it("disables sidebar glass and native material when reduced transparency changes live", async () => {
+    const media = installControllableMatchMedia({ prefersDark: false, reduced: false });
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      value: {},
+    });
+    bridgeMocks.setWindowChrome.mockImplementation(async ({ materialEnabled }) => ({
+      nativeCapable: true,
+      nativeActive: materialEnabled === true,
+    }));
+
+    render(
+      <AppProvider contentReady>
+        <span />
+      </AppProvider>,
+    );
+
+    await waitFor(() => {
+      expect(bridgeMocks.setWindowChrome).toHaveBeenCalledWith(
+        expect.objectContaining({ materialEnabled: true }),
+      );
+      expect(document.documentElement.dataset.sidebarGlass).toBe("on");
+      expect(document.documentElement.dataset.nativeMaterial).toBe("on");
+    });
+
+    act(() => {
+      media.setReduced(true);
+    });
+
+    expect(document.documentElement.dataset.sidebarGlass).toBe("off");
+    expect(document.documentElement.dataset.nativeMaterial).toBe("off");
+    await waitFor(() => {
+      expect(bridgeMocks.setWindowChrome).toHaveBeenLastCalledWith(
+        expect.objectContaining({ materialEnabled: false }),
+      );
+    });
+  });
+
+  it("ignores a stale native-material enable response after reduced transparency turns on", async () => {
+    const media = installControllableMatchMedia({ prefersDark: false, reduced: false });
+    const pendingEnable = createDeferred<WindowChromeTestResult>();
+    Object.defineProperty(window, "poracode", {
+      configurable: true,
+      value: {},
+    });
+    bridgeMocks.setWindowChrome
+      .mockImplementationOnce(() => pendingEnable.promise)
+      .mockResolvedValueOnce({ nativeCapable: true, nativeActive: false });
+
+    render(
+      <AppProvider contentReady>
+        <span />
+      </AppProvider>,
+    );
+
+    await waitFor(() => {
+      expect(bridgeMocks.setWindowChrome).toHaveBeenCalledWith(
+        expect.objectContaining({ materialEnabled: true }),
+      );
+      expect(document.documentElement.dataset.sidebarGlass).toBe("on");
+    });
+
+    act(() => {
+      media.setReduced(true);
+    });
+
+    await waitFor(() => {
+      expect(bridgeMocks.setWindowChrome).toHaveBeenLastCalledWith(
+        expect.objectContaining({ materialEnabled: false }),
+      );
+      expect(document.documentElement.dataset.sidebarGlass).toBe("off");
+      expect(document.documentElement.dataset.nativeMaterial).toBe("off");
+    });
+
+    await act(async () => {
+      pendingEnable.resolve({ nativeCapable: true, nativeActive: true });
+      await pendingEnable.promise;
+    });
+
+    expect(document.documentElement.dataset.sidebarGlass).toBe("off");
+    expect(document.documentElement.dataset.nativeMaterial).toBe("off");
   });
 });

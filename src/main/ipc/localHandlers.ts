@@ -75,7 +75,10 @@ import {
   type WindowChromePayload,
   type WindowChromeResult,
 } from "@/shared/ipc";
-import { supportsNativeWindowMaterial, syncNativeThemeForMaterial } from "../window/windowMaterial";
+import {
+  decideCurrentNativeWindowMaterial,
+  syncNativeThemeForMaterial,
+} from "../window/windowMaterial";
 import type { SharedSettings } from "@/shared/settings";
 import {
   removeCrossagentRoutingOverride,
@@ -547,10 +550,10 @@ export function createLocalIpcHandlers(
         return { settings: next, result: instance };
       }),
     setWindowChrome: async (payload: WindowChromePayload): Promise<WindowChromeResult> => {
-      const nativeCapable = supportsNativeWindowMaterial();
+      const decision = decideCurrentNativeWindowMaterial(payload.materialEnabled === true);
       const mainWindow = options.getMainWindow();
       if (!mainWindow) {
-        return { nativeCapable };
+        return { nativeCapable: decision.supported, nativeActive: false };
       }
       if (process.platform === "win32" || process.platform === "linux") {
         mainWindow.setTitleBarOverlay({
@@ -559,20 +562,32 @@ export function createLocalIpcHandlers(
           height: 32,
         });
       }
-      // Toggle the native translucency material live. macOS vibrancy is created
-      // with the window and revealed/hidden purely via CSS, so there is nothing
-      // to switch here. Windows acrylic is toggled at runtime (no relaunch).
-      const wantsMaterial = payload.materialEnabled === true && nativeCapable;
+      const opaqueBackground = payload.appearance === "dark" ? "#070709" : "#ffffff";
+      // Apply native material before revealing the renderer's transparent
+      // layers. When disabling, paint opaque first so no desktop flash can leak
+      // through while vibrancy/acrylic is removed.
+      if (process.platform === "darwin") {
+        if (decision.active) {
+          mainWindow.setVibrancy(decision.macVibrancy);
+          mainWindow.setBackgroundColor("#00000000");
+        } else {
+          mainWindow.setBackgroundColor(opaqueBackground);
+          mainWindow.setVibrancy(decision.macVibrancy);
+        }
+      }
       if (process.platform === "win32") {
-        mainWindow.setBackgroundMaterial(wantsMaterial ? "acrylic" : "none");
-        mainWindow.setBackgroundColor(
-          wantsMaterial ? "#00000000" : payload.appearance === "dark" ? "#070709" : "#ffffff",
-        );
+        if (decision.active) {
+          mainWindow.setBackgroundMaterial(decision.windowsMaterial);
+          mainWindow.setBackgroundColor("#00000000");
+        } else {
+          mainWindow.setBackgroundColor(opaqueBackground);
+          mainWindow.setBackgroundMaterial("none");
+        }
       }
-      if (wantsMaterial && payload.appearance) {
-        syncNativeThemeForMaterial(payload.appearance);
+      if (payload.themeMode ?? payload.appearance) {
+        syncNativeThemeForMaterial(payload.themeMode ?? payload.appearance ?? "system");
       }
-      return { nativeCapable };
+      return { nativeCapable: decision.supported, nativeActive: decision.active };
     },
     dbGetProjects: () => dbGetProjects(),
     dbGetThreads: () => dbGetThreads(),

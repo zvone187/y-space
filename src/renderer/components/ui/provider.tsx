@@ -175,6 +175,12 @@ export function AppProvider(props: {
     const styles = window.getComputedStyle(root);
     const wantMaterial = effectiveGlassEnabled && contentReady;
 
+    // Opaque renderer CSS must win immediately while native material is being
+    // disabled; enabling waits for main-process confirmation below.
+    if (!wantMaterial) root.dataset.nativeMaterial = "off";
+
+    let cancelled = false;
+
     void readBridge()
       .setWindowChrome({
         backgroundColor:
@@ -182,18 +188,26 @@ export function AppProvider(props: {
         symbolColor: appearance === "dark" ? "#fafafa" : "#181816",
         materialEnabled: wantMaterial,
         appearance,
+        themeMode,
       })
       .then((result) => {
+        if (cancelled) return;
         // The native material is toggled live by the main process; reveal it via
-        // the transparent-window CSS only where the OS actually supports it.
-        root.dataset.nativeMaterial = wantMaterial && !!result?.nativeCapable ? "on" : "off";
+        // transparent-shell CSS only when it was actually applied.
+        const nativeActive =
+          result?.nativeActive ?? (wantMaterial && result?.nativeCapable === true);
+        root.dataset.nativeMaterial = nativeActive ? "on" : "off";
       })
       .catch((error: unknown) => {
+        if (cancelled) return;
         root.dataset.nativeMaterial = "off";
         captureRendererException(error, { featureArea: "window-chrome" });
         // Keep renderer boot resilient if Electron rejects a color value.
       });
-  }, [appearance, effectiveGlassEnabled, contentReady, syncWindowChrome, remoteSession]);
+    return () => {
+      cancelled = true;
+    };
+  }, [appearance, themeMode, effectiveGlassEnabled, contentReady, syncWindowChrome, remoteSession]);
 
   // User-tuned sidebar frosting (Appearance slider): override the glass tint
   // alpha for the active appearance. No-op on platforms without a native blur

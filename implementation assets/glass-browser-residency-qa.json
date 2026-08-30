@@ -2,6 +2,13 @@
   "testedAt": "2026-08-28T20:55:00-07:00",
   "platform": "macOS Apple Silicon",
   "build": "release/mac-arm64/Y Space.app",
+  "historicalProvenance": {
+    "evidenceCommit": "361aab633035cad78d4c8f079117d345841c4a06",
+    "packageRetained": false,
+    "packageHashRecorded": false,
+    "currentPackageEvidence": false,
+    "boundary": "This historical package path was relative to the worktree used on August 28 and is no longer present. The artifact supports only the recorded one-cycle residency observation; it does not identify or validate the current frosted-glass package."
+  },
   "profile": "/tmp/y-space-glass-qa.FbbupN/base",
   "method": "Computer Use opened seven disposable peer browser tabs from the packaged app, process state was sampled at the eight-tab peak, and Computer Use closed every disposable peer.",
   "prePeak": {

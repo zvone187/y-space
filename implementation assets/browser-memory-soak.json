@@ -3,6 +3,13 @@
   "project": "Y Space",
   "testedAtUtc": "2026-08-28T03:56:15.543Z",
   "package": "release/mac-arm64/Y Space.app",
+  "historicalProvenance": {
+    "evidenceCommit": "cdd09b93bd8574d83ea30d842906c8795b65bcd1",
+    "packageRetained": false,
+    "packageHashRecorded": false,
+    "currentPackageEvidence": false,
+    "boundary": "This historical package path was relative to the worktree used on August 27 and is no longer present. The artifact supports only the recorded bounded-churn observation; it does not identify or validate the current frosted-glass package."
+  },
   "method": {
     "surface": "packaged macOS app operated through Computer Use",
     "startingBrowserTabs": 10,

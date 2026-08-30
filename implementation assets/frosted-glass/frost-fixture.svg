@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="field" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff4f20" />
+      <stop offset="0.34" stop-color="#ffbe3d" />
+      <stop offset="0.67" stop-color="#63d7ff" />
+      <stop offset="1" stop-color="#7657ff" />
+    </linearGradient>
+    <pattern id="checks" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="24" height="24" fill="#ffffff" fill-opacity="0.88" />
+      <rect x="24" y="24" width="24" height="24" fill="#ffffff" fill-opacity="0.88" />
+      <rect x="24" width="24" height="24" fill="#14121d" fill-opacity="0.84" />
+      <rect y="24" width="24" height="24" fill="#14121d" fill-opacity="0.84" />
+    </pattern>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#field)" />
+  <rect width="1600" height="1000" fill="url(#checks)" opacity="0.28" />
+  <g fill="none" stroke="#ffffff" stroke-width="16" opacity="0.78">
+    <circle cx="245" cy="230" r="150" />
+    <circle cx="800" cy="500" r="270" />
+    <circle cx="1360" cy="760" r="190" />
+  </g>
+  <g font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-weight="700" fill="#111018">
+    <text x="72" y="120" font-size="74">FROST / DIFFUSION / SATURATION</text>
+    <text x="72" y="900" font-size="58">SHARP BEHIND · SOFT THROUGH GLASS</text>
+  </g>
+  <g stroke="#111018" stroke-width="6" opacity="0.82">
+    <path d="M0 350H1600" />
+    <path d="M0 650H1600" />
+    <path d="M400 0V1000" />
+    <path d="M1200 0V1000" />
+  </g>
+</svg>

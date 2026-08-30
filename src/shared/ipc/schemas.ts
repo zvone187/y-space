@@ -245,8 +245,9 @@ export const windowChromePayloadSchema = z.object({
   symbolColor: z.string(),
   /**
    * Whether the translucent ("liquid glass") sidebar material should be active.
-   * The main process toggles it live (Windows acrylic; macOS vibrancy is created
-   * with the window and revealed via CSS). Optional for callers predating it.
+   * The main process toggles Windows acrylic or macOS vibrancy live, and the
+   * renderer reveals transparent shell layers only after native confirmation.
+   * Optional for callers predating it.
    */
   materialEnabled: z.boolean().optional(),
   /**
@@ -256,6 +257,8 @@ export const windowChromePayloadSchema = z.object({
    * OS default. Optional for callers that predate the toggle.
    */
   appearance: z.enum(["light", "dark"]).optional(),
+  /** Saved preference, so nativeTheme can preserve Follow System. */
+  themeMode: z.enum(["system", "light", "dark"]).optional(),
 });
 export type WindowChromePayload = z.infer<typeof windowChromePayloadSchema>;
 
@@ -267,4 +270,6 @@ export type WindowChromePayload = z.infer<typeof windowChromePayloadSchema>;
  */
 export interface WindowChromeResult {
   nativeCapable: boolean;
+  /** Whether the requested native material was actually applied. */
+  nativeActive: boolean;
 }

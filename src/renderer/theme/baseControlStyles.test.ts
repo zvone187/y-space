@@ -126,14 +126,13 @@ describe("base control styles", () => {
     expect(glassRule).toContain("border: 1px solid var(--glass-border)");
     expect(glassRule).toContain("border-radius: var(--glass-chrome-radius)");
     expect(glassRule).toContain("background: var(--glass-surface)");
-    expect(glassRule).toContain("background-image: var(--glass-specular)");
     expect(glassRule).toContain("backdrop-filter: var(--glass-backdrop)");
     expect(glassRule).toContain("-webkit-backdrop-filter: var(--glass-backdrop)");
     expect(glassRule).toContain("box-shadow: var(--glass-shadow)");
 
     expect(styles).toContain("--glass-chrome-radius: 16px");
-    expect(styles).toContain("--glass-muted: #504f4c");
-    expect(contrastRatio("#504f4c", "#cccccc")).toBeGreaterThanOrEqual(4.5);
+    expect(styles).toContain("--glass-muted: #302f2b");
+    expect(contrastRatio("#302f2b", "#999999")).toBeGreaterThanOrEqual(4.5);
   });
 
   it("softens browser and thread chrome without blurring content planes", () => {
@@ -157,7 +156,7 @@ describe("base control styles", () => {
     expect(omnibox).toContain("rounded-full");
 
     expect(styles).toMatch(
-      /\.poracode-thread-header-glass,\s*\.poracode-browser-chrome\s*\{[^}]*border:\s*1px solid var\(--glass-border\);[^}]*border-radius:\s*16px;[^}]*background-image:\s*var\(--glass-specular\);[^}]*box-shadow:/s,
+      /\.poracode-thread-header-glass,\s*\.poracode-browser-chrome\s*\{[^}]*border:\s*1px solid var\(--glass-border\);[^}]*border-radius:\s*16px;[^}]*background-image:\s*var\(--glass-grain\),\s*var\(--glass-specular\);[^}]*box-shadow:/s,
     );
     const cssWithoutComments = styles.replace(/\/\*[\s\S]*?\*\//g, "");
     for (const rule of cssWithoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -195,8 +194,8 @@ describe("base control styles", () => {
   });
 
   it("uses theme-aware glass edge and elevation tokens", () => {
-    expect(styles).toContain("--glass-edge-highlight: rgb(255 255 255 / 0.62)");
-    expect(styles).toContain("--glass-edge-highlight-strong: rgb(255 255 255 / 0.74)");
+    expect(styles).toContain("--glass-edge-highlight: rgb(255 255 255 / 0.38)");
+    expect(styles).toContain("--glass-edge-highlight-strong: rgb(255 255 255 / 0.52)");
     expect(styles).toContain("--glass-elevation: rgb(24 20 16 / 0.075)");
     expect(styles).toMatch(
       /\.dark,[^{]*\[data-theme="dark"\]\s*\{[^}]*--glass-edge-highlight:\s*rgb\(255 255 255 \/ 0\.07\);[^}]*--glass-edge-highlight-strong:\s*rgb\(255 255 255 \/ 0\.09\);[^}]*--glass-elevation:\s*rgb\(0 0 0 \/ 0\.3\);/s,
