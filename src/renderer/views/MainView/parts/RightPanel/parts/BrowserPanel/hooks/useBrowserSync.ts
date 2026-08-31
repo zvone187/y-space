@@ -111,17 +111,42 @@ function isExactWebviewPresented(tabId: string, surface: "main" | "extracted"): 
   );
 }
 
+function isExactBackgroundWebviewReady(tabId: string): boolean {
+  if (document.visibilityState !== "visible") return false;
+  const webview = findPresentedWebview(tabId);
+  if (
+    !webview?.isConnected ||
+    webview.style.display === "none" ||
+    webview.style.opacity !== "1" ||
+    webview.getAttribute("aria-hidden") === "true" ||
+    webview.hasAttribute("inert")
+  ) {
+    return false;
+  }
+  const rect = webview.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return false;
+  const host = webview.closest<HTMLElement>("[data-y-space-browser-host]");
+  // Production background hosts are explicitly inert and hidden from the
+  // accessibility tree. Tests may keep the exact host visibly marked while
+  // toggling only the workspace store, so either exact-host form is accepted.
+  return host !== null;
+}
+
 function presentMainBrowserPage(tabId: string, mode?: BrowserLinkPresentationMode): boolean {
   const browser = useBrowserPanelStore.getState();
   const target = browser.tabs.find((tab) => tab.tabId === tabId);
   if (!target || target.sensitiveIntegration) return false;
   browser.setActive(tabId);
-  useRightWorkspaceTabsStore.getState().selectBrowserPage(tabId);
+  const workspace = useRightWorkspaceTabsStore.getState();
+  if (workspace.hidden) workspace.promoteBrowserPage(tabId);
+  else workspace.selectBrowserPage(tabId);
   const panel = usePanelStore.getState();
   const wantsFullscreen = mode === "overlay";
   panel.setBrowserPanelOpen(true);
   panel.setRightPanelTab("browser");
-  if (wantsFullscreen || selectAnyObstructingOverlayOpen()) {
+  if (workspace.hidden) {
+    panel.setBrowserOverlayOpen(false);
+  } else if (wantsFullscreen || selectAnyObstructingOverlayOpen()) {
     panel.setBrowserOverlayMaximized(wantsFullscreen);
     panel.setBrowserOverlayOpen(true);
   } else if (mode === "panel") {
@@ -142,16 +167,24 @@ function isMainBrowserPagePresented(tabId: string): boolean {
     return false;
   }
   const workspace = useRightWorkspaceTabsStore.getState();
-  if (workspace.hidden) return false;
-  const selected = workspace.tabs.find((tab) => tab.id === workspace.activeTabId);
-  if (
-    selected?.kind !== "browser-page" ||
-    selected.browserTabId !== tabId ||
-    selected.resident === false
-  ) {
+  const targetWorkspacePage = workspace.tabs.find(
+    (tab): tab is Extract<(typeof workspace.tabs)[number], { kind: "browser-page" }> =>
+      tab.kind === "browser-page" && tab.browserTabId === tabId,
+  );
+  if (!targetWorkspacePage || targetWorkspacePage.resident === false) {
     return false;
   }
   const panel = usePanelStore.getState();
+  if (workspace.hidden) {
+    return (
+      panel.browserPanelOpen &&
+      panel.rightPanelTab === "browser" &&
+      !panel.browserOverlayOpen &&
+      isExactBackgroundWebviewReady(tabId)
+    );
+  }
+  const selected = workspace.tabs.find((tab) => tab.id === workspace.activeTabId);
+  if (selected?.kind !== "browser-page" || selected.browserTabId !== tabId) return false;
   const browserSurfaceVisible =
     panel.browserOverlayOpen || (panel.browserPanelOpen && panel.rightPanelTab === "browser");
   return (

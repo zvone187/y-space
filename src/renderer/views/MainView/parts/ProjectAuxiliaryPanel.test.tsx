@@ -49,6 +49,8 @@ const unifiedRightPanelProps = vi.hoisted(() => ({
     onWorkspaceTabActivate?: (tabId: string) => void;
     onWorkspaceTabClose?: (tabId: string) => void;
     onOpenBrowser?: () => void;
+    onCreateBrowserTab?: () => void;
+    onImportBrowserCookies?: () => void;
     onExtractBrowserToWindow?: () => void;
   } | null,
 }));
@@ -61,6 +63,8 @@ vi.mock("@/renderer/components/layout/UnifiedRightPanel", () => ({
     onWorkspaceTabActivate?: (tabId: string) => void;
     onWorkspaceTabClose?: (tabId: string) => void;
     onOpenBrowser?: () => void;
+    onCreateBrowserTab?: () => void;
+    onImportBrowserCookies?: () => void;
     onExtractBrowserToWindow?: () => void;
   }) => {
     unifiedRightPanelProps.current = props;
@@ -83,6 +87,16 @@ vi.mock("@/renderer/components/layout/UnifiedRightPanel", () => ({
         </button>
         <button type="button" data-testid="open-browser" onClick={props.onOpenBrowser}>
           Open Browser
+        </button>
+        <button type="button" data-testid="new-browser-tab" onClick={props.onCreateBrowserTab}>
+          New Browser tab
+        </button>
+        <button
+          type="button"
+          data-testid="import-browser-cookies"
+          onClick={props.onImportBrowserCookies}
+        >
+          Import cookies
         </button>
       </div>
     );
@@ -187,6 +201,9 @@ describe("ProjectAuxiliaryPanel", () => {
       browserOverlayMaximized: false,
       usagePanelOpen: false,
       notesPanelOpen: false,
+      settingsOpen: false,
+      settingsSection: null,
+      settingsAnchor: null,
     });
   });
 
@@ -334,6 +351,41 @@ describe("ProjectAuxiliaryPanel", () => {
     expect(useRightWorkspaceTabsStore.getState().tabs).not.toContainEqual(
       expect.objectContaining({ id: "tool:browser" }),
     );
+  });
+
+  it("creates a new independent Browser peer from the global Add tab action", async () => {
+    seedBrowserPage({ active: true });
+    usePanelStore.setState({ browserPanelOpen: true, rightPanelTab: "browser" });
+
+    render(
+      <I18nProvider i18n={i18n}>
+        <ProjectAuxiliaryPanel includeTerminal visible />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByTestId("new-browser-tab"));
+
+    await waitFor(() => expect(bridge.browserCreateTab).toHaveBeenCalledOnce());
+    expect(useRightWorkspaceTabsStore.getState().tabs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "browser:page-1" }),
+        expect.objectContaining({ id: "browser:page-new" }),
+      ]),
+    );
+  });
+
+  it("deep-links the global Add tab cookie action to the importer", () => {
+    render(
+      <I18nProvider i18n={i18n}>
+        <ProjectAuxiliaryPanel includeTerminal visible />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByTestId("import-browser-cookies"));
+
+    expect(usePanelStore.getState()).toMatchObject({
+      settingsOpen: true,
+      settingsSection: "browser",
+      settingsAnchor: "browser.cookieImport",
+    });
   });
 
   it("does not expose a browser extraction action from the global workspace", () => {

@@ -352,6 +352,8 @@ export function createLocalIpcHandlers(
       options.cookieImportBridge.forgetSource(sourceId);
     },
     browserCookieImportPreview: (payload) => options.browserCookieImportService.preview(payload),
+    browserCookieImportPreviewLocal: (payload) =>
+      options.browserCookieImportService.previewLocal(payload),
     browserCookieImportCommit: (payload) => options.browserCookieImportService.commit(payload),
     browserCookieImportCancel: ({ requestId }) =>
       options.browserCookieImportService.cancel(requestId),

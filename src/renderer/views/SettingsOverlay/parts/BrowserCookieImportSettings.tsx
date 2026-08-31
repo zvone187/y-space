@@ -1,6 +1,6 @@
 import { Trans, useLingui } from "@lingui/react/macro";
-import { CheckCircle2, FolderOpen, Puzzle, ShieldCheck } from "lucide-react";
-import { Button } from "@/renderer/components/common";
+import { CheckCircle2, FolderOpen, Globe2, Puzzle, ShieldCheck } from "lucide-react";
+import { Button, Select } from "@/renderer/components/common";
 import { useBrowserCookieImport } from "./useBrowserCookieImport";
 
 function formatPairingCode(code: string): string {
@@ -34,6 +34,7 @@ export function BrowserCookieImportSettings() {
   const selectedSource = model.state.sources.find(
     (source) => source.sourceId === model.selectedSourceId,
   );
+  const localProfiles = model.state.localProfiles ?? [];
   const hasBlockingRequest =
     activeRequest !== null &&
     activeRequest.status !== "completed" &&
@@ -74,19 +75,69 @@ export function BrowserCookieImportSettings() {
           </h2>
           <p className="mt-0.5 text-xs leading-relaxed text-muted">
             <Trans>
-              Copy selected sign-in cookies into Y Space&apos;s embedded browser. The extension is
-              import-only and cannot navigate, inspect, or control your other browser.
+              Copy only the browser sessions and sites you approve into Y Space&apos;s embedded
+              browser. Imported secrets never appear in the interface.
             </Trans>
           </p>
         </div>
       </div>
 
       <div className="space-y-3">
+        {!isLoading ? (
+          <div className="rounded-xl border border-accent/20 bg-accent/5 p-3">
+            <div className="flex items-center gap-2">
+              <Globe2 className="size-4 text-accent-text" aria-hidden="true" />
+              <h3 className="text-xs font-semibold text-foreground">
+                <Trans>Import from installed browsers</Trans>
+              </h3>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted">
+              <Trans>
+                Y Space reads only cookies for the exact sites you approve. Values stay in the
+                desktop process and never appear in this screen.
+              </Trans>
+            </p>
+            {localProfiles.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <div className="min-w-52 flex-1 text-[11px] font-medium text-muted">
+                  <span>
+                    <Trans>Installed browser profile</Trans>
+                  </span>
+                  <Select
+                    aria-label={t`Installed browser profile`}
+                    className="mt-1"
+                    options={localProfiles.map((profile) => ({
+                      id: profile.sourceId,
+                      label: profile.label,
+                    }))}
+                    value={model.selectedLocalSourceId}
+                    isDisabled={isBusy || hasBlockingRequest}
+                    onChange={model.setSelectedLocalSourceId}
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  isPending={model.operation === "previewing"}
+                  isDisabled={isBusy || hasBlockingRequest || !model.targetInput.trim()}
+                  onPress={() => void model.previewLocal()}
+                >
+                  <Trans>Preview browser cookies</Trans>
+                </Button>
+              </div>
+            ) : (
+              <p className="mt-3 text-xs text-muted">
+                <Trans>No supported local browser profiles were found on this Mac.</Trans>
+              </p>
+            )}
+          </div>
+        ) : null}
+
         <div className="rounded-xl border border-border/15 bg-surface-secondary/25 p-3">
           <div className="flex items-center gap-2">
             <Puzzle className="size-4 text-muted" aria-hidden="true" />
             <h3 className="text-xs font-semibold text-foreground">
-              <Trans>Install Y Space Cookie Import</Trans>
+              <Trans>Optional extension fallback</Trans>
             </h3>
           </div>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-muted">
@@ -229,8 +280,8 @@ export function BrowserCookieImportSettings() {
             <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
               <Trans>
                 Preview shows domain-level counts only. Nothing is copied until you confirm the
-                final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape
-                cookies.txt.
+                final selection. Cookie-Editor JSON and Netscape cookies.txt remain available as
+                compatibility fallbacks.
               </Trans>
             </p>
 

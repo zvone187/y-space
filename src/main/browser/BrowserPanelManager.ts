@@ -663,7 +663,7 @@ export class BrowserPanelManager {
         this.emitState();
         if (activeChanged) this.schedulePersist();
         if (surface === "main") this.focusMainHost();
-        this.revealPanel("panel");
+        else this.options.focusExtractedWindow?.();
         this.emit({
           type: "automation-presentation-request",
           requestId,

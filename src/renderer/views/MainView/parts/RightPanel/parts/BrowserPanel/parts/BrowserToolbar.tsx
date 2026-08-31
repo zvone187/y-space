@@ -13,6 +13,7 @@ import {
   Plus,
   RotateCw,
   Settings,
+  ShieldCheck,
   Star,
   TerminalSquare,
 } from "lucide-react";
@@ -113,6 +114,13 @@ export function BrowserToolbar(props: {
       panel.setBrowserOverlayMaximized(false);
       panel.setBrowserOverlayOpen(false);
       openSettingsSection("browser");
+      return;
+    }
+    if (key === "importCookies") {
+      const panel = usePanelStore.getState();
+      panel.setBrowserOverlayMaximized(false);
+      panel.setBrowserOverlayOpen(false);
+      openSettingsSection("browser", "browser.cookieImport");
       return;
     }
     if (key === "toggleBookmark") {
@@ -487,6 +495,14 @@ export function BrowserToolbar(props: {
               </Label>
             </Dropdown.Item>
             <Separator />
+            <Dropdown.Item id="importCookies" textValue={t`Import browser cookies`}>
+              <span className="size-4 shrink-0 text-muted">
+                <ShieldCheck className="size-4" />
+              </span>
+              <Label>
+                <Trans>Import browser cookies</Trans>
+              </Label>
+            </Dropdown.Item>
             <Dropdown.Item id="settings" textValue={t`Settings`}>
               <span className="size-4 shrink-0 text-muted">
                 <Settings className="size-4" />

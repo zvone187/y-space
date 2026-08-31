@@ -30,6 +30,7 @@ export interface BrowserCookieImportModel {
   readonly pairing: BrowserCookieImportPairingChallenge | null;
   readonly pairingRemainingMs: number;
   readonly selectedSourceId: string;
+  readonly selectedLocalSourceId: string;
   readonly targetInput: string;
   readonly selectedDomains: ReadonlySet<string>;
   readonly completion: BrowserCookieImportCompletion | null;
@@ -39,6 +40,7 @@ export interface BrowserCookieImportModel {
   openExtensionFolder(): Promise<void>;
   chooseFile(): Promise<void>;
   setSelectedSourceId(sourceId: string): void;
+  setSelectedLocalSourceId(sourceId: string): void;
   setTargetInput(value: string): void;
   useActiveOrigin(): void;
   toggleDomain(domain: string): void;
@@ -46,6 +48,7 @@ export interface BrowserCookieImportModel {
   cancelPairing(): Promise<void>;
   forgetSource(sourceId: string): Promise<void>;
   preview(): Promise<void>;
+  previewLocal(): Promise<void>;
   commit(): Promise<void>;
   cancelImport(): Promise<void>;
 }
@@ -110,7 +113,7 @@ export function parseTargetOrigins(input: string): ParsedOrigins {
 }
 
 function initialState(): BrowserCookieImportState {
-  return { sources: [], activeRequest: null };
+  return { sources: [], localProfiles: [], activeRequest: null };
 }
 
 export function useBrowserCookieImport(): BrowserCookieImportModel {
@@ -127,6 +130,7 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
   const [pairing, setPairing] = useState<BrowserCookieImportPairingChallenge | null>(null);
   const [pairingNow, setPairingNow] = useState(Date.now);
   const [selectedSourceId, setSelectedSourceId] = useState("");
+  const [selectedLocalSourceId, setSelectedLocalSourceId] = useState("");
   const [selectedDomains, setSelectedDomains] = useState<Set<string>>(() => new Set());
   const [completion, setCompletion] = useState<BrowserCookieImportCompletion | null>(null);
   const [operation, setOperation] = useState<CookieImportOperation>("loading");
@@ -207,6 +211,12 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
           ""
         );
       });
+      const localProfiles = nextState.localProfiles ?? [];
+      setSelectedLocalSourceId((currentSourceId) =>
+        localProfiles.some((profile) => profile.sourceId === currentSourceId)
+          ? currentSourceId
+          : (localProfiles[0]?.sourceId ?? ""),
+      );
       applyActiveRequest(nextState.activeRequest);
 
       const pairingBaseline = pairingBaselineRef.current;
@@ -381,6 +391,39 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
     });
   }, [applyActiveRequest, originErrorText, run, selectedSourceId, state.sources, t, targetInput]);
 
+  const previewLocal = useCallback(async () => {
+    const parsed = parseTargetOrigins(targetInput);
+    if (parsed.error) {
+      setError(originErrorText(parsed.error));
+      return;
+    }
+    const source = (state.localProfiles ?? []).find(
+      (candidate) => candidate.sourceId === selectedLocalSourceId,
+    );
+    if (!source) {
+      setError(t`Choose an installed browser profile before previewing cookies.`);
+      return;
+    }
+    await run("previewing", async (isCurrent) => {
+      const request = await readBridge().browserCookieImportPreviewLocal({
+        sourceId: source.sourceId,
+        targetUrls: parsed.targetUrls,
+      });
+      if (!isCurrent()) return;
+      setCompletion(null);
+      applyActiveRequest(request);
+      setState((currentState) => ({ ...currentState, activeRequest: request }));
+    });
+  }, [
+    applyActiveRequest,
+    originErrorText,
+    run,
+    selectedLocalSourceId,
+    state.localProfiles,
+    t,
+    targetInput,
+  ]);
+
   const commit = useCallback(
     () =>
       run("committing", async () => {
@@ -437,6 +480,7 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
     pairing,
     pairingRemainingMs: pairing ? Math.max(0, pairing.expiresAt - pairingNow) : 0,
     selectedSourceId,
+    selectedLocalSourceId,
     targetInput,
     selectedDomains,
     completion,
@@ -446,6 +490,7 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
     openExtensionFolder,
     chooseFile,
     setSelectedSourceId,
+    setSelectedLocalSourceId,
     setTargetInput: setTargetOverride,
     useActiveOrigin: () => {
       if (activeOrigin) setTargetOverride(activeOrigin);
@@ -455,6 +500,7 @@ export function useBrowserCookieImport(): BrowserCookieImportModel {
     cancelPairing,
     forgetSource,
     preview,
+    previewLocal,
     commit,
     cancelImport,
   };

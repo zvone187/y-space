@@ -114,10 +114,15 @@ export function SettingsOverlay(props: { onClose: () => void }) {
   const { onClose } = props;
   const { t } = useLingui();
   const requestedSection = usePanelStore((s) => s.settingsSection);
+  const requestedAnchor = usePanelStore((s) => s.settingsAnchor);
   const clearSettingsSection = usePanelStore((s) => s.clearSettingsSection);
   const [activeSection, setActiveSection] = useState<SettingsSection>(
     (requestedSection as SettingsSection | null) ?? "general",
   );
+  const [scrollTarget, setScrollTarget] = useState<{ anchor: string; token: number } | null>(
+    requestedAnchor ? { anchor: requestedAnchor, token: 0 } : null,
+  );
+  const scrollTokenRef = useRef(0);
   useProductViewTracking(
     {
       ...settingsSectionProductProperties(activeSection),
@@ -131,16 +136,18 @@ export function SettingsOverlay(props: { onClose: () => void }) {
   useEffect(() => {
     if (requestedSection) {
       setActiveSection(requestedSection as SettingsSection);
+      if (requestedAnchor) {
+        scrollTokenRef.current += 1;
+        setScrollTarget({ anchor: requestedAnchor, token: scrollTokenRef.current });
+      }
       clearSettingsSection();
     }
-  }, [requestedSection, clearSettingsSection]);
+  }, [requestedAnchor, requestedSection, clearSettingsSection]);
 
   // Pending scroll-to-setting target, set when a settings search result is
   // clicked. The token re-fires the effect when the same setting is picked
   // twice. Local (not a store): only this overlay coordinates the scroll, and it
   // has to land *after* the section content remounts (`key={activeSection}`).
-  const [scrollTarget, setScrollTarget] = useState<{ anchor: string; token: number } | null>(null);
-  const scrollTokenRef = useRef(0);
   const navigateToSection = useCallback((section: SettingsSection, anchor?: string) => {
     setActiveSection(section);
     if (anchor) {

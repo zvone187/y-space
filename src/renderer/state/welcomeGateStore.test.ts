@@ -4,7 +4,7 @@ import { isWelcomeSeen, useWelcomeGateStore, WELCOME_SEEN_STORAGE_KEY } from "./
 describe("welcomeGateStore", () => {
   beforeEach(() => {
     localStorage.clear();
-    useWelcomeGateStore.setState({ backgroundWorkReleased: false });
+    useWelcomeGateStore.setState({ welcomeSeen: false, backgroundWorkReleased: false });
   });
 
   afterEach(() => {
@@ -23,6 +23,14 @@ describe("welcomeGateStore", () => {
     const released = useWelcomeGateStore.getState();
     useWelcomeGateStore.getState().releaseBackgroundWork();
     expect(useWelcomeGateStore.getState()).toBe(released);
+  });
+
+  it("marks welcome completion reactively for post-onboarding prompts", () => {
+    useWelcomeGateStore.getState().markWelcomeSeen();
+    expect(useWelcomeGateStore.getState()).toMatchObject({
+      welcomeSeen: true,
+      backgroundWorkReleased: true,
+    });
   });
 
   it("seeds released=false on a fresh install (welcome unseen)", async () => {

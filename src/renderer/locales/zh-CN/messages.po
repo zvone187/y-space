@@ -1139,6 +1139,10 @@ msgstr "添加技能"
 msgid "Add skill destination"
 msgstr "新技能目标位置"
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+msgid "Add tab"
+msgstr "添加标签页"
+
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "Add tag"
 msgstr "添加标签"
@@ -2029,6 +2033,10 @@ msgstr "移回面板"
 msgid "Bring Uncommitted Changes"
 msgstr "带上未提交的更改"
 
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Bring your browser sessions into Y Space?"
+msgstr "要将浏览器会话导入 Y Space 吗？"
+
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Browse"
 msgstr "浏览"
@@ -2523,6 +2531,10 @@ msgstr "选择项目图标图片"
 msgid "Choose an image inside the project folder."
 msgstr "请选择项目文件夹内的图片。"
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose an installed browser profile before previewing cookies."
+msgstr "请先选择已安装的浏览器配置文件，再预览 Cookie。"
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "Choose an MCP server configuration file"
 #~ msgstr "选择 MCP 服务器配置文件"
@@ -2539,6 +2551,10 @@ msgstr "最多可选择 {MAX_TARGET_ORIGINS} 个源。"
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 #~ msgid "Choose automatically or override with a detected shell for new terminals."
 #~ msgstr "自动选择，或为新终端指定检测到的 shell。"
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Choose browsers"
+msgstr "选择浏览器"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose cookie file"
@@ -2585,6 +2601,10 @@ msgstr "选择 SSH 身份文件"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Choose the display language for Y Space's interface."
 msgstr "选择 Y Space 界面的显示语言。"
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Choose the installed browser profiles and exact sites you want to copy. Nothing is imported until you review and confirm it."
+msgstr "请选择要复制的已安装浏览器配置文件和具体网站。在你检查并确认前，不会导入任何内容。"
 
 #: src/renderer/components/connections/ConnectionsConfigurationState.tsx
 msgid "Choose the Pipedream setup file you added for Y Space. Your credentials stay private and are never shared with agents."
@@ -3610,6 +3630,10 @@ msgstr "复制图片"
 msgid "Copy message"
 msgstr "复制消息"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Copy only the browser sessions and sites you approve into Y Space's embedded browser. Imported secrets never appear in the interface."
+msgstr "仅将你批准的浏览器会话和网站复制到 Y Space 的内置浏览器中。导入的敏感值绝不会显示在界面中。"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy pairing link"
 msgstr "复制配对链接"
@@ -3627,8 +3651,8 @@ msgid "Copy Relative Path"
 msgstr "复制相对路径"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
-msgstr "将选中的登录 Cookie 复制到 Y Space 的内嵌浏览器。此扩展程序仅用于导入，无法导航、检查或控制您的其他浏览器。"
+#~ msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
+#~ msgstr "将选中的登录 Cookie 复制到 Y Space 的内嵌浏览器。此扩展程序仅用于导入，无法导航、检查或控制您的其他浏览器。"
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Copy selection"
@@ -6245,6 +6269,10 @@ msgstr "隐藏来自 {0} 的技能"
 msgid "Hide terminal"
 msgstr "隐藏终端"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
+msgid "Hide workspace"
+msgstr "隐藏工作区"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "History"
 msgstr "历史记录"
@@ -6362,6 +6390,8 @@ msgstr "再次导入"
 msgid "Import and restart"
 msgstr "导入并重新启动"
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Import browser cookies"
@@ -6392,6 +6422,10 @@ msgstr "导入外部智能体技能"
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Import external skills"
 msgstr "导入外部技能"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Import from installed browsers"
+msgstr "从已安装的浏览器导入"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data"
@@ -6671,8 +6705,8 @@ msgid "Install v{version}"
 msgstr "安装 v{version}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Install Y Space Cookie Import"
-msgstr "安装 Y Space Cookie Import"
+#~ msgid "Install Y Space Cookie Import"
+#~ msgstr "安装 Y Space Cookie Import"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -6686,6 +6720,10 @@ msgstr "已安装"
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Installed {0}."
 msgstr "已安装 {0}。"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Installed browser profile"
+msgstr "已安装的浏览器配置文件"
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
@@ -7926,6 +7964,10 @@ msgstr "新动作名称"
 msgid "New branch name..."
 msgstr "新分支名称..."
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+msgid "New browser tab"
+msgstr "新建浏览器标签页"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
 msgstr "新的 Claude 配置文件目录"
@@ -8542,6 +8584,10 @@ msgstr "未检测到支持的代理"
 msgid "No supported cookies were found for these origins."
 msgstr "未找到这些源支持的 Cookie。"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "No supported local browser profiles were found on this Mac."
+msgstr "在此 Mac 上未找到受支持的本地浏览器配置文件。"
+
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "No tags — the entry stops influencing tag affinity."
 msgstr "无标签 - 此条目不再影响标签亲和性。"
@@ -8623,6 +8669,10 @@ msgstr "未找到"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "未安装"
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Not now"
+msgstr "暂不"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -9079,6 +9129,10 @@ msgstr "通过 Y Space 的桌面控制工具操作桌面应用。"
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "可选"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Optional extension fallback"
+msgstr "可选扩展回退方案"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -9695,12 +9749,20 @@ msgid "Preview {0}"
 msgstr "预览{0}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Preview browser cookies"
+msgstr "预览浏览器 Cookie"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview extension cookies"
 msgstr "预览扩展程序 Cookie"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
-msgstr "预览仅显示域级别的数量。在您确认最终选择之前，不会复制任何内容。从 Firefox 和 Safari 导出的数据可使用 Cookie-Editor JSON 或 Netscape cookies.txt。"
+msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Cookie-Editor JSON and Netscape cookies.txt remain available as compatibility fallbacks."
+msgstr "预览仅显示各域名的数量。确认最终选择前不会复制任何内容。Cookie-Editor JSON 和 Netscape cookies.txt 仍可作为兼容性回退方案。"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+#~ msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
+#~ msgstr "预览仅显示域级别的数量。在您确认最终选择之前，不会复制任何内容。从 Firefox 和 Safari 导出的数据可使用 Cookie-Editor JSON 或 Netscape cookies.txt。"
 
 #: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 msgid "Previous"
@@ -14901,6 +14963,10 @@ msgstr "Y Space 可能正在等待已保存的数据或后台服务。你可以�
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Y Space only"
 msgstr "仅限 Y Space"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Y Space reads only cookies for the exact sites you approve. Values stay in the desktop process and never appear in this screen."
+msgstr "Y Space 只读取你批准的具体网站的 Cookie。值始终保留在桌面进程中，绝不会显示在此界面上。"
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Y Space SSH runtime manifest is missing or invalid: {path}"

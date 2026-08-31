@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 interface CookieImportService {
+  getState(): unknown;
   preview(input: { sourceId: string; targetUrls: string[] }): Promise<unknown>;
+  previewLocal(input: { sourceId: string; targetUrls: string[] }): Promise<unknown>;
   previewFile(input: { fileName: string; serialized: string; targetUrls: string[] }): unknown;
   commit(input: { requestId: string; selectedDomains: string[] }): Promise<unknown>;
 }
@@ -21,6 +23,11 @@ interface CookieImportServiceConstructor {
       cancel(input?: unknown): Promise<void>;
     };
     emit(...args: unknown[]): void;
+    listLocalProfiles?(): unknown[];
+    readLocalProfile?(input: {
+      sourceId: string;
+      targetUrls: string[];
+    }): Promise<{ cookies: unknown[]; invalidCount: number }>;
     now: () => number;
     randomId: () => string;
   }): CookieImportService;
@@ -246,6 +253,77 @@ describe("BrowserCookieImportService", () => {
     expect(JSON.stringify({ result, emitted: fixture.emit.mock.calls })).not.toContain(
       replacementSecret,
     );
+  });
+
+  it("previews an installed browser profile without sending cookie values to the renderer", async () => {
+    const BrowserCookieImportService = await loadService();
+    const secret = "local-profile-cookie-secret";
+    const cookies = {
+      get: vi.fn<(filter?: Record<string, unknown>) => Promise<unknown[]>>(async () => []),
+      set: vi.fn<(details: Record<string, unknown>) => Promise<void>>(async () => undefined),
+      flushStore: vi.fn<() => Promise<void>>(async () => undefined),
+    };
+    const localProfile = {
+      sourceId,
+      label: "Firefox — work",
+      browserFamily: "firefox",
+    };
+    const readLocalProfile = vi.fn<
+      (input: {
+        sourceId: string;
+        targetUrls: string[];
+      }) => Promise<{ cookies: unknown[]; invalidCount: number }>
+    >(async () => ({
+      cookies: [
+        {
+          name: "session",
+          value: secret,
+          domain: "example.com",
+          hostOnly: true,
+          path: "/",
+          secure: true,
+          httpOnly: true,
+          sameSite: "lax",
+          session: true,
+        },
+      ],
+      invalidCount: 0,
+    }));
+    const emit = vi.fn<(state: unknown) => void>();
+    const service = new BrowserCookieImportService({
+      session: { cookies },
+      bridge: {
+        requestPreview: vi.fn<(input: unknown) => Promise<unknown>>(),
+        requestCommit: vi.fn<(input: unknown) => Promise<unknown>>(),
+        cancel: vi.fn<(input?: unknown) => Promise<void>>(),
+      },
+      emit,
+      listLocalProfiles: () => [localProfile],
+      readLocalProfile,
+      now: () => Date.parse("2026-08-27T12:00:00.000Z"),
+      randomId: () => requestId,
+    });
+
+    expect(service.getState()).toMatchObject({ localProfiles: [localProfile] });
+    const preview = await service.previewLocal({
+      sourceId,
+      targetUrls: ["https://example.com"],
+    });
+    expect(readLocalProfile).toHaveBeenCalledWith({
+      sourceId,
+      targetUrls: ["https://example.com"],
+    });
+    expect(preview).toMatchObject({
+      sourceKind: "local-profile",
+      sourceLabel: "Firefox — work",
+      domains: [{ domain: "example.com", cookieCount: 1, unsupportedCount: 0 }],
+    });
+    expect(
+      JSON.stringify({ preview, state: service.getState(), emitted: emit.mock.calls }),
+    ).not.toContain(secret);
+
+    await service.commit({ requestId, selectedDomains: ["example.com"] });
+    expect(cookies.set).toHaveBeenCalledWith(expect.objectContaining({ value: secret }));
   });
 
   it("expires and clears an uncommitted file import after five minutes", async () => {

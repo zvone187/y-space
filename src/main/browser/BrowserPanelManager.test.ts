@@ -1685,7 +1685,6 @@ describe("BrowserPanelManager", () => {
         type: "state",
         state: expect.objectContaining({ activeTabId: target.tabId, tabs: originalTabs }),
       }),
-      { type: "open-panel", mode: "panel" },
       {
         type: "automation-presentation-request",
         requestId: expect.any(String),

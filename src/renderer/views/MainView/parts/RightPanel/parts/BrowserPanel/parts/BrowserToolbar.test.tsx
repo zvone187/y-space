@@ -2,6 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
+import { usePanelStore } from "@/renderer/state/panelStore";
 import { registerSensitiveNativeViewPresenter } from "@/renderer/state/sensitiveNativeViewObstruction";
 import type { PickDestination } from "../hooks/useElementPicker";
 import { BrowserToolbar } from "./BrowserToolbar";
@@ -81,5 +82,46 @@ describe("BrowserToolbar native-view obstruction", () => {
     } finally {
       unregister(Promise.resolve());
     }
+  });
+
+  it("offers a manual cookie-import button that deep-links to the importer", async () => {
+    useBrowserPanelStore.setState({
+      tabs: [
+        {
+          tabId: "tab-page",
+          url: "https://example.com",
+          title: "Example",
+          loading: false,
+          canGoBack: false,
+          canGoForward: false,
+        },
+      ],
+      activeTabId: "tab-page",
+      bookmarks: [],
+      bookmarkBarVisible: false,
+    });
+    usePanelStore.setState({ settingsOpen: false, settingsSection: null });
+
+    render(
+      <BrowserToolbar
+        onPick={vi.fn<() => void>()}
+        pickerActive={false}
+        pickerTargets={[]}
+        hasPendingPick={false}
+        pendingPickAnchor={null}
+        onChoosePickTarget={vi.fn<(threadId: string, destination: PickDestination) => void>()}
+        onCancelPendingPick={vi.fn<() => void>()}
+        onMenuPreviewChange={vi.fn<(dataUrl: string | null) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Browser menu" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Import browser cookies" }));
+
+    expect(usePanelStore.getState()).toMatchObject({
+      settingsOpen: true,
+      settingsSection: "browser",
+      settingsAnchor: "browser.cookieImport",
+    });
   });
 });

@@ -1139,6 +1139,10 @@ msgstr "Adicionar skill"
 msgid "Add skill destination"
 msgstr "Destino da nova skill"
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+msgid "Add tab"
+msgstr "Adicionar aba"
+
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "Add tag"
 msgstr "Adicionar tag"
@@ -2029,6 +2033,10 @@ msgstr "Trazer de volta ao painel"
 msgid "Bring Uncommitted Changes"
 msgstr "Trazer alterações não commitadas"
 
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Bring your browser sessions into Y Space?"
+msgstr "Trazer suas sessões do navegador para o Y Space?"
+
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Browse"
 msgstr "Procurar"
@@ -2523,6 +2531,10 @@ msgstr "Escolha uma imagem de ícone do projeto"
 msgid "Choose an image inside the project folder."
 msgstr "Escolha uma imagem dentro da pasta do projeto."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose an installed browser profile before previewing cookies."
+msgstr "Escolha um perfil de navegador instalado antes de visualizar os cookies."
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "Choose an MCP server configuration file"
 #~ msgstr "Escolher um arquivo de configuração de servidor MCP"
@@ -2539,6 +2551,10 @@ msgstr "Escolha no máximo {MAX_TARGET_ORIGINS} origens."
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 #~ msgid "Choose automatically or override with a detected shell for new terminals."
 #~ msgstr "Escolha automaticamente ou defina um shell detectado para novos terminais."
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Choose browsers"
+msgstr "Escolher navegadores"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose cookie file"
@@ -2585,6 +2601,10 @@ msgstr "Escolher arquivo de identidade SSH"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Choose the display language for Y Space's interface."
 msgstr "Escolha o idioma de exibição da interface do Y Space."
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Choose the installed browser profiles and exact sites you want to copy. Nothing is imported until you review and confirm it."
+msgstr "Escolha os perfis de navegador instalados e os sites exatos que deseja copiar. Nada será importado até você revisar e confirmar."
 
 #: src/renderer/components/connections/ConnectionsConfigurationState.tsx
 msgid "Choose the Pipedream setup file you added for Y Space. Your credentials stay private and are never shared with agents."
@@ -3610,6 +3630,10 @@ msgstr "Copiar imagem"
 msgid "Copy message"
 msgstr "Copiar mensagem"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Copy only the browser sessions and sites you approve into Y Space's embedded browser. Imported secrets never appear in the interface."
+msgstr "Copie apenas as sessões e os sites aprovados para o navegador integrado do Y Space. Os segredos importados nunca aparecem na interface."
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy pairing link"
 msgstr "Copiar link de pareamento"
@@ -3627,8 +3651,8 @@ msgid "Copy Relative Path"
 msgstr "Copiar caminho relativo"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
-msgstr "Copie os cookies de login selecionados para o navegador integrado do Y Space. A extensão serve apenas para importação e não pode navegar, inspecionar nem controlar seu outro navegador."
+#~ msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
+#~ msgstr "Copie os cookies de login selecionados para o navegador integrado do Y Space. A extensão serve apenas para importação e não pode navegar, inspecionar nem controlar seu outro navegador."
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Copy selection"
@@ -6245,6 +6269,10 @@ msgstr "Ocultar skills de {0}"
 msgid "Hide terminal"
 msgstr "Ocultar terminal"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
+msgid "Hide workspace"
+msgstr "Ocultar área de trabalho"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "History"
 msgstr "Histórico"
@@ -6362,6 +6390,8 @@ msgstr "Importar novamente"
 msgid "Import and restart"
 msgstr "Importar e reiniciar"
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Import browser cookies"
@@ -6392,6 +6422,10 @@ msgstr "Importar skills de agentes externos"
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Import external skills"
 msgstr "Importar skills externas"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Import from installed browsers"
+msgstr "Importar dos navegadores instalados"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data"
@@ -6671,8 +6705,8 @@ msgid "Install v{version}"
 msgstr "Instalar v{version}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Install Y Space Cookie Import"
-msgstr "Instalar o Y Space Cookie Import"
+#~ msgid "Install Y Space Cookie Import"
+#~ msgstr "Instalar o Y Space Cookie Import"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -6686,6 +6720,10 @@ msgstr "Instalado"
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Installed {0}."
 msgstr "{0} foi instalado."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Installed browser profile"
+msgstr "Perfil de navegador instalado"
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
@@ -7927,6 +7965,10 @@ msgstr "Novo nome de ação"
 msgid "New branch name..."
 msgstr "Novo nome de branch..."
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+msgid "New browser tab"
+msgstr "Nova aba do navegador"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
 msgstr "Novo diretório de configuração do perfil Claude"
@@ -8543,6 +8585,10 @@ msgstr "Nenhum agente compatível detectado"
 msgid "No supported cookies were found for these origins."
 msgstr "Nenhum cookie compatível foi encontrado para essas origens."
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "No supported local browser profiles were found on this Mac."
+msgstr "Nenhum perfil de navegador local compatível foi encontrado neste Mac."
+
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "No tags — the entry stops influencing tag affinity."
 msgstr "Sem tags — a entrada deixa de influenciar a afinidade de tags."
@@ -8624,6 +8670,10 @@ msgstr "Não encontrado"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "Não instalado"
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Not now"
+msgstr "Agora não"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -9080,6 +9130,10 @@ msgstr "Opere aplicativos de desktop pelas ferramentas de controle do Y Space."
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "Opcional"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Optional extension fallback"
+msgstr "Extensão opcional de contingência"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -9696,12 +9750,20 @@ msgid "Preview {0}"
 msgstr "Visualizar {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Preview browser cookies"
+msgstr "Visualizar cookies do navegador"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview extension cookies"
 msgstr "Visualizar cookies da extensão"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
-msgstr "A prévia mostra apenas as contagens por domínio. Nada será copiado até que você confirme a seleção final. As exportações do Firefox e do Safari podem usar Cookie-Editor JSON ou Netscape cookies.txt."
+msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Cookie-Editor JSON and Netscape cookies.txt remain available as compatibility fallbacks."
+msgstr "A visualização mostra apenas contagens por domínio. Nada é copiado até você confirmar a seleção final. Cookie-Editor JSON e Netscape cookies.txt continuam disponíveis como alternativas de compatibilidade."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+#~ msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
+#~ msgstr "A prévia mostra apenas as contagens por domínio. Nada será copiado até que você confirme a seleção final. As exportações do Firefox e do Safari podem usar Cookie-Editor JSON ou Netscape cookies.txt."
 
 #: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 msgid "Previous"
@@ -14902,6 +14964,10 @@ msgstr "O Y Space pode estar aguardando dados salvos ou um serviço em segundo p
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Y Space only"
 msgstr "Somente no Y Space"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Y Space reads only cookies for the exact sites you approve. Values stay in the desktop process and never appear in this screen."
+msgstr "O Y Space lê apenas os cookies dos sites exatos que você aprovar. Os valores permanecem no processo do aplicativo e nunca aparecem nesta tela."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Y Space SSH runtime manifest is missing or invalid: {path}"

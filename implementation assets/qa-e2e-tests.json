@@ -1,19 +1,19 @@
 {
-  "version": 14,
+  "version": 16,
   "project": "Y Space",
-  "branch": "y-space-popup-frost",
+  "branch": "y-space-tab-plus-split-cookies",
   "platform": "macOS Apple Silicon desktop",
   "testedOn": "2026-08-30",
-  "status": "popup_frost_complete_and_verified",
+  "status": "tab_plus_split_cookies_complete_and_verified",
   "currentPhase": {
-    "name": "True frosted popup surfaces",
-    "baseBranch": "y-space-frosted-glass",
-    "baseCommit": "c95bb6589305cfd2a42622c8f3d04ed9924d4bd5",
-    "baseline": "940 passed files, 6 skipped files, 11,126 passed tests, and 86 skipped tests under Node 26.8.1",
-    "failFirst": "The source material contract was written before implementation, then a packaged-runtime failure exposed the production optimizer stripping Electron's usable backdrop-filter declaration. A second fail-first pipeline contract captured that packaging defect.",
+    "name": "Global Add tab, equal split, background-safe hide, and direct cookie import",
+    "baseBranch": "y-space-popup-frost",
+    "baseCommit": "07e438a4595dfa92a68b63872701b931227da73f",
+    "baseline": "940 passed files, 6 skipped files, 11,130 passed tests, and 86 skipped tests; the sole loaded-run MCP timeout fixture passed its isolated 6-test recheck.",
+    "failFirst": "Twelve deliberate feature assertions fail across the new/mutated focused suites, proving the Add tab menu, visible hide control, equal split calculation, settings anchor, hidden background automation, local profile import, IPC, toolbar entry, consent prompt, and local browser reader are absent before implementation.",
     "implementationStatus": "complete_and_verified",
-    "performanceBoundary": "One bounded backdrop-filter per open responsive popup root; no per-Browser-guest, content-plane, row, result, or individual-tab filters.",
-    "reviewStatus": "The final unsigned ARM64 package passed deep/strict codesign verification and hands-on model search, scrolling, favorite restoration, Escape dismissal, shared-menu, and live macOS Reduce Transparency checks. PID 15340 remains open with the literal --use-mock-keychain argument."
+    "privacyBoundary": "Raw local cookie values, browser profile paths, and keychain details remain main-process-only. The renderer receives opaque profile metadata and domain-level preview counts.",
+    "reviewStatus": "Production implementation, automated regression coverage, privacy review, packaged hands-on verification, and delivery audit are complete."
   },
   "frostedGlassRevision": {
     "name": "Apple-style frosted material revision",
@@ -94,28 +94,144 @@
       }
     ]
   },
+  "tabPlusSplitCookiesRevision": {
+    "name": "Global Add tab, equal split, background-safe hide, and direct cookie import",
+    "branch": "y-space-tab-plus-split-cookies",
+    "baseBranch": "y-space-popup-frost",
+    "baseCommit": "07e438a4595dfa92a68b63872701b931227da73f",
+    "worktree": "/Users/zvonimirsabljic/Development/y-space/y-space-tab-plus-split-cookies",
+    "setup": {
+      "fetch": "git fetch fork --prune completed before the worktree was created from the fresh remote base.",
+      "environment": "The ignored .env.pipedream was copied at mode 0600 without printing values.",
+      "dependencies": "pnpm install --frozen-lockfile completed and Husky prepare installed the repository hooks.",
+      "nativeAndElectron": "Native server and Electron worker preparation passed before the baseline suite."
+    },
+    "baseline": {
+      "status": "pass_with_isolated_load_variance_recheck",
+      "passedFiles": 940,
+      "skippedFiles": 6,
+      "passedTests": 11130,
+      "skippedTests": 86,
+      "note": "One unresponsive MCP timeout fixture missed its temporary pid file after 102ms only under full-suite load. The same file passed all 6 tests in isolation in 437ms."
+    },
+    "failFirst": {
+      "status": "expected_failures_confirmed",
+      "newSuites": "Five new suites fail exactly because RightWorkspaceAddMenu, CookieImportPrompt, localBrowserProfiles, equal-split calculation, and the visible Hide workspace control do not exist yet.",
+      "mutatedSuites": "Seven focused suites fail exactly on the missing settings anchor, direct local-profile UI/service/IPC, toolbar entry, hidden background automation, and removal of automatic panel reveal.",
+      "existingAssertionsStillPassing": 154
+    },
+    "testLaunchInvariant": "Package QA must use one isolated Y Space process launched with the literal --use-mock-keychain argument, keep it open between cases, and leave it open for the user. Normal release credential storage remains unchanged.",
+    "e2eCases": [
+      {
+        "id": "YS-TABS-SPLIT-COOKIE-E2E-001",
+        "title": "Add tab creates independent Browser peers and focuses singleton tools",
+        "status": "passed",
+        "steps": [
+          "Open Add tab and create two Browser pages.",
+          "Navigate each page to a different local fixture URL and switch between them.",
+          "Open Files twice from Add tab."
+        ],
+        "expected": "Two independent Browser page IDs appear in the one global tab strip with preserved state, while Files is focused rather than duplicated.",
+        "evidence": [
+          "implementation assets/tab-plus-split-cookies/screenshots/final-packaged-equal-split.jpeg",
+          "implementation assets/tab-plus-split-cookies/screenshots/global-files-tab-equal-split.jpeg",
+          "The final ARM64 package displayed two independent Browser peers in the one global tab strip; Add tab also exposed Files, Git, Usage, Notes, and cookie import without a nested Browser tab strip."
+        ]
+      },
+      {
+        "id": "YS-TABS-SPLIT-COOKIE-E2E-002",
+        "title": "Right workspace starts at half, resizes, and persists safely",
+        "status": "passed",
+        "steps": [
+          "Launch with a fresh isolated profile at desktop width and measure the split.",
+          "Drag the divider smaller, larger, and back to half, then relaunch.",
+          "Resize the app to a narrow width."
+        ],
+        "expected": "The first desktop layout is 50/50, half-width is reachable, the chosen width persists, and narrow layouts use the existing overlay behavior.",
+        "evidence": [
+          "implementation assets/tab-plus-split-cookies/screenshots/final-packaged-equal-split.jpeg",
+          "A fresh isolated profile opened the visible global workspace at exactly 50% (accessibility splitter value 50); a manual drag moved the divider wider and returned it to half, and the versioned width key preserves the result."
+        ]
+      },
+      {
+        "id": "YS-TABS-SPLIT-COOKIE-E2E-003",
+        "title": "Visible hide control preserves background Browser automation",
+        "status": "passed",
+        "steps": [
+          "Hide the right workspace with its visible top-right button.",
+          "Run an exact-target Browser action against a hidden page.",
+          "Confirm the workspace stays hidden, then restore it."
+        ],
+        "expected": "The hidden Browser changes at the exact target without reopening the workspace; restoring shows the same live page and global tabs.",
+        "evidence": [
+          "implementation assets/tab-plus-split-cookies/screenshots/hidden-workspace-background-browser.jpeg",
+          "implementation assets/tab-plus-split-cookies/screenshots/final-packaged-workspace-hidden.jpeg",
+          "A live OpenCode task inspected the exact hidden DuckDuckGo page through Y Space Browser tools, reported Browser verified with two actions, and did not reopen the workspace; the same page and tabs returned on manual restore."
+        ]
+      },
+      {
+        "id": "YS-TABS-SPLIT-COOKIE-E2E-004",
+        "title": "First-run consent and always-available manual cookie import",
+        "status": "passed",
+        "steps": [
+          "Launch a fresh profile after onboarding and inspect the consent prompt.",
+          "Choose Not now and relaunch to confirm one-shot suppression.",
+          "Open the importer from Add tab and from the Browser toolbar."
+        ],
+        "expected": "The prompt appears once and both manual routes deep-link to Browser cookie-import settings at any time.",
+        "evidence": [
+          "implementation assets/tab-plus-split-cookies/screenshots/installed-browser-cookie-preview.jpeg",
+          "A fresh isolated packaged profile displayed the one-time consent prompt after onboarding. Choose browsers opened the exact Browser cookie-import settings, and the Add-tab menu and Browser toolbar both retained manual import routes."
+        ]
+      },
+      {
+        "id": "YS-TABS-SPLIT-COOKIE-E2E-005",
+        "title": "Installed-browser import is origin-scoped and renderer-safe",
+        "status": "passed",
+        "steps": [
+          "Use synthetic Firefox and Chromium profile databases in automated tests.",
+          "Preview cookies for one exact approved origin and inspect renderer-visible payloads.",
+          "Commit the approved domain, then exercise cancellation and preview expiry."
+        ],
+        "expected": "Only selected-domain cookies are committed; paths, keychain details, passwords, and raw cookie values never enter renderer state; temporary secrets are cleared.",
+        "evidence": [
+          "Synthetic Chromium and Firefox profile tests passed for discovery, decryption, host-digest verification, exact-origin filtering, SameSite/time conversion, commit, cancellation, expiry, cache clearing, and temporary-copy cleanup.",
+          "The packaged preview exposed only opaque profile metadata and domain-level counts; no cookie value, password, keychain detail, or local browser path entered the renderer."
+        ]
+      }
+    ]
+  },
   "build": {
     "kind": "final verified unsigned ad-hoc macOS package",
-    "app": "/private/tmp/y-space-popup-frost-reviewed-20260830-1414/mac-arm64/Y Space.app",
+    "app": "/Users/zvonimirsabljic/Development/y-space/y-space-tab-plus-split-cookies/release/mac-arm64/Y Space.app",
+    "dmg": "/Users/zvonimirsabljic/Development/y-space/y-space-tab-plus-split-cookies/release/Y-Space-1.6.6-arm64.dmg",
     "architecture": "arm64",
-    "appDiskBytes": 456663040,
-    "appAsarSha256": "c478ebadd2e2e3791d00f605fb8472555c566ecd85a6d4dcf4fe02f66c9fb958",
-    "appAsarBytes": 164175666,
-    "executableSha256": "9f9fb0e8c9c14f2cdedc9e464873eff4a794d80d5d50c0c1fc3438f98f2aa0c2",
+    "appDiskBytes": 456708096,
+    "appAsarSha256": "04061f4ba52d4e10ea355eb91b1f6823084d57c73d73678ec2bf6396954b3ecf",
+    "appAsarBytes": 164214861,
+    "executableSha256": "fdc5cf770a3a34b6bfe8af105eed927a73b437ebc8719187689956b42ffb6bbe",
     "executableBytes": 52752,
+    "dmgSha256": "18da987d1ab889f9c207a13fbe7fbbfca15382fd3e04237e82d11439ae0cde0b",
+    "dmgBytes": 156080826,
     "codesign": "codesign --verify --deep --strict passed; ad-hoc hardened-runtime signature with no Team ID",
-    "qaLaunch": "The exact reviewed packaged UI run launched with PORACODE_BASE_DIR=/tmp/y-space-popup-frost-reviewed-profile-20260830-1414 and the literal --use-mock-keychain argument; PID 15340 remained open between every popup-frost test case and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
+    "qaLaunch": "The exact final packaged UI run launched with PORACODE_BASE_DIR=/private/tmp/y-space-tab-plus-split-cookies-final.4YjPPw and the literal --use-mock-keychain argument; PID 39754 remained open between all final cases and is intentionally still running. Ordinary release launches do not enable the mock keychain.",
     "notarized": false
   },
   "verification": {
     "fullSuite": {
       "status": "pass on the final reviewed source state under Node.js 26.8.1",
-      "passedFiles": 941,
+      "passedFiles": 946,
       "skippedFiles": 6,
-      "passedTests": 11131,
+      "passedTests": 11154,
       "skippedTests": 86,
-      "durationSeconds": 112.79,
-      "focusedTimeoutStress": "Focused native-window, IPC, provider-lifecycle, sidebar-token, contrast, and CSS material-contract suites passed before this green full-suite run."
+      "durationSeconds": 99.45,
+      "focusedTimeoutStress": "One loaded full-suite attempt exposed the existing 100ms unresponsive-MCP pid-file timing variance; that file immediately passed all 6 tests in 407ms in isolation, and the complete suite then passed green on the unchanged source."
+    },
+    "tabPlusSplitCookies": {
+      "status": "pass",
+      "focusedFiles": 15,
+      "focusedTests": 203,
+      "coverage": "global Add-tab menu, independent Browser peers, singleton tools, equal split and persistence, visible hide control, exact hidden Browser targeting, first-run consent, settings deep-linking, installed-browser discovery/decryption/filtering, typed IPC, renderer privacy boundaries, cleanup, and toolbar access"
     },
     "targetedBranding": {
       "status": "pass",
@@ -136,12 +252,12 @@
       "lint": "pass",
       "typeAwareLint": "pass",
       "format": "pass",
-      "i18n": "pass: 3,345 extracted messages and 0 missing across 12 translated catalogs",
+      "i18n": "pass: 3,370 extracted messages and 0 missing across 12 translated catalogs",
       "websiteTypecheck": "pass",
       "diffCheck": "pass"
     },
     "productionBuilds": {
-      "desktop": "pass on final source; packaged and hands-on tested as the thin ARM64 app above",
+      "desktop": "pass on final source; rebuilt after the visible global-workspace equal-split correction and hands-on tested as the ARM64 app above",
       "website": "pass with Next 16.3.1; 62 of 62 static pages generated"
     }
   },

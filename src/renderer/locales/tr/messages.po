@@ -1139,6 +1139,10 @@ msgstr "Beceri ekle"
 msgid "Add skill destination"
 msgstr "Yeni beceri hedefi"
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+msgid "Add tab"
+msgstr "Sekme ekle"
+
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "Add tag"
 msgstr "Etiket ekle"
@@ -2029,6 +2033,10 @@ msgstr "Panele geri getir"
 msgid "Bring Uncommitted Changes"
 msgstr "Kaydedilmemiş değişiklikleri getir"
 
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Bring your browser sessions into Y Space?"
+msgstr "Tarayıcı oturumlarınızı Y Space'e aktarmak ister misiniz?"
+
 #: src/renderer/views/SettingsOverlay/parts/SshConnectionForm.tsx
 msgid "Browse"
 msgstr "Gözat"
@@ -2523,6 +2531,10 @@ msgstr "Proje simgesi görseli seçin"
 msgid "Choose an image inside the project folder."
 msgstr "Proje klasörü içinden bir görsel seçin."
 
+#: src/renderer/views/SettingsOverlay/parts/useBrowserCookieImport.ts
+msgid "Choose an installed browser profile before previewing cookies."
+msgstr "Çerezleri önizlemeden önce yüklü bir tarayıcı profili seçin."
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "Choose an MCP server configuration file"
 #~ msgstr "Bir MCP sunucusu yapılandırma dosyası seçin"
@@ -2539,6 +2551,10 @@ msgstr "En fazla {MAX_TARGET_ORIGINS} kaynak seçin."
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
 #~ msgid "Choose automatically or override with a detected shell for new terminals."
 #~ msgstr "Otomatik seçin veya yeni terminaller için algılanan bir kabuk belirleyin."
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Choose browsers"
+msgstr "Tarayıcıları seç"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Choose cookie file"
@@ -2585,6 +2601,10 @@ msgstr "SSH kimlik dosyasını seç"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Choose the display language for Y Space's interface."
 msgstr "Y Space'un arayüzü için görüntüleme dilini seçin."
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Choose the installed browser profiles and exact sites you want to copy. Nothing is imported until you review and confirm it."
+msgstr "Kopyalamak istediğiniz yüklü tarayıcı profillerini ve belirli siteleri seçin. İnceleyip onaylayana kadar hiçbir şey içe aktarılmaz."
 
 #: src/renderer/components/connections/ConnectionsConfigurationState.tsx
 msgid "Choose the Pipedream setup file you added for Y Space. Your credentials stay private and are never shared with agents."
@@ -3610,6 +3630,10 @@ msgstr "Görseli kopyala"
 msgid "Copy message"
 msgstr "Mesajı kopyala"
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Copy only the browser sessions and sites you approve into Y Space's embedded browser. Imported secrets never appear in the interface."
+msgstr "Yalnızca onayladığınız tarayıcı oturumlarını ve siteleri Y Space'in yerleşik tarayıcısına kopyalayın. İçe aktarılan gizli değerler arayüzde hiçbir zaman görünmez."
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy pairing link"
 msgstr "Eşleştirme bağlantısını kopyala"
@@ -3627,8 +3651,8 @@ msgid "Copy Relative Path"
 msgstr "Göreli Yolu Kopyala"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
-msgstr "Seçilen oturum açma çerezlerini Y Space'in yerleşik tarayıcısına kopyalayın. Uzantı yalnızca içe aktarma içindir; diğer tarayıcınızda gezinemez, içeriği inceleyemez veya tarayıcıyı kontrol edemez."
+#~ msgid "Copy selected sign-in cookies into Y Space's embedded browser. The extension is import-only and cannot navigate, inspect, or control your other browser."
+#~ msgstr "Seçilen oturum açma çerezlerini Y Space'in yerleşik tarayıcısına kopyalayın. Uzantı yalnızca içe aktarma içindir; diğer tarayıcınızda gezinemez, içeriği inceleyemez veya tarayıcıyı kontrol edemez."
 
 #: src/renderer/commands/shortcutCatalog.ts
 msgid "Copy selection"
@@ -6245,6 +6269,10 @@ msgstr "{0} becerilerini gizle"
 msgid "Hide terminal"
 msgstr "Terminali gizle"
 
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
+msgid "Hide workspace"
+msgstr "Çalışma alanını gizle"
+
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "History"
 msgstr "Geçmiş"
@@ -6362,6 +6390,8 @@ msgstr "Tekrar içe aktar"
 msgid "Import and restart"
 msgstr "İçe aktar ve yeniden başlat"
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Import browser cookies"
@@ -6392,6 +6422,10 @@ msgstr "Harici aracı becerilerini içe aktar"
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Import external skills"
 msgstr "Harici becerileri içe aktar"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Import from installed browsers"
+msgstr "Yüklü tarayıcılardan içe aktar"
 
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "Import legacy data"
@@ -6671,8 +6705,8 @@ msgid "Install v{version}"
 msgstr "v{version} sürümünü yükle"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Install Y Space Cookie Import"
-msgstr "Y Space Cookie Import uzantısını yükle"
+#~ msgid "Install Y Space Cookie Import"
+#~ msgstr "Y Space Cookie Import uzantısını yükle"
 
 #: src/renderer/components/plugins/PluginMarketplace.tsx
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
@@ -6686,6 +6720,10 @@ msgstr "Yüklendi"
 #: src/renderer/components/skills/SkillMarketplaceModal.tsx
 msgid "Installed {0}."
 msgstr "{0} yüklendi."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Installed browser profile"
+msgstr "Yüklü tarayıcı profili"
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/AgentEnvironmentRow.tsx
@@ -7927,6 +7965,10 @@ msgstr "Yeni işlem adı"
 msgid "New branch name..."
 msgstr "Yeni şube adı..."
 
+#: src/renderer/components/layout/RightWorkspaceAddMenu.tsx
+msgid "New browser tab"
+msgstr "Yeni tarayıcı sekmesi"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "New Claude profile config directory"
 msgstr "Yeni Claude profili yapılandırma dizini"
@@ -8543,6 +8585,10 @@ msgstr "Desteklenen aracı algılanmadı"
 msgid "No supported cookies were found for these origins."
 msgstr "Bu kaynaklar için desteklenen çerez bulunamadı."
 
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "No supported local browser profiles were found on this Mac."
+msgstr "Bu Mac'te desteklenen yerel tarayıcı profili bulunamadı."
+
 #: src/renderer/views/SettingsOverlay/parts/crossagent/CrossagentMemorySection.tsx
 msgid "No tags — the entry stops influencing tag affinity."
 msgstr "Etiket yok — girdi artık etiket yakınlığını etkilemiyor."
@@ -8624,6 +8670,10 @@ msgstr "Bulunamadı"
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Not installed"
 msgstr "Kurulu değil"
+
+#: src/renderer/views/MainView/parts/CookieImportPrompt.tsx
+msgid "Not now"
+msgstr "Şimdi değil"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Not running"
@@ -9080,6 +9130,10 @@ msgstr "Masaüstü uygulamalarını Y Space'un masaüstü denetim araçlarıyla 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "Optional"
 msgstr "İsteğe bağlı"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Optional extension fallback"
+msgstr "İsteğe bağlı uzantı alternatifi"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -9696,12 +9750,20 @@ msgid "Preview {0}"
 msgstr "Önizleme {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Preview browser cookies"
+msgstr "Tarayıcı çerezlerini önizle"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
 msgid "Preview extension cookies"
 msgstr "Uzantı çerezlerini önizle"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
-msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
-msgstr "Önizlemede yalnızca alan adı düzeyindeki sayılar gösterilir. Son seçimi onaylayana kadar hiçbir şey kopyalanmaz. Firefox ve Safari dışa aktarımlarında Cookie-Editor JSON veya Netscape cookies.txt kullanılabilir."
+msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Cookie-Editor JSON and Netscape cookies.txt remain available as compatibility fallbacks."
+msgstr "Önizleme yalnızca alan adı düzeyindeki sayıları gösterir. Son seçimi onaylayana kadar hiçbir şey kopyalanmaz. Cookie-Editor JSON ve Netscape cookies.txt uyumluluk alternatifleri olarak kullanılabilir."
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+#~ msgid "Preview shows domain-level counts only. Nothing is copied until you confirm the final selection. Firefox and Safari exports can use Cookie-Editor JSON or Netscape cookies.txt."
+#~ msgstr "Önizlemede yalnızca alan adı düzeyindeki sayılar gösterilir. Son seçimi onaylayana kadar hiçbir şey kopyalanmaz. Firefox ve Safari dışa aktarımlarında Cookie-Editor JSON veya Netscape cookies.txt kullanılabilir."
 
 #: src/renderer/components/connections/ConnectionsCatalogPanel.tsx
 msgid "Previous"
@@ -14902,6 +14964,10 @@ msgstr "Y Space kayıtlı verileri veya bir arka plan hizmetini bekliyor olabili
 #: src/renderer/components/skills/SkillsManager.tsx
 msgid "Y Space only"
 msgstr "Yalnızca Y Space"
+
+#: src/renderer/views/SettingsOverlay/parts/BrowserCookieImportSettings.tsx
+msgid "Y Space reads only cookies for the exact sites you approve. Values stay in the desktop process and never appear in this screen."
+msgstr "Y Space yalnızca onayladığınız belirli sitelerin çerezlerini okur. Değerler masaüstü işleminde kalır ve bu ekranda hiçbir zaman görünmez."
 
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Y Space SSH runtime manifest is missing or invalid: {path}"

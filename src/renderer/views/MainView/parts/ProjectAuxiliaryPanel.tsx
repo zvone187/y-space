@@ -44,6 +44,7 @@ import { watchRemoteTerminal } from "@/renderer/state/remoteTerminalFeed";
 import { prefetchVisibleGitPanelPrData } from "@/renderer/state/gitRefresh";
 import {
   moveThreadTodoDock,
+  createBrowserPanelTab,
   openBrowserPanel,
   showFilesPanel,
   showGitReviewPanel,
@@ -798,6 +799,10 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean; visible
           }
           openBrowserPanel();
         })
+      }
+      onCreateBrowserTab={createBrowserPanelTab}
+      onImportBrowserCookies={() =>
+        usePanelStore.getState().openSettingsSection("browser", "browser.cookieImport")
       }
       onOpenUsage={() =>
         pressTab("usage", () => {

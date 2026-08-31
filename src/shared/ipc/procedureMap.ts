@@ -219,6 +219,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "browserCookieImportCancelPairing",
   "browserCookieImportForgetSource",
   "browserCookieImportPreview",
+  "browserCookieImportPreviewLocal",
   "browserCookieImportCommit",
   "browserCookieImportCancel",
   "startUsageLogin",

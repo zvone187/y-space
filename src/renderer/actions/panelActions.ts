@@ -197,6 +197,22 @@ export function openBrowserPanel(): void {
     .catch(() => {});
 }
 
+/** Create and focus a new independent Browser page in the global tab strip. */
+export function createBrowserPanelTab(): void {
+  const panelStore = usePanelStore.getState();
+  undockPanelTab("browser");
+  panelStore.openBrowserPanel();
+  useRightWorkspaceTabsStore.getState().show();
+
+  void readBridge()
+    .browserCreateTab({ url: BROWSER_HOME_URL, activate: true })
+    .then((created) => {
+      focusWorkspaceBrowserPage(created);
+      useBrowserPanelStore.getState().setActive(created.tabId);
+    })
+    .catch(() => {});
+}
+
 /** Command binding entry point; Browser launch is intentionally idempotent. */
 export function toggleBrowserPanel(): void {
   openBrowserPanel();

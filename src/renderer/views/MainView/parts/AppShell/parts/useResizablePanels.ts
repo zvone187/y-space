@@ -11,18 +11,23 @@ const SIDEBAR_MAX_WIDTH = 500;
 const SIDEBAR_DEFAULT_WIDTH = 350;
 const PANEL_MIN_WIDTH = 320;
 const PANEL_MAX_WIDTH = 1100;
-const PANEL_DEFAULT_WIDTH = 480;
+const PANEL_WIDTH_STORAGE_KEY = "poracode-panel-width-v2";
 const PANEL_BOTTOM_MIN_HEIGHT = 200;
 const PANEL_BOTTOM_MAX_HEIGHT = 500;
 const PANEL_BOTTOM_DEFAULT_HEIGHT = 300;
 const GIT_PANEL_MIN_WIDTH = 280;
 const GIT_PANEL_MAX_WIDTH = 900;
-const GIT_PANEL_DEFAULT_WIDTH = 350;
+export const GLOBAL_WORKSPACE_WIDTH_STORAGE_KEY = "poracode-git-panel-width-v2";
 
 // Step used when a resize handle is nudged via arrow keys instead of dragged.
 const KEY_RESIZE_STEP_PX = 24;
 
-export const CONTENT_MIN_WIDTH = 540;
+export const CONTENT_MIN_WIDTH = 360;
+
+export function resolveInitialRightPanelWidth(viewportWidth: number): number {
+  if (!Number.isFinite(viewportWidth)) return PANEL_MIN_WIDTH;
+  return Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.round(viewportWidth / 2)));
+}
 
 export type ResizeTarget = "sidebar" | "panel" | "panel-bottom" | "git-panel";
 
@@ -68,13 +73,19 @@ export function useResizablePanels(
     readStoredNumber("poracode-sidebar-width", SIDEBAR_DEFAULT_WIDTH),
   );
   const [panelWidth, setPanelWidth] = useState(() =>
-    readStoredNumber("poracode-panel-width", PANEL_DEFAULT_WIDTH),
+    readStoredNumber(
+      PANEL_WIDTH_STORAGE_KEY,
+      resolveInitialRightPanelWidth(typeof window === "undefined" ? 960 : window.innerWidth),
+    ),
   );
   const [panelHeight, setPanelHeight] = useState(() =>
     readStoredNumber("poracode-panel-height", PANEL_BOTTOM_DEFAULT_HEIGHT),
   );
   const [gitPanelWidth, setGitPanelWidth] = useState(() =>
-    readStoredNumber("poracode-git-panel-width", GIT_PANEL_DEFAULT_WIDTH),
+    readStoredNumber(
+      GLOBAL_WORKSPACE_WIDTH_STORAGE_KEY,
+      resolveInitialRightPanelWidth(typeof window === "undefined" ? 960 : window.innerWidth),
+    ),
   );
   const sizeRef = useRef({
     sidebarWidth,
@@ -159,7 +170,7 @@ export function useResizablePanels(
   }, [sidebarWidth]);
 
   useEffect(() => {
-    localStorage.setItem("poracode-panel-width", String(panelWidth));
+    localStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(panelWidth));
   }, [panelWidth]);
 
   useEffect(() => {
@@ -167,7 +178,7 @@ export function useResizablePanels(
   }, [panelHeight]);
 
   useEffect(() => {
-    localStorage.setItem("poracode-git-panel-width", String(gitPanelWidth));
+    localStorage.setItem(GLOBAL_WORKSPACE_WIDTH_STORAGE_KEY, String(gitPanelWidth));
   }, [gitPanelWidth]);
 
   // Ends an in-flight resize (teardown + persist final size). Called on unmount

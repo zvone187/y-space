@@ -384,6 +384,50 @@ describe("useBrowserSync global Browser routing", () => {
     presented.remove();
   });
 
+  it("keeps a user-hidden workspace hidden while granting exact background browser automation", async () => {
+    const target = browserTab("page-hidden", "Background", "https://example.com/background");
+    bridge.browserGetState.mockResolvedValue({ tabs: [target], activeTabId: target.tabId });
+    const presented = mountPresentedWebview(target.tabId, "main");
+
+    const view = render(<Harness />);
+    await waitFor(() =>
+      expect(
+        useRightWorkspaceTabsStore.getState().tabs.some((tab) => tab.id === "browser:page-hidden"),
+      ).toBe(true),
+    );
+    act(() => {
+      const workspace = useRightWorkspaceTabsStore.getState();
+      workspace.selectBrowserPage(target.tabId);
+      workspace.hide();
+      usePanelStore.setState({ browserPanelOpen: true, rightPanelTab: "browser" });
+    });
+
+    act(() =>
+      bridge.handlers[0]?.({
+        type: "automation-presentation-request",
+        requestId: "beaa2ef6-6957-4e3f-8d91-e78b47471c9c",
+        tabId: target.tabId,
+        surface: "main",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(bridge.browserAcknowledgeAutomationPresentation).toHaveBeenCalledWith({
+        requestId: "beaa2ef6-6957-4e3f-8d91-e78b47471c9c",
+        tabId: target.tabId,
+        surface: "main",
+        presented: true,
+      }),
+    );
+    expect(useRightWorkspaceTabsStore.getState()).toMatchObject({
+      hidden: true,
+      activeTabId: "browser:page-hidden",
+    });
+    expect(usePanelStore.getState().browserPanelOpen).toBe(true);
+    view.unmount();
+    presented.remove();
+  });
+
   it("keeps presentation valid when focus moves into the selected embedded guest", async () => {
     const target = browserTab("page-2", "Target", "https://example.com/target");
     bridge.browserGetState.mockResolvedValue({ tabs: [target], activeTabId: target.tabId });

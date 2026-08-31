@@ -31,6 +31,14 @@ export const browserCookieImportSourceSchema = z
   })
   .strict();
 
+export const browserCookieImportLocalProfileSchema = z
+  .object({
+    sourceId: z.string().uuid(),
+    label: z.string().min(1).max(120),
+    browserFamily: z.enum(["chrome", "chromium", "brave", "edge", "arc", "firefox"]),
+  })
+  .strict();
+
 export const browserCookieImportDomainSummarySchema = z
   .object({
     domain: z.string().min(1).max(253),
@@ -43,7 +51,7 @@ export const browserCookieImportActiveRequestSchema = z
   .object({
     requestId: z.string().uuid(),
     sourceId: z.string().uuid(),
-    sourceKind: z.enum(["extension", "file"]),
+    sourceKind: z.enum(["extension", "file", "local-profile"]),
     sourceLabel: z.string().min(1).max(120).optional(),
     status: z.enum([
       "requesting-preview",
@@ -66,6 +74,7 @@ export const browserCookieImportActiveRequestSchema = z
 export const browserCookieImportStateSchema = z
   .object({
     sources: z.array(browserCookieImportSourceSchema),
+    localProfiles: z.array(browserCookieImportLocalProfileSchema).optional(),
     activeRequest: browserCookieImportActiveRequestSchema.nullable(),
   })
   .strict();
@@ -161,6 +170,11 @@ export const browserCookieImportProcedures = {
     z.infer<typeof browserCookieImportActiveRequestSchema>,
     "main-local"
   >("browserCookieImportPreview", "main-local", browserCookieImportPreviewPayloadSchema),
+  browserCookieImportPreviewLocal: definePayloadProcedure<
+    z.infer<typeof browserCookieImportPreviewPayloadSchema>,
+    z.infer<typeof browserCookieImportActiveRequestSchema>,
+    "main-local"
+  >("browserCookieImportPreviewLocal", "main-local", browserCookieImportPreviewPayloadSchema),
   browserCookieImportCommit: definePayloadProcedure<
     z.infer<typeof browserCookieImportCommitPayloadSchema>,
     BrowserCookieImportCompletion,

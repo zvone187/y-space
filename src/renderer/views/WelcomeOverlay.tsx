@@ -66,7 +66,7 @@ export function WelcomeOverlay() {
     setWelcomeSeen(true);
     // The user is moving on — let deferred startup work (agent detection) run
     // now rather than waiting out the settle timer.
-    useWelcomeGateStore.getState().releaseBackgroundWork();
+    useWelcomeGateStore.getState().markWelcomeSeen();
   }
 
   function handleAskQuestion() {

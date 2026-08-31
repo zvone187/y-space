@@ -19,6 +19,8 @@ export function isWelcomeSeen(): boolean {
 }
 
 interface WelcomeGateStore {
+  /** Reactive counterpart to the durable welcome flag. */
+  welcomeSeen: boolean;
   /**
    * True once it is safe to start deferred first-launch background work — most
    * importantly the agent-detection sweep kicked off by `getAgentStatuses`,
@@ -32,10 +34,18 @@ interface WelcomeGateStore {
    */
   backgroundWorkReleased: boolean;
   releaseBackgroundWork: () => void;
+  markWelcomeSeen: () => void;
 }
 
 export const useWelcomeGateStore = create<WelcomeGateStore>((set) => ({
+  welcomeSeen: isWelcomeSeen(),
   backgroundWorkReleased: isWelcomeSeen(),
   releaseBackgroundWork: () =>
     set((prev) => (prev.backgroundWorkReleased ? prev : { backgroundWorkReleased: true })),
+  markWelcomeSeen: () =>
+    set((prev) =>
+      prev.welcomeSeen && prev.backgroundWorkReleased
+        ? prev
+        : { welcomeSeen: true, backgroundWorkReleased: true },
+    ),
 }));

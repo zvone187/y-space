@@ -12,6 +12,7 @@ import {
   COOKIE_IMPORT_MAX_PAYLOAD_BYTES,
 } from "./protocol";
 import { parseCookieImportFile } from "./cookieFileParser";
+import type { LocalBrowserProfileInfo } from "./localBrowserProfiles";
 
 const IMPORT_SESSION_TTL_MS = 5 * 60 * 1000;
 
@@ -27,7 +28,7 @@ export interface CookieImportRendererSource {
 export interface CookieImportActiveRequest {
   requestId: string;
   sourceId: string;
-  sourceKind: "extension" | "file";
+  sourceKind: "extension" | "file" | "local-profile";
   sourceLabel?: string;
   status: "requesting-preview" | "ready" | "committing" | "completed" | "cancelled" | "failed";
   targetUrls: string[];
@@ -41,6 +42,7 @@ export interface CookieImportActiveRequest {
 
 export interface CookieImportRendererState {
   sources: CookieImportRendererSource[];
+  localProfiles: LocalBrowserProfileInfo[];
   activeRequest: CookieImportActiveRequest | null;
 }
 
@@ -70,6 +72,11 @@ export interface BrowserCookieImportServiceOptions {
   bridge: CookieImportBridge;
   emit(state: CookieImportRendererState): void;
   listSources?(): CookieImportRendererSource[];
+  listLocalProfiles?(): LocalBrowserProfileInfo[];
+  readLocalProfile?(input: {
+    sourceId: string;
+    targetUrls: string[];
+  }): Promise<{ cookies: CookieImportWireCookie[]; invalidCount: number }>;
   now?(): number;
   randomId?(): string;
 }
@@ -90,6 +97,14 @@ function isSelectedCookie(cookie: CookieImportWireCookie, selectedDomains: Set<s
   return selectedDomains.has(normalizeDomain(cookie.domain));
 }
 
+function summarizeCookies(cookies: readonly CookieImportWireCookie[]): CookieImportDomainSummary[] {
+  const counts = new Map<string, number>();
+  for (const cookie of cookies) counts.set(cookie.domain, (counts.get(cookie.domain) ?? 0) + 1);
+  return [...counts]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([domain, cookieCount]) => ({ domain, cookieCount, unsupportedCount: 0 }));
+}
+
 export class BrowserCookieImportService {
   private activeRequest: CookieImportActiveRequest | null = null;
   private activeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -108,6 +123,7 @@ export class BrowserCookieImportService {
   getState(): CookieImportRendererState {
     return {
       sources: this.options.listSources?.().map((source) => ({ ...source })) ?? [],
+      localProfiles: this.options.listLocalProfiles?.().map((profile) => ({ ...profile })) ?? [],
       activeRequest: this.activeRequest
         ? {
             ...this.activeRequest,
@@ -116,6 +132,62 @@ export class BrowserCookieImportService {
           }
         : null,
     };
+  }
+
+  async previewLocal(input: {
+    sourceId: string;
+    targetUrls: string[];
+  }): Promise<CookieImportActiveRequest> {
+    this.ensureNoBlockingRequest();
+    const targetUrls = validateCookieImportTargetUrls(input.targetUrls);
+    const profile = this.options
+      .listLocalProfiles?.()
+      .find((candidate) => candidate.sourceId === input.sourceId);
+    if (!profile || !this.options.readLocalProfile) {
+      throw new Error("Installed browser profile is unavailable.");
+    }
+    const requestId = this.randomId();
+    const expiresAt = this.now() + IMPORT_SESSION_TTL_MS;
+    this.activeRequest = {
+      requestId,
+      sourceId: input.sourceId,
+      sourceKind: "local-profile",
+      sourceLabel: profile.label,
+      status: "requesting-preview",
+      targetUrls,
+      domains: [],
+      expiresAt,
+    };
+    this.emitState();
+
+    try {
+      const result = await this.options.readLocalProfile({
+        sourceId: input.sourceId,
+        targetUrls,
+      });
+      this.fileCookies.set(requestId, {
+        cookies: result.cookies,
+        invalidCount: result.invalidCount,
+      });
+      this.activeRequest = {
+        requestId,
+        sourceId: input.sourceId,
+        sourceKind: "local-profile",
+        sourceLabel: profile.label,
+        status: "ready",
+        targetUrls,
+        domains: summarizeCookies(result.cookies),
+        expiresAt,
+        ...(result.invalidCount > 0 ? { unscopedUnsupportedCount: result.invalidCount } : {}),
+      };
+      this.scheduleExpiry(requestId, expiresAt);
+      this.emitState();
+      return this.getRequiredActiveRequest();
+    } catch {
+      this.clearRequestResources(requestId);
+      this.failActiveRequest("Unable to preview cookies.");
+      throw new Error("Unable to preview cookies from the selected browser profile.");
+    }
   }
 
   async preview(input: {

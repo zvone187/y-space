@@ -28,6 +28,8 @@ const { bridgeMock } = vi.hoisted(() => ({
     browserCookieImportForgetSource: vi.fn<(payload: { sourceId: string }) => Promise<void>>(),
     browserCookieImportPreview:
       vi.fn<(payload: { sourceId: string; targetUrls: string[] }) => Promise<ActiveRequest>>(),
+    browserCookieImportPreviewLocal:
+      vi.fn<(payload: { sourceId: string; targetUrls: string[] }) => Promise<ActiveRequest>>(),
     browserCookieImportCommit:
       vi.fn<
         (payload: {
@@ -39,7 +41,10 @@ const { bridgeMock } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/renderer/bridge", () => ({ readBridge: () => bridgeMock }));
+vi.mock("@/renderer/bridge", () => ({
+  isRemoteSession: () => false,
+  readBridge: () => bridgeMock,
+}));
 
 import { BrowserCookieImportSettings } from "./BrowserCookieImportSettings";
 
@@ -48,7 +53,11 @@ const SECOND_SOURCE_ID = "22222222-2222-4222-8222-222222222222";
 const PAIRING_ID = "33333333-3333-4333-8333-333333333333";
 const REQUEST_ID = "44444444-4444-4444-8444-444444444444";
 
-const emptyState: BrowserCookieImportState = { sources: [], activeRequest: null };
+const emptyState = {
+  sources: [],
+  localProfiles: [],
+  activeRequest: null,
+} as unknown as BrowserCookieImportState;
 
 const connectedSource = {
   sourceId: SOURCE_ID,
@@ -110,6 +119,11 @@ describe("BrowserCookieImportSettings", () => {
     bridgeMock.browserCookieImportCancelPairing.mockResolvedValue(undefined);
     bridgeMock.browserCookieImportForgetSource.mockResolvedValue(undefined);
     bridgeMock.browserCookieImportPreview.mockResolvedValue(readyRequest);
+    bridgeMock.browserCookieImportPreviewLocal.mockResolvedValue({
+      ...readyRequest,
+      sourceKind: "local-profile",
+      sourceLabel: "Firefox — work",
+    } as ActiveRequest);
     bridgeMock.browserCookieImportCommit.mockResolvedValue({
       requestId: REQUEST_ID,
       importedCount: 4,
@@ -123,7 +137,7 @@ describe("BrowserCookieImportSettings", () => {
   it("explains how to install the import-only extension and begins or cancels pairing", async () => {
     render(<BrowserCookieImportSettings />);
 
-    expect(screen.getByText("Install Y Space Cookie Import")).toBeInTheDocument();
+    expect(screen.getByText("Optional extension fallback")).toBeInTheDocument();
     expect(screen.getByText(/chrome:\/\/extensions/i)).toBeInTheDocument();
     expect(screen.getByText(/Load unpacked/i)).toBeInTheDocument();
     const openExtensionFolderButton = screen.getByRole("button", {
@@ -294,6 +308,37 @@ describe("BrowserCookieImportSettings", () => {
     expect(await screen.findByText("cookies.txt")).toBeInTheDocument();
     expect(screen.getByText("example.com")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Preview extension cookies" })).toBeNull();
+  });
+
+  it("imports directly from an installed browser profile without an extension", async () => {
+    bridgeMock.browserCookieImportGetState.mockResolvedValue({
+      sources: [],
+      localProfiles: [
+        {
+          sourceId: SOURCE_ID,
+          label: "Firefox — work",
+          browserFamily: "firefox",
+        },
+      ],
+      activeRequest: null,
+    } as unknown as BrowserCookieImportState);
+    setActiveBrowserUrl("https://app.example.com/dashboard");
+    render(<BrowserCookieImportSettings />);
+
+    expect(await screen.findByText("Import from installed browsers")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Installed browser profile/ })).toHaveTextContent(
+      "Firefox — work",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Preview browser cookies" }));
+
+    await waitFor(() =>
+      expect(bridgeMock.browserCookieImportPreviewLocal).toHaveBeenCalledWith({
+        sourceId: SOURCE_ID,
+        targetUrls: ["https://app.example.com"],
+      }),
+    );
+    expect(await screen.findByText(".example.com")).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain("local-profile-cookie-secret");
   });
 
   it("cancels a pending preview without committing it", async () => {

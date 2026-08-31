@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space Popup Frost — Final Implementation Report</title>
+    <title>Y Space Global Workspace — Final Implementation Report</title>
     <style>
       :root {
-        --canvas: #f6f2e8;
-        --ink: #172026;
-        --muted: #65727a;
-        --border: #2c3338;
+        --canvas: #f7f3e9;
+        --ink: #182128;
+        --muted: #66737b;
+        --border: #293137;
         --paper: #fff;
-        --blue: #d9ecff;
-        --green: #dff5df;
-        --yellow: #fff1b8;
-        --pink: #ffe2eb;
-        --orange: #ffd8c2;
-        --shadow: 7px 7px 0 rgb(23 32 38 / 18%);
+        --blue: #dceeff;
+        --green: #ddf5df;
+        --yellow: #fff0b6;
+        --pink: #ffe1e9;
+        --orange: #ffd8c4;
+        --shadow: 7px 7px 0 rgb(24 33 40 / 16%);
         font-family:
           Inter,
           ui-sans-serif,
@@ -127,8 +127,7 @@
       .orange {
         background: var(--orange);
       }
-      ul,
-      ol {
+      ul {
         margin: 10px 0 0;
         padding-left: 20px;
       }
@@ -138,7 +137,7 @@
       code {
         padding: 2px 5px;
         border-radius: 5px;
-        background: rgb(23 32 38 / 8%);
+        background: rgb(24 33 40 / 8%);
         overflow-wrap: anywhere;
       }
       figure {
@@ -155,6 +154,14 @@
         color: var(--muted);
         font-size: 0.83rem;
       }
+      a {
+        color: #984113;
+        font-weight: 750;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 850;
+      }
       .check {
         display: inline-grid;
         width: 1.3rem;
@@ -165,10 +172,6 @@
         border-radius: 50%;
         background: var(--green);
         font-weight: 900;
-      }
-      summary {
-        cursor: pointer;
-        font-weight: 850;
       }
       @media (max-width: 760px) {
         header,
@@ -183,236 +186,235 @@
     <main>
       <header>
         <section class="hero">
-          <span class="tag green">IMPLEMENTED + PACKAGED + HANDS-ON VERIFIED · 30 AUG 2026</span>
-          <h1>Y Space popups now render real frost</h1>
+          <span class="tag green">IMPLEMENTED · PACKAGED · HANDS-ON VERIFIED · 30 AUG 2026</span>
+          <h1>The Y Space workspace is now global, balanced, and agent-ready</h1>
           <p class="muted">
-            The model picker and shared desktop menus no longer stop at transparency. The shipped
-            renderer preserves a native Electron-compatible 56px backdrop blur, richer light
-            diffusion, an optical rim and lens, and a complete opaque accessibility fallback.
+            One global tab strip now creates independent Browser peers, opens tools as peer tabs,
+            starts at a true 50/50 split, hides completely without disabling browser automation, and
+            offers privacy-scoped cookie import from installed browsers.
           </p>
         </section>
         <section class="meta">
           <article class="card green">
             <h3>Outcome</h3>
             <p><strong>PASS</strong></p>
-            <p class="muted">
-              All three popup-frost E2E cases and the full automated suite passed.
-            </p>
+            <p class="muted">All five acceptance flows and the complete automated suite passed.</p>
           </article>
           <article class="card orange">
-            <h3>Reviewed app</h3>
-            <p><strong>Still open</strong></p>
+            <h3>Ready to try</h3>
+            <p><strong>Final app is open</strong></p>
             <p class="muted">
-              PID 15340, launched with the literal <code>--use-mock-keychain</code> flag.
+              PID 39754 · isolated profile · literal <code>--use-mock-keychain</code>.
             </p>
           </article>
         </section>
       </header>
 
-      <h2>What was actually broken</h2>
-      <section class="grid two">
-        <article class="card pink">
-          <h3>Symptom</h3>
+      <h2>Fast answer</h2>
+      <section class="grid three">
+        <article class="card yellow">
+          <h3>What changed?</h3>
           <p>
-            The source stylesheet declared blur, but the packaged model search displayed a
-            transparent sheet whose covered labels and edges stayed sharp.
+            A visible <strong>+</strong> menu creates Browser peers or focuses Files, Git, Usage,
+            and Notes in the single global tab strip.
           </p>
         </article>
         <article class="card blue">
-          <h3>Production root cause</h3>
+          <h3>Can agents still browse while hidden?</h3>
           <p>
-            Tailwind 4.3.2’s Lightning CSS optimizer removed the standard
-            <code>backdrop-filter</code> and retained only <code>-webkit-backdrop-filter</code>.
-            Electron 43 does not expose that alias, so the computed packaged style became
-            <code>none</code>.
+            Yes. Exact resident Browser targets remain available to agents without forcing the right
+            workspace back on screen.
+          </p>
+        </article>
+        <article class="card pink">
+          <h3>Main release note</h3>
+          <p>
+            The macOS build is ad-hoc signed and verified, but intentionally unsigned by a Developer
+            ID and not notarized.
           </p>
         </article>
       </section>
 
-      <h2>Final implementation</h2>
+      <h2>Delivered</h2>
       <section class="grid three">
-        <article class="card yellow">
-          <h3>Shared surface</h3>
+        <article class="card green">
+          <h3>Global Add tab</h3>
           <p>
-            Every desktop <code>ResponsiveMenuSurface</code> receives one
-            <code>poracode-frosted-popover</code> root, covering model, effort, permission, project,
-            branch, and related menus.
+            Every new Browser page is a new global peer. Singleton tools focus their existing tab
+            instead of duplicating it.
           </p>
         </article>
         <article class="card green">
-          <h3>Material</h3>
+          <h3>True 50/50 workspace</h3>
           <p>
-            <code>blur(56px) saturate(195%) contrast(1.03)</code>, a valid three-bloom color field,
-            fine grain, a specular pass, optical rim, lens, and sharp dialog content.
+            A fresh desktop profile opens at half the window, supports drag and keyboard resize,
+            persists the choice, and keeps narrow overlay behavior.
+          </p>
+        </article>
+        <article class="card green">
+          <h3>Visible Hide workspace</h3>
+          <p>
+            The top-right action fully removes the workspace visually while the Browser service and
+            exact agent target stay alive.
           </p>
         </article>
         <article class="card blue">
-          <h3>Build integrity</h3>
+          <h3>Cookie consent</h3>
           <p>
-            Tailwind’s faulty optimizer is disabled for this renderer and Vite/esbuild performs CSS
-            minification while preserving both standard and prefixed declarations.
+            A one-time post-onboarding prompt asks first. Manual import remains available from Add
+            tab and the Browser toolbar.
+          </p>
+        </article>
+        <article class="card blue">
+          <h3>Installed browser profiles</h3>
+          <p>
+            Chrome, Brave, Edge, Chromium, Arc, and Firefox profiles can be previewed on macOS
+            without a browser extension.
+          </p>
+        </article>
+        <article class="card blue">
+          <h3>Privacy boundary</h3>
+          <p>
+            Only exact approved origins are read. Raw values, paths, passwords, and keychain details
+            stay in the main process and temporary data is cleared.
           </p>
         </article>
       </section>
 
-      <h2>Before and after</h2>
+      <h2>Packaged evidence</h2>
       <section class="grid two">
         <figure class="card">
           <img
-            src="popup-frost/qa-screenshots/model-picker-before.jpeg"
-            alt="Baseline transparent model picker with sharply legible background content"
+            src="tab-plus-split-cookies/screenshots/final-packaged-equal-split.jpeg"
+            alt="Y Space with the Browser workspace occupying half the window"
           />
           <figcaption>
-            Baseline: transparency without effective packaged backdrop diffusion.
+            Fresh isolated package: global Browser workspace at accessibility value 50, with Add tab
+            and Hide workspace visible.
           </figcaption>
         </figure>
         <figure class="card">
           <img
-            src="popup-frost/qa-screenshots/final-model-picker-frost.jpeg"
-            alt="Final model picker with strong soft background diffusion and sharp foreground rows"
+            src="tab-plus-split-cookies/screenshots/final-packaged-workspace-hidden.jpeg"
+            alt="Y Space chat with the right workspace completely hidden"
           />
           <figcaption>
-            Final package: diffuse scene behind the menu, warm color transmission, and crisp model
-            content.
-          </figcaption>
-        </figure>
-      </section>
-
-      <h2>Hands-on interaction evidence</h2>
-      <section class="grid two">
-        <figure class="card">
-          <img
-            src="popup-frost/qa-screenshots/final-model-search-filtered.jpeg"
-            alt="Filtered model search in the final frosted popup"
-          />
-          <figcaption>
-            Search typed and cleared; the list was scrolled and a favorite was toggled on and
-            restored off in the same process.
+            The right workspace is completely hidden; the same resident Browser pages remain
+            available to agent automation.
           </figcaption>
         </figure>
         <figure class="card">
           <img
-            src="popup-frost/qa-screenshots/final-effort-popup-frost.jpeg"
-            alt="Effort menu using the same frosted popup surface"
+            src="tab-plus-split-cookies/screenshots/global-files-tab-equal-split.jpeg"
+            alt="Files opened as a global peer tab"
           />
           <figcaption>
-            A second responsive menu proves the material is shared rather than model-picker-only.
-            The permission menu was inspected in the same run.
-          </figcaption>
-        </figure>
-      </section>
-
-      <h2>Accessibility fallback</h2>
-      <section class="grid two">
-        <figure class="card">
-          <img
-            src="popup-frost/qa-screenshots/final-reduced-transparency-popup.jpeg"
-            alt="Opaque popup while macOS Reduce Transparency is enabled"
-          />
-          <figcaption>
-            With Reduce Transparency enabled, the same PID changed live to an opaque surface with no
-            blur, background image, grain, rim, or lens.
+            Files opens as a global singleton peer rather than inside a Browser tab.
           </figcaption>
         </figure>
         <figure class="card">
           <img
-            src="popup-frost/qa-screenshots/final-restored-popup-frost.jpeg"
-            alt="Frosted popup restored after disabling Reduce Transparency"
+            src="tab-plus-split-cookies/screenshots/installed-browser-cookie-preview.jpeg"
+            alt="Installed browser cookie preview in Y Space settings"
           />
           <figcaption>
-            The system setting was restored to off and the 56px frost returned without relaunching.
+            The renderer sees profile labels and count-only preview data; cookie secrets stay
+            main-only.
           </figcaption>
         </figure>
       </section>
 
       <h2>Verification</h2>
+      <section class="grid two">
+        <article class="card green">
+          <h3><span class="check">✓</span>Automated</h3>
+          <ul>
+            <li>946 test files passed; 6 skipped.</li>
+            <li>11,154 tests passed; 86 skipped.</li>
+            <li>Typecheck, both lint stages, formatting, and diff check passed.</li>
+            <li>3,370 i18n messages; 0 missing in all 12 translated catalogs.</li>
+          </ul>
+        </article>
+        <article class="card green">
+          <h3><span class="check">✓</span>Hands-on package QA</h3>
+          <ul>
+            <li>Created multiple Browser peers from the + menu.</li>
+            <li>Opened Files as a global tab and resized back to half.</li>
+            <li>Hid and restored the workspace from the visible control.</li>
+            <li>Ran an exact hidden Browser task through OpenCode without reopening the panel.</li>
+            <li>Exercised first-run and manual cookie-import routes.</li>
+          </ul>
+        </article>
+      </section>
+
+      <h2>Handoff</h2>
       <section class="grid three">
-        <article class="card green">
-          <h3><span class="check">✓</span>Full suite</h3>
-          <p><strong>941 files · 11,131 tests</strong></p>
-          <p class="muted">6 files and 86 tests skipped; 112.79 seconds on Node 26.8.1.</p>
-        </article>
-        <article class="card green">
-          <h3><span class="check">✓</span>Focused contract</h3>
-          <p><strong>2 files · 9 tests</strong></p>
-          <p class="muted">
-            Covers material strength, valid color field, optics, fallback, and production CSS
-            preservation.
-          </p>
-        </article>
-        <article class="card green">
-          <h3><span class="check">✓</span>Quality gates</h3>
-          <p><strong>All green</strong></p>
-          <p class="muted">
-            Typecheck, standard and type-aware lint, formatting, renderer production build, and diff
-            integrity.
-          </p>
-        </article>
-      </section>
-
-      <h2>Package and process</h2>
-      <section class="grid two">
-        <article class="card blue">
-          <h3>Exact reviewed artifact</h3>
-          <p>
-            <code
-              >/private/tmp/y-space-popup-frost-reviewed-20260830-1414/mac-arm64/Y Space.app</code
-            >
-          </p>
-          <p class="muted">
-            Unsigned ad-hoc ARM64 build; <code>codesign --verify --deep --strict</code> passed.
-          </p>
-        </article>
         <article class="card yellow">
-          <h3>Launch invariant</h3>
-          <p>
-            PID 15340 remained open across search, scroll, favorite, dismissal, other-menu, and
-            Reduce Transparency cases with <code>--use-mock-keychain</code>.
-          </p>
+          <h3>Git</h3>
+          <p><code>y-space-tab-plus-split-cookies</code></p>
           <p class="muted">
-            Normal release credential behavior was not weakened; the flag belongs only to the
-            persistent QA launch.
+            Base: <code>fork/y-space-popup-frost@07e438a</code>. Delivery commit is this branch’s
+            pushed HEAD. No PR or merge was requested.
+          </p>
+        </article>
+        <article class="card orange">
+          <h3>Package</h3>
+          <p><code>release/Y-Space-1.6.6-arm64.dmg</code></p>
+          <p class="muted">
+            SHA-256: <code>18da987d…e0cde0b</code>. Ad-hoc signature verification passed.
+          </p>
+        </article>
+        <article class="card blue">
+          <h3>Decision</h3>
+          <p>Ready for user acceptance testing.</p>
+          <p class="muted">
+            The optional extension/file importer remains labeled as a fallback; deleting that legacy
+            path requires explicit approval.
           </p>
         </article>
       </section>
 
-      <h2>Performance and scope boundaries</h2>
+      <h2>Detailed evidence</h2>
       <section class="grid two">
-        <article class="card">
-          <h3>Bounded composition</h3>
+        <details>
+          <summary>Acceptance cases and exact evidence</summary>
           <p>
-            One backdrop filter exists on each open popup root. Closing the menu unmounts that
-            compositor surface. There are no filters on individual rows, model results, global tabs,
-            Browser guests, document content, or page hosts.
+            See <a href="qa-e2e-tests.json">qa-e2e-tests.json</a> for the five passed E2E cases,
+            process launch invariant, artifact hashes, security boundaries, and screenshot
+            references.
           </p>
-        </article>
-        <article class="card">
-          <h3>Change scope</h3>
           <p>
-            Renderer styling, the shared desktop menu class boundary, the production CSS pipeline,
-            focused tests, durable repository guidance, and QA evidence only. No agent runtime,
-            Browser-control, or Pipedream authority path changed in this revision.
+            See <a href="tab-plus-split-cookies/pass-criteria.md">pass-criteria.md</a> for the
+            original acceptance contract.
           </p>
-        </article>
+        </details>
+        <details>
+          <summary>Regression note</summary>
+          <p>
+            One loaded suite attempt hit the repository’s existing 100ms unresponsive-MCP pid-file
+            timing variance. That six-test file passed immediately in isolation, then the unchanged
+            full source passed 946 files and 11,154 tests. The harmless JSDOM canvas warnings remain
+            unchanged.
+          </p>
+        </details>
+        <details>
+          <summary>Cookie-import implementation detail</summary>
+          <p>
+            Chromium databases are copied with WAL/SHM sidecars, decrypted with the macOS Safe
+            Storage key, validated against SHA-256 host digests, normalized, filtered to the exact
+            approved origin, and capped. Firefox imports use the same origin and count boundaries.
+            Caches and temporary copies are cleared on commit, cancellation, expiry, and error.
+          </p>
+        </details>
+        <details>
+          <summary>Agent-browser behavior</summary>
+          <p>
+            Hidden automation resolves only the exact resident Browser page. It does not select a
+            sibling page, create a replacement, reveal the workspace, or invoke an external browser.
+            Extracted Browser windows still focus explicitly when the user has chosen that mode.
+          </p>
+        </details>
       </section>
-
-      <h2>Source handoff</h2>
-      <details open>
-        <summary>Branch, base, review state, and delivery</summary>
-        <ul>
-          <li>Branch: <code>y-space-popup-frost</code> (HEAD contains this report).</li>
-          <li>
-            Base: <code>fork/y-space-frosted-glass</code> at
-            <code>c95bb6589305cfd2a42622c8f3d04ed9924d4bd5</code>.
-          </li>
-          <li>No PR was requested or created.</li>
-          <li>No blocked or failed final check remains.</li>
-          <li>
-            Machine-readable E2E evidence:
-            <code>implementation assets/qa-e2e-tests.json</code>.
-          </li>
-        </ul>
-      </details>
     </main>
   </body>
 </html>

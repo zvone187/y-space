@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, useRef } from "react";
-import { X } from "lucide-react";
+import { PanelRightClose, X } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { PanelDockDropZone } from "@/renderer/components/layout/PanelDock/PanelDockDropZone";
 import { PanelSectionHeader } from "@/renderer/components/layout/PanelDock/PanelSectionHeader";
@@ -15,6 +15,7 @@ import {
   RightWorkspaceActionsMenu,
   type RightWorkspaceToolMenuItem,
 } from "./RightWorkspaceActionsMenu";
+import { RightWorkspaceAddMenu } from "./RightWorkspaceAddMenu";
 import { RightWorkspaceTabStrip } from "./RightWorkspaceTabStrip";
 
 export type { RightPanelTab };
@@ -56,6 +57,8 @@ export function UnifiedRightPanel(props: {
   onOpenUsage?: () => void;
   onOpenNotes?: () => void;
   onOpenPorts?: () => void;
+  onCreateBrowserTab?: () => void;
+  onImportBrowserCookies?: () => void;
   /** Whether the panel re-scopes itself to whichever thread is open. */
   followsThread?: boolean;
   onToggleFollowsThread?: () => void;
@@ -110,6 +113,8 @@ export function UnifiedRightPanel(props: {
     onOpenUsage,
     onOpenNotes,
     onOpenPorts,
+    onCreateBrowserTab,
+    onImportBrowserCookies,
     followsThread = false,
     onToggleFollowsThread,
     splitTab,
@@ -263,10 +268,26 @@ export function UnifiedRightPanel(props: {
         {...(onWorkspaceTabReorder ? { onReorder: onWorkspaceTabReorder } : {})}
         actions={
           <>
+            <RightWorkspaceAddMenu
+              tools={tabs}
+              activeTool={workspaceDocumentActive ? null : activeTab}
+              onToolChange={onTabChange}
+              onCreateBrowserTab={onCreateBrowserTab ?? (() => onTabChange("browser"))}
+              onImportCookies={onImportBrowserCookies ?? (() => undefined)}
+            />
             {hasSubagentModel ? (
               <div className="min-w-0 max-w-40 truncate">{subagentModel}</div>
             ) : null}
             {!workspaceDocumentActive && activeTab === "usage" ? usageHeaderActions : null}
+            <button
+              type="button"
+              aria-label={t`Hide workspace`}
+              title={t`Hide workspace`}
+              onClick={onClose}
+              className="poracode-overlay-header__controls flex size-7 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-foreground/8 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <PanelRightClose className="size-4" aria-hidden="true" />
+            </button>
             <RightWorkspaceActionsMenu
               tools={tabs}
               activeTool={workspaceDocumentActive ? null : activeTab}

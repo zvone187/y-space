@@ -51,6 +51,7 @@ import {
   CookieImportBridgeServer,
   createFileBackedCookieImportPairingStore,
   installCookieImportExtension,
+  LocalBrowserCookieReader,
 } from "./browser/cookieImport";
 import { buildBrowserUserAgent } from "./browser/userAgent";
 import { cleanupSensitiveSessionPartition } from "./browser/cleanupSensitiveSessionPartition";
@@ -834,10 +835,13 @@ if (!hasSingleInstanceLock) {
       const cookieImportBridge = new CookieImportBridgeServer({
         pairingStore: cookieImportPairingStore,
       });
+      const localBrowserCookieReader = new LocalBrowserCookieReader();
       const browserCookieImportService = new BrowserCookieImportService({
         session: browserSession,
         bridge: cookieImportBridge,
         listSources: () => cookieImportBridge.listSources(),
+        listLocalProfiles: () => localBrowserCookieReader.listProfiles(),
+        readLocalProfile: (input) => localBrowserCookieReader.readProfile(input),
         // Renderer state is pulled through typed IPC. Keeping this callback
         // empty ensures raw cookie payloads never enter a renderer event.
         emit: () => undefined,

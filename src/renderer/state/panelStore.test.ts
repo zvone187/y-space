@@ -121,6 +121,30 @@ describe("setPrReviewContext", () => {
   });
 });
 
+describe("settings deep links", () => {
+  beforeEach(() => resetPanelStore());
+  afterEach(() => resetPanelStore());
+
+  it("keeps a requested anchor with its section until the settings overlay consumes it", () => {
+    (usePanelStore.getState().openSettingsSection as (section: string, anchor?: string) => void)(
+      "browser",
+      "browser.cookieImport",
+    );
+
+    expect(usePanelStore.getState()).toMatchObject({
+      settingsOpen: true,
+      settingsSection: "browser",
+      settingsAnchor: "browser.cookieImport",
+    });
+
+    usePanelStore.getState().clearSettingsSection();
+    expect(usePanelStore.getState()).toMatchObject({
+      settingsSection: null,
+      settingsAnchor: null,
+    });
+  });
+});
+
 describe("subagent panel lifecycle", () => {
   beforeEach(() => {
     resetPanelStore();

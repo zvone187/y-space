@@ -128,6 +128,8 @@ interface PanelState {
   settingsOpen: boolean;
   /** When the overlay is opened deep-linked to a section (e.g. "usage"); else null. */
   settingsSection: string | null;
+  /** Optional setting row to reveal after a deep-linked section mounts. */
+  settingsAnchor: string | null;
   projectSettingsId: string | null;
   threadSortMode: ThreadSortMode;
   threadListLayout: ThreadListLayout;
@@ -163,7 +165,7 @@ interface PanelState {
   setBrowserOverlayDrawerWidth: (v: number) => void;
   openBrowserPanel: () => void;
   openSettings: () => void;
-  openSettingsSection: (section: string) => void;
+  openSettingsSection: (section: string, anchor?: string) => void;
   clearSettingsSection: () => void;
   closeSettings: () => void;
   openProjectSettings: (projectId: string) => void;
@@ -309,6 +311,7 @@ export const usePanelStore = create<PanelState>()((set) => ({
   ),
   settingsOpen: false,
   settingsSection: null,
+  settingsAnchor: null,
   projectSettingsId: null,
   threadSortMode: sanitizeThreadSortMode(initialPersisted?.threadSortMode),
   threadListLayout: sanitizeThreadListLayout(initialPersisted?.threadListLayout),
@@ -569,11 +572,16 @@ export const usePanelStore = create<PanelState>()((set) => ({
     set((state) =>
       state.settingsOpen && state.settingsSection === null
         ? {}
-        : { settingsOpen: true, settingsSection: null },
+        : { settingsOpen: true, settingsSection: null, settingsAnchor: null },
     ),
-  openSettingsSection: (section) => set({ settingsOpen: true, settingsSection: section }),
+  openSettingsSection: (section, anchor) =>
+    set({ settingsOpen: true, settingsSection: section, settingsAnchor: anchor ?? null }),
   clearSettingsSection: () =>
-    set((state) => (state.settingsSection === null ? {} : { settingsSection: null })),
+    set((state) =>
+      state.settingsSection === null && state.settingsAnchor === null
+        ? {}
+        : { settingsSection: null, settingsAnchor: null },
+    ),
   closeSettings: () => set((state) => (state.settingsOpen ? { settingsOpen: false } : {})),
   openProjectSettings: (projectId) =>
     set((state) => (state.projectSettingsId === projectId ? {} : { projectSettingsId: projectId })),

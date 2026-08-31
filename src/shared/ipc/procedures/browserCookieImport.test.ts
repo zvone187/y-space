@@ -53,6 +53,7 @@ describe("browser cookie-import IPC", () => {
       "browserCookieImportCancelPairing",
       "browserCookieImportForgetSource",
       "browserCookieImportPreview",
+      "browserCookieImportPreviewLocal",
       "browserCookieImportCommit",
       "browserCookieImportCancel",
     ]);

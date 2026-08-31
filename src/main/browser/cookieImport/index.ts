@@ -26,3 +26,5 @@ export { createFileBackedCookieImportPairingStore } from "./persistence";
 export { parseCookieImportFile } from "./cookieFileParser";
 export type { CookieImportFileFormat, ParsedCookieImportFile } from "./cookieFileParser";
 export { installCookieImportExtension } from "./extensionInstall";
+export { decryptChromiumCookieValue, LocalBrowserCookieReader } from "./localBrowserProfiles";
+export type { LocalBrowserFamily, LocalBrowserProfileInfo } from "./localBrowserProfiles";

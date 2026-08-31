@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Y Space Frosted Glass — Implementation Readiness</title>
+    <title>Y Space — Tabs, Split Workspace & Cookie Import Readiness</title>
     <style>
       :root {
         --canvas: #f6f2e8;
@@ -16,7 +16,7 @@
         --yellow: #fff1b8;
         --pink: #ffe2eb;
         --purple: #eadfff;
-        --shadow: 7px 7px 0 rgb(23 32 38 / 18%);
+        --shadow: 7px 7px 0 rgb(23 32 38/18%);
         font-family:
           Inter,
           ui-sans-serif,
@@ -34,8 +34,8 @@
         color: var(--ink);
         line-height: 1.45;
         background:
-          linear-gradient(90deg, rgb(47 58 66 / 7%) 1px, transparent 1px),
-          linear-gradient(rgb(47 58 66 / 7%) 1px, transparent 1px), var(--canvas);
+          linear-gradient(90deg, rgb(47 58 66/7%) 1px, transparent 1px),
+          linear-gradient(rgb(47 58 66/7%) 1px, transparent 1px), var(--canvas);
         background-size: 28px 28px;
       }
       main {
@@ -60,169 +60,148 @@
         line-height: 0.96;
       }
       h2 {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         text-transform: uppercase;
-      }
-      a {
-        color: #0f5f85;
-        font-weight: 750;
-        text-decoration: none;
+        letter-spacing: 0.04em;
       }
       code {
         padding: 2px 5px;
-        border: 1px solid rgb(47 58 66 / 24%);
+        border: 1px solid rgb(47 58 66/24%);
         border-radius: 6px;
-        background: rgb(255 255 255 / 72%);
+        background: rgb(255 255 255/72%);
       }
       .hero,
       .card,
-      details,
       .sticky {
         border: 2px solid var(--border);
-        box-shadow: var(--shadow);
-      }
-      .hero,
-      .card,
-      details {
-        border-radius: 16px;
         background: var(--paper);
+        box-shadow: var(--shadow);
+        border-radius: 14px;
       }
       .hero {
-        padding: 26px;
-      }
-      .hero p {
-        max-width: 760px;
-        margin-top: 12px;
-        color: var(--muted);
-      }
-      .meta-stack,
-      .grid {
-        display: grid;
-        gap: 14px;
-      }
-      .grid.two {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .grid.three {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-      .card {
-        padding: 16px;
-      }
-      .card small {
-        display: block;
-        color: var(--muted);
-        font-size: 0.78rem;
-        font-weight: 850;
-        text-transform: uppercase;
-      }
-      .card strong {
-        display: block;
-        margin-top: 4px;
-        font-size: 1.25rem;
-        line-height: 1.15;
-      }
-      .tag,
-      .pill {
-        display: inline-flex;
-        padding: 5px 9px;
-        border: 2px solid var(--border);
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 900;
-        text-transform: uppercase;
-      }
-      .tag {
-        margin-bottom: 12px;
+        padding: 24px;
         background: var(--yellow);
-      }
-      .pill {
-        margin: 0 6px 6px 0;
-      }
-      .board-section {
-        margin-top: 24px;
-      }
-      .section-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-      .pin {
-        width: 16px;
-        height: 16px;
-        border: 2px solid var(--border);
-        border-radius: 50%;
-        background: #ff6b57;
       }
       .sticky {
-        min-height: 128px;
-        padding: 16px;
-        border-radius: 3px;
-        transform: rotate(-0.5deg);
-      }
-      .sticky:nth-child(even) {
-        transform: rotate(0.5deg);
-      }
-      .sticky h3 {
-        margin-bottom: 8px;
-        font-size: 1.08rem;
-      }
-      .sticky p,
-      .sticky li {
-        color: #334148;
-        font-size: 0.94rem;
-      }
-      .sticky ul,
-      .sticky ol {
-        margin: 8px 0 0;
-        padding-left: 19px;
-      }
-      .bg-blue {
-        background: var(--blue);
-      }
-      .bg-green {
+        padding: 19px;
+        transform: rotate(1deg);
         background: var(--green);
       }
-      .bg-yellow {
-        background: var(--yellow);
+      .tag {
+        display: inline-block;
+        margin-bottom: 10px;
+        padding: 5px 9px;
+        border: 1.5px solid var(--border);
+        border-radius: 999px;
+        background: #fff;
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-transform: uppercase;
       }
-      .bg-pink {
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 16px;
+      }
+      .card {
+        grid-column: span 4;
+        padding: 18px;
+      }
+      .wide {
+        grid-column: span 8;
+      }
+      .full {
+        grid-column: 1/-1;
+      }
+      .blue {
+        background: var(--blue);
+      }
+      .green {
+        background: var(--green);
+      }
+      .pink {
         background: var(--pink);
       }
-      .bg-purple {
+      .purple {
         background: var(--purple);
       }
-      summary {
-        padding: 14px 16px;
-        cursor: pointer;
-        font-weight: 850;
-        list-style: none;
+      .yellow {
+        background: var(--yellow);
       }
-      summary::before {
-        display: inline-block;
-        width: 14px;
-        margin-right: 10px;
-        content: "+";
+      ul,
+      ol {
+        margin: 10px 0 0;
+        padding-left: 21px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .metric {
+        font-size: 2rem;
+        font-weight: 850;
+        line-height: 1;
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 800;
+      }
+      .dot {
+        width: 11px;
+        height: 11px;
+        border: 2px solid var(--border);
+        border-radius: 50%;
+        background: #39aa56;
+      }
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-top: 14px;
+      }
+      .step {
+        position: relative;
+        padding: 14px;
+        border: 1.5px dashed var(--border);
+        border-radius: 10px;
+        background: rgb(255 255 255/68%);
+      }
+      .step:not(:last-child):after {
+        content: "→";
+        position: absolute;
+        right: -15px;
+        top: 34%;
+        z-index: 2;
+        font-size: 1.35rem;
         font-weight: 900;
       }
-      details[open] summary::before {
-        content: "−";
+      .risk {
+        border-left: 7px solid #de703f;
       }
-      .detail-body {
-        padding: 14px 16px 16px;
-        border-top: 2px solid var(--border);
-        color: #334148;
+      .footer {
+        margin-top: 18px;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
       }
-      .detail-body ul {
-        margin: 8px 0 0;
-        padding-left: 18px;
-      }
-      @media (max-width: 900px) {
-        header,
-        .grid.two,
-        .grid.three {
+      @media (max-width: 820px) {
+        header {
           grid-template-columns: 1fr;
+        }
+        .card,
+        .wide {
+          grid-column: 1/-1;
+        }
+        .flow {
+          grid-template-columns: 1fr;
+        }
+        .step:not(:last-child):after {
+          content: "↓";
+          right: auto;
+          left: 50%;
+          top: auto;
+          bottom: -20px;
         }
       }
     </style>
@@ -230,277 +209,205 @@
   <body>
     <main>
       <header>
-        <section class="hero" aria-labelledby="title">
-          <span class="tag">Pre-implementation readiness</span>
-          <h1 id="title">Real frost, not white transparency</h1>
-          <p>
-            Ready to replace the current glossy opacity with native sidebar diffusion, bounded
-            backdrop blur, milky depth, and restrained optical edges—without filtering Browser or
-            document content.
+        <section class="hero">
+          <span class="tag">Implementation readiness · 30 Aug 2026</span>
+          <h1>One tab language.<br />A calmer split.<br />Private imports.</h1>
+          <p style="margin-top: 16px; max-width: 68ch">
+            Production plan for global tab creation, a true half-width workspace, a visible
+            background-safe hide control, and consent-led cookie import from browsers already
+            installed on this Mac.
           </p>
         </section>
-        <aside class="meta-stack" aria-label="Report metadata">
-          <div class="card bg-green">
-            <small>Status</small><strong>Ready for implementation: yes</strong>
-          </div>
-          <div class="card bg-blue">
-            <small>Branch</small><strong>y-space-frosted-glass</strong>
-          </div>
-          <div class="card bg-yellow"><small>Date</small><strong>2026-08-30</strong></div>
+        <aside class="sticky">
+          <div class="status"><span class="dot"></span>Ready to implement</div>
+          <p style="margin-top: 12px">
+            <strong>Branch</strong><br /><code>y-space-tab-plus-split-cookies</code>
+          </p>
+          <p style="margin-top: 12px"><strong>Base</strong><br /><code>07e438a4595d</code></p>
+          <p style="margin-top: 12px">
+            <strong>Worktree</strong><br />Dedicated new branch; no existing checkout changed.
+          </p>
         </aside>
       </header>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Fast Answer</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-pink">
-            <h3>What is wrong now?</h3>
-            <p>
-              The 74–94% white scrims and 78% full-surface highlight hide the blur. Thread and
-              Browser chrome are paint-only, so the shell reads as translucent plastic.
-            </p>
-          </div>
-          <div class="sticky bg-green">
-            <h3>What changes?</h3>
-            <p>
-              Use AppKit vibrancy for the sidebar, stronger bounded blur for overlapping chrome,
-              lower milk tints, subtle grain, and independent pointer-free rim/lens layers.
-            </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>What stays crisp?</h3>
-            <p>
-              Browser guests, webviews, transcript, PDFs, spreadsheets, files, terminal, rows,
-              individual tabs, and every content plane remain opaque and unfiltered.
-            </p>
-          </div>
-        </div>
-      </section>
+      <section class="grid">
+        <article class="card blue">
+          <span class="tag">Baseline</span>
+          <div class="metric">11,130</div>
+          <p>tests passed across 940 files; 86 tests and 6 files skipped.</p>
+          <p class="muted" style="margin-top: 9px">
+            One loaded-run MCP timeout fixture missed a temporary PID file after 102ms. Its isolated
+            6-test suite passed in 437ms.
+          </p>
+        </article>
+        <article class="card green">
+          <span class="tag">Fail first</span>
+          <div class="metric">12</div>
+          <p>deliberate feature failures across new and mutated focused suites.</p>
+          <p class="muted" style="margin-top: 9px">
+            154 existing assertions remain green in the modified-suite run.
+          </p>
+        </article>
+        <article class="card purple">
+          <span class="tag">Setup</span>
+          <ul>
+            <li>Fresh <code>fork</code> fetch</li>
+            <li>Frozen dependency install</li>
+            <li>Husky hooks installed</li>
+            <li>Native/server + Electron prep passed</li>
+            <li>Ignored Pipedream env copied at mode 0600; no value printed</li>
+          </ul>
+        </article>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Readiness</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-green">
-            <h3>Clean worktree</h3>
-            <p>
-              <a href="file:///Users/zvonimirsabljic/Development/y-space/y-space-frosted-glass"
-                >Worktree</a
+        <article class="card wide">
+          <span class="tag">Architecture</span>
+          <h2>One global tab model</h2>
+          <div class="flow">
+            <div class="step">
+              <strong>＋ Add tab</strong><br /><span class="muted">Open compact surface menu</span>
+            </div>
+            <div class="step">
+              <strong>Browser</strong><br /><span class="muted"
+                >Always creates an independent page ID</span
               >
-              and branch match. Base <code>153af142</code> was fetched and verified against the fork
-              without switching the original repository.
-            </p>
+            </div>
+            <div class="step">
+              <strong>Files · Git · Terminal</strong><br /><span class="muted"
+                >Focus singleton tabs</span
+              >
+            </div>
+            <div class="step">
+              <strong>Same strip</strong><br /><span class="muted">No nested Browser tabs</span>
+            </div>
           </div>
-          <div class="sticky bg-blue">
-            <h3>Setup complete</h3>
-            <p>
-              Ignored mode-600 Pipedream env copied, frozen dependencies installed, Husky present,
-              Electron workers built, and server-native binding prepared serially.
-            </p>
-          </div>
-          <div class="sticky bg-purple">
-            <h3>Baseline green</h3>
-            <p>
-              Node 26.8.1: 937 files and 11,105 tests passed; 6 files/86 tests skipped. Duration:
-              92.96 seconds.
-            </p>
-          </div>
-        </div>
-      </section>
+          <p style="margin-top: 16px">
+            The existing global workspace tab store remains the source of truth. The plus menu
+            composes the current tool registry, so hidden or unavailable tools stay out of the menu
+            and future eligible surfaces inherit the same interaction.
+          </p>
+        </article>
+        <article class="card yellow">
+          <span class="tag">Layout</span>
+          <h2>Half means half</h2>
+          <ul>
+            <li>Fresh desktop width: 50% of viewport</li>
+            <li>Bounds: 320–1,100px</li>
+            <li>User drag persists</li>
+            <li>Reduced content minimum permits half-width resizing</li>
+            <li>Narrow windows retain safe overlay mode</li>
+          </ul>
+        </article>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Fail-first proof</h2>
-        </div>
-        <div class="grid two">
-          <div class="sticky bg-pink">
-            <h3>Expected red state captured</h3>
-            <ul>
-              <li>3 focused suites failed exactly as designed.</li>
-              <li>9 tests failed and 5 existing tests passed.</li>
-              <li>
-                Missing resolver, transparent-window mode, 24px/152% recipe, and absent rim/lens
-                layers are all exposed.
-              </li>
-            </ul>
+        <article class="card pink risk">
+          <span class="tag">Critical invariant</span>
+          <h2>Hidden is still hidden</h2>
+          <p>
+            A top-right button completely removes the workspace from view without closing its tabs.
+            Agent automation may promote the exact Browser guest off-screen, but must not clear the
+            user’s hidden state or reveal the panel.
+          </p>
+          <p class="muted" style="margin-top: 10px">
+            Exact-tab presentation leases, surface identity, connected guest checks, and obstruction
+            rules remain fail-closed.
+          </p>
+        </article>
+        <article class="card wide green">
+          <span class="tag">Cookie trust boundary</span>
+          <h2>Consent first, secrets stay in main</h2>
+          <div class="flow">
+            <div class="step">
+              <strong>Discover</strong><br /><span class="muted"
+                >Opaque ID + label + family only</span
+              >
+            </div>
+            <div class="step">
+              <strong>Approve origins</strong><br /><span class="muted"
+                >Exact HTTP(S), maximum 12</span
+              >
+            </div>
+            <div class="step">
+              <strong>Preview</strong><br /><span class="muted">Domain/count metadata only</span>
+            </div>
+            <div class="step">
+              <strong>Commit</strong><br /><span class="muted"
+                >Selected domains after confirmation</span
+              >
+            </div>
           </div>
-          <div class="sticky bg-green">
-            <h3>Definition of done</h3>
-            <p>
-              Fourteen explicit criteria cover material, native behavior, accessibility, contrast,
-              hit testing, bounded compositing, persistent performance, regression, and the
-              mandatory mock-keychain launch invariant.
-            </p>
-            <p><a href="frosted-glass/pass-criteria.md">Open all pass criteria</a></p>
-          </div>
-        </div>
-      </section>
+          <ul>
+            <li>Chrome, Brave, Edge, Chromium, Arc, and Firefox profile discovery on macOS.</li>
+            <li>
+              Chromium decryption in the main process with the fixed browser-specific Safe Storage
+              service; Firefox read from a temporary SQLite copy.
+            </li>
+            <li>
+              Paths, passwords, keychain identifiers, and raw cookie values never enter renderer
+              state.
+            </li>
+            <li>
+              Short-lived previews and temporary database copies are cleared on commit, cancel,
+              expiry, and error.
+            </li>
+            <li>
+              The current extension/file route remains as a compatibility fallback pending separate
+              deletion approval.
+            </li>
+          </ul>
+        </article>
+        <article class="card risk">
+          <span class="tag">Consent UX</span>
+          <ul>
+            <li>Prompt once after onboarding</li>
+            <li><strong>Choose browsers</strong> deep-links to the importer</li>
+            <li><strong>Not now</strong> records the decision</li>
+            <li>Manual access always available from Add tab and Browser menu</li>
+          </ul>
+        </article>
 
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>End-To-End Verification Plan</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-blue">
-            <h3>YS-FROST-E2E-001 · Visual diffusion</h3>
-            <p>
-              <strong>Setup:</strong> one persistent unsigned ARM64 process with
-              <code>--use-mock-keychain</code>; deterministic colored stripe/checkerboard behind
-              native and renderer glass.
-            </p>
-            <ol>
-              <li>Capture matched light on/off frames.</li>
-              <li>Repeat dark, Connections, and menu.</li>
-              <li>Compare detail diffusion and crisp planes.</li>
-            </ol>
-            <p>
-              <strong>Expected proof:</strong> visible blur/color diffusion, restrained rim, no
-              content haze. <strong>Status: pending.</strong>
-            </p>
-          </div>
-          <div class="sticky bg-purple">
-            <h3>YS-FROST-E2E-002 · Accessibility live</h3>
-            <p>
-              <strong>Setup:</strong> continue in the same PID with native sidebar plus renderer
-              popover visible.
-            </p>
-            <ol>
-              <li>Enable Reduce Transparency.</li>
-              <li>Switch theme and open glass controls.</li>
-              <li>Disable it and verify restoration.</li>
-            </ol>
-            <p>
-              <strong>Expected proof:</strong> immediate solid fallback, no stale re-enable/flash,
-              same PID and state. <strong>Status: pending.</strong>
-            </p>
-          </div>
-          <div class="sticky bg-yellow">
-            <h3>YS-FROST-E2E-003 · Bounded long session</h3>
-            <p>
-              <strong>Setup:</strong> thread, Browser, files/docs, Git/Usage, and at least six
-              Browser peers in the same process.
-            </p>
-            <ol>
-              <li>Switch, reorder, resize, navigate, and theme-toggle.</li>
-              <li>Exercise menus/composer and frost off/on.</li>
-              <li>Close disposable peers and sample cleanup.</li>
-            </ol>
-            <p>
-              <strong>Expected proof:</strong> bounded filtered hosts/guests/renderers and no
-              monotonic memory signal. <strong>Status: pending.</strong>
-            </p>
-          </div>
-        </div>
+        <article class="card full blue">
+          <span class="tag">End-to-end verification plan</span>
+          <ol>
+            <li>
+              <strong>E2E-001 · Tab creation:</strong> create two Browser peers, navigate them
+              independently, then open Files twice and verify one singleton tab.
+            </li>
+            <li>
+              <strong>E2E-002 · Equal split:</strong> measure fresh 50/50 layout, drag through half,
+              relaunch for persistence, and shrink into safe overlay behavior.
+            </li>
+            <li>
+              <strong>E2E-003 · Background-safe hide:</strong> hide workspace, drive an exact hidden
+              Browser target, verify no visible reopen, then restore unchanged tabs/page.
+            </li>
+            <li>
+              <strong>E2E-004 · Consent and manual access:</strong> inspect fresh-profile prompt,
+              persist Not now, and deep-link from both Add tab and Browser toolbar.
+            </li>
+            <li>
+              <strong>E2E-005 · Import privacy:</strong> use synthetic Firefox/Chromium databases to
+              prove origin filtering, Chromium v10 decryption + host-digest validation,
+              renderer-safe metadata, cancellation, and expiry.
+            </li>
+          </ol>
+          <p style="margin-top: 12px">
+            <strong>Packaged-run invariant:</strong> one unsigned ARM64 process, literal
+            <code>--use-mock-keychain</code>, kept open between hands-on cases and left open for
+            user testing. Automated fixtures prove cookie handling; hands-on QA does not inspect or
+            import personal cookie values without an explicit user action.
+          </p>
+        </article>
+        <article class="card full">
+          <span class="tag">Quality gates</span>
+          <p>
+            Focused suites → typecheck → lint → formatting → i18n extraction/validation → full suite
+            → production package → deep/strict signing inspection → one-process hands-on QA → final
+            evidence report → Husky commit → branch push.
+          </p>
+        </article>
       </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Design guardrails</h2>
-        </div>
-        <div class="grid three">
-          <div class="sticky bg-green">
-            <h3>Apple hierarchy</h3>
-            <p>
-              Glass is the functional navigation/control layer, used sparingly so content remains
-              dominant. Text-heavy surfaces use a regular, contrast-safe material.
-            </p>
-          </div>
-          <div class="sticky bg-blue">
-            <h3>Electron reality</h3>
-            <p>
-              Electron exposes AppKit vibrancy, not Tahoe's <code>NSGlassEffectView</code>. The safe
-              edge effect is an honest rim approximation, not claimed pixel refraction.
-            </p>
-          </div>
-          <div class="sticky bg-pink">
-            <h3>Performance boundary</h3>
-            <p>
-              One filtered host per stable region. No per-tab, row, guest, webview, Browser-host, or
-              content-plane filters.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section class="board-section">
-        <div class="section-title">
-          <span class="pin"></span>
-          <h2>Open the cards</h2>
-        </div>
-        <details open>
-          <summary>Baseline visual evidence</summary>
-          <div class="detail-body">
-            Current live capture:
-            <a href="frosted-glass/qa-screenshots/baseline-transparency.jpeg"
-              >baseline-transparency.jpeg</a
-            >
-            (SHA-256 <code>cd0740ca…b15c8ec</code>). It shows white opacity and faint borders rather
-            than perceptible frost.
-          </div>
-        </details>
-        <details>
-          <summary>Primary-source research</summary>
-          <div class="detail-body">
-            <ul>
-              <li>
-                <a href="https://developer.apple.com/design/human-interface-guidelines/materials"
-                  >Apple HIG — Materials</a
-                >: use regular Liquid Glass for text-bearing navigation; keep it out of content.
-              </li>
-              <li>
-                <a href="https://developer.apple.com/videos/play/wwdc2025/219/"
-                  >Apple — Meet Liquid Glass</a
-                >: depth comes from diffusion, light concentration, adaptivity, and curved floating
-                forms.
-              </li>
-              <li>
-                <a href="https://www.electronjs.org/docs/latest/api/browser-window"
-                  >Electron BrowserWindow</a
-                >: supported vibrancy/material APIs and live setters.
-              </li>
-              <li>
-                <a href="https://www.electronjs.org/docs/latest/tutorial/custom-window-styles"
-                  >Electron custom window styles</a
-                >: transparent-window resize, shadow, artifact, and DevTools limitations.
-              </li>
-              <li>
-                <a href="https://webkit.org/demos/backdrop-filter/">WebKit backdrop-filter demo</a>:
-                bounded background blur is distinct from element opacity.
-              </li>
-            </ul>
-          </div>
-        </details>
-        <details>
-          <summary>Setup notes</summary>
-          <div class="detail-body">
-            The first fresh-worktree suite found generated Electron worker assets and a serial
-            better-sqlite3 server binding were absent; parallel test bootstrap raced while compiling
-            them. Running <code>pnpm build:electron</code> and
-            <code>pnpm prepare:server-native</code> once resolved the setup condition. The complete
-            rerun passed, so this is not an implementation blocker.
-          </div>
-        </details>
-        <details>
-          <summary>Artifacts</summary>
-          <div class="detail-body">
-            <ul>
-              <li><a href="qa-e2e-tests.json">Root E2E ledger (version 13)</a></li>
-              <li><a href="frosted-glass/pass-criteria.md">Scoped pass criteria</a></li>
-              <li><code>src/main/window/windowMaterialDecision.test.ts</code></li>
-              <li><code>src/main/window/createMainWindow.test.ts</code></li>
-              <li><code>src/renderer/theme/frostedGlassStyles.test.ts</code></li>
-            </ul>
-          </div>
-        </details>
-      </section>
+      <p class="footer">
+        Readiness artifact · Y Space · global tabs / split workspace / cookie import
+      </p>
     </main>
   </body>
 </html>
